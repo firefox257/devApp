@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Programming Language Token Counter</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        body {
+            background: linear-gradient(135deg, #1a2a6c, #b21f1f, #1a2a6c);
+            color: #fff;
+            min-height: 100vh;
+            padding: 10px;
+        }
+        .container {
+            max-width: 100%;
+            margin: 0 auto;
+        }
+        header {
+            text-align: center;
+            padding: 15px 0;
+            margin-bottom 15px;
+        }
+        h1 {
+            font-size: 1.8rem;
+            margin-bottom: 8px;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+        }
+        .subtitle {
+            font-size: 0.9rem;
+            opacity: 0.9;
+            max-width: 100%;
+            margin: 0 auto;
+        }
+        .card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 15px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .input-section {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .language-selector {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            justify-content: center;
+        }
+        .lang-btn {
+            background: rgba(255, 255, 255, 0.15);
+            border: none;
+            border-radius: 50px;
+            padding: 8px 15px;
+            color: white;
+            font-weight: 600;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 3px rgba(0, 0, 0, 0.1);
+            min-width: 80px;
+        }
+        .lang-btn:hover {
+            background: rgba(255, 255, 255, 0.25);
+            transform: translateY(-2px);
+        }
+        .lang-btn.active {
+            background: rgba(255, 255, 255, 0.3);
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.2);
+        }
+        textarea {
+            width: 100%;
+            height: 150px;
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 12px;
+            color: white;
+            font-size: 0.9rem;
+            resize: vertical;
+            transition: all 0.3s ease;
+        }
+        textarea:focus {
+            outline: none;
+            border-color: rgba(255, 255, 255, 0.3);
+            box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.1);
+        }
+        .stats-section {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .stat-card {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+            padding: 12px;
+            text-align: center;
+            transition: transform 0.3s ease;
+        }
+        .stat-card:hover {
+            transform: translateY(-3px);
+            background: rgba(0, 0, 0, 0.3);
+        }
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin: 8px 0;
+            color: #4fc3f7;
+        }
+        .stat-label {
+            font-size: 0.85rem;
+            opacity: 0.8;
+        }
+        .examples {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        .example-card {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+            padding: 12px;
+        }
+        .example-title {
+            font-size: 1rem;
+            margin-bottom: 10px;
+            color: #4fc3f7;
+        }
+        .example-code {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 6px;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 0.75rem;
+            overflow-x: auto;
+        }
+        footer {
+            text-align: center;
+            padding: 15px 0;
+            opacity: 0.7;
+            font-size: 0.7rem;
+        }
+        @media (max-width: 768px) {
+            .language-selector {
+                flex-direction: column;
+                align-items: center;
+            }
+            .lang-btn {
+                width: 100%;
+                max-width: 100%;
+                min-width: auto;
+            }
+            h1 {
+                font-size: 1.5rem;
+            }
+            .stats-section {
+                grid-template-columns: 1fr;
+            }
+            .card {
+                padding: 12px;
+            }
+            textarea {
+                height: 120px;
+                padding: 10px;
+                font-size: 0.85rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Programming Language Token Counter</h1>
+            <p class="subtitle">Analyze your code in real-time - count words, characters, and tokens for multiple programming languages</p>
+        </header>
+        <main>
+            <div class="card input-section">
+                <div class="language-selector">
+                    <button class="lang-btn active" data-lang="javascript">JavaScript</button>
+                    <button class="lang-btn" data-lang="python">Python</button>
+                    <button class="lang-btn" data-lang="java">Java</button>
+                    <button class="lang-btn" data-lang="cpp">C++</button>
+                    <button class="lang-btn" data-lang="html">HTML</button>
+                    <button class="lang-btn" data-lang="css">CSS</button>
+                </div>
+                <textarea id="code-input" placeholder="Paste or type your code here...">function fibonacci(n) {
+    if (n <= 1) return n;
+    return fibonacci(n - 1) + fibonacci(n - 2);}
+console.log(fibonacci(10));</textarea>
+            </div>
+            <div class="card">
+                <h2>Analysis Results</h2>
+                < class="stats-section">
+                    <div class="stat-card">
+                        <div class="stat-label">Characters</div>
+                        <div class="stat-value" id="char-count">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Words</div>
+                        <div class="stat-value" id="word-count">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Tokens</div>
+                        <div class="stat-value" id="token-count">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Lines</div>
+                        <div class="stat-value" id="line-count">0</div>
+                    </div>
+                </div>
+            </div>
+            <div class="card">
+                <div class="example-card">
+                    <h3 class="example-title">JavaScript Example</h3>
+                    <div class="example-code">function greet(name) {
+    return `Hello, ${name}!`;
+}
+const message = greet("World");
+console.log(message);</div>
+                </div>
+                <div class="example-card">
+                    <h3 class="example-title">Python Example</h3>
+                    <div class="example-code">def fibonacci(n):
+    if n <= 1:
+        return n
+    return fibonacci(n-1) + fibonacci(n-2)
+print(fibonacci(10))</div>
+                </div>
+            </div>
+        </main>
+        <footer>
+            <p>Programming Language Token Counter &copy; 2023 | Real-time code analysis tool</p>
+        </footer>
+    </div>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const codeInput = document.getElementById('code-input');
+            const charCount = document.getElementById('char-count');
+            const wordCount = document.getElementById('word-count');
+            const tokenCount = document.getElementById('token-count');
+            const lineCount = document.getElementById('line-count');
+            const langButtons = document.querySelectorAll('.lang-btn');
+            let currentLanguage = 'javascript';
+            
+            // Update language buttons
+            langButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    langButtons.forEach(btn => btn.classList.remove('active'));
+                    button.classList.add('active');
+                    currentLanguage = button.dataset.lang;
+                    updateCounts();
+                });
+            });
+            
+            // Update counts when input changes
+            codeInput.addEventListener('input', updateCounts);
+            
+            // Initial calculation
+            updateCounts();
+            
+            function updateCounts() {
+                const text = codeInput.value;
+                
+                // Count characters
+                charCount.textContent = text.length;
+                
+                // Count words (non-empty sequences of non-whitespace characters)
+                const words = text.trim() ? text.trim().split(/\s+/).length : 0;
+                wordCount.textContent = words;
+                
+                // Count lines
+                const lines = text.split('\n').length;
+                lineCount.textContent = lines;
+                
+ // Count tokens based on language
+                let tokens = 0;
+                switch(currentLanguage) {
+                    case 'javascript':
+                        tokens = countJS(text);
+                        break;
+                    case 'python':
+                        tokens = countPython(text);
+                        break;
+                    case 'java':
+                        tokens = countJava(text);
+                        break;
+                    case 'cpp':
+                        tokens = countCpp(text);
+                        break;
+                    case 'html':
+                        tokens = countHTML(text);
+                        break;
+                    case 'css':
+                        tokens = countCSS(text);
+                        break;
+                    default:
+                        tokens = words;
+                }
+                tokenCount.textContent = tokens;
+            }
+            
+            function countJS(text) {
+                // More accurate JavaScript token counting
+                const tokens = text.match(/\b\w+\b|[{}()\[\];,.<>+=\-*/%&|!^~?:]/g) || [];
+                return tokens.length;
+            }
+            
+            function countPython(text) {
+                // More accurate Python token counting
+                const tokens = text.match(/\b\w+\b|[{}()\[\];,.<>+=\-*/%&|!^~?:]/g) || [];
+                return tokens.length;
+            }
+            
+            function countJava(text) {
+                // More accurate Java token counting
+                const tokens = text.match(/\b\w+\b|[{}()\[\];,.<>+=\-*/%&|!^~?:]/g) || [];
+                return tokens.length;
+            }
+            
+            function countCpp(text) {
+                // More accurate C++ token counting
+                const tokens = text.match(/\b\w+\b|[{}()\[\];,.<>+=\-*/%&|!^~?:]/g) || [];
+                return tokens.length;
+            }
+            
+            function countHTML(text) {
+                // HTML token counting (tags, attributes, text)
+                const tokens = text.match(/<[^>]*>/g) || [];
+                return tokens.length;
+            }
+            
+            function countCSS(text) {
+                // CSS token counting (selectors, properties, values)
+                const tokens = text.match(/[a-zA-Z][a-zA-Z0-9_-]*/g) || [];
+                return tokens.length;
+            }
+        });
+    </script>
+</body>
+</html>
