@@ -1,0 +1,337 @@
+You: give me html for a matrix themed animated login page
+
+AI: # Matrix-Themed Animated Login Page
+
+AI: I'll create a stylish, animated login page inspired by the iconic Matrix digital rain effect with a dark theme and futuristic design.
+
+AI: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Courier New', monospace;
+        }
+
+AI: #000;
+            color: #0f0;
+            overflow: hidden;
+            height: 100vh;
+            position: relative;
+        }
+
+AI: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+
+AI: relative;
+            z-index: 2;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            flex-direction: column;
+        }
+
+AI: rgba(0, 15, 0, 0.7);
+            border: 1px solid #0f0;
+            border-radius: 5px;
+            padding: 30px;
+            width: 350px;
+            box-shadow: 0 0 15px rgba(0, 255, 0, 0.5);
+            backdrop-filter: blur(5px);
+            position: relative;
+            overflow: hidden;
+        }
+
+AI: :before {
+            content: '';
+            position: absolute;
+            top: -2px;
+            left: -2px;
+            right: -2px;
+            bottom: -2px;
+            background: linear-gradient(45deg, #0f0, #00a800, #0f0);
+            z-index: -1;
+            border-radius: 7px;
+            animation: pulse 3s infinite;
+        }
+
+AI: center;
+            margin-bottom: 25px;
+            font-size: 28px;
+            text-shadow: 0 0 10px #0f0;
+            letter-spacing: 3px;
+        }
+
+AI: 20px;
+            position: relative;
+        }
+
+AI: block;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+AI: 100%;
+            padding: 12px 15px;
+            background: rgba(0, 20, 0, 0.8);
+            border: 1px solid #0a0;
+            border-radius: 3px;
+            color: #0f0;
+            font-size: 16px;
+            outline: none;
+            transition: all 0.3s;
+        }
+
+AI: focus {
+            border-color: #0f0;
+            box-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
+        }
+
+AI: 100%;
+            padding: 12px;
+            background: rgba(0, 20, 0, 0.8);
+            border: 1px solid #0f0;
+            border-radius: 3px;
+            color: #0f0;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            font-weight: bold;
+            position: relative;
+            overflow: hidden;
+        }
+
+AI: hover {
+            background: rgba(0, 40, 0, 0.9);
+            box-shadow: 0 0 15px rgba(0, 255, 0, 0.7);
+        }
+
+AI: :after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(0, 255, 0, 0.2), transparent);
+            transition: 0.5s;
+        }
+
+AI: hover::after {
+            left: 100%;
+        }
+
+AI: 25px;
+            text-align: center;
+            font-size: 14px;
+            color: #0a0;
+        }
+
+AI: #0f0;
+            text-decoration: none;
+            transition: all 0.3s;
+        }
+
+AI: hover {
+            text-shadow: 0 0 10px #0f0;
+        }
+
+AI: relative;
+            animation: glitch 5s infinite;
+        }
+
+AI: translate(0); }
+            20% { transform: translate(-2px, 2px); }
+            40% { transform: translate(-2px, -2px); }
+            60% { transform: translate(2px, 2px); }
+            80% { transform: translate(2px, -2px); }
+            100% { transform: translate(0); }
+        }
+
+AI: 0.7; }
+            50% { opacity: 1; }
+            100% { opacity: 0.7; }
+        }
+
+AI: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 5px;
+            background: rgba(0, 255, 0, 0.3);
+            box-shadow: 0 0 10px rgba(0, 255, 0, 0.7);
+            animation: scan 4s linear infinite;
+            z-index: 3;
+        }
+
+AI: 0; }
+            100% { top: 100%; }
+        }
+
+AI: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            opacity: 0.1;
+        }
+
+AI: absolute;
+            top: -20px;
+            font-size: 16px;
+            color: #0f0;
+            opacity: 0.7;
+            animation: fall linear forwards;
+        }
+
+AI: translateY(105vh);
+                opacity: 0;
+            }
+        }
+
+AI: 36px;
+            margin-bottom: 20px;
+            text-align: center;
+            letter-spacing: 5px;
+            text-shadow: 0 0 10px #0f0;
+        }
+    </style>
+</head>
+<body>
+    <!-- Matrix Background -->
+    <div id="matrix-background"></div>
+    
+    <!-- Scan Line Effect -->
+    <div class="scan-line"></div>
+    
+    <!-- Login Card -->
+    <div class="container">
+        <div class="login-card">
+            <div class="logo">MATRIX</div>
+            <h1 class="glitch">SECURE ACCESS</h1>
+            <form>
+                <div class="input-group">
+                    <label for="username">USER ID</label>
+                    <input type="text" id="username" placeholder="Enter your ID" required>
+                </div>
+                <div class="input-group">
+                    <label for="password">ACCESS CODE</label>
+                    <input type="password" id="password" placeholder="Enter access code" required>
+                </div>
+                <button type="submit" class="btn">INITIATE CONNECTION</button>
+            </form>
+            <div class="footer">
+                <p>SYSTEM STATUS: <span style="color:#0f0;">ONLINE</span></p>
+                <p><a href="#">RECOVER ACCESS</a> | <a href="#">CONTACT ADMIN</a></p>
+            </div>
+        </div>
+    </div>
+
+AI: <script>
+        // Create Matrix background effect
+        const matrixBackground = document.getElementById('matrix-background');
+        const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789$#@%&*";
+        const fontSize = 14;
+        const columns = Math.floor(window.innerWidth / fontSize);
+        
+        // Create falling characters
+        for (let i = 0; i < columns; i++) {
+            const char = document.createElement('div');
+            char.className = 'code-char';
+            char.style.left = `${i * fontSize}px`;
+            char.style.animationDuration = `${Math.random() * 5 + 5}s`;
+            char.style.animationDelay = `${Math.random() * 5}s`;
+            char.textContent = chars[Math.floor(Math.random() * chars.length)];
+            matrixBackground.appendChild(char);
+            
+            // Add more characters for effect
+            for (let j = 0; j < 20; j++) {
+                const charClone = char.cloneNode(true);
+                charClone.style.top = `${j * -fontSize}px`;
+                matrixBackground.appendChild(charClone);
+            }
+        }
+        
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            const newColumns = Math.floor(window.innerWidth / fontSize);
+            if (newColumns > columns) {
+                // Add more columns
+                for (let i = columns; i < newColumns; i++) {
+                    const char = document.createElement('div');
+                    char.className = 'code-char';
+                    char.style.left = `${i * fontSize}px`;
+                    char.style.animationDuration = `${Math.random() * 5 + 5}s`;
+                    char.style.animationDelay = `${Math.random() * 5}s`;
+                    char.textContent = chars[Math.floor(Math.random() * chars.length)];
+                    matrixBackground.appendChild(char);
+                    
+                    for (let j = 0; j < 20; j++) {
+                        const charClone = char.cloneNode(true);
+                        charClone.style.top = `${j * -fontSize}px`;
+                        matrixBackground.appendChild(charClone);
+                    }
+                }
+            }
+        });
+        
+        // Form submission
+        const form = document.querySelector('form');
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            
+            // Simple validation
+            if(username && password) {
+                // Add loading effect
+                const btn = document.querySelector('.btn');
+                const originalText = btn.textContent;
+                btn.textContent = 'AUTHENTICATING...';
+                btn.disabled = true;
+                
+                // Simulate authentication process
+                setTimeout(() => {
+                    // Show success message
+                    alert(`Access granted to ${username}! Welcome to the Matrix.`);
+                    btn.textContent = originalText;
+                    btn.disabled = false;
+                }, 2000);
+            }
+        });
+    </script>
+</body>
+</html>
+```
+
+AI: 
+
+AI: - Digital rain background with falling green characters
+   - Scan line animation moving down the screen
+   - Glitch effect on the title
+   - Pulsing border animation
+
+AI: - Green-on-black color scheme
+   - Neon glow effects
+   - Glass-morphism card design
+   - Animated button with hover effect
+
+AI: - Form validation
+   - Loading state during authentication
+   - Responsive design that works on all devices
+
+AI: - "USER ID" and "ACCESS CODE" labels
+   - "SECURE ACCESS" heading
+   - System status indicator
+   - Recovery links
+
+AI: The page features a dark background with green accents reminiscent of the Matrix films, along with animated elements that create an immersive experience. The login form is centered with a glass-like card that has a pulsing neon border.
+
+AI: Simply copy and paste this code into an HTML file and open it in any modern browser to see the effect!

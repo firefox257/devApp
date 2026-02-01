@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Canvas Draw Module Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f4f4f4;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* Container for the programmatic canvas */
+        .programmatic-container {
+            width: 100%;
+            height: 400px;
+            border: 2px dashed #007bff;
+            padding: 10px;
+            background-color: #fff;
+        }
+
+        /* Container for the declarative canvas (replaces the <canvasdraw> tag) */
+        .declarative-container {
+            width: 100%;
+            height: 400px;
+            border: 2px dashed #4CAF50;
+            padding: 10px;
+            background-color: #fff;
+        }
+
+        h2 {
+            margin-top: 0;
+            padding-bottom: 5px;
+            border-bottom: 1px solid #ddd;
+        }
+
+        /* Ensure the custom tag is hidden while the JS replaces it */
+        canvasdraw {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Canvas Drawing Tool Demonstration 🎨</h1>
+    
+    <div class="programmatic-section">
+        <h2>1. Programmatic Initialization (using createCanvasDraw())</h2>
+        <div id="programmaticWrapper" class="programmatic-container">
+            <p>Canvas will be inserted here...</p>
+        </div>
+    </div>
+
+    <hr>
+
+    <div class="declarative-section">
+        <h2>2. Declarative Initialization (using &lt;canvasdraw&gt; tag)</h2>
+        <div class="declarative-container">
+            <canvasdraw id="myDeclarativeCanvas"></canvasdraw>
+        </div>
+    </div>
+
+    <script type="module">
+        import { createCanvasDraw } from './ux/canvasDraw.js';
+
+        // --- Programmatic Setup ---
+        
+        // 1. Get the target wrapper element
+        const wrapper = document.getElementById('programmaticWrapper');
+        
+        // 2. Create the canvas draw instance
+        const programmaticCanvas = createCanvasDraw();
+        
+        // 3. Append the instance to the wrapper
+        wrapper.innerHTML = ''; // Clear the "Canvas will be inserted here..." text
+        wrapper.appendChild(programmaticCanvas);
+
+        console.log("Programmatic Canvas Initialized.");
+
+        // NOTE: The declarative canvas (<canvasdraw>) is handled automatically 
+        // by the MutationObserver in canvasDraw.js upon DOMContentLoaded.
+    </script>
+
+    <script type="module" src="./ux/canvasDraw.js"></script>
+
+</body>
+</html>

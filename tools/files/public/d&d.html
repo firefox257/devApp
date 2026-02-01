@@ -1,0 +1,1842 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>D&D 5e Character Sheet</title>
+    <style>
+        :root {
+            --primary-color: #8b0000;
+            --secondary-color: #d4af37;
+            --dark-bg: #2c1b10;
+            --light-bg: #f5e9d3;
+            --border-color: #5d4037;
+            --text-color: #3e2723;
+            --paper-bg: #f8f3e6;
+            --section-bg: #e9e0d1;
+            --info-bg: #e3f2fd;
+            --info-border: #2196f3;
+            --accent-color: #4caf50;
+            --danger-color: #f44336;
+        }
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--dark-bg);
+            color: var(--text-color);
+            line-height: 1.6;
+            padding: 20px;
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" fill="%232c1b10"/><path d="M0 50 L100 50 M50 0 L50 100" stroke="%233e2723" stroke-width="0.5" opacity="0.3"/></svg>');
+            background-attachment: fixed;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        header {
+            text-align: center;
+            margin-bottom: 25px;
+            position: relative;
+            padding: 15px;
+            background-color: var(--paper-bg);
+            border: 3px solid var(--border-color);
+            border-radius: 8px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
+            margin-top: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        h1 {
+            font-size: 2.8rem;
+            color: var(--primary-color);
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+            letter-spacing: 3px;
+            margin-bottom: 5px;
+            font-family: 'Cinzel', 'Palatino Linotype', serif;
+        }
+        .subtitle {
+            font-size: 1.2rem;
+            color: var(--secondary-color);
+            font-weight: bold;
+            letter-spacing: 2px;
+            margin-bottom: 15px;
+        }
+        /* Character Management Bar */
+        .char-management {
+            background-color: var(--section-bg);
+            border: 2px solid var(--border-color);
+            border-radius: 6px;
+            padding: 15px;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 15px;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
+        }
+        .char-select-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .char-select-group label {
+            font-weight: bold;
+            color: var(--primary-color);
+            margin-right: 8px;
+        }
+        #char-select {
+            padding: 8px 12px;
+            border: 2px solid var(--border-color);
+            border-radius: 4px;
+            background-color: white;
+            font-size: 1rem;
+            min-width: 200px;
+        }
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 0.95rem;
+        }
+        .btn-new {
+            background-color: var(--accent-color);
+            color: white;
+        }
+        .btn-new:hover {
+            background-color: #388e3c;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+        }
+        .btn-delete {
+            background-color: var(--danger-color);
+            color: white;
+        }
+        .btn-delete:hover {
+            background-color: #d32f2f;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+        }
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .character-sheet {
+            background-color: var(--paper-bg);
+            border: 3px solid var(--border-color);
+            border-radius: 8px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+            padding: 25px;
+            position: relative;
+            overflow: hidden;
+        }
+        .character-sheet::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 15px;
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="20" viewBox="0 0 100 20"><path d="M0,10 L30,5 L60,15 L90,8 L100,12" stroke="%235d4037" stroke-width="2" fill="none" opacity="0.7"/></svg>');
+            background-repeat: repeat-x;
+        }
+        .character-sheet::after {
+            content: "";
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 15px;
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="20" viewBox="0 0 100 20"><path d="M0,10 L30,15 L60,5 L90,12 L100,8" stroke="%235d4037" stroke-width="2" fill="none" opacity="0.7"/></svg>');
+            background-repeat: repeat-x;
+        }
+        .sheet-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 25px;
+        }
+        .section {
+            background-color: var(--section-bg);
+            border: 2px solid var(--border-color);
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 15px;
+            position: relative;
+        }
+        .section-title {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            margin-bottom: 12px;
+            font-weight: bold;
+            text-align: center;
+            font-size: 1.2rem;
+            letter-spacing: 1px;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .section-title::after {
+            content: "";
+            position: absolute;
+            bottom: -5px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 40px;
+            height: 3px;
+            background-color: var(--secondary-color);
+            border-radius: 2px;
+        }
+        .info-icon {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 22px;
+            height: 22px;
+            background-color: var(--secondary-color);
+            color: var(--primary-color);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 0.8rem;
+            cursor: help;
+            border: 2px solid var(--primary-color);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .info-icon:hover {
+            transform: translateY(-50%) scale(1.1);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.5);
+        }
+        .form-row {
+            display: flex;
+            flex-wrap: wrap;
+            margin-bottom: 10px;
+            align-items: center;
+        }
+        .form-group {
+            margin-bottom: 12px;
+            flex: 1 0 45%;
+            min-width: 120px;
+            padding: 0 5px;
+        }
+        label {
+            display: block;
+            margin-bottom: 4px;
+            font-weight: bold;
+            font-size: 0.9rem;
+            color: var(--primary-color);
+        }
+        input, select, textarea {
+            width: 100%;
+            padding: 6px 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            background-color: white;
+            font-family: inherit;
+            font-size: 0.95rem;
+        }
+        select {
+            appearance: none;
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="8" viewBox="0 0 12 8"><path fill="%235d4037" d="M0 0l6 8 6-8z"/></svg>');
+            background-repeat: no-repeat;
+            background-position: right 8px center;
+            background-size: 12px 8px;
+            padding-right: 30px;
+        }
+        input[type="number"] {
+            text-align: center;
+        }
+        textarea {
+            min-height: 80px;
+            resize: vertical;
+        }
+        .ability-scores {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 8px;
+            text-align: center;
+        }
+        .ability-score {
+            background-color: white;
+            border: 2px solid var(--border-color);
+            border-radius: 6px;
+            padding: 8px 5px;
+        }
+        .ability-name {
+            font-weight: bold;
+            margin-bottom: 4px;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .ability-mod {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: var(--primary-color);
+            margin: 3px 0;
+            min-height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .ability-save {
+            font-size: 0.9rem;
+            margin-top: 3px;
+        }
+        .skills-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+        }
+        .skill-item {
+            display: flex;
+            align-items: center;
+            padding: 4px 0;
+            border-bottom: 1px dashed #ccc;
+        }
+        .skill-item:last-child {
+            border-bottom: none;
+        }
+        .skill-prof {
+            margin-right: 8px;
+            width: 20px;
+            height: 20px;
+        }
+        .skill-name {
+            flex: 1;
+            font-size: 0.9rem;
+        }
+        .skill-mod {
+            width: 40px;
+            text-align: center;
+            font-weight: bold;
+            background-color: white;
+            border: 1px solid var(--border-color);
+            border-radius: 3px;
+            padding: 2px;
+        }
+        .combat-stats {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+        }
+        .combat-stat {
+            text-align: center;
+            padding: 10px;
+            background-color: white;
+            border: 2px solid var(--border-color);
+            border-radius: 6px;
+        }
+        .combat-label {
+            font-weight: bold;
+            margin-bottom: 5px;
+            font-size: 0.9rem;
+            color: var(--primary-color);
+        }
+        .combat-value {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: var(--primary-color);
+            min-height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .death-saves {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 10px;
+        }
+        .death-save-group {
+            text-align: center;
+        }
+        .death-save-title {
+            font-weight: bold;
+            margin-bottom: 5px;
+            font-size: 0.9rem;
+        }
+        .death-save-boxes {
+            display: flex;
+        }
+        .death-save-box {
+            width: 25px;
+            height: 25px;
+            border: 2px solid var(--border-color);
+            margin: 0 3px;
+            border-radius: 4px;
+            background-color: white;
+        }
+        .attacks-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 15px;
+            margin-top: 10px;
+        }
+        .attack-item {
+            background-color: white;
+            border: 2px solid var(--border-color);
+            border-radius: 6px;
+            padding: 10px;
+        }
+        .attack-name {
+            font-weight: bold;
+            margin-bottom: 5px;
+            width: 100%;
+            border: none;
+            background: transparent;
+            text-align: center;
+        }
+        .attack-bonus, .attack-damage {
+            display: block;
+            width: 100%;
+            text-align: center;
+            margin-top: 3px;
+            font-weight: bold;
+            background: transparent;
+            border: none;
+            font-size: 1.2rem;
+            color: var(--primary-color);
+        }
+        .notes-section {
+            grid-column: 1 / -1;
+        }
+        .status-bar {
+            background-color: var(--section-bg);
+            border: 2px solid var(--border-color);
+            border-radius: 6px;
+            padding: 10px;
+            margin-top: 15px;
+            text-align: center;
+            font-weight: bold;
+            color: var(--primary-color);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+        }
+        .status-info {
+            flex: 1;
+            text-align: left;
+        }
+        .status-chars {
+            flex: 1;
+            text-align: right;
+            font-size: 0.9rem;
+        }
+        .dice-row {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-top: 15px;
+        }
+        .dice {
+            width: 50px;
+            height: 50px;
+            background-color: var(--primary-color);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 1.5rem;
+            box-shadow: 0 3px 6px rgba(0, 0, 0, 0.3);
+            position: relative;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .dice:hover {
+            transform: scale(1.1);
+        }
+        .dice::after {
+            content: "";
+            position: absolute;
+            width: 80%;
+            height: 80%;
+            border: 2px solid white;
+            border-radius: 50%;
+        }
+        .info-tooltip {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: var(--info-bg);
+            border: 3px solid var(--info-border);
+            border-radius: 8px;
+            padding: 20px;
+            max-width: 600px;
+            width: 90%;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            display: none;
+            animation: fadeIn 0.3s;
+            /* SCROLL FIXES FOR MOBILE */
+            max-height: 80vh;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            padding-bottom: 60px;
+        }
+        @keyframes fadeIn {
+            from { 
+                opacity: 0; 
+                transform: translate(-50%, -50%) scale(0.9); 
+            }
+            to { 
+                opacity: 1; 
+                transform: translate(-50%, -50%) scale(1); 
+            }
+        }
+        .tooltip-title {
+            font-size: 1.5rem;
+            color: var(--primary-color);
+            margin-bottom: 15px;
+            text-align: center;
+            border-bottom: 2px solid var(--info-border);
+            padding-bottom: 10px;
+        }
+        .tooltip-content {
+            line-height: 1.8;
+            margin-bottom: 15px;
+        }
+        .tooltip-close {
+            position: sticky;
+            top: 10px;
+            right: 15px;
+            background-color: var(--info-border);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 1.2rem;
+            transition: background-color 0.2s;
+            margin-left: auto;
+            z-index: 1001;
+        }
+        .tooltip-close:hover {
+            background-color: #1565c0;
+        }
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.7);
+            z-index: 999;
+            display: none;
+        }
+        footer {
+            text-align: center;
+            margin-top: 25px;
+            color: var(--light-bg);
+            font-size: 0.9rem;
+            padding: 15px;
+            border-top: 1px solid var(--border-color);
+        }
+        @media (max-width: 768px) {
+            .sheet-grid {
+                grid-template-columns: 1fr;
+            }
+            .ability-scores {
+                grid-template-columns: repeat(3, 1fr);
+            }
+            .skills-grid {
+                grid-template-columns: 1fr;
+            }
+            .combat-stats {
+                grid-template-columns: 1fr;
+            }
+            .attacks-list {
+                grid-template-columns: 1fr;
+            }
+            .dice-row {
+                flex-direction: column;
+                align-items: center;
+            }
+            .info-tooltip {
+                max-width: 95%;
+                max-height: 85vh;
+                padding: 15px;
+                padding-bottom: 55px;
+            }
+            .tooltip-title {
+                font-size: 1.3rem;
+            }
+            .tooltip-content {
+                font-size: 0.9rem;
+            }
+            .tooltip-content ul {
+                padding-left: 15px;
+            }
+            .char-management {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            #char-select {
+                width: 100%;
+            }
+        }
+        @media (max-width: 480px) {
+            .info-tooltip {
+                top: 0;
+                left: 0;
+                transform: none;
+                width: 100%;
+                height: 100%;
+                max-height: 100vh;
+                border-radius: 0;
+                padding: 20px;
+                padding-bottom: 60px;
+            }
+            .tooltip-close {
+                position: fixed;
+                top: 15px;
+                right: 15px;
+                z-index: 1002;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>DUNGEONS & DRAGONS</h1>
+            <div class="subtitle">Character Sheet • 5th Edition</div>
+            <!-- Character Management Bar -->
+            <div class="char-management">
+                <div class="char-select-group">
+                    <label for="char-select">Characters:</label>
+                    <select id="char-select">
+                        <option value="">-- Select a Character --</option>
+                    </select>
+                </div>
+                <button id="new-char-btn" class="btn btn-new">+ New Character</button>
+                <button id="delete-char-btn" class="btn btn-delete">Delete Character</button>
+            </div>
+        </header>
+        
+        <div class="character-sheet">
+            <div class="sheet-grid">
+                <div>
+                    <div class="section">
+                        <div class="section-title">
+                            Character Details
+                            <span class="info-icon" data-tooltip="character-details">i</span>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="char-name">Character Name</label>
+                                <input type="text" id="char-name" name="char-name" placeholder="e.g. Elminster">
+                            </div>
+                            <div class="form-group">
+                                <label for="player-name">Player Name</label>
+                                <input type="text" id="player-name" name="player-name" placeholder="Your name">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="class-primary">Class</label>
+                                <select id="class-primary" name="class-primary">
+                                    <option value="">-- Select Class --</option>
+                                    <option value="barbarian">Barbarian</option>
+                                    <option value="bard">Bard</option>
+                                    <option value="cleric">Cleric</option>
+                                    <option value="druid">Druid</option>
+                                    <option value="fighter">Fighter</option>
+                                    <option value="monk">Monk</option>
+                                    <option value="paladin">Paladin</option>
+                                    <option value="ranger">Ranger</option>
+                                    <option value="rogue">Rogue</option>
+                                    <option value="sorcerer">Sorcerer</option>
+                                    <option value="warlock">Warlock</option>
+                                    <option value="wizard">Wizard</option>
+                                    <option value="artificer">Artificer</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="level-primary">Level</label>
+                                <select id="level-primary" name="level-primary">
+                                    <option value="1">1</option>
+                                    <option value="2">2</option>
+                                    <option value="3">3</option>
+                                    <option value="4">4</option>
+                                    <option value="5">5</option>
+                                    <option value="6">6</option>
+                                    <option value="7">7</option>
+                                    <option value="8">8</option>
+                                    <option value="9">9</option>
+                                    <option value="10">10</option>
+                                    <option value="11">11</option>
+                                    <option value="12">12</option>
+                                    <option value="13">13</option>
+                                    <option value="14">14</option>
+                                    <option value="15">15</option>
+                                    <option value="16">16</option>
+                                    <option value="17">17</option>
+                                    <option value="18">18</option>
+                                    <option value="19">19</option>
+                                    <option value="20">20</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="race">Race</label>
+                                <select id="race" name="race">
+                                    <option value="">-- Select Race --</option>
+                                    <optgroup label="Standard Races">
+                                        <option value="dragonborn">Dragonborn</option>
+                                        <option value="dwarf">Dwarf</option>
+                                        <option value="elf">Elf</option>
+                                        <option value="gnome">Gnome</option>
+                                        <option value="half-elf">Half-Elf</option>
+                                        <option value="half-orc">Half-Orc</option>
+                                        <option value="halfling">Halfling</option>
+                                        <option value="human">Human</option>
+                                        <option value="tiefling">Tiefling</option>
+                                    </optgroup>
+                                    <optgroup label="Dwarf Subraces">
+                                        <option value="hill-dwarf">Hill Dwarf</option>
+                                        <option value="mountain-dwarf">Mountain Dwarf</option>
+                                        <option value="duergar">Duergar (Gray Dwarf)</option>
+                                    </optgroup>
+                                    <optgroup label="Elf Subraces">
+                                        <option value="high-elf">High Elf</option>
+                                        <option value="wood-elf">Wood Elf</option>
+                                        <option value="dark-elf">Dark Elf (Drow)</option>
+                                        <option value="eladrin">Eladrin</option>
+                                        <option value="sea-elf">Sea Elf</option>
+                                        <option value="shadar-kai">Shadar-Kai</option>
+                                    </optgroup>
+                                    <optgroup label="Halfling Subraces">
+                                        <option value="lightfoot-halfling">Lightfoot Halfling</option>
+                                        <option value="stout-halfling">Stout Halfling</option>
+                                        <option value="ghostwise-halfling">Ghostwise Halfling</option>
+                                    </optgroup>
+                                    <optgroup label="Gnome Subraces">
+                                        <option value="forest-gnome">Forest Gnome</option>
+                                        <option value="rock-gnome">Rock Gnome</option>
+                                        <option value="deep-gnome">Deep Gnome (Svirfneblin)</option>
+                                    </optgroup>
+                                    <optgroup label="Other Options">
+                                        <option value="aarakocra">Aarakocra</option>
+                                        <option value="genasi">Genasi</option>
+                                        <option value="goliath">Goliath</option>
+                                        <option value="aasimar">Aasimar</option>
+                                        <option value="firbolg">Firbolg</option>
+                                        <option value="kenku">Kenku</option>
+                                        <option value="tabaxi">Tabaxi</option>
+                                        <option value="triton">Triton</option>
+                                        <option value="bugbear">Bugbear</option>
+                                        <option value="goblin">Goblin</option>
+                                        <option value="hobgoblin">Hobgoblin</option>
+                                        <option value="kobold">Kobold</option>
+                                        <option value="orc">Orc</option>
+                                        <option value="yuan-ti-pureblood">Yuan-ti Pureblood</option>
+                                        <option value="warforged">Warforged</option>
+                                        <option value="custom-lineage">Custom Lineage</option>
+                                    </optgroup>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="background">Background</label>
+                                <select id="background" name="background">
+                                    <option value="">-- Select Background --</option>
+                                    <option value="acolyte">Acolyte</option>
+                                    <option value="charlatan">Charlatan</option>
+                                    <option value="criminal">Criminal / Spy</option>
+                                    <option value="entertainer">Entertainer / Gladiator</option>
+                                    <option value="folk-hero">Folk Hero</option>
+                                    <option value="guild-artisan">Guild Artisan / Guild Merchant</option>
+                                    <option value="hermit">Hermit</option>
+                                    <option value="noble">Noble / Knight</option>
+                                    <option value="outlander">Outlander</option>
+                                    <option value="sage">Sage</option>
+                                    <option value="sailor">Sailor / Pirate</option>
+                                    <option value="soldier">Soldier</option>
+                                    <option value="urchin">Urchin</option>
+                                    <optgroup label="Other Backgrounds">
+                                        <option value="anthropologist">Anthropologist</option>
+                                        <option value="archaeologist">Archaeologist</option>
+                                        <option value="astronomer">Astronomer</option>
+                                        <option value="athlete">Athlete</option>
+                                        <option value="city-watch">City Watch</option>
+                                        <option value="clan-crafter">Clan Crafter</option>
+                                        <option value="cloistered-scholar">Cloistered Scholar</option>
+                                        <option value="courtier">Courtier</option>
+                                        <option value="custom">Custom Background</option>
+                                        <option value="emissary">Emissary</option>
+                                        <option value="faceless">Faceless</option>
+                                        <option value="far-traveler">Far Traveler</option>
+                                        <option value="fortune-teller">Fortune Teller</option>
+                                        <option value="inheritor">Inheritor</option>
+                                        <option value="investigator">Investigator</option>
+                                        <option value="ironwright">Ironwright</option>
+                                        <option value="knight-of-the-order">Knight of the Order</option>
+                                        <option value="mercenary-veteran">Mercenary Veteran</option>
+                                        <option value="nomad">Nomad</option>
+                                        <option value="order-of-scribes">Order of Scribes</option>
+                                        <option value="ranger">Ranger</option>
+                                        <option value="shipwright">Shipwright</option>
+                                        <option value="smuggler">Smuggler</option>
+                                        <option value="urban-bounty-hunter">Urban Bounty Hunter</option>
+                                        <option value="uurchin">Urchin</option>
+                                        <option value="wanderer">Wanderer</option>
+                                        <option value="witch-light-reveller">Witch Light Reveller</option>
+                                    </optgroup>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="alignment">Alignment</label>
+                                <select id="alignment" name="alignment">
+                                    <option value="">-- Select Alignment --</option>
+                                    <option value="lg">Lawful Good</option>
+                                    <option value="ng">Neutral Good</option>
+                                    <option value="cg">Chaotic Good</option>
+                                    <option value="ln">Lawful Neutral</option>
+                                    <option value="tn">True Neutral</option>
+                                    <option value="cn">Chaotic Neutral</option>
+                                    <option value="le">Lawful Evil</option>
+                                    <option value="ne">Neutral Evil</option>
+                                    <option value="ce">Chaotic Evil</option>
+                                    <option value="unaligned">Unaligned</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="prof-bonus">Proficiency Bonus</label>
+                                <input type="text" id="prof-bonus" name="prof-bonus" value="+2" readonly>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="exp">Experience Points</label>
+                                <input type="number" id="exp" name="exp" min="0" value="0" placeholder="0">
+                            </div>
+                            <div class="form-group">
+                                <label for="inspiration">Inspiration</label>
+                                <select id="inspiration" name="inspiration">
+                                    <option value="0">No</option>
+                                    <option value="1">Yes</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="section">
+                        <div class="section-title">
+                            Ability Scores
+                            <span class="info-icon" data-tooltip="ability-scores">i</span>
+                        </div>
+                        <div class="ability-scores">
+                            <div class="ability-score">
+                                <div class="ability-name">STR</div>
+                                <input type="number" class="ability-input" id="str-score" name="str-score" min="1" max="30" value="10">
+                                <div class="ability-mod" id="str-mod">+0</div>
+                                <div class="ability-save">Save: <span id="str-save">+0</span></div>
+                            </div>
+                            <div class="ability-score">
+                                <div class="ability-name">DEX</div>
+                                <input type="number" class="ability-input" id="dex-score" name="dex-score" min="1" max="30" value="10">
+                                <div class="ability-mod" id="dex-mod">+0</div>
+                                <div class="ability-save">Save: <span id="dex-save">+0</span></div>
+                            </div>
+                            <div class="ability-score">
+                                <div class="ability-name">CON</div>
+                                <input type="number" class="ability-input" id="con-score" name="con-score" min="1" max="30" value="10">
+                                <div class="ability-mod" id="con-mod">+0</div>
+                                <div class="ability-save">Save: <span id="con-save">+0</span></div>
+                            </div>
+                            <div class="ability-score">
+                                <div class="ability-name">INT</div>
+                                <input type="number" class="ability-input" id="int-score" name="int-score" min="1" max="30" value="10">
+                                <div class="ability-mod" id="int-mod">+0</div>
+                                <div class="ability-save">Save: <span id="int-save">+0</span></div>
+                            </div>
+                            <div class="ability-score">
+                                <div class="ability-name">WIS</div>
+                                <input type="number" class="ability-input" id="wis-score" name="wis-score" min="1" max="30" value="10">
+                                <div class="ability-mod" id="wis-mod">+0</div>
+                                <div class="ability-save">Save: <span id="wis-save">+0</span></div>
+                            </div>
+                            <div class="ability-score">
+                                <div class="ability-name">CHA</div>
+                                <input type="number" class="ability-input" id="cha-score" name="cha-score" min="1" max="30" value="10">
+                                <div class="ability-mod" id="cha-mod">+0</div>
+                                <div class="ability-save">Save: <span id="cha-save">+0</span></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="section">
+                        <div class="section-title">
+                            Skills
+                            <span class="info-icon" data-tooltip="skills">i</span>
+                        </div>
+                        <div class="skills-grid">
+                            <div class="skill-item">
+                                <input type="checkbox" class="skill-prof" id="skill-prof-acrobatics" name="skill-prof-acrobatics">
+                                <label class="skill-name" for="skill-prof-acrobatics">Acrobatics (Dex)</label>
+                                <div class="skill-mod" id="skill-mod-acrobatics">+0</div>
+                            </div>
+                            <div class="skill-item">
+                                <input type="checkbox" class="skill-prof" id="skill-prof-animal-handling" name="skill-prof-animal-handling">
+                                <label class="skill-name" for="skill-prof-animal-handling">Animal Handling (Wis)</label>
+                                <div class="skill-mod" id="skill-mod-animal-handling">+0</div>
+                            </div>
+                            <div class="skill-item">
+                                <input type="checkbox" class="skill-prof" id="skill-prof-arcana" name="skill-prof-arcana">
+                                <label class="skill-name" for="skill-prof-arcana">Arcana (Int)</label>
+                                <div class="skill-mod" id="skill-mod-arcana">+0</div>
+                            </div>
+                            <div class="skill-item">
+                                <input type="checkbox" class="skill-prof" id="skill-prof-athletics" name="skill-prof-athletics">
+                                <label class="skill-name" for="skill-prof-athletics">Athletics (Str)</label>
+                                <div class="skill-mod" id="skill-mod-athletics">+0</div>
+                            </div>
+                            <div class="skill-item">
+                                <input type="checkbox" class="skill-prof" id="skill-prof-deception" name="skill-prof-deception">
+                                <label class="skill-name" for="skill-prof-deception">Deception (Cha)</label>
+                                <div class="skill-mod" id="skill-mod-deception">+0</div>
+                            </div>
+                            <div class="skill-item">
+                                <input type="checkbox" class="skill-prof" id="skill-prof-history" name="skill-prof-history">
+                                <label class="skill-name" for="skill-prof-history">History (Int)</label>
+                                <div class="skill-mod" id="skill-mod-history">+0</div>
+                            </div>
+                            <div class="skill-item">
+                                <input type="checkbox" class="skill-prof" id="skill-prof-insight" name="skill-prof-insight">
+                                <label class="skill-name" for="skill-prof-insight">Insight (Wis)</label>
+                                <div class="skill-mod" id="skill-mod-insight">+0</div>
+                            </div>
+                            <div class="skill-item">
+                                <input type="checkbox" class="skill-prof" id="skill-prof-intimidation" name="skill-prof-intimidation">
+                                <label class="skill-name" for="skill-prof-intimidation">Intimidation (Cha)</label>
+                                <div class="skill-mod" id="skill-mod-intimidation">+0</div>
+                            </div>
+                            <div class="skill-item">
+                                <input type="checkbox" class="skill-prof" id="skill-prof-investigation" name="skill-prof-investigation">
+                                <label class="skill-name" for="skill-prof-investigation">Investigation (Int)</label>
+                                <div class="skill-mod" id="skill-mod-investigation">+0</div>
+                            </div>
+                            <div class="skill-item">
+                                <input type="checkbox" class="skill-prof" id="skill-prof-medicine" name="skill-prof-medicine">
+                                <label class="skill-name" for="skill-prof-medicine">Medicine (Wis)</label>
+                                <div class="skill-mod" id="skill-mod-medicine">+0</div>
+                            </div>
+                            <div class="skill-item">
+                                <input type="checkbox" class="skill-prof" id="skill-prof-nature" name="skill-prof-nature">
+                                <label class="skill-name" for="skill-prof-nature">Nature (Int)</label>
+                                <div class="skill-mod" id="skill-mod-nature">+0</div>
+                            </div>
+                            <div class="skill-item">
+                                <input type="checkbox" class="skill-prof" id="skill-prof-perception" name="skill-prof-perception">
+                                <label class="skill-name" for="skill-prof-perception">Perception (Wis)</label>
+                                <div class="skill-mod" id="skill-mod-perception">+0</div>
+                            </div>
+                            <div class="skill-item">
+                                <input type="checkbox" class="skill-prof" id="skill-prof-performance" name="skill-prof-performance">
+                                <label class="skill-name" for="skill-prof-performance">Performance (Cha)</label>
+                                <div class="skill-mod" id="skill-mod-performance">+0</div>
+                            </div>
+                            <div class="skill-item">
+                                <input type="checkbox" class="skill-prof" id="skill-prof-persuasion" name="skill-prof-persuasion">
+                                <label class="skill-name" for="skill-prof-persuasion">Persuasion (Cha)</label>
+                                <div class="skill-mod" id="skill-mod-persuasion">+0</div>
+                            </div>
+                            <div class="skill-item">
+                                <input type="checkbox" class="skill-prof" id="skill-prof-religion" name="skill-prof-religion">
+                                <label class="skill-name" for="skill-prof-religion">Religion (Int)</label>
+                                <div class="skill-mod" id="skill-mod-religion">+0</div>
+                            </div>
+                            <div class="skill-item">
+                                <input type="checkbox" class="skill-prof" id="skill-prof-sleight-of-hand" name="skill-prof-sleight-of-hand">
+                                <label class="skill-name" for="skill-prof-sleight-of-hand">Sleight of Hand (Dex)</label>
+                                <div class="skill-mod" id="skill-mod-sleight-of-hand">+0</div>
+                            </div>
+                            <div class="skill-item">
+                                <input type="checkbox" class="skill-prof" id="skill-prof-stealth" name="skill-prof-stealth">
+                                <label class="skill-name" for="skill-prof-stealth">Stealth (Dex)</label>
+                                <div class="skill-mod" id="skill-mod-stealth">+0</div>
+                            </div>
+                            <div class="skill-item">
+                                <input type="checkbox" class="skill-prof" id="skill-prof-survival" name="skill-prof-survival">
+                                <label class="skill-name" for="skill-prof-survival">Survival (Wis)</label>
+                                <div class="skill-mod" id="skill-mod-survival">+0</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div>
+                    <div class="section">
+                        <div class="section-title">
+                            Combat Stats
+                            <span class="info-icon" data-tooltip="combat-stats">i</span>
+                        </div>
+                        <div class="combat-stats">
+                            <div class="combat-stat">
+                                <div class="combat-label">Armor Class</div>
+                                <input type="number" id="armor-class" name="armor-class" min="0" value="10" class="combat-value">
+                            </div>
+                            <div class="combat-stat">
+                                <div class="combat-label">Initiative</div>
+                                <div class="combat-value" id="initiative">+0</div>
+                            </div>
+                            <div class="combat-stat">
+                                <div class="combat-label">Speed</div>
+                                <select id="speed" name="speed" class="combat-value">
+                                    <option value="25 ft">25 ft</option>
+                                    <option value="30 ft" selected>30 ft</option>
+                                    <option value="35 ft">35 ft</option>
+                                    <option value="40 ft">40 ft</option>
+                                    <option value="45 ft">45 ft</option>
+                                    <option value="50 ft">50 ft</option>
+                                    <option value="60 ft">60 ft</option>
+                                    <option value="10 ft">10 ft (Crawling)</option>
+                                    <option value="0 ft">0 ft (Paralyzed)</option>
+                                </select>
+                            </div>
+                            <div class="combat-stat">
+                                <div class="combat-label">Hit Dice</div>
+                                <select id="hit-dice" name="hit-dice" class="combat-value">
+                                    <option value="1d6">1d6 (Wizard, Sorcerer)</option>
+                                    <option value="1d8">1d8 (Bard, Cleric, Druid, Monk, Rogue, Warlock)</option>
+                                    <option value="1d10" selected>1d10 (Fighter, Paladin, Ranger)</option>
+                                    <option value="1d12">1d12 (Barbarian)</option>
+                                    <option value="1d8">1d8 (Artificer)</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div style="margin-top: 20px;">
+                            <div class="form-row">
+                                <div class="form-group" style="flex: 1 0 45%;">
+                                    <label for="hp-current">Current HP</label>
+                                    <input type="number" id="hp-current" name="hp-current" min="0" value="10">
+                                </div>
+                                <div class="form-group" style="flex: 1 0 45%;">
+                                    <label for="hp-max">Max HP</label>
+                                    <input type="number" id="hp-max" name="hp-max" min="1" value="10">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="section-title" style="margin-top: 20px; margin-bottom: 15px;">
+                            Death Saves
+                            <span class="info-icon" data-tooltip="death-saves">i</span>
+                        </div>
+                        <div class="death-saves">
+                            <div class="death-save-group">
+                                <div class="death-save-title">Successes</div>
+                                <div class="death-save-boxes">
+                                    <div class="death-save-box" id="death-save-success-1"></div>
+                                    <div class="death-save-box" id="death-save-success-2"></div>
+                                    <div class="death-save-box" id="death-save-success-3"></div>
+                                </div>
+                            </div>
+                            <div class="death-save-group">
+                                <div class="death-save-title">Failures</div>
+                                <div class="death-save-boxes">
+                                    <div class="death-save-box" id="death-save-failure-1"></div>
+                                    <div class="death-save-box" id="death-save-failure-2"></div>
+                                    <div class="death-save-box" id="death-save-failure-3"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="section">
+                        <div class="section-title">
+                            Attacks & Spellcasting
+                            <span class="info-icon" data-tooltip="attacks">i</span>
+                        </div>
+                        <div class="attacks-list">
+                            <div class="attack-item">
+                                <input type="text" class="attack-name" name="attack-name-1" placeholder="Attack Name">
+                                <input type="text" class="attack-bonus" name="attack-bonus-1" placeholder="+0">
+                                <input type="text" class="attack-damage" name="attack-damage-1" placeholder="Damage Type">
+                            </div>
+                            <div class="attack-item">
+                                <input type="text" class="attack-name" name="attack-name-2" placeholder="Attack Name">
+                                <input type="text" class="attack-bonus" name="attack-bonus-2" placeholder="+0">
+                                <input type="text" class="attack-damage" name="attack-damage-2" placeholder="Damage Type">
+                            </div>
+                            <div class="attack-item">
+                                <input type="text" class="attack-name" name="attack-name-3" placeholder="Attack Name">
+                                <input type="text" class="attack-bonus" name="attack-bonus-3" placeholder="+0">
+                                <input type="text" class="attack-damage" name="attack-damage-3" placeholder="Damage Type">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="section notes-section">
+                        <div class="section-title">
+                            Equipment
+                            <span class="info-icon" data-tooltip="equipment">i</span>
+                        </div>
+                        <textarea id="equipment" name="equipment" placeholder="Weapons, armor, adventuring gear, treasure, etc."></textarea>
+                    </div>
+                    
+                    <div class="section notes-section">
+                        <div class="section-title">
+                            Features & Traits
+                            <span class="info-icon" data-tooltip="features">i</span>
+                        </div>
+                        <textarea id="features" name="features" placeholder="Racial traits, class features, feats, special abilities, etc."></textarea>
+                    </div>
+                    
+                    <div class="section notes-section">
+                        <div class="section-title">
+                            Spells
+                            <span class="info-icon" data-tooltip="spells">i</span>
+                        </div>
+                        <textarea id="spells" name="spells" placeholder="Spellcasting ability: ___&#10;&#10;Cantrips:&#10;1st Level (___ slots):&#10;2nd Level (___ slots):&#10;3rd Level (___ slots):&#10;..."></textarea>
+                    </div>
+                    
+                    <div class="section notes-section">
+                        <div class="section-title">
+                            Personality & Backstory
+                            <span class="info-icon" data-tooltip="personality">i</span>
+                        </div>
+                        <textarea id="personality" name="personality" placeholder="Personality Traits:&#10;&#10;Ideals:&#10;&#10;Bonds:&#10;&#10;Flaws:&#10;&#10;Backstory:"></textarea>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="status-bar" id="save-status">
+                <div class="status-info">Character sheet ready. All changes saved automatically.</div>
+                <div class="status-chars" id="char-count">0 characters</div>
+            </div>
+            
+            <div class="dice-row">
+                <div class="dice">D4</div>
+                <div class="dice">D6</div>
+                <div class="dice">D8</div>
+                <div class="dice">D10</div>
+                <div class="dice">D12</div>
+                <div class="dice">D20</div>
+            </div>
+        </div>
+        
+        <!-- Info Tooltips -->
+        <div class="overlay" id="tooltip-overlay"></div>
+        
+        <div class="info-tooltip" id="tooltip-character-details">
+            <button class="tooltip-close">&times;</button>
+            <h3 class="tooltip-title">Character Details</h3>
+            <div class="tooltip-content">
+                <p><strong>Character Name:</strong> The name of your character in the game world.</p>
+                <p><strong>Class:</strong> Your character's profession or role. Each class has unique abilities and playstyles.</p>
+                <p><strong>Level:</strong> Your character's experience level (1-20). Higher levels unlock more powerful abilities.</p>
+                <p><strong>Race:</strong> Your character's species, which grants racial traits and ability score increases.</p>
+                <p><strong>Background:</strong> Your character's life before becoming an adventurer. Provides skill proficiencies and roleplaying hooks.</p>
+                <p><strong>Alignment:</strong> Your character's moral and ethical outlook. Not all characters strictly adhere to their alignment.</p>
+                <p><strong>Proficiency Bonus:</strong> Added to attacks, skills, saves, and other checks where you're proficient. Increases as you level up.</p>
+                <p><strong>Inspiration:</strong> A reward from the DM for good roleplaying. Can be spent to gain advantage on an ability check, attack roll, or saving throw.</p>
+            </div>
+        </div>
+        
+        <div class="info-tooltip" id="tooltip-ability-scores">
+            <button class="tooltip-close">&times;</button>
+            <h3 class="tooltip-title">Ability Scores</h3>
+            <div class="tooltip-content">
+                <p><strong>Strength (STR):</strong> Physical power. Used for melee attacks, athletics, and carrying capacity.</p>
+                <p><strong>Dexterity (DEX):</strong> Agility and reflexes. Used for ranged attacks, AC (with light/medium armor), stealth, and initiative.</p>
+                <p><strong>Constitution (CON):</strong> Health and stamina. Determines hit points and fortitude.</p>
+                <p><strong>Intelligence (INT):</strong> Mental acuity and knowledge. Used for arcana, history, investigation, nature, and religion.</p>
+                <p><strong>Wisdom (WIS):</strong> Perception and insight. Used for animal handling, insight, medicine, perception, and survival.</p>
+                <p><strong>Charisma (CHA):</strong> Force of personality. Used for deception, intimidation, performance, and persuasion.</p>
+                <p><strong>Ability Modifier:</strong> Calculated as (Score - 10) ÷ 2, rounded down. Ranges from -5 to +10.</p>
+                <p><strong>Saving Throws:</strong> Used to resist harmful effects. Some classes are proficient in certain saves.</p>
+            </div>
+        </div>
+        
+        <div class="info-tooltip" id="tooltip-skills">
+            <button class="tooltip-close">&times;</button>
+            <h3 class="tooltip-title">Skills</h3>
+            <div class="tooltip-content">
+                <p>Skills represent your character's training and expertise in specific areas.</p>
+                <p><strong>Proficiency:</strong> Check the box if your character is proficient in a skill. Proficient skills add your proficiency bonus to the ability modifier.</p>
+                <p><strong>Skill Modifiers:</strong> Automatically calculated as: Ability Modifier + Proficiency Bonus (if proficient).</p>
+                <p><strong>Skill Descriptions:</strong></p>
+                <ul style="margin-left: 20px; margin-top: 10px;">
+                    <li><strong>Acrobatics:</strong> Stay on your feet, perform flips, reduce fall damage</li>
+                    <li><strong>Animal Handling:</strong> Calm, train, or understand animals</li>
+                    <li><strong>Arcana:</strong> Knowledge of magic, magical items, and planes</li>
+                    <li><strong>Athletics:</strong> Climbing, jumping, swimming, grappling</li>
+                    <li><strong>Deception:</strong> Lie, cheat, bluff, or mislead</li>
+                    <li><strong>History:</strong> Knowledge of historical events and figures</li>
+                    <li><strong>Insight:</strong> Determine intentions and detect lies</li>
+                    <li><strong>Intimidation:</strong> Influence through threats or displays of power</li>
+                    <li><strong>Investigation:</strong> Find clues, deduce patterns, solve puzzles</li>
+                    <li><strong>Medicine:</strong> Stabilize dying creatures, diagnose illnesses</li>
+                    <li><strong>Nature:</strong> Knowledge of terrain, plants, animals, and weather</li>
+                    <li><strong>Perception:</strong> Spot, hear, or notice hidden things (most used skill!)</li>
+                    <li><strong>Performance:</strong> Entertain an audience with music, dance, or acting</li>
+                    <li><strong>Persuasion:</strong> Influence through diplomacy and etiquette</li>
+                    <li><strong>Religion:</strong> Knowledge of deities, rituals, and religious customs</li>
+                    <li><strong>Sleight of Hand:</strong> Pick pockets, plant items, perform tricks</li>
+                    <li><strong>Stealth:</strong> Hide, move silently, avoid detection</li>
+                    <li><strong>Survival:</strong> Track creatures, follow trails, forage for food</li>
+                </ul>
+            </div>
+        </div>
+        
+        <div class="info-tooltip" id="tooltip-combat-stats">
+            <button class="tooltip-close">&times;</button>
+            <h3 class="tooltip-title">Combat Stats</h3>
+            <div class="tooltip-content">
+                <p><strong>Armor Class (AC):</strong> Difficulty to hit your character. Base AC is 10 + DEX modifier + armor bonus.</p>
+                <p><strong>Initiative:</strong> Determines turn order in combat. Equal to DEX modifier (unless you have a special feature).</p>
+                <p><strong>Speed:</strong> How far you can move on your turn. Base is typically 30 feet for most races.</p>
+                <p><strong>Hit Dice:</strong> Used to recover hit points during short rests. Type depends on your class.</p>
+                <p><strong>Current HP:</strong> Your remaining hit points. When reduced to 0, you fall unconscious.</p>
+                <p><strong>Max HP:</strong> Your maximum hit points. Increases when you level up.</p>
+                <p><strong>Calculating AC:</strong></p>
+                <ul style="margin-left: 20px; margin-top: 10px;">
+                    <li><strong>No Armor:</strong> 10 + DEX modifier</li>
+                    <li><strong>Light Armor:</strong> Armor value + DEX modifier</li>
+                    <li><strong>Medium Armor:</strong> Armor value + DEX modifier (max +2)</li>
+                    <li><strong>Heavy Armor:</strong> Armor value (no DEX modifier)</li>
+                    <li><strong>Shield:</strong> +2 to AC when using a shield</li>
+                </ul>
+            </div>
+        </div>
+        
+        <div class="info-tooltip" id="tooltip-death-saves">
+            <button class="tooltip-close">&times;</button>
+            <h3 class="tooltip-title">Death Saves</h3>
+            <div class="tooltip-content">
+                <p>When your HP drops to 0, you begin making death saving throws at the start of each of your turns.</p>
+                <p><strong>Rolling Death Saves:</strong></p>
+                <ul style="margin-left: 20px; margin-top: 10px;">
+                    <li><strong>10-20:</strong> Success (mark one success box)</li>
+                    <li><strong>1-9:</strong> Failure (mark one failure box)</li>
+                    <li><strong>Natural 20:</strong> Regain 1 HP and become stable</li>
+                    <li><strong>Natural 1:</strong> Count as two failures</li>
+                </ul>
+                <p><strong>Outcomes:</strong></p>
+                <ul style="margin-left: 20px; margin-top: 10px;">
+                    <li><strong>3 Successes:</strong> You become stable (stop making death saves)</li>
+                    <li><strong>3 Failures:</strong> You die</li>
+                </ul>
+                <p><strong>Stabilizing:</strong> Another character can use an action to make a DC 10 Wisdom (Medicine) check to stabilize you, or use a healer's kit.</p>
+                <p><strong>Damage at 0 HP:</strong> Taking any damage while at 0 HP counts as a failed death save. If the damage is from a critical hit, it counts as two failures.</p>
+            </div>
+        </div>
+        
+        <div class="info-tooltip" id="tooltip-attacks">
+            <button class="tooltip-close">&times;</button>
+            <h3 class="tooltip-title">Attacks & Spellcasting</h3>
+            <div class="tooltip-content">
+                <p><strong>Attack Bonus:</strong> Added to your d20 roll when making an attack. Calculated as: Ability Modifier + Proficiency Bonus (if proficient) + other bonuses.</p>
+                <p><strong>Damage:</strong> Roll the damage dice and add your ability modifier (usually STR for melee, DEX for ranged).</p>
+                <p><strong>Attack Types:</strong></p>
+                <ul style="margin-left: 20px; margin-top: 10px;">
+                    <li><strong>Melee Weapon:</strong> STR modifier + Proficiency (if proficient)</li>
+                    <li><strong>Ranged Weapon:</strong> DEX modifier + Proficiency (if proficient)</li>
+                    <li><strong>Spell Attack:</strong> Spellcasting ability modifier + Proficiency</li>
+                </ul>
+                <p><strong>Spellcasting:</strong> If your class casts spells, note your spellcasting ability and spell slots here.</p>
+                <p><strong>Common Damage Types:</strong> Acid, Bludgeoning, Cold, Fire, Force, Lightning, Necrotic, Piercing, Poison, Psychic, Radiant, Slashing, Thunder.</p>
+            </div>
+        </div>
+        
+        <div class="info-tooltip" id="tooltip-equipment">
+            <button class="tooltip-close">&times;</button>
+            <h3 class="tooltip-title">Equipment</h3>
+            <div class="tooltip-content">
+                <p>List all your character's possessions:</p>
+                <ul style="margin-left: 20px; margin-top: 10px;">
+                    <li><strong>Weapons:</strong> Note attack bonus and damage</li>
+                    <li><strong>Armor:</strong> Note AC bonus and any restrictions</li>
+                    <li><strong>Adventuring Gear:</strong> Rope, torches, rations, etc.</li>
+                    <li><strong>Tools:</strong> Thieves' tools, musical instruments, artisan tools</li>
+                    <li><strong>Magic Items:</strong> Special properties and charges</li>
+                    <li><strong>Treasure:</strong> Gold, silver, gems, art objects</li>
+                </ul>
+                <p><strong>Carrying Capacity:</strong> STR score × 15 = pounds you can carry without penalty.</p>
+                <p><strong>Encumbrance:</strong> Optional rule - carrying more than 5 × STR score slows you down.</p>
+            </div>
+        </div>
+        
+        <div class="info-tooltip" id="tooltip-features">
+            <button class="tooltip-close">&times;</button>
+            <h3 class="tooltip-title">Features & Traits</h3>
+            <div class="tooltip-content">
+                <p>List all your character's special abilities:</p>
+                <ul style="margin-left: 20px; margin-top: 10px;">
+                    <li><strong>Racial Traits:</strong> Darkvision, Fey Ancestry, Stonecunning, etc.</li>
+                    <li><strong>Class Features:</strong> Rage, Spellcasting, Divine Sense, Sneak Attack, etc.</li>
+                    <li><strong>Background Features:</strong> Shelter of the Faithful, Position of Privilege, etc.</li>
+                    <li><strong>Feats:</strong> Special abilities like Alert, Athlete, Magic Initiate, etc.</li>
+                    <li><strong>Other Abilities:</strong> Magic items, blessings, curses, etc.</li>
+                </ul>
+                <p><strong>Tracking Uses:</strong> Some features have limited uses per rest. Track them here:</p>
+                <ul style="margin-left: 20px; margin-top: 10px;">
+                    <li><strong>Short Rest:</strong> 1 hour of downtime</li>
+                    <li><strong>Long Rest:</strong> 8 hours of sleep</li>
+                </ul>
+            </div>
+        </div>
+        
+        <div class="info-tooltip" id="tooltip-spells">
+            <button class="tooltip-close">&times;</button>
+            <h3 class="tooltip-title">Spells</h3>
+            <div class="tooltip-content">
+                <p><strong>Spellcasting Ability:</strong> The ability score that determines your spell save DC and spell attack bonus:</p>
+                <ul style="margin-left: 20px; margin-top: 10px;">
+                    <li><strong>Intelligence:</strong> Wizards, Artificers</li>
+                    <li><strong>Wisdom:</strong> Clerics, Druids, Rangers, Monks</li>
+                    <li><strong>Charisma:</strong> Bards, Sorcerers, Warlocks, Paladins</li>
+                </ul>
+                <p><strong>Spell Save DC:</strong> 8 + Proficiency Bonus + Spellcasting Ability Modifier</p>
+                <p><strong>Spell Attack Bonus:</strong> Proficiency Bonus + Spellcasting Ability Modifier</p>
+                <p><strong>Spell Slots:</strong> Number of spells you can cast before a long rest. Increases with level.</p>
+                <p><strong>Cantrips:</strong> At-will spells that don't use spell slots.</p>
+                <p><strong>Preparing Spells:</strong> Some classes (Cleric, Druid, Wizard) prepare spells daily from their spell list.</p>
+            </div>
+        </div>
+        
+        <div class="info-tooltip" id="tooltip-personality">
+            <button class="tooltip-close">&times;</button>
+            <h3 class="tooltip-title">Personality & Backstory</h3>
+            <div class="tooltip-content">
+                <p><strong>Personality Traits:</strong> How your character behaves, thinks, and interacts with others. What makes them unique?</p>
+                <p><strong>Ideals:</strong> What principles guide your character? What do they believe in above all else?</p>
+                <p><strong>Bonds:</strong> Connections to people, places, events, or things. What ties them to the world?</p>
+                <p><strong>Flaws:</strong> Insecurities, phobias, vices, or weaknesses. What might lead them to ruin?</p>
+                <p><strong>Backstory:</strong> Your character's history before the campaign began. Where did they come from? What shaped them?</p>
+                <p><strong>Tips for Good Roleplaying:</strong></p>
+                <ul style="margin-left: 20px; margin-top: 10px;">
+                    <li>Make choices based on your character's personality, not just what's optimal</li>
+                    <li>React to situations in character</li>
+                    <li>Develop relationships with other characters</li>
+                    <li>Let your character grow and change over time</li>
+                </ul>
+            </div>
+        </div>
+        
+        <footer>
+            <p>D&D 5e Character Sheet • All data saved to your browser's local storage • Created with HTML, CSS & JavaScript</p>
+            <p>© 2026 • This is not an official Wizards of the Coast product</p>
+        </footer>
+    </div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // DOM Elements
+            const abilityInputs = document.querySelectorAll('.ability-input');
+            const skillProfs = document.querySelectorAll('.skill-prof');
+            const deathSaveSuccesses = document.querySelectorAll('[id^="death-save-success"]');
+            const deathSaveFailures = document.querySelectorAll('[id^="death-save-failure"]');
+            const diceElements = document.querySelectorAll('.dice');
+            const saveStatus = document.getElementById('save-status');
+            const charSelect = document.getElementById('char-select');
+            const newCharBtn = document.getElementById('new-char-btn');
+            const deleteCharBtn = document.getElementById('delete-char-btn');
+            const charCountDisplay = document.getElementById('char-count');
+            const profBonusInput = document.getElementById('prof-bonus');
+            const infoIcons = document.querySelectorAll('.info-icon');
+            const tooltipOverlay = document.getElementById('tooltip-overlay');
+            const tooltipCloses = document.querySelectorAll('.tooltip-close');
+            const charNameInput = document.getElementById('char-name');
+            
+            // Current character ID
+            let currentCharId = null;
+            let characters = {};
+            
+            // Load characters from localStorage
+            loadCharacters();
+            
+            // Set up event listeners
+            abilityInputs.forEach(input => {
+                input.addEventListener('change', recalculate);
+                input.addEventListener('input', saveCurrentCharacter);
+            });
+            
+            skillProfs.forEach(checkbox => {
+                checkbox.addEventListener('change', recalculate);
+                checkbox.addEventListener('change', saveCurrentCharacter);
+            });
+            
+            // Character name auto-save
+            charNameInput.addEventListener('input', function() {
+                if (currentCharId) {
+                    characters[currentCharId].name = charNameInput.value;
+                    saveCharactersToStorage();
+                    updateCharSelect();
+                }
+            });
+            
+            // Death save clicks
+            deathSaveSuccesses.forEach((box, index) => {
+                box.addEventListener('click', () => toggleDeathSave('success', index));
+            });
+            
+            deathSaveFailures.forEach((box, index) => {
+                box.addEventListener('click', () => toggleDeathSave('failure', index));
+            });
+            
+            // Dice rollers
+            diceElements.forEach(dice => {
+                dice.addEventListener('click', rollDice);
+            });
+            
+            // Character selection
+            charSelect.addEventListener('change', function() {
+                const charId = this.value;
+                if (charId) {
+                    loadCharacter(charId);
+                } else {
+                    // Clear form for new character
+                    clearForm();
+                    currentCharId = null;
+                }
+            });
+            
+            // New character button
+            newCharBtn.addEventListener('click', createNewCharacter);
+            
+            // Delete character button
+            deleteCharBtn.addEventListener('click', deleteCurrentCharacter);
+            
+            // Info icons
+            infoIcons.forEach(icon => {
+                icon.addEventListener('click', function() {
+                    const tooltipId = this.getAttribute('data-tooltip');
+                    showTooltip(tooltipId);
+                });
+            });
+            
+            // Close tooltips
+            tooltipCloses.forEach(button => {
+                button.addEventListener('click', hideAllTooltips);
+            });
+            
+            tooltipOverlay.addEventListener('click', hideAllTooltips);
+            
+            // Close tooltip with Escape key
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') {
+                    hideAllTooltips();
+                }
+            });
+            
+            // General form inputs
+            const formInputs = document.querySelectorAll('input, select, textarea');
+            formInputs.forEach(input => {
+                if (!input.classList.contains('ability-input') && 
+                    !input.classList.contains('skill-prof') && 
+                    input.id !== 'char-select') {
+                    input.addEventListener('input', saveCurrentCharacter);
+                    input.addEventListener('change', saveCurrentCharacter);
+                }
+            });
+            
+            // Level change to update proficiency bonus
+            const levelSelect = document.getElementById('level-primary');
+            levelSelect.addEventListener('change', recalculate);
+            levelSelect.addEventListener('change', saveCurrentCharacter);
+            
+            // Initial calculation
+            recalculate();
+            
+            // Initialize death saves if not set
+            if (!localStorage.getItem('death-saves-success')) {
+                localStorage.setItem('death-saves-success', JSON.stringify([false, false, false]));
+            }
+            if (!localStorage.getItem('death-saves-failure')) {
+                localStorage.setItem('death-saves-failure', JSON.stringify([false, false, false]));
+            }
+            
+            // Initial death saves display
+            updateDeathSavesDisplay();
+            
+            // Functions
+            function loadCharacters() {
+                const saved = localStorage.getItem('dnd-characters');
+                if (saved) {
+                    characters = JSON.parse(saved);
+                } else {
+                    // Create default character if none exists
+                    createNewCharacter(true);
+                }
+                updateCharSelect();
+            }
+            
+            function saveCharactersToStorage() {
+                localStorage.setItem('dnd-characters', JSON.stringify(characters));
+                updateCharCount();
+            }
+            
+            function updateCharSelect() {
+                // Save current character before switching
+                if (currentCharId) {
+                    saveCurrentCharacter();
+                }
+                
+                // Clear and repopulate dropdown
+                charSelect.innerHTML = '<option value="">-- Select a Character --</option>';
+                Object.keys(characters).forEach(id => {
+                    const option = document.createElement('option');
+                    option.value = id;
+                    option.textContent = characters[id].name || 'Unnamed Character';
+                    if (id === currentCharId) {
+                        option.selected = true;
+                    }
+                    charSelect.appendChild(option);
+                });
+                
+                updateCharCount();
+                updateDeleteButtonState();
+            }
+            
+            function updateCharCount() {
+                const count = Object.keys(characters).length;
+                charCountDisplay.textContent = `${count} character${count !== 1 ? 's' : ''}`;
+            }
+            
+            function updateDeleteButtonState() {
+                deleteCharBtn.disabled = !currentCharId || Object.keys(characters).length <= 1;
+            }
+            
+            function createNewCharacter(silent = false) {
+                // Save current character first
+                if (currentCharId) {
+                    saveCurrentCharacter();
+                }
+                
+                // Create unique ID
+                const charId = 'char_' + Date.now();
+                
+                // Create new character object with default values
+                characters[charId] = {
+                    id: charId,
+                    name: 'New Character',
+                    createdAt: new Date().toISOString()
+                };
+                
+                currentCharId = charId;
+                clearForm();
+                charNameInput.value = 'New Character';
+                charNameInput.focus();
+                
+                if (!silent) {
+                    showStatus('New character created!', true);
+                }
+                
+                updateCharSelect();
+                saveCharactersToStorage();
+            }
+            
+            function clearForm() {
+                // Reset all form fields to defaults
+                document.querySelectorAll('input, select, textarea').forEach(input => {
+                    if (input.type === 'checkbox') {
+                        input.checked = false;
+                    } else if (input.type === 'number') {
+                        if (input.id === 'str-score' || input.id === 'dex-score' || 
+                            input.id === 'con-score' || input.id === 'int-score' || 
+                            input.id === 'wis-score' || input.id === 'cha-score') {
+                            input.value = '10';
+                        } else if (input.id === 'hp-current' || input.id === 'hp-max' || 
+                                   input.id === 'armor-class' || input.id === 'exp') {
+                            input.value = '10';
+                        } else {
+                            input.value = '';
+                        }
+                    } else if (input.tagName === 'SELECT') {
+                        if (input.id === 'level-primary') {
+                            input.value = '1';
+                        } else if (input.id === 'speed') {
+                            input.value = '30 ft';
+                        } else if (input.id === 'hit-dice') {
+                            input.value = '1d10';
+                        } else if (input.id === 'inspiration') {
+                            input.value = '0';
+                        } else {
+                            input.selectedIndex = 0;
+                        }
+                    } else {
+                        input.value = '';
+                    }
+                });
+                
+                // Clear death saves
+                localStorage.setItem('death-saves-success', JSON.stringify([false, false, false]));
+                localStorage.setItem('death-saves-failure', JSON.stringify([false, false, false]));
+                updateDeathSavesDisplay();
+                
+                // Recalculate everything
+                recalculate();
+            }
+            
+            function loadCharacter(charId) {
+                if (!characters[charId]) return;
+                
+                // Save current character before switching
+                if (currentCharId && currentCharId !== charId) {
+                    saveCurrentCharacter();
+                }
+                
+                currentCharId = charId;
+                const charData = characters[charId];
+                
+                // Load character data
+                document.querySelectorAll('input, select, textarea').forEach(input => {
+                    const value = charData[input.name];
+                    if (value !== undefined) {
+                        if (input.type === 'checkbox') {
+                            input.checked = value;
+                        } else if (input.type === 'radio') {
+                            if (value === input.value) {
+                                input.checked = true;
+                            }
+                        } else {
+                            input.value = value;
+                        }
+                    }
+                });
+                
+                // Load death saves
+                if (charData['death-saves-success']) {
+                    localStorage.setItem('death-saves-success', JSON.stringify(charData['death-saves-success']));
+                }
+                if (charData['death-saves-failure']) {
+                    localStorage.setItem('death-saves-failure', JSON.stringify(charData['death-saves-failure']));
+                }
+                
+                updateDeathSavesDisplay();
+                recalculate();
+                showStatus(`Loaded: ${charData.name}`, true);
+            }
+            
+            function saveCurrentCharacter() {
+                if (!currentCharId) return;
+                
+                const charData = characters[currentCharId] || { id: currentCharId };
+                
+                // Save all form fields
+                document.querySelectorAll('input, select, textarea').forEach(input => {
+                    if (input.type === 'checkbox') {
+                        charData[input.name] = input.checked;
+                    } else if (input.type === 'radio') {
+                        if (input.checked) {
+                            charData[input.name] = input.value;
+                        }
+                    } else {
+                        charData[input.name] = input.value;
+                    }
+                });
+                
+                // Save death saves
+                charData['death-saves-success'] = JSON.parse(localStorage.getItem('death-saves-success')) || [false, false, false];
+                charData['death-saves-failure'] = JSON.parse(localStorage.getItem('death-saves-failure')) || [false, false, false];
+                
+                // Update character name from input
+                charData.name = document.getElementById('char-name').value || 'Unnamed Character';
+                
+                characters[currentCharId] = charData;
+                saveCharactersToStorage();
+            }
+            
+            function deleteCurrentCharacter() {
+                if (!currentCharId) return;
+                
+                const charName = characters[currentCharId].name || 'this character';
+                if (Object.keys(characters).length <= 1) {
+                    showStatus('Cannot delete the only character!', false);
+                    return;
+                }
+                
+                if (confirm(`Are you sure you want to delete "${charName}"? This action cannot be undone.`)) {
+                    delete characters[currentCharId];
+                    saveCharactersToStorage();
+                    
+                    // Load first available character
+                    const firstCharId = Object.keys(characters)[0];
+                    if (firstCharId) {
+                        loadCharacter(firstCharId);
+                    } else {
+                        currentCharId = null;
+                        clearForm();
+                    }
+                    
+                    showStatus(`Character "${charName}" deleted!`, true);
+                }
+            }
+            
+            function recalculate() {
+                // Get ability scores and calculate modifiers
+                const abilities = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
+                const abilityMods = {};
+                
+                abilities.forEach(ability => {
+                    const score = parseInt(document.getElementById(`${ability}-score`).value) || 10;
+                    const mod = Math.floor((score - 10) / 2);
+                    const modDisplay = mod >= 0 ? `+${mod}` : `${mod}`;
+                    document.getElementById(`${ability}-mod`).textContent = modDisplay;
+                    abilityMods[ability] = mod;
+                    
+                    // Calculate saving throws (base ability mod)
+                    document.getElementById(`${ability}-save`).textContent = modDisplay;
+                });
+                
+                // Calculate proficiency bonus based on level
+                const level = parseInt(document.getElementById('level-primary').value) || 1;
+                let profBonus = 2;
+                if (level >= 17) profBonus = 6;
+                else if (level >= 13) profBonus = 5;
+                else if (level >= 9) profBonus = 4;
+                else if (level >= 5) profBonus = 3;
+                profBonusInput.value = `+${profBonus}`;
+                
+                // Calculate skills
+                const skills = [
+                    { id: 'acrobatics', ability: 'dex' },
+                    { id: 'animal-handling', ability: 'wis' },
+                    { id: 'arcana', ability: 'int' },
+                    { id: 'athletics', ability: 'str' },
+                    { id: 'deception', ability: 'cha' },
+                    { id: 'history', ability: 'int' },
+                    { id: 'insight', ability: 'wis' },
+                    { id: 'intimidation', ability: 'cha' },
+                    { id: 'investigation', ability: 'int' },
+                    { id: 'medicine', ability: 'wis' },
+                    { id: 'nature', ability: 'int' },
+                    { id: 'perception', ability: 'wis' },
+                    { id: 'performance', ability: 'cha' },
+                    { id: 'persuasion', ability: 'cha' },
+                    { id: 'religion', ability: 'int' },
+                    { id: 'sleight-of-hand', ability: 'dex' },
+                    { id: 'stealth', ability: 'dex' },
+                    { id: 'survival', ability: 'wis' }
+                ];
+                
+                skills.forEach(skill => {
+                    const proficient = document.getElementById(`skill-prof-${skill.id}`).checked;
+                    const baseMod = abilityMods[skill.ability];
+                    const totalMod = baseMod + (proficient ? profBonus : 0);
+                    const modDisplay = totalMod >= 0 ? `+${totalMod}` : `${totalMod}`;
+                    document.getElementById(`skill-mod-${skill.id}`).textContent = modDisplay;
+                });
+                
+                // Calculate initiative (Dex modifier)
+                document.getElementById('initiative').textContent = abilityMods.dex >= 0 ? `+${abilityMods.dex}` : `${abilityMods.dex}`;
+                
+                // Update death saves display
+                updateDeathSavesDisplay();
+            }
+            
+            function toggleDeathSave(type, index) {
+                const key = `death-saves-${type}`;
+                let saves = JSON.parse(localStorage.getItem(key)) || [false, false, false];
+                saves[index] = !saves[index];
+                localStorage.setItem(key, JSON.stringify(saves));
+                updateDeathSavesDisplay();
+                
+                // Save to current character
+                if (currentCharId) {
+                    if (!characters[currentCharId]) {
+                        characters[currentCharId] = {};
+                    }
+                    characters[currentCharId][key] = saves;
+                    saveCharactersToStorage();
+                }
+            }
+            
+            function updateDeathSavesDisplay() {
+                const successSaves = JSON.parse(localStorage.getItem('death-saves-success')) || [false, false, false];
+                const failureSaves = JSON.parse(localStorage.getItem('death-saves-failure')) || [false, false, false];
+                
+                deathSaveSuccesses.forEach((box, index) => {
+                    box.style.backgroundColor = successSaves[index] ? '#4caf50' : 'white';
+                    box.style.boxShadow = successSaves[index] ? 'inset 0 0 5px rgba(0,0,0,0.5)' : 'none';
+                });
+                
+                deathSaveFailures.forEach((box, index) => {
+                    box.style.backgroundColor = failureSaves[index] ? '#f44336' : 'white';
+                    box.style.boxShadow = failureSaves[index] ? 'inset 0 0 5px rgba(0,0,0,0.5)' : 'none';
+                });
+            }
+            
+            function rollDice(e) {
+                const diceType = e.target.textContent;
+                const diceValue = parseInt(diceType.replace('D', ''));
+                const roll = Math.floor(Math.random() * diceValue) + 1;
+                
+                // Create roll animation
+                const diceElement = e.target;
+                const originalText = diceElement.textContent;
+                
+                // Animation effect
+                let rolls = 0;
+                const animation = setInterval(() => {
+                    diceElement.textContent = Math.floor(Math.random() * diceValue) + 1;
+                    rolls++;
+                    if (rolls > 10) {
+                        clearInterval(animation);
+                        diceElement.textContent = roll;
+                        // Show result temporarily
+                        setTimeout(() => {
+                            diceElement.textContent = originalText;
+                        }, 1500);
+                    }
+                }, 50);
+                
+                // Show roll result in status bar
+                showStatus(`Rolled ${diceType}: ${roll}`);
+            }
+            
+            function showTooltip(tooltipId) {
+                hideAllTooltips();
+                const tooltip = document.getElementById(`tooltip-${tooltipId}`);
+                if (tooltip) {
+                    tooltip.style.display = 'block';
+                    tooltipOverlay.style.display = 'block';
+                }
+            }
+            
+            function hideAllTooltips() {
+                document.querySelectorAll('.info-tooltip').forEach(tooltip => {
+                    tooltip.style.display = 'none';
+                });
+                tooltipOverlay.style.display = 'none';
+            }
+            
+            function showStatus(message, success = true) {
+                const statusInfo = saveStatus.querySelector('.status-info');
+                statusInfo.textContent = message;
+                statusInfo.style.color = success ? '#2e7d32' : '#c62828';
+                
+                // Reset after 3 seconds
+                setTimeout(() => {
+                    statusInfo.textContent = 'All changes saved automatically.';
+                    statusInfo.style.color = '#8b0000';
+                }, 3000);
+            }
+        });
+    </script>
+</body>
+</html>

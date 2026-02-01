@@ -1,0 +1,1044 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Dev</title>
+    
+    <script type="importmap">
+    {
+        "imports": {
+            "apiCalls": "./js/apiCalls.js",
+            "filePicker": "./ux/filePicker.js",
+            "filePickerUI": "./ux/filePickerUI.js",
+            "textCode": "./ux/textCode.js",
+            "textCodeUI": "./ux/textCodeUI.js",
+            "aiChat": "./ux/aichat.js"
+        }
+    }
+    </script>
+    
+    <style>
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body {
+            font-family: 'Fira Code', monospace;
+            background:#1e1e1e;
+            color:#ccc;
+            height:100vh;
+            overflow:hidden;
+            font-size:12px;
+        }
+        .container { display:flex; flex-direction:column; height:100vh; width:100vw; }
+        
+        /* Minimal nav bar */
+        .nav { 
+            background:#252526; 
+            padding:2px 6px; 
+            display:flex; 
+            align-items:center; 
+            gap:4px; 
+            border-bottom:1px solid #3e3e42;
+            height:24px;
+        }
+        .page-control { 
+            display:flex; 
+            align-items:center; 
+            gap:2px; 
+            flex-grow:1; 
+        }
+        select { 
+            background:#2d2d30; 
+            color:#fff; 
+            border:1px solid #3e3e42; 
+            border-radius:2px; 
+            padding:1px 16px 1px 4px; 
+            font:inherit; 
+            font-size:11px; 
+            height:20px;
+            min-width:120px;
+            appearance:none;
+            background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='%23888' d='M4 6l4 4 4-4z'/%3E%3C/svg%3E");
+            background-repeat:no-repeat;
+            background-position:right 4px center;
+            background-size:10px;
+        }
+        select:focus { outline:none; border-color:#007acc; }
+        
+        /* Action buttons */
+        .close-btn {
+            background:#c50f1f; 
+            color:white; 
+            border:none; 
+            border-radius:2px; 
+            width:22px; 
+            height:20px; 
+            display:flex; 
+            align-items:center; 
+            justify-content:center; 
+            font-size:11px; 
+            cursor:pointer; 
+            padding:0;
+            margin-left:4px;
+        }
+        .close-btn:hover { background:#a50d19; }
+        .close-btn:disabled { opacity:0.4; cursor:not-allowed; }
+        
+        .save-status {
+            color:#555;
+            font-size:10px;
+            margin-left:6px;
+            height:20px;
+            display:flex;
+            align-items:center;
+        }
+        .save-status.dirty::after {
+            content: "•";
+            color:#c50f1f;
+            margin-left:2px;
+        }
+        
+        /* App View Toolbar */
+        .app-toolbar {
+            background:#252526;
+            border-bottom:1px solid #3e3e42;
+            padding:2px 6px;
+            height:24px;
+            display:none;
+            align-items:center;
+            gap:4px;
+        }
+        .app-toolbar.active {
+            display:flex;
+        }
+        .url-input {
+            background:#2d2d30;
+            color:#fff;
+            border:1px solid #3e3e42;
+            border-radius:2px;
+            padding:2px 6px;
+            font:inherit;
+            font-size:11px;
+            height:20px;
+            flex-grow:1;
+            min-width:0;
+        }
+        .url-input:focus {
+            outline:none;
+            border-color:#007acc;
+        }
+        .go-btn {
+            background:#13a10e;
+            color:white;
+            border:none;
+            border-radius:2px;
+            width:30px;
+            height:20px;
+            font-size:11px;
+            cursor:pointer;
+            flex-shrink:0;
+        }
+        .go-btn:hover { background:#10890c; }
+        .go-btn:active { transform:scale(0.95); }
+        
+        /* Settings page styles */
+        .settings-page {
+            padding: 20px;
+            color: #ccc;
+            font-family: inherit;
+            overflow-y: auto;
+            height: 100%;
+        }
+        .settings-section {
+            background: #252526;
+            border: 1px solid #3e3e42;
+            border-radius: 4px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+        .settings-section h3 {
+            color: #007acc;
+            font-size: 14px;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .settings-row {
+            margin-bottom: 12px;
+        }
+        .settings-row label {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 12px;
+            color: #ccc;
+        }
+        .settings-input {
+            width: 100%;
+            padding: 6px 8px;
+            background: #2d2d30;
+            color: #fff;
+            border: 1px solid #3e3e42;
+            border-radius: 3px;
+            font: inherit;
+            font-size: 12px;
+            box-sizing: border-box;
+        }
+        .settings-input:focus {
+            outline: none;
+            border-color: #007acc;
+            box-shadow: 0 0 0 2px rgba(0, 122, 204, 0.3);
+        }
+        .settings-btn {
+            background: #13a10e;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            padding: 6px 12px;
+            cursor: pointer;
+            font: inherit;
+            font-size: 12px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .settings-btn:hover {
+            background: #10890c;
+        }
+        .settings-btn:active {
+            transform: scale(0.98);
+        }
+        .settings-status {
+            margin-top: 10px;
+            padding: 8px;
+            border-radius: 3px;
+            font-size: 11px;
+            display: none;
+        }
+        .settings-status.success {
+            background: rgba(19, 161, 14, 0.15);
+            color: #13a10e;
+            display: block;
+        }
+        .settings-status.error {
+            background: rgba(197, 15, 31, 0.15);
+            color: #c50f1f;
+            display: block;
+        }
+        
+        /* Content area */
+        .content { 
+            flex-grow:1; 
+            position:relative; 
+            background:#1e1e1e;
+        }
+        .page { 
+            position:absolute; 
+            top:0; 
+            left:0; 
+            width:100%; 
+            height:100%; 
+            display:none;
+        }
+        .page.active { 
+            display:block;
+        }
+        
+        /* Iframe containers */
+        .iframe-container { 
+            width:100%; 
+            height:100%; 
+            position:relative;
+            background:#000;
+        }
+        iframe { 
+            width:100%; 
+            height:100%; 
+            border:none; 
+            display:block;
+        }
+        .iframe-fallback {
+            position:absolute;
+            top:0;
+            left:0;
+            width:100%;
+            height:100%;
+            display:flex;
+            flex-direction:column;
+            align-items:center;
+            justify-content:center;
+            background:#1e1e1e;
+            color:#666;
+            padding:20px;
+            text-align:center;
+        }
+        .iframe-fallback h3 {
+            color:#c50f1f;
+            margin-bottom:10px;
+            font-size:14px;
+        }
+        .iframe-fallback a {
+            display:inline-block;
+            margin-top:15px;
+            padding:6px 12px;
+            background:#007acc;
+            color:#fff;
+            text-decoration:none;
+            border-radius:3px;
+            font-size:12px;
+        }
+        
+        /* File picker */
+        .fp-container { 
+            width:100%; 
+            height:100%; 
+        }
+        .fp-placeholder { 
+            height:100%; 
+            display:flex; 
+            align-items:center; 
+            justify-content:center; 
+            color:#666; 
+            font-size:13px; 
+            flex-direction:column; 
+            gap:8px;
+        }
+        .spinner {
+            border:2px solid #333; 
+            border-top:2px solid #007acc; 
+            border-radius:50%; 
+            width:20px; 
+            height:20px; 
+            animation:spin 1s linear infinite;
+        }
+        
+        /* Status bar */
+        .status { 
+            background:#252526; 
+            padding:1px 6px; 
+            font-size:10px; 
+            color:#888; 
+            border-top:1px solid #3e3e42; 
+            height:18px;
+            display:flex;
+            align-items:center;
+        }
+        .status::before { 
+            content:""; 
+            display:inline-block; 
+            width:6px; 
+            height:6px; 
+            background:#13a10e; 
+            border-radius:50%; 
+            margin-right:4px; 
+        }
+        
+        @keyframes spin { to { transform:rotate(360deg); } }
+        
+        /* Toast notifications */
+        .toast {
+            position:fixed;
+            bottom:10px;
+            right:10px;
+            background:#2d2d30;
+            color:#fff;
+            padding:5px 10px;
+            border-radius:3px;
+            box-shadow:0 2px 6px rgba(0,0,0,0.3);
+            font-size:11px;
+            transform:translateX(400px);
+            transition:transform 0.2s;
+            z-index:10000;
+            max-width:80%;
+        }
+        .toast.show { transform:translateX(0); }
+        .toast.error { background:#c50f1f; }
+        .toast.success { background:#13a10e; }
+        .toast.info { background:#007acc; }
+        
+        /* AIChat Component Theme - Match DevApp Dark Theme */
+        ai-chat {
+            --ai-chat-bg: #1e1e1e;
+            --ai-chat-text: #ccc;
+            --ai-chat-border: #3e3e42;
+            --ai-chat-input-bg: #2d2d30;
+            --ai-chat-input-text: #fff;
+            --ai-chat-button-bg: #007acc;
+            --ai-chat-button-hover: #005c99;
+            --ai-chat-user-bg: #252526;
+            --ai-chat-ai-bg: #2d2d30;
+            --ai-chat-code-bg: #1e1e1e;
+            --ai-chat-code-text: #d4d4d4;
+            --ai-chat-scrollbar-thumb: #444;
+            --ai-chat-scrollbar-track: #252526;
+            --ai-chat-error: #c50f1f;
+            --ai-chat-success: #13a10e;
+            --ai-chat-warning: #ffc107;
+            --ai-chat-warning-text: #000;
+        }
+        
+        /* Override AIChat internal styles for perfect theme matching */
+        ai-chat .section {
+            border-bottom: 1px solid #3e3e42 !important;
+        }
+        
+        ai-chat .top-menu button,
+        ai-chat .top-menu select {
+            background-color: #2d2d30 !important;
+            border: 1px solid #3e3e42 !important;
+            color: #fff !important;
+        }
+        
+        ai-chat .top-menu button:hover,
+        ai-chat .top-menu select:hover {
+            background-color: #3e3e42 !important;
+        }
+        
+        ai-chat #textInput,
+        ai-chat #systemInput {
+            background-color: #2d2d30 !important;
+            border: 1px solid #3e3e42 !important;
+            color: #fff !important;
+        }
+        
+        ai-chat #textInput:focus,
+        ai-chat #systemInput:focus {
+            border-color: #007acc !important;
+            box-shadow: 0 0 0 2px rgba(0, 122, 204, 0.3) !important;
+        }
+        
+        ai-chat .chat-area {
+            background-color: #1e1e1e !important;
+            color: #ccc !important;
+        }
+        
+        ai-chat .code-block-container {
+            background-color: #252526 !important;
+            border: 1px solid #3e3e42 !important;
+        }
+        
+        ai-chat .code-block-header {
+            background-color: #2d2d30 !important;
+            border-bottom: 1px solid #3e3e42 !important;
+            color: #ccc !important;
+        }
+        
+        ai-chat #sendButton {
+            background-color: #007acc !important;
+        }
+        
+        ai-chat #sendButton:hover {
+            background-color: #005c99 !important;
+        }
+        
+        ai-chat #conversationBigButton {
+            background-color: #007acc !important;
+        }
+        
+        ai-chat #conversationBigButton:hover {
+            background-color: #005c99 !important;
+        }
+        
+        ai-chat #conversationBigButton.listening {
+            background-color: #c50f1f !important;
+            box-shadow: 0 0 0 0.5em rgba(197, 15, 31, 0.5) !important;
+        }
+        
+        ai-chat #conversationBigButton.speaking {
+            background-color: #13a10e !important;
+            color: #fff !important;
+            box-shadow: 0 0 0 0.5em rgba(19, 161, 14, 0.5) !important;
+        }
+        
+        ai-chat .close-button {
+            color: #888 !important;
+        }
+        
+        ai-chat .close-button:hover {
+            color: #ccc !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="nav">
+            <div class="page-control">
+                <select id="pageSelector">
+                    <option value="chat">💬 Chat</option>
+                    <option value="appview">📱 App View</option>
+                    <option value="settings">⚙️ Settings</option>
+                    <option value="filepicker">📁 Files</option>
+                </select>
+                <button id="closePageBtn" class="close-btn" disabled title="Close tab">🗑️</button>
+                <div class="save-status" id="saveStatus"></div>
+            </div>
+        </div>
+        
+        <!-- App View Toolbar -->
+        <div class="app-toolbar" id="appToolbar">
+            <input type="text" class="url-input" id="appUrlInput" placeholder="Enter URL (https://example.com)">
+            <button class="go-btn" id="appGoBtn" title="Load URL">Go</button>
+        </div>
+        
+        <div class="content">
+            <!-- Chat Page - REPLACED WITH AIChat Component -->
+            <div id="chatPage" class="page active">
+                <ai-chat 
+                    title="Dev AI Assistant" 
+                    style="width:100%;height:100%;"
+                    id="aiChatComponent"
+                ></ai-chat>
+            </div>
+            
+            <!-- App View Page -->
+            <div id="appViewPage" class="page">
+                <div class="iframe-container">
+                    <iframe id="appIframe" src="about:blank" allow="camera; microphone; geolocation; clipboard-read; clipboard-write; autoplay; fullscreen" allowfullscreen></iframe>
+                    <div class="iframe-fallback" id="appFallback" style="display:none;">
+                        <h3>⚠️ App Unavailable</h3>
+                        <p>Could not load the application.</p>
+                        <p id="appErrorText">Check URL and permissions</p>
+                        <button class="go-btn" style="margin-top:15px;width:auto;padding:6px 12px;" id="appRetryBtn">Retry</button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Settings Page -->
+            <div id="settingsPage" class="page">
+                <div class="settings-page">
+                    <div class="settings-section">
+                        <h3>⚙️ Application Settings</h3>
+                        <div class="settings-row">
+                            <label for="defaultTestUrl">Default Test App URL:</label>
+                            <input type="text" id="defaultTestUrl" class="settings-input" placeholder="https://your-test-app.com">
+                        </div>
+                        <button id="saveSettingsBtn" class="settings-btn">
+                            <span>💾</span> Save Settings
+                        </button>
+                        <div id="settingsStatus" class="settings-status"></div>
+                    </div>
+                    
+                    <div class="settings-section">
+                        <h3>ℹ️ About</h3>
+                        <p style="font-size:11px;line-height:1.5;">
+                            Dev Environment v1.0<br>
+                            • Chat: AI Assistant with voice support<br>
+                            • App View: Test web applications<br>
+                            • File Editor: Code editing with syntax support<br>
+                            • Settings: Persistent configuration
+                        </p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- File Picker Page -->
+            <div id="filePickerPage" class="page">
+                <div class="fp-container" id="filePickerContainer">
+                    <div class="fp-placeholder">
+                        <div class="spinner"></div>
+                        <div>Loading files...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="status" id="statusBar">Ready</div>
+    </div>
+    
+    <div class="toast" id="toast"></div>
+
+    <script type="module">
+        // Load modules
+        const mods = { api: null, fp: null, tc: null, aiChat: null };
+        try {
+            const apiMod = await import('apiCalls');
+            mods.api = apiMod.api;
+            
+            await import('filePickerUI');
+            const fpMod = await import('filePicker');
+            mods.fp = fpMod.createfilePicker;
+            
+            await import('textCodeUI');
+            const tcMod = await import('textCode');
+            mods.tc = tcMod.createTexCode;
+            
+            // Load AIChat component
+            await import('aiChat');
+            mods.aiChat = true;
+            
+        } catch (e) {
+            console.error('Module load failed:', e);
+            document.getElementById('statusBar').textContent = `❌ Error: ${e.message}`;
+        }
+        
+        // DOM elements
+        const pageSel = document.getElementById('pageSelector');
+        const closeBtn = document.getElementById('closePageBtn');
+        const saveStatus = document.getElementById('saveStatus');
+        const statusEl = document.getElementById('statusBar');
+        const toastEl = document.getElementById('toast');
+        const fpContainer = document.getElementById('filePickerContainer');
+        const contentArea = document.querySelector('.content');
+        const appToolbar = document.getElementById('appToolbar');
+        const appUrlInput = document.getElementById('appUrlInput');
+        const appGoBtn = document.getElementById('appGoBtn');
+        const appIframe = document.getElementById('appIframe');
+        const appFallback = document.getElementById('appFallback');
+        const appErrorText = document.getElementById('appErrorText');
+        const appRetryBtn = document.getElementById('appRetryBtn');
+        const defaultTestUrlInput = document.getElementById('defaultTestUrl');
+        const saveSettingsBtn = document.getElementById('saveSettingsBtn');
+        const settingsStatus = document.getElementById('settingsStatus');
+        
+        // Load settings from localStorage
+        const SETTINGS_KEY = 'devEnvSettings';
+        let appSettings = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
+        if (!appSettings.defaultTestUrl) {
+            appSettings.defaultTestUrl = 'https://';
+            localStorage.setItem(SETTINGS_KEY, JSON.stringify(appSettings));
+        }
+        
+        // State
+        const state = {
+            currentPage: 'chat',
+            systemPages: {
+                chat: { id:'chat', el:document.getElementById('chatPage') },
+                appview: { 
+                    id:'appview', 
+                    el:document.getElementById('appViewPage'), 
+                    url: appSettings.defaultTestUrl 
+                },
+                settings: { id:'settings', el:document.getElementById('settingsPage') },
+                filepicker: { id:'filepicker', el:document.getElementById('filePickerPage'), init:false }
+            },
+            tabs: {} // { id: { id, name, el, editor, filePath, content } }
+        };
+        
+        // Initialize settings page with saved value
+        defaultTestUrlInput.value = appSettings.defaultTestUrl;
+        
+        // Utilities
+        function showToast(msg, type='info') {
+            toastEl.textContent = msg;
+            toastEl.className = `toast ${type}`;
+            toastEl.classList.add('show');
+            setTimeout(() => toastEl.classList.remove('show'), 2500);
+        }
+        
+        function updateStatus(msg) {
+            statusEl.textContent = msg;
+        }
+        
+        function updateSaveStatus(isDirty) {
+            saveStatus.className = 'save-status';
+            if (isDirty) saveStatus.classList.add('dirty');
+            saveStatus.title = isDirty ? 'Unsaved changes' : 'All changes saved';
+        }
+        
+        function toggleAppToolbar(show) {
+            appToolbar.classList.toggle('active', show);
+        }
+        
+        function showSettingsStatus(message, isSuccess) {
+            settingsStatus.textContent = message;
+            settingsStatus.className = 'settings-status';
+            settingsStatus.classList.add(isSuccess ? 'success' : 'error');
+            
+            // Auto-hide after 3 seconds
+            setTimeout(() => {
+                if (settingsStatus.classList.contains('success')) {
+                    settingsStatus.classList.remove('success');
+                    settingsStatus.style.display = 'none';
+                }
+            }, 3000);
+        }
+        
+        function loadAppUrl(url) {
+            if (!url.trim()) {
+                showToast('⚠️ URL cannot be empty', 'error');
+                return;
+            }
+            
+            // Auto-add https if missing
+            if (!url.startsWith('http://') && !url.startsWith('https://')) {
+                url = 'https://' + url;
+            }
+            
+            try {
+                new URL(url);
+                appIframe.src = url;
+                state.systemPages.appview.url = url;
+                appUrlInput.value = url;
+                updateStatus(`Loading: ${url}`);
+                showToast(`Loading ${url}`, 'info');
+                appFallback.style.display = 'none';
+                appIframe.style.display = 'block';
+            } catch (e) {
+                showToast(`❌ Invalid URL: ${e.message}`, 'error');
+                updateStatus(`Error: Invalid URL`);
+                showAppFallback(`Invalid URL format: ${e.message}`);
+            }
+        }
+        
+        function showAppFallback(message) {
+            appFallback.style.display = 'flex';
+            appIframe.style.display = 'none';
+            appErrorText.textContent = message;
+            updateStatus(`App load failed: ${message}`);
+        }
+        
+        function switchPage(id) {
+            // Hide current page
+            if (state.currentPage in state.systemPages) {
+                state.systemPages[state.currentPage].el.classList.remove('active');
+            } else if (state.tabs[state.currentPage]) {
+                state.tabs[state.currentPage].el.classList.remove('active');
+            }
+            
+            // Show new page
+            if (id in state.systemPages) {
+                state.systemPages[id].el.classList.add('active');
+            } else if (state.tabs[id]) {
+                state.tabs[id].el.classList.add('active');
+            }
+            
+            state.currentPage = id;
+            pageSel.value = id;
+            closeBtn.disabled = (id === 'chat' || id === 'filepicker' || id === 'appview' || id === 'settings');
+            
+            // Toggle UI elements based on page type
+            toggleAppToolbar(id === 'appview');
+            
+            // Update save status for editor tabs
+            if (id in state.tabs) {
+                const tab = state.tabs[id];
+                const isDirty = tab.editor?.value !== tab.content;
+                updateSaveStatus(isDirty);
+            } else {
+                updateSaveStatus(false);
+                saveStatus.textContent = '';
+            }
+            
+            // Handle special pages
+            if (id === 'filepicker' && !state.systemPages.filepicker.init) {
+                initFilePicker();
+            }
+            
+            if (id === 'appview') {
+                appUrlInput.value = state.systemPages.appview.url;
+                updateStatus(`App View: ${state.systemPages.appview.url}`);
+                setTimeout(() => appUrlInput.focus(), 100);
+            }
+            
+            if (id === 'settings') {
+                // Refresh settings input with latest value
+                defaultTestUrlInput.value = appSettings.defaultTestUrl;
+                updateStatus('Settings');
+            }
+            
+            // Update status bar
+            if (id === 'chat') {
+                updateStatus('AI Assistant ready');
+                // Focus on text input if needed
+                setTimeout(() => {
+                    const aiChat = document.getElementById('aiChatComponent');
+                    if (aiChat) {
+                        const textInput = aiChat.shadowRoot?.getElementById('textInput');
+                        if (textInput) {
+                            textInput.focus();
+                        }
+                    }
+                }, 100);
+            } else if (id === 'appview') {
+                updateStatus(`App View: ${state.systemPages.appview.url}`);
+            } else if (id === 'settings') {
+                updateStatus('Settings');
+            } else if (id === 'filepicker') {
+                updateStatus('File browser');
+            } else if (state.tabs[id]) {
+                updateStatus(`Editing: ${state.tabs[id].name}`);
+            }
+        }
+        
+        function addTab(id, name, el, editor, filePath, content) {
+            state.tabs[id] = { id, name, el, editor, filePath, content };
+            const opt = document.createElement('option');
+            opt.value = id;
+            opt.textContent = `📝 ${name}`;
+            pageSel.appendChild(opt);
+        }
+        
+        function removeTab(id) {
+            if (!state.tabs[id]) return;
+            const opt = Array.from(pageSel.options).find(o => o.value === id);
+            if (opt) pageSel.removeChild(opt);
+            if (state.tabs[id].el.parentNode) {
+                state.tabs[id].el.parentNode.removeChild(state.tabs[id].el);
+            }
+            delete state.tabs[id];
+        }
+        
+        // File operations
+        async function openFile(path) {
+            try {
+                const content = await mods.api.readFile(path);
+                const name = path.split('/').pop();
+                const id = `tab-${Date.now()}`;
+                
+                const existing = Object.values(state.tabs).find(t => t.filePath === path);
+                if (existing) {
+                    switchPage(existing.id);
+                    return showToast(`Already open: ${name}`, 'info');
+                }
+                
+                // Create simple container for editor
+                const page = document.createElement('div');
+                page.className = 'page';
+                page.innerHTML = `<div style="width:100%;height:100%"></div>`;
+                contentArea.appendChild(page);
+                
+                const editorContainer = page.firstChild;
+                const editor = mods.tc(content);
+                editorContainer.appendChild(editor);
+                
+                // Handle save events from editor (triggered internally by textCode module)
+                editor.addEventListener('save', async (e) => {
+                    try {
+                        await mods.api.saveFile(path, editor.value);
+                        state.tabs[id].content = editor.value;
+                        if (state.currentPage === id) {
+                            updateSaveStatus(false);
+                        }
+                        showToast(`✅ Saved: ${name}`, 'success');
+                        updateStatus(`Saved: ${name}`);
+                    } catch (error) {
+                        showToast(`❌ Save failed: ${error.message}`, 'error');
+                        console.error('Save error:', error);
+                    }
+                });
+                
+                // Track changes for dirty status
+                let changeTimeout;
+                editor.addEventListener('input', () => {
+                    clearTimeout(changeTimeout);
+                    changeTimeout = setTimeout(() => {
+                        if (state.currentPage === id) {
+                            const isDirty = editor.value !== state.tabs[id].content;
+                            updateSaveStatus(isDirty);
+                        }
+                    }, 300);
+                });
+                
+                addTab(id, name, page, editor, path, content);
+                switchPage(id);
+                showToast(`Opened: ${name}`, 'info');
+                
+            } catch (e) {
+                showToast(`❌ Open failed: ${e.message}`, 'error');
+                console.error('Open error:', e);
+            }
+        }
+        
+        function closeCurrent() {
+            const id = state.currentPage;
+            if (id === 'chat' || id === 'filepicker' || id === 'appview' || id === 'settings') return;
+            
+            const tab = state.tabs[id];
+            if (!tab) return;
+            
+            if (tab.editor.value !== tab.content) {
+                if (!confirm(`Unsaved changes in "${tab.name}". Close anyway?`)) return;
+            }
+            
+            switchPage('filepicker');
+            removeTab(id);
+            showToast(`Closed: ${tab.name}`, 'info');
+        }
+        
+        // Settings operations
+        function saveSettings() {
+            const newUrl = defaultTestUrlInput.value.trim();
+            
+            if (!newUrl) {
+                showSettingsStatus('URL cannot be empty', false);
+                return;
+            }
+            
+            // Validate URL format
+            try {
+                // Add https if missing for validation
+                const testUrl = newUrl.startsWith('http') ? newUrl : `https://${newUrl}`;
+                new URL(testUrl);
+                
+                // Save to settings object and localStorage
+                appSettings.defaultTestUrl = newUrl;
+                localStorage.setItem(SETTINGS_KEY, JSON.stringify(appSettings));
+                
+                // Update app view state
+                state.systemPages.appview.url = newUrl;
+                
+                // Show success message
+                showSettingsStatus('✅ Settings saved successfully!', true);
+                showToast('Settings saved', 'success');
+                updateStatus('Settings saved');
+                
+                // If app view is open, update its URL input
+                if (state.currentPage === 'appview') {
+                    appUrlInput.value = newUrl;
+                }
+                
+            } catch (e) {
+                showSettingsStatus(`Invalid URL format: ${e.message}`, false);
+                showToast(`URL error: ${e.message}`, 'error');
+            }
+        }
+        
+        // File picker init
+        function initFilePicker() {
+            if (state.systemPages.filepicker.init) return;
+            
+            try {
+                fpContainer.innerHTML = '<div class="fp-placeholder"><div class="spinner"></div><div>Initializing...</div></div>';
+                const wrapper = mods.fp();
+                const picker = wrapper.querySelector('.file-picker-container-wrapper');
+                
+                if (!picker) throw new Error('Picker container not found');
+                
+                picker.onfilepick = (e, path) => openFile(path);
+                picker.addEventListener('filepick', e => openFile(e.detail.filePath));
+                
+                fpContainer.innerHTML = '';
+                fpContainer.appendChild(picker);
+                state.systemPages.filepicker.init = true;
+                showToast('File picker ready', 'info');
+                
+            } catch (e) {
+                fpContainer.innerHTML = `<div class="fp-placeholder" style="color:#c50f1f">Error: ${e.message}</div>`;
+                showToast(`Picker error: ${e.message}`, 'error');
+                console.error('Picker init failed:', e);
+            }
+        }
+        
+        // App View iframe handling
+        let appLoaded = false;
+        let appLoadTimeout = null;
+        
+        appIframe.addEventListener('load', () => {
+            appLoaded = true;
+            appFallback.style.display = 'none';
+            appIframe.style.display = 'block';
+            updateStatus(`App loaded: ${state.systemPages.appview.url}`);
+            showToast(`✅ App loaded`, 'success');
+        });
+        
+        appIframe.addEventListener('error', (e) => {
+            showAppFallback('Failed to load application. Check URL and permissions.');
+        });
+        
+        function setupAppLoadTimeout() {
+            clearTimeout(appLoadTimeout);
+            appLoaded = false;
+            appLoadTimeout = setTimeout(() => {
+                if (!appLoaded) {
+                    showAppFallback('Application failed to load. May be blocked by security policies.');
+                }
+            }, 8000);
+        }
+        
+        // Events
+        pageSel.addEventListener('change', e => switchPage(e.target.value));
+        closeBtn.addEventListener('click', closeCurrent);
+        
+        // App View events
+        appGoBtn.addEventListener('click', () => {
+            loadAppUrl(appUrlInput.value);
+            setupAppLoadTimeout();
+        });
+        
+        appUrlInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                loadAppUrl(appUrlInput.value);
+                setupAppLoadTimeout();
+            }
+        });
+        
+        appRetryBtn.addEventListener('click', () => {
+            loadAppUrl(appUrlInput.value);
+            setupAppLoadTimeout();
+        });
+        
+        // Settings events
+        saveSettingsBtn.addEventListener('click', saveSettings);
+        defaultTestUrlInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                saveSettings();
+            }
+        });
+        
+        // Keyboard shortcuts
+        document.addEventListener('keydown', e => {
+            const isEditorTab = state.currentPage in state.tabs;
+            const isAppView = state.currentPage === 'appview';
+            const isSettings = state.currentPage === 'settings';
+            
+            if ((e.ctrlKey || e.metaKey) && e.key === 'w') {
+                e.preventDefault();
+                !closeBtn.disabled && closeCurrent();
+            }
+            if ((e.ctrlKey || e.metaKey) && e.key === 'o') {
+                e.preventDefault();
+                switchPage('filepicker');
+            }
+            if (e.key === 'Escape') {
+                if (isEditorTab) {
+                    switchPage('filepicker');
+                } else if (isAppView) {
+                    appUrlInput.focus();
+                } else if (isSettings) {
+                    defaultTestUrlInput.blur();
+                }
+            }
+            
+            // Editor-specific shortcuts (handled by textCode module internally)
+            // The textCode module should handle:
+            // - Ctrl+C/Cmd+C: Copy selection
+            // - Ctrl+V/Cmd+V: Paste
+            // - Ctrl+S/Cmd+S: Trigger save event
+            
+            if (isAppView && e.target !== appUrlInput) {
+                if ((e.ctrlKey || e.metaKey) && e.key === 'l') {
+                    e.preventDefault();
+                    appUrlInput.focus();
+                    appUrlInput.select();
+                }
+            }
+            
+            // Settings shortcut: Ctrl+, to open settings
+            if ((e.ctrlKey || e.metaKey) && e.key === ',') {
+                e.preventDefault();
+                switchPage('settings');
+                setTimeout(() => defaultTestUrlInput.focus(), 100);
+            }
+        });
+        
+        // Initialize
+        setTimeout(() => {
+            showToast('Ready', 'info');
+            updateStatus('Ready');
+        }, 300);
+        
+        // Set initial app URL from settings
+        appUrlInput.value = state.systemPages.appview.url;
+        
+        // Debug access
+        window.dev = { 
+            state, 
+            openFile, 
+            closeCurrent, 
+            switchPage, 
+            loadAppUrl,
+            appSettings,
+            saveSettings
+        };
+    </script>
+</body>
+</html>

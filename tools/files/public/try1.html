@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Animated Styled Page</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            animation: fadeInUp 1s ease-out;
+            transform-origin: center;
+        }
+        
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        
+        p {
+            color: #34495e;
+            line-height: 1.6;
+            animation: slideInLeft 0.8s ease-out;
+        }
+        
+        .highlight {
+            background-color: #fff9c4;
+            padding: 2px 5px;
+            border-radius: 3px;
+            animation: highlightPulse 1.5s infinite;
+        }
+        
+        @keyframes highlightPulse {
+            0% { background-color: #fff9c4; }
+            50% { background-color: #ffeb3b; }
+            100% { background-color: #fff9c4; }
+        }
+        
+        ul {
+            animation: slideInRight 0.8s ease-out 0.3s both;
+        }
+        
+        li {
+            margin: 10px 0;
+            animation: fadeIn 0.5s ease-out forwards;
+            opacity: 0;
+        }
+        
+        li:nth-child(1) { animation-delay: 0.5s; }
+        li:nth-child(2) { animation-delay: 0.7s; }
+        li:nth-child(3) { animation-delay: 0.9s; }
+        li:nth-child(4) { animation-delay: 1.1s; }
+        
+        @keyframes slideInLeft {
+            from {
+                opacity: 0;
+                transform: translateX(-30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+        
+        @keyframes slideInRight {
+            from {
+                opacity: 0;
+                transform: translateX(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+        
+        @keyframes fadeIn {
+            to {
+                opacity: 1;
+            }
+        }
+        
+        .floating {
+            animation: floating 3s ease-in-out infinite;
+        }
+        
+        @keyframes floating {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-15px); }
+            100% { transform: translateY(0px); }
+        }
+        
+        /* Hover effects */
+        .container:hover {
+            transform: scale(1.02);
+            transition: transform 0.3s ease;
+        }
+        
+        /* Responsive design */
+        @media (max-width: 768px) {
+            .container {
+                margin: 10px;
+                padding: 20px;
+            }
+            
+            h1 {
+                font-size: 1.5em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container floating">
+        <h1>Welcome to My Animated Page</h1>
+        <p>This is a <span class="highlight">styled HTML page</span> with various animations.</p>
+        <p>The animations include:</p>
+        <ul>
+            <li>Fade in and slide effects</li>
+            <li>Pulsing highlights</li>
+            <li>Hover interactions</li>
+            <li>Floating container</li>
+        </ul>
+        <p>Try hovering over this card to see the scaling effect!</p>
+    </div>
+</body>
+</html>
