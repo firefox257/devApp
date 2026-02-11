@@ -77,7 +77,9 @@ const _mimetype = {
     '.zip': 'application/zip',
     '.xyz': 'application/octet-stream',
     '.webm': 'video/webm',
-    '.wat': 'text/plain'
+    '.wat': 'text/plain',
+	'.pdf': 'application/pdf',
+
 }
 
 // ===== CRITICAL SECURITY FIX: PATH VALIDATION HELPER =====

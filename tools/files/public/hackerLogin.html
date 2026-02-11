@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hacker Login</title>
+    <style>
+        /* --- Embedded CSS --- */
+        /* Basic Reset */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Courier New', Courier, monospace; /* Classic monospace font */
+            background-color: #000;
+            color: #0f0; /* Green text for a hacker feel */
+            overflow: hidden; /* Hide scrollbars caused by canvas */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .matrix-container {
+            position: relative;
+            width: 100%;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #matrixCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1; /* Behind the login box */
+        }
+
+        .login-box {
+            position: relative; /* To be above the canvas */
+            z-index: 2;
+            background-color: rgba(0, 0, 0, 0.7); /* Semi-transparent background */
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.3); /* Green glow */
+            text-align: center;
+            max-width: 400px;
+            width: 90%;
+        }
+
+        .login-box h1 {
+            color: #0f0;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            text-shadow: 0 0 5px #0f0;
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #0f0;
+            font-size: 1.1em;
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #0f0;
+            background-color: #000;
+            color: #0f0;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 1em;
+            outline: none; /* Remove default outline */
+            box-shadow: inset 0 0 5px rgba(0, 255, 0, 0.5); /* Inner glow */
+        }
+
+        .input-group input:focus {
+            border-color: #0ff; /* Cyan highlight on focus */
+            box-shadow: inset 0 0 8px rgba(0, 255, 255, 0.7);
+        }
+
+        button[type="submit"] {
+            background-color: #0f0;
+            color: #000;
+            border: none;
+            padding: 12px 25px;
+            font-size: 1.2em;
+            font-family: 'Courier New', Courier, monospace;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: background-color 0.3s ease, box-shadow 0.3s ease;
+            text-transform: uppercase;
+            margin-top: 15px;
+            box-shadow: 0 0 8px rgba(0, 255, 0, 0.7);
+        }
+
+        button[type="submit"]:hover {
+            background-color: #0ff; /* Cyan on hover */
+            box-shadow: 0 0 15px rgba(0, 255, 255, 0.9);
+        }
+
+        .error-message {
+            color: #f00; /* Red for errors */
+            margin-top: 15px;
+            font-size: 0.9em;
+            min-height: 1.2em; /* Reserve space for the message */
+        }
+    </style>
+</head>
+<body>
+
+    <div class="matrix-container">
+        <canvas id="matrixCanvas"></canvas>
+        <div class="login-box">
+            <h1>Hacker Login</h1>
+            <form id="loginForm">
+                <div class="input-group">
+                    <label for="username">Username:</label>
+                    <input type="text" id="username" name="username" required>
+                </div>
+                <div class="input-group">
+                    <label for="password">Password:</label>
+                    <input type="password" id="password" name="password" required>
+                </div>
+                <button type="submit">Login</button>
+            </form>
+            <p class="error-message" id="errorMessage"></p>
+        </div>
+    </div>
+
+    <script>
+        // --- Embedded JavaScript ---
+        const canvas = document.getElementById('matrixCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Set canvas dimensions to full screen
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        // Matrix characters (Japanese Katakana, numbers, and symbols are common)
+        const matrixChars = 'アァカサタナハマヤャラワガザダバパイィキシチニヒミリヰギジヂビピウゥクスツヌフムユュルヱグズヅブヅヴエェケセテネヘメヱゲゼデベペオォコソトノホモヨョロヲゴゾドボポヴ　ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+=-`~[]{}|;:,.<>?';
+        const charArray = matrixChars.split('');
+
+        const fontSize = 16; // Adjust for desired character size
+        const columns = canvas.width / fontSize;
+        const drops = []; // Array to hold the Y position of each 'drop' (column)
+
+        // Initialize drops array with random starting positions
+        for (let i = 0; i < columns; i++) {
+            drops[i] = 1; // Start each column at the top
+        }
+
+        // Function to draw the matrix effect
+        function drawMatrix() {
+            // Make the background slightly transparent black to create a fading trail
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Set text color and font
+            ctx.fillStyle = '#0f0'; // Green color
+            ctx.font = `${fontSize}px 'Courier New', Courier, monospace`;
+
+            // Loop through each column
+            for (let i = 0; i < drops.length; i++) {
+                // Pick a random character from the charArray
+                const text = charArray[Math.floor(Math.random() * charArray.length)];
+
+                // Draw the character at the current column and drop position
+                ctx.fillText(text, i * fontSize, drops[i] * fontSize);
+
+                // If the drop is below the screen, reset it to the top
+                // and add a random chance to reset it further up to create gaps
+                if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) {
+                    drops[i] = 0; // Reset to top
+                }
+
+                // Move the drop down
+                drops[i]++;
+            }
+        }
+
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+            drawMatrix();
+        }
+
+        // Handle window resizing
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            // Recalculate columns based on new width
+            const newColumns = canvas.width / fontSize;
+            // Adjust drops array if necessary (though often it's fine to let it expand)
+            while (drops.length < newColumns) {
+                drops.push(1);
+            }
+            while (drops.length > newColumns) {
+                drops.pop();
+            }
+        });
+
+        // --- Login Form Logic ---
+        const loginForm = document.getElementById('loginForm');
+        const errorMessage = document.getElementById('errorMessage');
+
+        loginForm.addEventListener('submit', (e) => {
+            e.preventDefault(); // Prevent default form submission
+
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+
+            // Basic validation (replace with actual authentication logic)
+            if (username === 'admin' && password === 'matrix') {
+                errorMessage.textContent = '';
+                alert('Login successful! Welcome, hacker.');
+                // Redirect or do something else upon successful login
+            } else {
+                errorMessage.textContent = 'Access Denied. Invalid credentials.';
+                // Optionally clear the inputs
+                // document.getElementById('username').value = '';
+                // document.getElementById('password').value = '';
+            }
+        });
+
+        // Start the animation
+        animate();
+    </script>
+
+</body>
+</html>

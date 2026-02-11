@@ -1,0 +1,1084 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>File Picker - Developer Documentation</title>
+    <style>
+        :root {
+            --primary-color: #007bff;
+            --secondary-color: #6c757d;
+            --success-color: #28a745;
+            --danger-color: #dc3545;
+            --warning-color: #ffc107;
+            --info-color: #17a2b8;
+            --light-color: #f8f9fa;
+            --dark-color: #343a40;
+            --border-radius: 4px;
+            --box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            --code-bg: #2d2d2d;
+            --code-text: #f8f8f2;
+            --code-comment: #75715e;
+            --code-keyword: #f92672;
+            --code-string: #a6e22e;
+            --code-function: #66d9ef;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f5f5f5;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        header {
+            background: linear-gradient(135deg, var(--primary-color), #0056b3);
+            color: white;
+            padding: 40px 60px;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            font-size: 1.2em;
+            opacity: 0.9;
+            margin-bottom: 20px;
+        }
+
+        .badges {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .badge {
+            background: rgba(255,255,255,0.2);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.9em;
+        }
+
+        nav {
+            background: #2c3e50;
+            padding: 15px 60px;
+        }
+
+        .toc {
+            display: flex;
+            flex-wrap: wrap;
+            list-style: none;
+            gap: 20px;
+        }
+
+        .toc a {
+            color: white;
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            transition: background 0.3s;
+        }
+
+        .toc a:hover {
+            background: rgba(255,255,255,0.1);
+        }
+
+        main {
+            padding: 40px 60px;
+        }
+
+        section {
+            margin-bottom: 40px;
+            padding-bottom: 40px;
+            border-bottom: 1px solid #eaeaea;
+        }
+
+        section:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+            padding-bottom: 0;
+        }
+
+        h2 {
+            color: var(--primary-color);
+            font-size: 1.8em;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid var(--primary-color);
+        }
+
+        h3 {
+            color: var(--dark-color);
+            font-size: 1.4em;
+            margin: 25px 0 15px 0;
+        }
+
+        p {
+            margin-bottom: 15px;
+            line-height: 1.7;
+        }
+
+        .note, .warning, .tip {
+            padding: 15px;
+            border-left: 4px solid;
+            margin: 20px 0;
+            border-radius: 4px;
+            background: #f8f9fa;
+        }
+
+        .note {
+            border-left-color: var(--info-color);
+            border-left-width: 6px;
+        }
+
+        .warning {
+            border-left-color: var(--danger-color);
+            border-left-width: 6px;
+            background: #fff3cd;
+        }
+
+        .tip {
+            border-left-color: var(--success-color);
+            border-left-width: 6px;
+            background: #d4edda;
+        }
+
+        .note h4, .warning h4, .tip h4 {
+            margin-top: 0;
+            margin-bottom: 10px;
+            color: var(--dark-color);
+        }
+
+        .code-block {
+            background: var(--code-bg);
+            color: var(--code-text);
+            padding: 20px;
+            border-radius: var(--border-radius);
+            margin: 20px 0;
+            overflow-x: auto;
+            font-family: 'Fira Code', 'Cascadia Code', 'SFMono-Regular', Consolas, monospace;
+            font-size: 0.95em;
+            line-height: 1.5;
+        }
+
+        .code-comment {
+            color: var(--code-comment);
+        }
+
+        .code-keyword {
+            color: var(--code-keyword);
+        }
+
+        .code-string {
+            color: var(--code-string);
+        }
+
+        .code-function {
+            color: var(--code-function);
+        }
+
+        .code-tag {
+            color: #f92672;
+        }
+
+        .code-attr {
+            color: #a6e22e;
+        }
+
+        .code-value {
+            color: #e6db74;
+        }
+
+        .example {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: var(--border-radius);
+            padding: 25px;
+            margin: 25px 0;
+        }
+
+        .example-title {
+            font-weight: bold;
+            color: var(--primary-color);
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .example-title::before {
+            content: "💡";
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            background: white;
+            box-shadow: var(--box-shadow);
+        }
+
+        th {
+            background: var(--primary-color);
+            color: white;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+        }
+
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        tr:nth-child(even) {
+            background: #f8f9fa;
+        }
+
+        tr:hover {
+            background: #e9ecef;
+        }
+
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin: 30px 0;
+        }
+
+        .feature-card {
+            background: white;
+            padding: 20px;
+            border-radius: var(--border-radius);
+            box-shadow: var(--box-shadow);
+            border-left: 4px solid var(--primary-color);
+        }
+
+        .feature-card h4 {
+            color: var(--primary-color);
+            margin-bottom: 10px;
+        }
+
+        .api-table td:first-child {
+            font-weight: 600;
+            color: var(--primary-color);
+            width: 200px;
+        }
+
+        .api-table td code {
+            background: var(--code-bg);
+            color: var(--code-text);
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Fira Code', monospace;
+        }
+
+        footer {
+            background: #2c3e50;
+            color: white;
+            text-align: center;
+            padding: 30px;
+            margin-top: 40px;
+        }
+
+        .quick-links {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin-top: 20px;
+        }
+
+        .quick-links a {
+            color: #00a8ff;
+            text-decoration: none;
+        }
+
+        .quick-links a:hover {
+            text-decoration: underline;
+        }
+
+        @media (max-width: 768px) {
+            header, nav, main {
+                padding: 20px;
+            }
+
+            h1 {
+                font-size: 2em;
+            }
+
+            .toc {
+                flex-direction: column;
+                gap: 10px;
+            }
+
+            .feature-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📁 File Picker</h1>
+            <p class="subtitle">A powerful, customizable file browser component for web applications</p>
+            <div class="badges">
+                <span class="badge">Vanilla JavaScript</span>
+                <span class="badge">No Dependencies</span>
+                <span class="badge">Custom Element Support</span>
+                <span class="badge">Programmatic API</span>
+            </div>
+        </header>
+
+        <nav>
+            <ul class="toc">
+                <li><a href="#overview">Overview</a></li>
+                <li><a href="#features">Features</a></li>
+                <li><a href="#installation">Installation</a></li>
+                <li><a href="#usage">Usage</a></li>
+                <li><a href="#api">API Reference</a></li>
+                <li><a href="#events">Events</a></li>
+                <li><a href="#examples">Examples</a></li>
+                <li><a href="#customization">Customization</a></li>
+                <li><a href="#best-practices">Best Practices</a></li>
+            </ul>
+        </nav>
+
+        <main>
+            <!-- Overview Section -->
+            <section id="overview">
+                <h2>Overview</h2>
+                <p>
+                    The File Picker is a comprehensive file browser component that provides a user-friendly interface 
+                    for navigating, selecting, and managing files and directories. It can be used both as a custom HTML 
+                    element (<code>&lt;filepicker&gt;</code>) or programmatically via JavaScript.
+                </p>
+                <p>
+                    Built with vanilla JavaScript, it offers a rich set of features including file operations 
+                    (create, rename, copy, cut, paste, delete), download/upload capabilities, and a responsive design 
+                    that works across devices.
+                </p>
+
+                <div class="feature-grid">
+                    <div class="feature-card">
+                        <h4>📁 File Operations</h4>
+                        <p>Complete CRUD operations with clipboard support</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>🔄 Download/Upload</h4>
+                        <p>Toggle between downloading files and uploading to directories</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>🎨 Custom Element</h4>
+                        <p>Declarative usage with HTML attributes</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>💻 Programmatic API</h4>
+                        <p>Full JavaScript control for dynamic scenarios</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Features Section -->
+            <section id="features">
+                <h2>Features</h2>
+                
+                <h3>Core Functionality</h3>
+                <ul>
+                    <li><strong>File Navigation:</strong> Browse directories with intuitive path display</li>
+                    <li><strong>File Selection:</strong> Single or multiple file selection with checkboxes</li>
+                    <li><strong>Path Navigation:</strong> Quick access to parent directories with ".." navigation</li>
+                    <li><strong>Responsive Design:</strong> Adapts to different screen sizes</li>
+                    <li><strong>File Size Display:</strong> Human-readable file sizes (KB, MB, GB)</li>
+                </ul>
+
+                <h3>File Operations</h3>
+                <ul>
+                    <li><strong>Create:</strong> Create new files or directories</li>
+                    <li><strong>Rename:</strong> Rename files and directories</li>
+                    <li><strong>Copy/Cut:</strong> Clipboard operations with visual feedback</li>
+                    <li><strong>Paste:</strong> Smart paste with duplicate detection and auto-renaming</li>
+                    <li><strong>Delete:</strong> Move to trash or permanent deletion with confirmation</li>
+                </ul>
+
+                <h3>Download & Upload</h3>
+                <ul>
+                    <li><strong>Download:</strong> Download selected files as binary blobs</li>
+                    <li><strong>Upload:</strong> Upload files to current directory</li>
+                    <li><strong>Smart Button:</strong> Context-aware button toggles between download and upload modes</li>
+                </ul>
+
+                <h3>Event System</h3>
+                <ul>
+                    <li><strong>Custom Events:</strong> <code>filepick</code> and <code>cancel</code> events</li>
+                    <li><strong>Attribute Handlers:</strong> Inline event handlers via HTML attributes</li>
+                    <li><strong>Programmatic Handlers:</strong> JavaScript callback functions</li>
+                </ul>
+            </section>
+
+            <!-- Installation Section -->
+            <section id="installation">
+                <h2>Installation</h2>
+                
+                <h3>File Structure</h3>
+                <p>The File Picker consists of two main files:</p>
+                <ul>
+                    <li><code>./ux/filePicker.js</code> - Core logic and functionality</li>
+                    <li><code>./ux/filePickerUI.js</code> - UI components, styles, and helper functions</li>
+                </ul>
+
+                <div class="example">
+                    <div class="example-title">Project Structure</div>
+                    <div class="code-block">
+                        <span class="code-comment">// Your project structure</span><br>
+                        your-project/<br>
+                        ├── ux/<br>
+                        │   ├── filePicker.js<br>
+                        │   └── filePickerUI.js<br>
+                        ├── apiCalls.js <span class="code-comment">// Your API implementation</span><br>
+                        └── index.html
+                    </div>
+                </div>
+
+                <h3>Setup Requirements</h3>
+                <p>You need to implement an <code>api</code> module that provides the following methods:</p>
+                <ul>
+                    <li><code>api.ls(path)</code> - List directory contents</li>
+                    <li><code>api.rn(oldPath, newPath)</code> - Rename file/directory</li>
+                    <li><code>api.saveFile(path, content)</code> - Save file content</li>
+                    <li><code>api.mkPath(path)</code> - Create directory</li>
+                    <li><code>api.copy(source, destination)</code> - Copy file/directory</li>
+                    <li><code>api.mv(source, destination)</code> - Move file/directory</li>
+                    <li><code>api.del(path)</code> - Delete file/directory</li>
+                    <li><code>api.readFileBinary(path)</code> - Read file as binary</li>
+                </ul>
+
+                <div class="note">
+                    <h4>📝 Note</h4>
+                    <p>The File Picker uses a decoupled architecture. You can implement the <code>api</code> module 
+                    to connect to any backend (REST API, WebSocket, local storage, etc.).</p>
+                </div>
+            </section>
+
+            <!-- Usage Section -->
+            <section id="usage">
+                <h2>Usage</h2>
+                
+                <h3>Method 1: Declarative (Custom Element)</h3>
+                <p>Use the <code>&lt;filepicker&gt;</code> custom element directly in your HTML:</p>
+
+                <div class="example">
+                    <div class="example-title">Basic Usage</div>
+                    <div class="code-block">
+                        <span class="code-tag">&lt;!</span><span class="code-keyword">DOCTYPE</span> html<span class="code-tag">&gt;</span><br>
+                        <span class="code-tag">&lt;html</span> <span class="code-attr">lang</span>=<span class="code-value">"en"</span><span class="code-tag">&gt;</span><br>
+                        <span class="code-tag">&lt;head&gt;</span><br>
+                        &nbsp;&nbsp;<span class="code-tag">&lt;title&gt;</span>File Picker Example<span class="code-tag">&lt;/title&gt;</span><br>
+                        <span class="code-tag">&lt;/head&gt;</span><br>
+                        <span class="code-tag">&lt;body&gt;</span><br>
+                        &nbsp;&nbsp;<span class="code-comment">&lt;!-- Basic file picker --&gt;</span><br>
+                        &nbsp;&nbsp;<span class="code-tag">&lt;filepicker&gt;&lt;/filepicker&gt;</span><br><br>
+                        
+                        &nbsp;&nbsp;<span class="code-tag">&lt;script</span> <span class="code-attr">type</span>=<span class="code-value">"module"</span><span class="code-tag">&gt;</span><br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;<span class="code-keyword">import</span> { } <span class="code-keyword">from</span> <span class="code-string">'./ux/filePicker.js'</span>;<br>
+                        &nbsp;&nbsp;<span class="code-tag">&lt;/script&gt;</span><br>
+                        <span class="code-tag">&lt;/body&gt;</span><br>
+                        <span class="code-tag">&lt;/html&gt;</span>
+                    </div>
+                </div>
+
+                <h3>Method 2: Programmatic (JavaScript)</h3>
+                <p>Create a file picker instance dynamically using JavaScript:</p>
+
+                <div class="example">
+                    <div class="example-title">Programmatic Creation</div>
+                    <div class="code-block">
+                        <span class="code-keyword">import</span> { createfilePicker } <span class="code-keyword">from</span> <span class="code-string">'./ux/filePicker.js'</span>;<br><br>
+                        
+                        <span class="code-comment">// Create file picker instance</span><br>
+                        <span class="code-keyword">const</span> filePickerDialog = createfilePicker();<br><br>
+                        
+                        <span class="code-comment">// Append to document body</span><br>
+                        document.body.appendChild(filePickerDialog);<br><br>
+                        
+                        <span class="code-comment">// Access the file picker element</span><br>
+                        <span class="code-keyword">const</span> filePicker = filePickerDialog.querySelector(<span class="code-string">'.file-picker-container-wrapper'</span>);<br><br>
+                        
+                        <span class="code-comment">// Set event handlers</span><br>
+                        filePicker.onfilepick = <span class="code-keyword">function</span>(event, filePath) {<br>
+                        &nbsp;&nbsp;console.log(<span class="code-string">'Selected file:'</span>, filePath);<br>
+                        &nbsp;&nbsp;<span class="code-comment">// Your logic here</span><br>
+                        };<br><br>
+                        
+                        filePicker.oncancel = <span class="code-keyword">function</span>(event) {<br>
+                        &nbsp;&nbsp;console.log(<span class="code-string">'File picker cancelled'</span>);<br>
+                        &nbsp;&nbsp;document.body.removeChild(filePickerDialog);<br>
+                        };
+                    </div>
+                </div>
+
+                <div class="warning">
+                    <h4>⚠️ Important</h4>
+                    <p>When using the programmatic approach, you are responsible for managing the lifecycle of the 
+                    file picker (showing, hiding, removing from DOM).</p>
+                </div>
+            </section>
+
+            <!-- API Reference Section -->
+            <section id="api">
+                <h2>API Reference</h2>
+                
+                <h3>HTML Attributes</h3>
+                <p>When using the <code>&lt;filepicker&gt;</code> custom element, you can configure it with these attributes:</p>
+
+                <table class="api-table">
+                    <thead>
+                        <tr>
+                            <th>Attribute</th>
+                            <th>Type</th>
+                            <th>Description</th>
+                            <th>Example</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>id</code></td>
+                            <td>string</td>
+                            <td>Unique identifier for the element</td>
+                            <td><code>id="myPicker"</code></td>
+                        </tr>
+                        <tr>
+                            <td><code>class</code></td>
+                            <td>string</td>
+                            <td>CSS classes to apply</td>
+                            <td><code>class="custom-picker"</code></td>
+                        </tr>
+                        <tr>
+                            <td><code>onfilepick</code></td>
+                            <td>string</td>
+                            <td>JavaScript code to execute when file is picked</td>
+                            <td><code>onfilepick="handlePick(event, filePath)"</code></td>
+                        </tr>
+                        <tr>
+                            <td><code>oncancel</code></td>
+                            <td>string</td>
+                            <td>JavaScript code to execute when cancelled</td>
+                            <td><code>oncancel="handleCancel(event)"</code></td>
+                        </tr>
+                        <tr>
+                            <td><code>useFileButtonText</code></td>
+                            <td>string</td>
+                            <td>Custom text for the "Use Path" button</td>
+                            <td><code>useFileButtonText="Select"</code></td>
+                        </tr>
+                        <tr>
+                            <td><code>file-path</code></td>
+                            <td>string</td>
+                            <td>Initial file path to load</td>
+                            <td><code>file-path="/documents/report.txt"</code></td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <h3>JavaScript Properties</h3>
+                <p>Programmatically accessible properties on the file picker element:</p>
+
+                <table class="api-table">
+                    <thead>
+                        <tr>
+                            <th>Property</th>
+                            <th>Type</th>
+                            <th>Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>onfilepick</code></td>
+                            <td>Function</td>
+                            <td>Callback function triggered when a file is selected and "Use Path" is clicked</td>
+                        </tr>
+                        <tr>
+                            <td><code>oncancel</code></td>
+                            <td>Function</td>
+                            <td>Callback function triggered when the cancel button is clicked</td>
+                        </tr>
+                        <tr>
+                            <td><code>filePath</code></td>
+                            <td>string</td>
+                            <td>Get or set the currently selected file path</td>
+                        </tr>
+                        <tr>
+                            <td><code>dom.buttonText</code></td>
+                            <td>string</td>
+                            <td>Get or set the text of the "Use Path" button</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <h3>Public Functions</h3>
+
+                <table class="api-table">
+                    <thead>
+                        <tr>
+                            <th>Function</th>
+                            <th>Parameters</th>
+                            <th>Returns</th>
+                            <th>Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>createfilePicker()</code></td>
+                            <td>None</td>
+                            <td><code>HTMLElement</code></td>
+                            <td>Creates a new file picker instance wrapped in a modal dialog</td>
+                        </tr>
+                        <tr>
+                            <td><code>injectStyles()</code></td>
+                            <td>None</td>
+                            <td><code>void</code></td>
+                            <td>Injects CSS styles into the document (called automatically)</td>
+                        </tr>
+                        <tr>
+                            <td><code>formatBytes(bytes)</code></td>
+                            <td><code>number</code></td>
+                            <td><code>string</code></td>
+                            <td>Converts bytes to human-readable format (KB, MB, GB)</td>
+                        </tr>
+                        <tr>
+                            <td><code>showPopupMessage(msg, isError)</code></td>
+                            <td><code>string, boolean</code></td>
+                            <td><code>void</code></td>
+                            <td>Shows a temporary popup message</td>
+                        </tr>
+                        <tr>
+                            <td><code>showConfirmDialog(msg)</code></td>
+                            <td><code>string</code></td>
+                            <td><code>Promise&lt;boolean&gt;</code></td>
+                            <td>Shows a confirmation dialog with OK/Cancel buttons</td>
+                        </tr>
+                        <tr>
+                            <td><code>showPromptDialog(msg, default)</code></td>
+                            <td><code>string, string</code></td>
+                            <td><code>Promise&lt;string|null&gt;</code></td>
+                            <td>Shows a text input prompt dialog</td>
+                        </tr>
+                        <tr>
+                            <td><code>showCreationDialog()</code></td>
+                            <td>None</td>
+                            <td><code>Promise&lt;{name, type}|null&gt;</code></td>
+                            <td>Shows a dialog to create a new file or directory</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </section>
+
+            <!-- Events Section -->
+            <section id="events">
+                <h2>Events</h2>
+                
+                <h3>Custom Events</h3>
+                <p>The file picker dispatches the following custom events:</p>
+
+                <table class="api-table">
+                    <thead>
+                        <tr>
+                            <th>Event Name</th>
+                            <th>Bubbles</th>
+                            <th>Detail</th>
+                            <th>Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>filepick</code></td>
+                            <td>Yes</td>
+                            <td><code>{ filePath: string }</code></td>
+                            <td>Fired when a file/directory is selected and "Use Path" is clicked</td>
+                        </tr>
+                        <tr>
+                            <td><code>cancel</code></td>
+                            <td>Yes</td>
+                            <td>None</td>
+                            <td>Fired when the cancel button is clicked</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div class="example">
+                    <div class="example-title">Event Listener Example</div>
+                    <div class="code-block">
+                        <span class="code-comment">// Using event listeners</span><br>
+                        <span class="code-keyword">const</span> filePicker = document.querySelector(<span class="code-string">'filepicker'</span>);<br><br>
+                        
+                        filePicker.addEventListener(<span class="code-string">'filepick'</span>, <span class="code-keyword">function</span>(event) {<br>
+                        &nbsp;&nbsp;console.log(<span class="code-string">'File picked:'</span>, event.detail.filePath);<br>
+                        &nbsp;&nbsp;<span class="code-comment">// Handle file selection</span><br>
+                        });<br><br>
+                        
+                        filePicker.addEventListener(<span class="code-string">'cancel'</span>, <span class="code-keyword">function</span>(event) {<br>
+                        &nbsp;&nbsp;console.log(<span class="code-string">'Cancelled'</span>);<br>
+                        &nbsp;&nbsp;<span class="code-comment">// Handle cancellation</span><br>
+                        });
+                    </div>
+                </div>
+
+                <h3>Attribute Event Handlers</h3>
+                <p>Inline event handlers can be specified as HTML attributes:</p>
+
+                <div class="example">
+                    <div class="example-title">Attribute Handler Example</div>
+                    <div class="code-block">
+                        <span class="code-tag">&lt;filepicker</span><br>
+                        &nbsp;&nbsp;<span class="code-attr">onfilepick</span>=<span class="code-value">"console.log('Picked:', filePath); loadFile(filePath);"</span><br>
+                        &nbsp;&nbsp;<span class="code-attr">oncancel</span>=<span class="code-value">"console.log('Cancelled'); closePicker();"</span><br>
+                        <span class="code-tag">&gt;&lt;/filepicker&gt;</span>
+                    </div>
+                </div>
+
+                <div class="note">
+                    <h4>📝 Note</h4>
+                    <p>Attribute handlers have access to <code>event</code> and <code>filePath</code> variables in scope.</p>
+                </div>
+            </section>
+
+            <!-- Examples Section -->
+            <section id="examples">
+                <h2>Usage Examples</h2>
+                
+                <h3>Example 1: Basic File Selection</h3>
+                <p>A simple file picker that logs the selected file path:</p>
+
+                <div class="example">
+                    <div class="example-title">HTML + JavaScript</div>
+                    <div class="code-block">
+                        <span class="code-comment">&lt;!-- HTML --&gt;</span><br>
+                        <span class="code-tag">&lt;filepicker</span><br>
+                        &nbsp;&nbsp;<span class="code-attr">id</span>=<span class="code-value">"simplePicker"</span><br>
+                        &nbsp;&nbsp;<span class="code-attr">onfilepick</span>=<span class="code-value">"alert('Selected: ' + filePath);"</span><br>
+                        &nbsp;&nbsp;<span class="code-attr">oncancel</span>=<span class="code-value">"alert('Cancelled');"</span><br>
+                        <span class="code-tag">&gt;&lt;/filepicker&gt;</span><br><br>
+                        
+                        <span class="code-comment">&lt;!-- JavaScript --&gt;</span><br>
+                        <span class="code-tag">&lt;script</span> <span class="code-attr">type</span>=<span class="code-value">"module"</span><span class="code-tag">&gt;</span><br>
+                        &nbsp;&nbsp;<span class="code-keyword">import</span> { } <span class="code-keyword">from</span> <span class="code-string">'./ux/filePicker.js'</span>;<br>
+                        <span class="code-tag">&lt;/script&gt;</span>
+                    </div>
+                </div>
+
+                <h3>Example 2: Programmatic Control with Initial Path</h3>
+                <p>Creating a file picker programmatically and setting an initial path:</p>
+
+                <div class="example">
+                    <div class="example-title">JavaScript Implementation</div>
+                    <div class="code-block">
+                        <span class="code-keyword">import</span> { createfilePicker } <span class="code-keyword">from</span> <span class="code-string">'./ux/filePicker.js'</span>;<br><br>
+                        
+                        <span class="code-keyword">function</span> openFilePicker(initialPath = <span class="code-string">'/'</span>) {<br>
+                        &nbsp;&nbsp;<span class="code-comment">// Create file picker dialog</span><br>
+                        &nbsp;&nbsp;<span class="code-keyword">const</span> dialog = createfilePicker();<br>
+                        &nbsp;&nbsp;document.body.appendChild(dialog);<br><br>
+                        
+                        &nbsp;&nbsp;<span class="code-comment">// Get the file picker element</span><br>
+                        &nbsp;&nbsp;<span class="code-keyword">const</span> picker = dialog.querySelector(<span class="code-string">'.file-picker-container-wrapper'</span>);<br><br>
+                        
+                        &nbsp;&nbsp;<span class="code-comment">// Set initial path if provided</span><br>
+                        &nbsp;&nbsp;<span class="code-keyword">if</span> (initialPath) {<br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;picker.filePath = initialPath;<br>
+                        &nbsp;&nbsp;}<br><br>
+                        
+                        &nbsp;&nbsp;<span class="code-comment">// Set file pick handler</span><br>
+                        &nbsp;&nbsp;picker.onfilepick = <span class="code-keyword">function</span>(event, filePath) {<br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;console.log(<span class="code-string">'Selected file:'</span>, filePath);<br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;<span class="code-comment">// Process the file...</span><br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;closePicker();<br>
+                        &nbsp;&nbsp;};<br><br>
+                        
+                        &nbsp;&nbsp;<span class="code-comment">// Set cancel handler</span><br>
+                        &nbsp;&nbsp;picker.oncancel = <span class="code-keyword">function</span>(event) {<br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;console.log(<span class="code-string">'Cancelled'</span>);<br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;closePicker();<br>
+                        &nbsp;&nbsp;};<br><br>
+                        
+                        &nbsp;&nbsp;<span class="code-keyword">function</span> closePicker() {<br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;document.body.removeChild(dialog);<br>
+                        &nbsp;&nbsp;}<br>
+                        }<br><br>
+                        
+                        <span class="code-comment">// Usage</span><br>
+                        openFilePicker(<span class="code-string">'/documents/projects/'</span>);
+                    </div>
+                </div>
+
+                <h3>Example 3: Image Gallery Integration</h3>
+                <p>Using the file picker to select and display images:</p>
+
+                <div class="example">
+                    <div class="example-title">Image Selector</div>
+                    <div class="code-block">
+                        <span class="code-tag">&lt;div</span> <span class="code-attr">id</span>=<span class="code-value">"gallery"</span><span class="code-tag">&gt;</span><br>
+                        &nbsp;&nbsp;<span class="code-tag">&lt;button</span> <span class="code-attr">onclick</span>=<span class="code-value">"openImagePicker()"</span><span class="code-tag">&gt;</span>Select Image<span class="code-tag">&lt;/button&gt;</span><br>
+                        &nbsp;&nbsp;<span class="code-tag">&lt;img</span> <span class="code-attr">id</span>=<span class="code-value">"preview"</span> <span class="code-attr">style</span>=<span class="code-value">"max-width: 500px; margin-top: 20px;"</span><span class="code-tag">&gt;</span><br>
+                        <span class="code-tag">&lt;/div&gt;</span><br><br>
+                        
+                        <span class="code-tag">&lt;script</span> <span class="code-attr">type</span>=<span class="code-value">"module"</span><span class="code-tag">&gt;</span><br>
+                        &nbsp;&nbsp;<span class="code-keyword">import</span> { createfilePicker } <span class="code-keyword">from</span> <span class="code-string">'./ux/filePicker.js'</span>;<br>
+                        &nbsp;&nbsp;<span class="code-keyword">import</span> { api } <span class="code-keyword">from</span> <span class="code-string">'./apiCalls.js'</span>;<br><br>
+                        
+                        &nbsp;&nbsp;<span class="code-keyword">let</span> currentDialog = <span class="code-keyword">null</span>;<br><br>
+                        
+                        &nbsp;&nbsp;<span class="code-keyword">async</span> <span class="code-keyword">function</span> openImagePicker() {<br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;<span class="code-comment">// Close existing dialog if any</span><br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;<span class="code-keyword">if</span> (currentDialog) {<br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;document.body.removeChild(currentDialog);<br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;}<br><br>
+                        
+                        &nbsp;&nbsp;&nbsp;&nbsp;<span class="code-comment">// Create new file picker</span><br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;currentDialog = createfilePicker();<br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;document.body.appendChild(currentDialog);<br><br>
+                        
+                        &nbsp;&nbsp;&nbsp;&nbsp;<span class="code-keyword">const</span> picker = currentDialog.querySelector(<span class="code-string">'.file-picker-container-wrapper'</span>);<br><br>
+                        
+                        &nbsp;&nbsp;&nbsp;&nbsp;<span class="code-comment">// Navigate to images directory</span><br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;picker.filePath = <span class="code-string">'/images/'</span>;<br><br>
+                        
+                        &nbsp;&nbsp;&nbsp;&nbsp;picker.onfilepick = <span class="code-keyword">async</span> <span class="code-keyword">function</span>(event, filePath) {<br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="code-keyword">try</span> {<br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="code-comment">// Read image file as binary</span><br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="code-keyword">const</span> arrayBuffer = <span class="code-keyword">await</span> api.readFileBinary(filePath);<br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="code-keyword">const</span> blob = <span class="code-keyword">new</span> Blob([arrayBuffer]);<br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="code-keyword">const</span> url = URL.createObjectURL(blob);<br><br>
+                        
+                        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="code-comment">// Display image</span><br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;document.getElementById(<span class="code-string">'preview'</span>).src = url;<br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;closePicker();<br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} <span class="code-keyword">catch</span> (error) {<br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;console.error(<span class="code-string">'Error loading image:'</span>, error);<br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;};<br><br>
+                        
+                        &nbsp;&nbsp;&nbsp;&nbsp;picker.oncancel = closePicker;<br>
+                        &nbsp;&nbsp;}<br><br>
+                        
+                        &nbsp;&nbsp;<span class="code-keyword">function</span> closePicker() {<br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;<span class="code-keyword">if</span> (currentDialog) {<br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;document.body.removeChild(currentDialog);<br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;currentDialog = <span class="code-keyword">null</span>;<br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;}<br>
+                        &nbsp;&nbsp;}<br>
+                        <span class="code-tag">&lt;/script&gt;</span>
+                    </div>
+                </div>
+
+                <h3>Example 4: File Upload Integration</h3>
+                <p>Using the upload functionality to add files to a specific directory:</p>
+
+                <div class="example">
+                    <div class="example-title">Upload Handler</div>
+                    <div class="code-block">
+                        <span class="code-keyword">import</span> { createfilePicker } <span class="code-keyword">from</span> <span class="code-string">'./ux/filePicker.js'</span>;<br><br>
+                        
+                        <span class="code-keyword">function</span> showUploadDialog(targetDirectory = <span class="code-string">'/uploads/'</span>) {<br>
+                        &nbsp;&nbsp;<span class="code-keyword">const</span> dialog = createfilePicker();<br>
+                        &nbsp;&nbsp;document.body.appendChild(dialog);<br><br>
+                        
+                        &nbsp;&nbsp;<span class="code-keyword">const</span> picker = dialog.querySelector(<span class="code-string">'.file-picker-container-wrapper'</span>);<br><br>
+                        
+                        &nbsp;&nbsp;<span class="code-comment">// Navigate to target directory</span><br>
+                        &nbsp;&nbsp;picker.filePath = targetDirectory;<br><br>
+                        
+                        &nbsp;&nbsp;<span class="code-comment">// Customize button text</span><br>
+                        &nbsp;&nbsp;picker[<span class="code-string">'dom.buttonText'</span>] = <span class="code-string">'Done'</span>;<br><br>
+                        
+                        &nbsp;&nbsp;picker.onfilepick = <span class="code-keyword">function</span>(event, filePath) {<br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;console.log(<span class="code-string">'Upload complete, current directory:'</span>, filePath);<br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;<span class="code-comment">// Refresh your file list or perform other actions</span><br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;document.body.removeChild(dialog);<br>
+                        &nbsp;&nbsp;};<br><br>
+                        
+                        &nbsp;&nbsp;picker.oncancel = <span class="code-keyword">function</span>() {<br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;document.body.removeChild(dialog);<br>
+                        &nbsp;&nbsp;};<br><br>
+                        
+                        &nbsp;&nbsp;<span class="code-comment">// User can now click the upload button (⬆️) to upload files</span><br>
+                        &nbsp;&nbsp;<span class="code-comment">// The file picker will automatically refresh after upload</span><br>
+                        }
+                    </div>
+                </div>
+            </section>
+
+            <!-- Customization Section -->
+            <section id="customization">
+                <h2>Customization</h2>
+                
+                <h3>CSS Customization</h3>
+                <p>The file picker uses CSS custom properties for easy theming:</p>
+
+                <div class="example">
+                    <div class="example-title">Custom Theme</div>
+                    <div class="code-block">
+                        <span class="code-tag">&lt;style&gt;</span><br>
+                        &nbsp;&nbsp;<span class="code-comment">/* Override file picker styles */</span><br>
+                        &nbsp;&nbsp;.file-picker-container-wrapper {<br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;<span class="code-keyword">border</span>: <span class="code-value">2px solid #4CAF50</span>;<br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;<span class="code-keyword">border-radius</span>: <span class="code-value">8px</span>;<br>
+                        &nbsp;&nbsp;}<br><br>
+                        
+                        &nbsp;&nbsp;.file-picker-title-bar {<br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;<span class="code-keyword">background-color</span>: <span class="code-value">#4CAF50</span>;<br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;<span class="code-keyword">color</span>: <span class="code-value">white</span>;<br>
+                        &nbsp;&nbsp;}<br><br>
+                        
+                        &nbsp;&nbsp;.file-picker-menu-bar button:hover:not(:disabled) {<br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;<span class="code-keyword">background-color</span>: <span class="code-value">#e8f5e9</span>;<br>
+                        &nbsp;&nbsp;}<br><br>
+                        
+                        &nbsp;&nbsp;<span class="code-comment">/* Custom button colors */</span><br>
+                        &nbsp;&nbsp;.create-btn { <span class="code-keyword">color</span>: <span class="code-value">#2196F3</span>; }<br>
+                        &nbsp;&nbsp;.delete-btn { <span class="code-keyword">color</span>: <span class="code-value">#F44336</span>; }<br>
+                        <span class="code-tag">&lt;/style&gt;</span>
+                    </div>
+                </div>
+
+                <h3>Button Customization</h3>
+                <p>Change the "Use Path" button text dynamically:</p>
+
+                <div class="example">
+                    <div class="example-title">Dynamic Button Text</div>
+                    <div class="code-block">
+                        <span class="code-keyword">const</span> filePicker = document.querySelector(<span class="code-string">'filepicker'</span>);<br><br>
+                        
+                        <span class="code-comment">// Change button text</span><br>
+                        filePicker[<span class="code-string">'dom.buttonText'</span>] = <span class="code-string">'Open File'</span>;<br><br>
+                        
+                        <span class="code-comment">// Or based on context</span><br>
+                        filePicker.addEventListener(<span class="code-string">'filepick'</span>, <span class="code-keyword">function</span>(event) {<br>
+                        &nbsp;&nbsp;<span class="code-keyword">const</span> path = event.detail.filePath;<br>
+                        &nbsp;&nbsp;<span class="code-keyword">if</span> (path.endsWith(<span class="code-string">'.txt'</span>)) {<br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;filePicker[<span class="code-string">'dom.buttonText'</span>] = <span class="code-string">'Edit Text'</span>;<br>
+                        &nbsp;&nbsp;} <span class="code-keyword">else</span> <span class="code-keyword">if</span> (path.includes(<span class="code-string">'/'</span>)) {<br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;filePicker[<span class="code-string">'dom.buttonText'</span>] = <span class="code-string">'Browse Folder'</span>;<br>
+                        &nbsp;&nbsp;}<br>
+                        });
+                    </div>
+                </div>
+
+                <h3>Initial Path Configuration</h3>
+                <p>Set the initial path via HTML attribute or JavaScript:</p>
+
+                <div class="example">
+                    <div class="example-title">Setting Initial Path</div>
+                    <div class="code-block">
+                        <span class="code-comment">&lt;!-- Method 1: HTML Attribute --&gt;</span><br>
+                        <span class="code-tag">&lt;filepicker</span> <span class="code-attr">file-path</span>=<span class="code-value">"/documents/reports/"</span><span class="code-tag">&gt;&lt;/filepicker&gt;</span><br><br>
+                        
+                        <span class="code-comment">&lt;!-- Method 2: JavaScript Property --&gt;</span><br>
+                        <span class="code-keyword">const</span> picker = document.querySelector(<span class="code-string">'filepicker'</span>);<br>
+                        picker.filePath = <span class="code-string">'/images/photos/'</span>;<br><br>
+                        
+                        <span class="code-comment">&lt;!-- Method 3: Programmatic Creation --&gt;</span><br>
+                        <span class="code-keyword">const</span> dialog = createfilePicker();<br>
+                        <span class="code-keyword">const</span> picker = dialog.querySelector(<span class="code-string">'.file-picker-container-wrapper'</span>);<br>
+                        picker.filePath = <span class="code-string">'/projects/current/'</span>;
+                    </div>
+                </div>
+            </section>
+
+            <!-- Best Practices Section -->
+            <section id="best-practices">
+                <h2>Best Practices</h2>
+                
+                <h3>1. Error Handling</h3>
+                <p>Always implement proper error handling for API calls:</p>
+                <div class="code-block">
+                    picker.onfilepick = <span class="code-keyword">async</span> <span class="code-keyword">function</span>(event, filePath) {<br>
+                    &nbsp;&nbsp;<span class="code-keyword">try</span> {<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;<span class="code-keyword">const</span> content = <span class="code-keyword">await</span> api.readFileBinary(filePath);<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;<span class="code-comment">// Process content...</span><br>
+                    &nbsp;&nbsp;} <span class="code-keyword">catch</span> (error) {<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;console.error(<span class="code-string">'Failed to read file:'</span>, error);<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;showPopupMessage(<span class="code-string">`Error: <span class="code-interpolation">${error.message}</span>`</span>, <span class="code-keyword">true</span>);<br>
+                    &nbsp;&nbsp;}<br>
+                    };
+                </div>
+
+                <h3>2. Memory Management</h3>
+                <p>Clean up file picker instances when not needed:</p>
+                <div class="code-block">
+                    <span class="code-keyword">let</span> filePickerDialog = <span class="code-keyword">null</span>;<br><br>
+                    
+                    <span class="code-keyword">function</span> openPicker() {<br>
+                    &nbsp;&nbsp;<span class="code-comment">// Remove existing instance</span><br>
+                    &nbsp;&nbsp;<span class="code-keyword">if</span> (filePickerDialog) {<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;document.body.removeChild(filePickerDialog);<br>
+                    &nbsp;&nbsp;}<br><br>
+                    
+                    &nbsp;&nbsp;filePickerDialog = createfilePicker();<br>
+                    &nbsp;&nbsp;document.body.appendChild(filePickerDialog);<br>
+                    }
+                </div>
+
+                <h3>3. Accessibility</h3>
+                <p>Add ARIA attributes for better accessibility:</p>
+                <div class="code-block">
+                    <span class="code-comment">&lt;!-- Add to your filepicker element --&gt;</span><br>
+                    <span class="code-tag">&lt;filepicker</span><br>
+                    &nbsp;&nbsp;<span class="code-attr">aria-label</span>=<span class="code-value">"File browser for document selection"</span><br>
+                    &nbsp;&nbsp;<span class="code-attr">role</span>=<span class="code-value">"dialog"</span><br>
+                    &nbsp;&nbsp;<span class="code-attr">aria-modal</span>=<span class="code-value">"true"</span><br>
+                    <span class="code-tag">&gt;&lt;/filepicker&gt;</span>
+                </div>
+
+                <h3>4. Performance Optimization</h3>
+                <p>For large directories, consider implementing virtual scrolling or pagination in your API layer.</p>
+
+                <div class="tip">
+                    <h4>💡 Tip</h4>
+                    <p>Use the <code>showPopupMessage</code> function for user feedback instead of <code>alert()</code> 
+                    for a better user experience.</p>
+                </div>
+
+                <h3>5. Security Considerations</h3>
+                <ul>
+                    <li>Validate file paths on the server-side to prevent directory traversal attacks</li>
+                    <li>Implement proper authentication and authorization for file operations</li>
+                    <li>Sanitize file names to prevent XSS vulnerabilities</li>
+                    <li>Limit file upload sizes and types on the server</li>
+                </ul>
+            </section>
+        </main>
+
+        <footer>
+            <h3>File Picker Documentation</h3>
+            <p>Version 1.0.0 • Built with Vanilla JavaScript</p>
+            <div class="quick-links">
+                <a href="#overview">Overview</a>
+                <a href="#features">Features</a>
+                <a href="#api">API Reference</a>
+                <a href="#examples">Examples</a>
+            </div>
+            <p style="margin-top: 20px; opacity: 0.7;">© 2026 File Picker Team • MIT License</p>
+        </footer>
+    </div>
+</body>
+</html>

@@ -57,7 +57,7 @@
             height:20px;
             min-width:120px;
             appearance:none;
-            background-image:url("image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='%23888' d='M4 6l4 4 4-4z'/%3E%3C/svg%3E");
+            background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='%23888' d='M4 6l4 4 4-4z'/%3E%3C/svg%3E");
             background-repeat:no-repeat;
             background-position:right 4px center;
             background-size:10px;
@@ -96,6 +96,49 @@
             color:#c50f1f;
             margin-left:2px;
         }
+        
+        /* App View Toolbar */
+        .app-toolbar {
+            background:#252526;
+            border-bottom:1px solid #3e3e42;
+            padding:2px 6px;
+            height:24px;
+            display:none;
+            align-items:center;
+            gap:4px;
+        }
+        .app-toolbar.active {
+            display:flex;
+        }
+        .url-input {
+            background:#2d2d30;
+            color:#fff;
+            border:1px solid #3e3e42;
+            border-radius:2px;
+            padding:2px 6px;
+            font:inherit;
+            font-size:11px;
+            height:20px;
+            flex-grow:1;
+            min-width:0;
+        }
+        .url-input:focus {
+            outline:none;
+            border-color:#007acc;
+        }
+        .go-btn {
+            background:#13a10e;
+            color:white;
+            border:none;
+            border-radius:2px;
+            width:30px;
+            height:20px;
+            font-size:11px;
+            cursor:pointer;
+            flex-shrink:0;
+        }
+        .go-btn:hover { background:#10890c; }
+        .go-btn:active { transform:scale(0.95); }
         
         /* Settings page styles */
         .settings-page {
@@ -200,7 +243,7 @@
             display:block;
         }
         
-        /* Iframe containers (PRESERVED for Viewer tabs) */
+        /* Iframe containers */
         .iframe-container { 
             width:100%; 
             height:100%; 
@@ -312,82 +355,6 @@
         .toast.success { background:#13a10e; }
         .toast.info { background:#007acc; }
         
-        /* Open Mode Modal */
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.7);
-            z-index: 20000;
-            justify-content: center;
-            align-items: center;
-        }
-        .modal-content {
-            background: #252526;
-            border: 1px solid #3e3e42;
-            border-radius: 4px;
-            width: 90%;
-            max-width: 500px;
-            padding: 16px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
-        }
-        .modal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 12px;
-            padding-bottom: 8px;
-            border-bottom: 1px solid #3e3e42;
-        }
-        .modal-header h2 {
-            color: #007acc;
-            font-size: 16px;
-            margin: 0;
-            font-weight: 500;
-        }
-        .close-modal {
-            color: #888;
-            font-size: 24px;
-            cursor: pointer;
-            line-height: 1;
-            padding: 0 4px;
-        }
-        .close-modal:hover { color: #ccc; }
-        .modal-body {
-            color: #ccc;
-            line-height: 1.5;
-        }
-        .modal-buttons {
-            display: flex;
-            gap: 10px;
-            margin-top: 15px;
-            justify-content: flex-end;
-        }
-        .modal-btn {
-            border: none;
-            border-radius: 3px;
-            padding: 6px 16px;
-            font-family: inherit;
-            font-size: 13px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-        .editor-btn {
-            background: #007acc;
-            color: white;
-        }
-        .editor-btn:hover { background: #0066b3; }
-        .viewer-btn {
-            background: #13a10e;
-            color: white;
-        }
-        .viewer-btn:hover { background: #10890c; }
-        
         /* AIChat Component Theme - Match DevApp Dark Theme */
         ai-chat {
             --ai-chat-bg: #1e1e1e;
@@ -497,12 +464,19 @@
             <div class="page-control">
                 <select id="pageSelector">
                     <option value="chat">💬 Chat</option>
+                    <option value="appview">📱 App View</option>
                     <option value="settings">⚙️ Settings</option>
                     <option value="filepicker">📁 Files</option>
                 </select>
                 <button id="closePageBtn" class="close-btn" disabled title="Close tab">🗑️</button>
                 <div class="save-status" id="saveStatus"></div>
             </div>
+        </div>
+        
+        <!-- App View Toolbar -->
+        <div class="app-toolbar" id="appToolbar">
+            <input type="text" class="url-input" id="appUrlInput" placeholder="Enter URL (https://example.com)">
+            <button class="go-btn" id="appGoBtn" title="Load URL">Go</button>
         </div>
         
         <div class="content">
@@ -515,16 +489,41 @@
                 ></ai-chat>
             </div>
             
-            <!-- Settings Page (SIMPLIFIED) -->
+            <!-- App View Page -->
+            <div id="appViewPage" class="page">
+                <div class="iframe-container">
+                    <iframe id="appIframe" src="about:blank" allow="camera; microphone; geolocation; clipboard-read; clipboard-write; autoplay; fullscreen" allowfullscreen></iframe>
+                    <div class="iframe-fallback" id="appFallback" style="display:none;">
+                        <h3>⚠️ App Unavailable</h3>
+                        <p>Could not load the application.</p>
+                        <p id="appErrorText">Check URL and permissions</p>
+                        <button class="go-btn" style="margin-top:15px;width:auto;padding:6px 12px;" id="appRetryBtn">Retry</button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Settings Page -->
             <div id="settingsPage" class="page">
                 <div class="settings-page">
+                    <div class="settings-section">
+                        <h3>⚙️ Application Settings</h3>
+                        <div class="settings-row">
+                            <label for="defaultTestUrl">Default Test App URL:</label>
+                            <input type="text" id="defaultTestUrl" class="settings-input" placeholder="https://your-test-app.com">
+                        </div>
+                        <button id="saveSettingsBtn" class="settings-btn">
+                            <span>💾</span> Save Settings
+                        </button>
+                        <div id="settingsStatus" class="settings-status"></div>
+                    </div>
+                    
                     <div class="settings-section">
                         <h3>ℹ️ About</h3>
                         <p style="font-size:11px;line-height:1.5;">
                             Dev Environment v1.0<br>
                             • Chat: AI Assistant with voice support<br>
+                            • App View: Test web applications<br>
                             • File Editor: Code editing with syntax support<br>
-                            • File Viewer: Live preview with refresh<br>
                             • Settings: Persistent configuration
                         </p>
                     </div>
@@ -546,26 +545,6 @@
     </div>
     
     <div class="toast" id="toast"></div>
-    
-    <!-- Open Mode Modal -->
-    <div id="openModeModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <span class="close-modal">&times;</span>
-                <h2>Open File As</h2>
-            </div>
-            <div class="modal-body">
-                <p>How would you like to open <span id="modalFileName" style="color:#007acc;font-weight:500;"></span>?</p>
-                <div class="modal-buttons">
-                    <button id="openInEditorBtn" class="modal-btn editor-btn">📝 Editor (textCode)</button>
-                    <button id="openInViewerBtn" class="modal-btn viewer-btn">👁️ Viewer (Preview)</button>
-                </div>
-                <p style="font-size:10px;color:#888;margin-top:8px;">
-                    Viewer URL: <span id="viewerUrlPreview" style="color:#555;"></span>
-                </p>
-            </div>
-        </div>
-    </div>
 
     <script type="module">
         // Load modules
@@ -591,7 +570,7 @@
             document.getElementById('statusBar').textContent = `❌ Error: ${e.message}`;
         }
         
-        // DOM elements (APP VIEW ELEMENTS REMOVED)
+        // DOM elements
         const pageSel = document.getElementById('pageSelector');
         const closeBtn = document.getElementById('closePageBtn');
         const saveStatus = document.getElementById('saveStatus');
@@ -599,29 +578,43 @@
         const toastEl = document.getElementById('toast');
         const fpContainer = document.getElementById('filePickerContainer');
         const contentArea = document.querySelector('.content');
+        const appToolbar = document.getElementById('appToolbar');
+        const appUrlInput = document.getElementById('appUrlInput');
+        const appGoBtn = document.getElementById('appGoBtn');
+        const appIframe = document.getElementById('appIframe');
+        const appFallback = document.getElementById('appFallback');
+        const appErrorText = document.getElementById('appErrorText');
+        const appRetryBtn = document.getElementById('appRetryBtn');
+        const defaultTestUrlInput = document.getElementById('defaultTestUrl');
+        const saveSettingsBtn = document.getElementById('saveSettingsBtn');
+        const settingsStatus = document.getElementById('settingsStatus');
         
-        // Modal elements
-        const modal = document.getElementById('openModeModal');
-        const closeModalBtn = document.querySelector('.close-modal');
-        const openEditorBtn = document.getElementById('openInEditorBtn');
-        const openViewerBtn = document.getElementById('openInViewerBtn');
-        const modalFileName = document.getElementById('modalFileName');
-        const viewerUrlPreview = document.getElementById('viewerUrlPreview');
-        
-        // Load settings from localStorage (SIMPLIFIED - no app view settings)
+        // Load settings from localStorage
         const SETTINGS_KEY = 'devEnvSettings';
         let appSettings = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
+        if (!appSettings.defaultTestUrl) {
+            appSettings.defaultTestUrl = 'https://';
+            localStorage.setItem(SETTINGS_KEY, JSON.stringify(appSettings));
+        }
         
-        // State (APP VIEW REMOVED)
+        // State
         const state = {
             currentPage: 'chat',
             systemPages: {
                 chat: { id:'chat', el:document.getElementById('chatPage') },
+                appview: { 
+                    id:'appview', 
+                    el:document.getElementById('appViewPage'), 
+                    url: appSettings.defaultTestUrl 
+                },
                 settings: { id:'settings', el:document.getElementById('settingsPage') },
                 filepicker: { id:'filepicker', el:document.getElementById('filePickerPage'), init:false }
             },
-            tabs: {} // { id, name, el, editor, filePath, content, type }
+            tabs: {} // { id: { id, name, el, editor, filePath, content } }
         };
+        
+        // Initialize settings page with saved value
+        defaultTestUrlInput.value = appSettings.defaultTestUrl;
         
         // Utilities
         function showToast(msg, type='info') {
@@ -641,6 +634,58 @@
             saveStatus.title = isDirty ? 'Unsaved changes' : 'All changes saved';
         }
         
+        function toggleAppToolbar(show) {
+            appToolbar.classList.toggle('active', show);
+        }
+        
+        function showSettingsStatus(message, isSuccess) {
+            settingsStatus.textContent = message;
+            settingsStatus.className = 'settings-status';
+            settingsStatus.classList.add(isSuccess ? 'success' : 'error');
+            
+            // Auto-hide after 3 seconds
+            setTimeout(() => {
+                if (settingsStatus.classList.contains('success')) {
+                    settingsStatus.classList.remove('success');
+                    settingsStatus.style.display = 'none';
+                }
+            }, 3000);
+        }
+        
+        function loadAppUrl(url) {
+            if (!url.trim()) {
+                showToast('⚠️ URL cannot be empty', 'error');
+                return;
+            }
+            
+            // Auto-add https if missing
+            if (!url.startsWith('http://') && !url.startsWith('https://')) {
+                url = 'https://' + url;
+            }
+            
+            try {
+                new URL(url);
+                appIframe.src = url;
+                state.systemPages.appview.url = url;
+                appUrlInput.value = url;
+                updateStatus(`Loading: ${url}`);
+                showToast(`Loading ${url}`, 'info');
+                appFallback.style.display = 'none';
+                appIframe.style.display = 'block';
+            } catch (e) {
+                showToast(`❌ Invalid URL: ${e.message}`, 'error');
+                updateStatus(`Error: Invalid URL`);
+                showAppFallback(`Invalid URL format: ${e.message}`);
+            }
+        }
+        
+        function showAppFallback(message) {
+            appFallback.style.display = 'flex';
+            appIframe.style.display = 'none';
+            appErrorText.textContent = message;
+            updateStatus(`App load failed: ${message}`);
+        }
+        
         function switchPage(id) {
             // Hide current page
             if (state.currentPage in state.systemPages) {
@@ -658,20 +703,16 @@
             
             state.currentPage = id;
             pageSel.value = id;
-            closeBtn.disabled = (id === 'chat' || id === 'filepicker' || id === 'settings');
+            closeBtn.disabled = (id === 'chat' || id === 'filepicker' || id === 'appview' || id === 'settings');
             
-            // Update save status for tabs
+            // Toggle UI elements based on page type
+            toggleAppToolbar(id === 'appview');
+            
+            // Update save status for editor tabs
             if (id in state.tabs) {
                 const tab = state.tabs[id];
-                if (tab.type === 'viewer') {
-                    updateSaveStatus(false);
-                    saveStatus.textContent = '👁️ Preview mode';
-                    saveStatus.title = 'Live preview - changes require refresh';
-                } else {
-                    const isDirty = tab.editor?.value !== tab.content;
-                    updateSaveStatus(isDirty);
-                    saveStatus.textContent = '';
-                }
+                const isDirty = tab.editor?.value !== tab.content;
+                updateSaveStatus(isDirty);
             } else {
                 updateSaveStatus(false);
                 saveStatus.textContent = '';
@@ -682,32 +723,39 @@
                 initFilePicker();
             }
             
+            if (id === 'appview') {
+                appUrlInput.value = state.systemPages.appview.url;
+                updateStatus(`App View: ${state.systemPages.appview.url}`);
+                setTimeout(() => appUrlInput.focus(), 100);
+            }
+            
             if (id === 'settings') {
+                // Refresh settings input with latest value
+                defaultTestUrlInput.value = appSettings.defaultTestUrl;
                 updateStatus('Settings');
             }
             
             // Update status bar
             if (id === 'chat') {
                 updateStatus('AI Assistant ready');
+                // Focus on text input if needed
                 setTimeout(() => {
                     const aiChat = document.getElementById('aiChatComponent');
                     if (aiChat) {
                         const textInput = aiChat.shadowRoot?.getElementById('textInput');
-                        if (textInput) textInput.focus();
+                        if (textInput) {
+                            textInput.focus();
+                        }
                     }
                 }, 100);
+            } else if (id === 'appview') {
+                updateStatus(`App View: ${state.systemPages.appview.url}`);
             } else if (id === 'settings') {
                 updateStatus('Settings');
             } else if (id === 'filepicker') {
                 updateStatus('File browser');
             } else if (state.tabs[id]) {
-                const tab = state.tabs[id];
-                const cleanName = tab.name.replace(/^(📝|👁️)\s*/, '');
-                if (tab.type === 'viewer') {
-                    updateStatus(`Previewing: ${cleanName}`);
-                } else {
-                    updateStatus(`Editing: ${cleanName}`);
-                }
+                updateStatus(`Editing: ${state.tabs[id].name}`);
             }
         }
         
@@ -715,7 +763,7 @@
             state.tabs[id] = { id, name, el, editor, filePath, content };
             const opt = document.createElement('option');
             opt.value = id;
-            opt.textContent = name;
+            opt.textContent = `📝 ${name}`;
             pageSel.appendChild(opt);
         }
         
@@ -729,24 +777,20 @@
             delete state.tabs[id];
         }
         
-        // ===== FILE OPERATIONS =====
+        // File operations
         async function openFile(path) {
             try {
                 const content = await mods.api.readFile(path);
                 const name = path.split('/').pop();
+                const id = `tab-${Date.now()}`;
                 
-                // Prevent duplicate EDITOR tabs for same file
-                const existingEditor = Object.values(state.tabs).find(t => 
-                    t.filePath === path && (t.type === 'editor' || t.type === undefined)
-                );
-                if (existingEditor) {
-                    switchPage(existingEditor.id);
-                    return showToast(`✅ Already open in Editor: ${name}`, 'info');
+                const existing = Object.values(state.tabs).find(t => t.filePath === path);
+                if (existing) {
+                    switchPage(existing.id);
+                    return showToast(`Already open: ${name}`, 'info');
                 }
                 
-                const id = `editor-${Date.now()}-${encodeURIComponent(path)}`;
-                
-                // Create editor container
+                // Create simple container for editor
                 const page = document.createElement('div');
                 page.className = 'page';
                 page.innerHTML = `<div style="width:100%;height:100%"></div>`;
@@ -756,12 +800,14 @@
                 const editor = mods.tc(content);
                 editorContainer.appendChild(editor);
                 
-                // Save handler
+                // Handle save events from editor (triggered internally by textCode module)
                 editor.addEventListener('save', async (e) => {
                     try {
                         await mods.api.saveFile(path, editor.value);
                         state.tabs[id].content = editor.value;
-                        if (state.currentPage === id) updateSaveStatus(false);
+                        if (state.currentPage === id) {
+                            updateSaveStatus(false);
+                        }
                         showToast(`✅ Saved: ${name}`, 'success');
                         updateStatus(`Saved: ${name}`);
                     } catch (error) {
@@ -770,7 +816,7 @@
                     }
                 });
                 
-                // Dirty tracking
+                // Track changes for dirty status
                 let changeTimeout;
                 editor.addEventListener('input', () => {
                     clearTimeout(changeTimeout);
@@ -782,13 +828,9 @@
                     }, 300);
                 });
                 
-                // Register tab WITH TYPE
-                addTab(id, `📝 ${name}`, page, editor, path, content);
-                state.tabs[id].type = 'editor';
-                state.tabs[id].content = content;
-                
+                addTab(id, name, page, editor, path, content);
                 switchPage(id);
-                showToast(`✏️ Opened in Editor: ${name}`, 'success');
+                showToast(`Opened: ${name}`, 'info');
                 
             } catch (e) {
                 showToast(`❌ Open failed: ${e.message}`, 'error');
@@ -796,151 +838,58 @@
             }
         }
         
-        // URL converter for viewer
-        function convertFilePathToUrl(filePath) {
-            let cleanPath = filePath.startsWith('/') ? filePath : `/${filePath}`;
-            cleanPath = cleanPath.replace(/^\/public(?=\/|$)/i, '');
-            cleanPath = cleanPath || '/';
-            return `${window.location.origin}${cleanPath}`;
-        }
-        
-        // Viewer tab creator (WITH UNICODE REFRESH BUTTON)
-        async function openFileInViewer(filePath) {
-            try {
-                const url = convertFilePathToUrl(filePath);
-                const fileName = filePath.split('/').pop() || 'preview';
-                
-                // Prevent duplicate VIEWER tabs for same file
-                const existingViewer = Object.values(state.tabs).find(t => 
-                    t.filePath === filePath && t.type === 'viewer'
-                );
-                if (existingViewer) {
-                    switchPage(existingViewer.id);
-                    return showToast(`✅ Already open in Viewer: ${fileName}`, 'info');
-                }
-                
-                const tabId = `viewer-${Date.now()}-${encodeURIComponent(filePath)}`;
-                
-                // Create viewer page WITH UNICODE REFRESH BUTTON
-                const page = document.createElement('div');
-                page.className = 'page';
-                page.innerHTML = `
-                    <div style="display:flex;flex-direction:column;height:100%;">
-                        <div class="app-toolbar" style="display:flex;height:28px;background:#252526;border-bottom:1px solid #3e3e42;padding:2px 6px;align-items:center;">
-                            <button class="go-btn" id="refreshBtn-${tabId}" title="Refresh preview" 
-                                    style="width:28px;height:24px;font-size:16px;padding:0;display:flex;align-items:center;justify-content:center;">🔄</button>
-                            <div style="color:#888;font-size:11px;margin-left:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
-                                ${url}
-                            </div>
-                        </div>
-                        <div class="iframe-container" style="flex-grow:1;position:relative;">
-                            <iframe id="viewerIframe-${tabId}" src="${url}" 
-                                allow="camera; microphone; geolocation; clipboard-read; clipboard-write; autoplay; fullscreen" 
-                                allowfullscreen style="width:100%;height:100%;border:none;"></iframe>
-                            <div class="iframe-fallback" id="viewerFallback-${tabId}" style="display:none;">
-                                <h3>⚠️ Preview Unavailable</h3>
-                                <p>Could not load preview for:</p>
-                                <p style="color:#007acc;margin:8px 0;font-size:13px;">${fileName}</p>
-                                <p id="viewerError-${tabId}" style="color:#c50f1f;margin:8px 0;font-size:12px;">Loading...</p>
-                                <button class="go-btn" id="viewerRetry-${tabId}" style="margin-top:12px;width:auto;padding:5px 15px;">Retry</button>
-                            </div>
-                        </div>
-                    </div>
-                `;
-                contentArea.appendChild(page);
-                
-                // Setup iframe elements
-                const iframe = document.getElementById(`viewerIframe-${tabId}`);
-                const fallback = document.getElementById(`viewerFallback-${tabId}`);
-                const errorEl = document.getElementById(`viewerError-${tabId}`);
-                const retryBtn = document.getElementById(`viewerRetry-${tabId}`);
-                const refreshBtn = document.getElementById(`refreshBtn-${tabId}`);
-                
-                // Load handling
-                let loadTimeout;
-                const resetTimeout = () => {
-                    clearTimeout(loadTimeout);
-                    loadTimeout = setTimeout(() => {
-                        if (fallback.style.display === 'none') {
-                            showError('Preview timeout. Check file type and permissions.');
-                        }
-                    }, 8000);
-                };
-                
-                const showError = (msg) => {
-                    errorEl.textContent = msg;
-                    fallback.style.display = 'flex';
-                    iframe.style.display = 'none';
-                    updateStatus(`Preview error: ${msg}`);
-                };
-                
-                iframe.addEventListener('load', () => {
-                    clearTimeout(loadTimeout);
-                    fallback.style.display = 'none';
-                    iframe.style.display = 'block';
-                    updateStatus(`Preview loaded: ${fileName}`);
-                });
-                
-                iframe.addEventListener('error', () => showError('Iframe load error'));
-                iframe.onerror = () => showError('Blocked by security policy (CORS)');
-                
-                // Button handlers
-                retryBtn?.addEventListener('click', () => {
-                    iframe.src = url;
-                    fallback.style.display = 'none';
-                    iframe.style.display = 'block';
-                    resetTimeout();
-                });
-                
-                refreshBtn?.addEventListener('click', () => {
-                    iframe.src = iframe.src;
-                    resetTimeout();
-                    showToast('🔄 Refreshing...', 'info');
-                });
-                
-                // Initial load
-                resetTimeout();
-                
-                // Register tab WITH TYPE
-                addTab(tabId, `👁️ ${fileName}`, page, null, filePath, null);
-                state.tabs[tabId].type = 'viewer';
-                state.tabs[tabId].previewUrl = url;
-                
-                switchPage(tabId);
-                showToast(`👁️ Opened in Viewer: ${fileName}`, 'success');
-                
-            } catch (e) {
-                showToast(`Preview failed: ${e.message}`, 'error');
-                console.error('Viewer error:', e);
-            }
-        }
-        
         function closeCurrent() {
             const id = state.currentPage;
-            if (id === 'chat' || id === 'filepicker' || id === 'settings') return;
+            if (id === 'chat' || id === 'filepicker' || id === 'appview' || id === 'settings') return;
             
             const tab = state.tabs[id];
             if (!tab) return;
             
-            // Skip confirmation for viewer tabs
-            if (tab.type === 'viewer') {
-                switchPage('filepicker');
-                removeTab(id);
-                const cleanName = tab.name.replace('👁️ ', '');
-                showToast(`Closed preview: ${cleanName}`, 'info');
-                return;
-            }
-            
-            // Editor tab confirmation
-            if (tab.editor?.value !== tab.content) {
-                const cleanName = tab.name.replace('📝 ', '');
-                if (!confirm(`Unsaved changes in "${cleanName}". Close anyway?`)) return;
+            if (tab.editor.value !== tab.content) {
+                if (!confirm(`Unsaved changes in "${tab.name}". Close anyway?`)) return;
             }
             
             switchPage('filepicker');
             removeTab(id);
-            const cleanName = tab.name.replace('📝 ', '');
-            showToast(`Closed: ${cleanName}`, 'info');
+            showToast(`Closed: ${tab.name}`, 'info');
+        }
+        
+        // Settings operations
+        function saveSettings() {
+            const newUrl = defaultTestUrlInput.value.trim();
+            
+            if (!newUrl) {
+                showSettingsStatus('URL cannot be empty', false);
+                return;
+            }
+            
+            // Validate URL format
+            try {
+                // Add https if missing for validation
+                const testUrl = newUrl.startsWith('http') ? newUrl : `https://${newUrl}`;
+                new URL(testUrl);
+                
+                // Save to settings object and localStorage
+                appSettings.defaultTestUrl = newUrl;
+                localStorage.setItem(SETTINGS_KEY, JSON.stringify(appSettings));
+                
+                // Update app view state
+                state.systemPages.appview.url = newUrl;
+                
+                // Show success message
+                showSettingsStatus('✅ Settings saved successfully!', true);
+                showToast('Settings saved', 'success');
+                updateStatus('Settings saved');
+                
+                // If app view is open, update its URL input
+                if (state.currentPage === 'appview') {
+                    appUrlInput.value = newUrl;
+                }
+                
+            } catch (e) {
+                showSettingsStatus(`Invalid URL format: ${e.message}`, false);
+                showToast(`URL error: ${e.message}`, 'error');
+            }
         }
         
         // File picker init
@@ -954,14 +903,8 @@
                 
                 if (!picker) throw new Error('Picker container not found');
                 
-                // Show modal on file selection
-                picker.addEventListener('filepick', (e) => {
-                    const filePath = e.detail.filePath;
-                    pendingFilePath = filePath;
-                    modalFileName.textContent = filePath.split('/').pop() || filePath;
-                    viewerUrlPreview.textContent = convertFilePathToUrl(filePath);
-                    modal.style.display = 'flex';
-                });
+                picker.onfilepick = (e, path) => openFile(path);
+                picker.addEventListener('filepick', e => openFile(e.detail.filePath));
                 
                 fpContainer.innerHTML = '';
                 fpContainer.appendChild(picker);
@@ -975,47 +918,67 @@
             }
         }
         
-        // Modal handling
-        let pendingFilePath = null;
+        // App View iframe handling
+        let appLoaded = false;
+        let appLoadTimeout = null;
         
-        function hideOpenModal() {
-            modal.style.display = 'none';
-            pendingFilePath = null;
-            viewerUrlPreview.textContent = '';
+        appIframe.addEventListener('load', () => {
+            appLoaded = true;
+            appFallback.style.display = 'none';
+            appIframe.style.display = 'block';
+            updateStatus(`App loaded: ${state.systemPages.appview.url}`);
+            showToast(`✅ App loaded`, 'success');
+        });
+        
+        appIframe.addEventListener('error', (e) => {
+            showAppFallback('Failed to load application. Check URL and permissions.');
+        });
+        
+        function setupAppLoadTimeout() {
+            clearTimeout(appLoadTimeout);
+            appLoaded = false;
+            appLoadTimeout = setTimeout(() => {
+                if (!appLoaded) {
+                    showAppFallback('Application failed to load. May be blocked by security policies.');
+                }
+            }, 8000);
         }
-        
-        closeModalBtn?.addEventListener('click', hideOpenModal);
-        modal?.addEventListener('click', (e) => {
-            if (e.target === modal) hideOpenModal();
-        });
-        
-        openEditorBtn?.addEventListener('click', () => {
-            if (pendingFilePath) openFile(pendingFilePath);
-            hideOpenModal();
-        });
-        
-        openViewerBtn?.addEventListener('click', () => {
-            if (pendingFilePath) openFileInViewer(pendingFilePath);
-            hideOpenModal();
-        });
         
         // Events
         pageSel.addEventListener('change', e => switchPage(e.target.value));
         closeBtn.addEventListener('click', closeCurrent);
         
-        // Keyboard shortcuts (UPDATED - removed app view shortcuts)
-        document.addEventListener('keydown', e => {
-            const isEditorTab = state.currentPage in state.tabs && 
-                (state.tabs[state.currentPage].type === 'editor' || state.tabs[state.currentPage].type === undefined);
-            const isSettings = state.currentPage === 'settings';
-            const isModalOpen = modal.style.display === 'flex';
-            
-            // Close modal with Escape
-            if (e.key === 'Escape' && isModalOpen) {
-                e.preventDefault();
-                hideOpenModal();
-                return;
+        // App View events
+        appGoBtn.addEventListener('click', () => {
+            loadAppUrl(appUrlInput.value);
+            setupAppLoadTimeout();
+        });
+        
+        appUrlInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                loadAppUrl(appUrlInput.value);
+                setupAppLoadTimeout();
             }
+        });
+        
+        appRetryBtn.addEventListener('click', () => {
+            loadAppUrl(appUrlInput.value);
+            setupAppLoadTimeout();
+        });
+        
+        // Settings events
+        saveSettingsBtn.addEventListener('click', saveSettings);
+        defaultTestUrlInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                saveSettings();
+            }
+        });
+        
+        // Keyboard shortcuts
+        document.addEventListener('keydown', e => {
+            const isEditorTab = state.currentPage in state.tabs;
+            const isAppView = state.currentPage === 'appview';
+            const isSettings = state.currentPage === 'settings';
             
             if ((e.ctrlKey || e.metaKey) && e.key === 'w') {
                 e.preventDefault();
@@ -1028,8 +991,24 @@
             if (e.key === 'Escape') {
                 if (isEditorTab) {
                     switchPage('filepicker');
+                } else if (isAppView) {
+                    appUrlInput.focus();
                 } else if (isSettings) {
-                    document.activeElement?.blur();
+                    defaultTestUrlInput.blur();
+                }
+            }
+            
+            // Editor-specific shortcuts (handled by textCode module internally)
+            // The textCode module should handle:
+            // - Ctrl+C/Cmd+C: Copy selection
+            // - Ctrl+V/Cmd+V: Paste
+            // - Ctrl+S/Cmd+S: Trigger save event
+            
+            if (isAppView && e.target !== appUrlInput) {
+                if ((e.ctrlKey || e.metaKey) && e.key === 'l') {
+                    e.preventDefault();
+                    appUrlInput.focus();
+                    appUrlInput.select();
                 }
             }
             
@@ -1037,6 +1016,7 @@
             if ((e.ctrlKey || e.metaKey) && e.key === ',') {
                 e.preventDefault();
                 switchPage('settings');
+                setTimeout(() => defaultTestUrlInput.focus(), 100);
             }
         });
         
@@ -1046,14 +1026,18 @@
             updateStatus('Ready');
         }, 300);
         
-        // Debug access (CLEANED UP)
+        // Set initial app URL from settings
+        appUrlInput.value = state.systemPages.appview.url;
+        
+        // Debug access
         window.dev = { 
             state, 
             openFile, 
-            openFileInViewer,
             closeCurrent, 
-            switchPage,
-            convertFilePathToUrl
+            switchPage, 
+            loadAppUrl,
+            appSettings,
+            saveSettings
         };
     </script>
 </body>
