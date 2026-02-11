@@ -1,10 +1,8 @@
-// webserver.js
 const http = require('http');
 const https = require('https');
 const fs = require('fs');
 const path = require('path');
 const { promisify } = require('util');
-const crypto = require('crypto'); // [WEBSOCKET] Required for handshake
 
 const readdir = promisify(fs.readdir);
 const stat = promisify(fs.stat);
@@ -80,96 +78,10 @@ const _mimetype = {
     '.wat': 'text/plain'
 }
 
-// ===== CRITICAL SECURITY FIX: PATH VALIDATION HELPER =====
-/**
- * Securely validates that a user-provided path stays within root directory
- * Prevents path traversal AND path confusion attacks
- * @param {string} root - Base directory (FILES_ROOT)
- * @param {string} userPath - User-supplied relative path
- * @returns {boolean} True if path is safe
- */
-function isPathInsideRoot(root, userPath) {
-    const resolvedRoot = path.resolve(root) + path.sep;
-    const resolvedTarget = path.resolve(path.join(root, userPath)) + path.sep;
-    return resolvedTarget.startsWith(resolvedRoot);
-}
-// ==========================================================
-
-// ===== WEBSOCKET PROTOCOL HELPERS (RFC 6455 MINIMAL IMPLEMENTATION) =====
-// [WEBSOCKET] Compute Sec-WebSocket-Accept header value
-function computeAcceptKey(key) {
-    const magic = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
-    return crypto.createHash('sha1').update(key + magic).digest('base64');
-}
-
-// [WEBSOCKET] Parse ONLY masked text frames (client->server MUST mask)
-function parseWebSocketFrame(buffer) {
-    if (buffer.length < 2) return null;
-    const opcode = buffer[0] & 0x0F;
-    if (opcode !== 1) return null; // Only text frames
-    const isMasked = (buffer[1] & 0x80) === 0x80;
-    if (!isMasked) return null; // Reject unmasked frames per spec
-    
-    let payloadLen = buffer[1] & 0x7F;
-    let dataStart = 2;
-    
-    if (payloadLen === 126) {
-        if (buffer.length < 4) return null;
-        payloadLen = buffer.readUInt16BE(2);
-        dataStart = 4;
-    } else if (payloadLen === 127) {
-        if (buffer.length < 10) return null;
-        payloadLen = Number(buffer.readBigUInt64BE(2));
-        dataStart = 10;
-    }
-    
-    if (buffer.length < dataStart + 4 + payloadLen) return null;
-    const masks = buffer.slice(dataStart, dataStart + 4);
-    const payload = buffer.slice(dataStart + 4, dataStart + 4 + payloadLen);
-    
-    // Unmask payload (XOR with mask bytes)
-    for (let i = 0; i < payload.length; i++) {
-        payload[i] ^= masks[i % 4];
-    }
-    return payload.toString('utf8');
-}
-
-// [WEBSOCKET] Create server->client text frame (unmasked per spec)
-function createWebSocketFrame(message) {
-    const payload = Buffer.from(message, 'utf8');
-    const len = payload.length;
-    let headerLen = 2;
-    
-    if (len > 65535) headerLen += 8;
-    else if (len > 125) headerLen += 2;
-    
-    const buffer = Buffer.allocUnsafe(headerLen + len);
-    buffer[0] = 0x81; // FIN bit + text frame opcode
-    
-    if (len <= 125) {
-        buffer[1] = len;
-    } else if (len <= 65535) {
-        buffer[1] = 126;
-        buffer.writeUInt16BE(len, 2);
-    } else {
-        buffer[1] = 127;
-        buffer.writeBigUInt64BE(BigInt(len), 2);
-    }
-    
-    payload.copy(buffer, headerLen);
-    return buffer;
-}
-// ==========================================================
-
-// WebRTC Signaling Store
+// WebRTC Signaling Store - FIXED STRUCTURE
 const webrtcRooms = {}; // roomId -> { pendingMessage: *, waitingQueue: [{res, timeoutId}], lastAccessed: Date }
 const MAX_ROOMS = 1000; // Prevent memory exhaustion
 const WAIT_TIMEOUT = 30000; // 30 seconds wait timeout
-
-// ===== WEBSOCKET HANDLER CACHE (MIRRORS API CACHE PATTERN) =====
-// [WEBSOCKET] Cache structure identical to apiCache
-const wsCache = new Map(); // handlerName -> { module, lastAccessed }
-// ==========================================================
 
 const serverOptions = {
     port: 80,
@@ -297,180 +209,6 @@ async function handleApiRequest(req, res, apiName) {
     }
 }
 
-// ===== WEBSOCKET UPGRADE HANDLER (SECURE ROUTING) =====
-// [WEBSOCKET] Handles HTTP Upgrade requests for /ws/* endpoints
-function handleWsUpgrade(serverType, req, socket, head) {
-    try {
-        // Validate path structure
-        if (!req.url.startsWith('/ws/')) {
-            socket.end('HTTP/1.1 400 Bad Request\r\n\r\n');
-            return;
-        }
-
-        // Extract handler name with strict sanitization
-        const url = new URL(req.url, `http://${req.headers.host}`);
-        const handlerName = path.basename(url.pathname);
-        
-        // SECURITY: Block path traversal/suspicious characters
-        if (!handlerName || 
-            handlerName.includes('.') || 
-            handlerName.includes('/') || 
-            handlerName.includes('\\') ||
-            handlerName.length > 100) {
-            console.warn(`[WS] Blocked invalid handler name: ${handlerName}`);
-            socket.end('HTTP/1.1 403 Forbidden\r\n\r\n');
-            return;
-        }
-
-        // Resolve handler path WITH ROOT VALIDATION
-        const apiRoot = path.join(__dirname, 'files', 'api');
-        const wsFilePath = path.join(apiRoot, `${handlerName}.ws.js`);
-        
-        if (!isPathInsideRoot(apiRoot, path.relative(apiRoot, wsFilePath))) {
-            console.warn(`[WS] Blocked path traversal: ${wsFilePath}`);
-            socket.end('HTTP/1.1 403 Forbidden\r\n\r\n');
-            return;
-        }
-
-        // Verify file exists
-        fs.access(wsFilePath, fs.constants.F_OK, (err) => {
-            if (err) {
-                socket.end('HTTP/1.1 404 Not Found\r\n\r\n');
-                return;
-            }
-
-            // Load handler (with cache)
-            let handlerMod;
-            if (wsCache.has(handlerName)) {
-                const cached = wsCache.get(handlerName);
-                cached.lastAccessed = Date.now();
-                handlerMod = cached.module;
-            } else {
-                try {
-                    // Clear require cache for hot reload
-                    delete require.cache[require.resolve(wsFilePath)];
-                    handlerMod = require(wsFilePath);
-                    
-                    if (typeof handlerMod.handler !== 'function') {
-                        throw new Error('Handler must export "handler" function');
-                    }
-                    
-                    wsCache.set(handlerName, { 
-                        module: handlerMod, 
-                        lastAccessed: Date.now() 
-                    });
-                    console.log(`[WS] ${serverType} Loaded handler: ${handlerName}`);
-                } catch (e) {
-                    console.error(`[WS] ${serverType} Load error ${handlerName}:`, e.message);
-                    socket.end('HTTP/1.1 500 Internal Error\r\n\r\n');
-                    return;
-                }
-            }
-
-            // Validate WebSocket handshake headers
-            if (req.headers.upgrade?.toLowerCase() !== 'websocket' || 
-                !req.headers['sec-websocket-key']) {
-                socket.end('HTTP/1.1 400 Bad Request\r\n\r\n');
-                return;
-            }
-
-            // Send handshake response
-            const acceptKey = computeAcceptKey(req.headers['sec-websocket-key']);
-            socket.write(
-                `HTTP/1.1 101 Switching Protocols\r\n` +
-                `Upgrade: websocket\r\n` +
-                `Connection: Upgrade\r\n` +
-                `Sec-WebSocket-Accept: ${acceptKey}\r\n\r\n`
-            );
-
-            // Create minimal WebSocket object (mimics ws library API)
-            const ws = {
-                send: (msg) => {
-                    if (socket.writable && typeof msg === 'string') {
-                        try { socket.write(createWebSocketFrame(msg)); }
-                        catch (e) { console.error(`[WS] Send error:`, e.message); }
-                    }
-                },
-                close: (code = 1000, reason = '') => {
-                    if (socket.writable) {
-                        try {
-                            const payload = Buffer.alloc(2 + reason.length);
-                            payload.writeUInt16BE(code, 0);
-                            if (reason) Buffer.from(reason, 'utf8').copy(payload, 2);
-                            socket.write(Buffer.concat([
-                                Buffer.from([0x88, payload.length]),
-                                payload
-                            ]));
-                        } catch (e) {}
-                    }
-                    socket.destroy();
-                },
-                readyState: 1, // OPEN (matches WebSocket API spec)
-                _socket: socket
-            };
-
-            // Frame parsing buffer
-            let frameBuffer = Buffer.alloc(0);
-            socket.on('data', (chunk) => {
-                frameBuffer = Buffer.concat([frameBuffer, chunk]);
-                while (frameBuffer.length >= 2) {
-                    const message = parseWebSocketFrame(frameBuffer);
-                    if (message === null) break; // Need more data
-                    
-                    // Remove processed frame bytes (simplified)
-                    const processedLen = frameBuffer.length; // Actual impl would calculate precisely
-                    frameBuffer = Buffer.alloc(0); // Reset buffer
-                    
-                    try {
-                        // Call handler's onMessage if defined
-                        const instance = handlerMod.handler(ws, req);
-                        if (typeof instance?.onMessage === 'function') {
-                            instance.onMessage(message);
-                        }
-                    } catch (e) {
-                        console.error(`[WS] ${serverType} Handler error ${handlerName}:`, e.message);
-                        ws.close(1011, 'Handler error');
-                    }
-                }
-            });
-
-            // Connection lifecycle events
-            socket.on('close', () => {
-                ws.readyState = 3; // CLOSED
-                if (wsCache.has(handlerName)) {
-                    wsCache.get(handlerName).lastAccessed = Date.now();
-                }
-                try {
-                    const instance = handlerMod.handler(ws, req);
-                    if (typeof instance?.onClose === 'function') instance.onClose();
-                } catch (e) {}
-            });
-
-            socket.on('error', (err) => {
-                console.error(`[WS] ${serverType} Socket error ${handlerName}:`, err.message);
-                ws.close(1006, 'Socket error');
-            });
-
-            // Initialize handler
-            try {
-                const instance = handlerMod.handler(ws, req);
-                if (typeof instance?.onOpen === 'function') {
-                    instance.onOpen();
-                }
-            } catch (e) {
-                console.error(`[WS] ${serverType} Init error ${handlerName}:`, e.message);
-                ws.close(1011, 'Init failed');
-            }
-        });
-    } catch (e) {
-        console.error(`[WS] ${serverType} Upgrade error:`, e.message);
-        if (!socket.destroyed) {
-            socket.end('HTTP/1.1 500 Internal Error\r\n\r\n');
-        }
-    }
-}
-// ==========================================================
-
 setInterval(() => {
     const now = Date.now();
     
@@ -482,18 +220,6 @@ setInterval(() => {
             const apiFilePath = path.join(__dirname, 'files', 'api', `${apiName}.api.js`);
             delete require.cache[require.resolve(apiFilePath)];
             apiCache.delete(apiName);
-        }
-    }
-    
-    // [WEBSOCKET] Cleanup inactive WebSocket handlers
-    for (const [name, info] of wsCache.entries()) {
-        if (now - info.lastAccessed > 60 * 60 * 1000) { // 1 hour
-            console.log(`[WS] Unloaded inactive handler: ${name}`);
-            try {
-                const fp = path.join(__dirname, 'files', 'api', `${name}.ws.js`);
-                delete require.cache[require.resolve(fp)];
-            } catch (e) {}
-            wsCache.delete(name);
         }
     }
     
@@ -519,24 +245,23 @@ setInterval(() => {
 
 const FILES_ROOT = path.join(__dirname, 'files');
 const TRASH_DIR = path.join(FILES_ROOT, 'trash');
-const MAX_UPLOAD_SIZE = 10 * 1024 * 1024; // 10MB upload limit
 
-// ===== CORRECTED handleLs with SECURITY FIX =====
+// The CORRECTED handleLs function
 async function handleLs(res, lsPath) {
-    if (!isPathInsideRoot(FILES_ROOT, lsPath)) {
-        return sendPlainTextResponse(res, 'Access Denied', 403);
-    }
-
     const hasWildcard = lsPath.includes('*');
     let targetDirectory;
     let filesToProcess = [];
+
+    // Basic path traversal prevention for the target directory
+    if (!path.join(FILES_ROOT, lsPath).startsWith(FILES_ROOT)) {
+        return sendPlainTextResponse(res, 'Access Denied: Invalid LS path.', 403);
+    }
 
     try {
         if (hasWildcard) {
             targetDirectory = path.join(FILES_ROOT, path.dirname(lsPath));
             const pattern = path.basename(lsPath);
-            const safePattern = pattern.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*');
-            const regex = new RegExp('^' + safePattern + '$');
+            const regex = new RegExp('^' + pattern.replace(/\./g, '\\.').replace(/\*/g, '.*') + '$');
             const allEntries = await readdir(targetDirectory);
             filesToProcess = allEntries.filter(file => regex.test(file));
         } else {
@@ -544,6 +269,7 @@ async function handleLs(res, lsPath) {
             const stats = await stat(targetDirectory);
 
             if (stats.isFile()) {
+                // It's a single file request, return only its info
                 const fileInfo = {
                     name: path.basename(targetDirectory),
                     type: 'file',
@@ -553,6 +279,7 @@ async function handleLs(res, lsPath) {
                 };
                 return sendJsonResponse(res, [fileInfo]);
             } else if (stats.isDirectory()) {
+                // It's a directory request, list all its contents
                 filesToProcess = await readdir(targetDirectory);
             }
         }
@@ -570,58 +297,57 @@ async function handleLs(res, lsPath) {
                     modifiedTimeMs: fileStats.mtime.getTime()
                 });
             } catch (err) {
-                console.warn(`Could not get stats for file: ${err.message}`);
+                // Skip if we can't get stats (e.g., race condition)
+                console.warn(`Could not get stats for ${filePath}: ${err.message}`);
             }
         }
         sendJsonResponse(res, fileInfoList);
 
     } catch (error) {
         if (error.code === 'ENOENT') {
-            sendPlainTextResponse(res, 'Path not found', 404);
+            sendPlainTextResponse(res, `LS Error: Path not found: ${lsPath}`, 404);
         } else {
-            console.error(`LS Error: ${error.message}`);
-            sendPlainTextResponse(res, 'Internal Server Error', 500);
+            console.error(`LS Internal Server Error for path "${lsPath}": ${error.message}`);
+            sendPlainTextResponse(res, `LS Internal Server Error: ${error.message}`, 500);
         }
     }
 }
 
-// ===== CORRECTED handleReadFile with SECURITY FIX =====
 async function handleReadFile(res, filePathHeader) {
-    if (!isPathInsideRoot(FILES_ROOT, filePathHeader)) {
-        return sendPlainTextResponse(res, 'Access Denied', 403);
-    }
-
     const fullPath = path.join(FILES_ROOT, filePathHeader);
+
+    if (!fullPath.startsWith(FILES_ROOT)) {
+        return sendPlainTextResponse(res, 'Access Denied: Invalid file path.', 403);
+    }
 
     try {
         const stats = await stat(fullPath);
         if (stats.isDirectory()) {
-            return sendPlainTextResponse(res, 'Cannot read a directory', 400);
+            return sendPlainTextResponse(res, 'READFILE Error: Cannot read a directory.', 400);
         }
         const content = await readFile(fullPath, 'utf8');
         sendPlainTextResponse(res, content);
     } catch (error) {
         if (error.code === 'ENOENT') {
-            sendPlainTextResponse(res, 'File not found', 404);
+            sendPlainTextResponse(res, `READFILE Error: File not found: ${filePathHeader}`, 404);
         } else {
             console.error(`READFILE Error: ${error.message}`);
-            sendPlainTextResponse(res, 'Internal Server Error', 500);
+            sendPlainTextResponse(res, `READFILE Internal Server Error: ${error.message}`, 500);
         }
     }
 }
 
-// ===== CORRECTED handleReadFileBinary with SECURITY FIX =====
 async function handleReadFileBinary(req, res, filePathHeader) {
-    if (!isPathInsideRoot(FILES_ROOT, filePathHeader)) {
-        return sendPlainTextResponse(res, 'Access Denied', 403);
-    }
+   const fullPath = path.join(FILES_ROOT, filePathHeader);
 
-    const fullPath = path.join(FILES_ROOT, filePathHeader);
+    if (!fullPath.startsWith(FILES_ROOT)) {
+        return sendPlainTextResponse(res, 'Access Denied: Invalid file path.', 403);
+    }
 
     try {
         const stats = await stat(fullPath);
         if (stats.isDirectory()) {
-            return sendPlainTextResponse(res, 'Cannot read a directory', 400);
+            return sendPlainTextResponse(res, 'READFILE Error: Cannot read a directory.', 400);
         }
         
         const ext = path.extname(fullPath).toLowerCase();
@@ -631,92 +357,77 @@ async function handleReadFileBinary(req, res, filePathHeader) {
 
     } catch (error) {
         if (error.code === 'ENOENT') {
-            sendPlainTextResponse(res, 'File not found', 404);
+            sendPlainTextResponse(res, `READFILE Error: File not found: ${filePathHeader}`, 404);
         } else {
-            console.error(`READFILEB Error: ${error.message}`);
-            sendPlainTextResponse(res, 'Internal Server Error', 500);
+            console.error(`READFILE Error: ${error.message}`);
+            sendPlainTextResponse(res, `READFILE Internal Server Error: ${error.message}`, 500);
         }
     }
 }
 
-// ===== CORRECTED handleSaveFile with SECURITY + DOS FIX =====
 async function handleSaveFile(req, res, filePathHeader) {
-    if (!isPathInsideRoot(FILES_ROOT, filePathHeader)) {
-        return sendPlainTextResponse(res, 'Access Denied', 403);
+    const fullPath = path.join(FILES_ROOT, filePathHeader);
+
+    if (!fullPath.startsWith(FILES_ROOT)) {
+        return sendPlainTextResponse(res, 'Access Denied: Invalid file path.', 403);
     }
 
-    const fullPath = path.join(FILES_ROOT, filePathHeader);
     let body = '';
-    let sizeExceeded = false;
-
     req.on('data', chunk => {
-        if (sizeExceeded) return;
         body += chunk.toString();
-        if (body.length > MAX_UPLOAD_SIZE) {
-            sizeExceeded = true;
-            req.destroy();
-            if (!res.headersSent) {
-                sendPlainTextResponse(res, 'Payload too large (max 10MB)', 413);
-            }
-        }
     });
 
     req.on('end', async () => {
-        if (sizeExceeded) return;
         try {
             const dir = path.dirname(fullPath);
             await mkdir(dir, { recursive: true });
 
             await writeFile(fullPath, body, 'utf8');
-            sendPlainTextResponse(res, `File saved: ${filePathHeader}`, 200);
+            sendPlainTextResponse(res, `File saved successfully: ${filePathHeader}`, 200);
         } catch (error) {
             console.error(`SAVEFILE Error: ${error.message}`);
-            sendPlainTextResponse(res, 'Internal Server Error', 500);
+            sendPlainTextResponse(res, `SAVEFILE Internal Server Error: ${error.message}`, 500);
         }
     });
 
     req.on('error', (error) => {
-        if (!res.headersSent) {
-            sendPlainTextResponse(res, 'Request Error', 500);
-        }
+        console.error(`Request error during SAVEFILE: ${error.message}`);
+        sendPlainTextResponse(res, 'Request Error during SAVEFILE', 500);
     });
 }
 
-// ===== CORRECTED handleMkpath with SECURITY FIX =====
 async function handleMkpath(res, mkPathHeader) {
-    if (!isPathInsideRoot(FILES_ROOT, mkPathHeader)) {
-        return sendPlainTextResponse(res, 'Access Denied', 403);
-    }
-
     const fullPath = path.join(FILES_ROOT, mkPathHeader);
+
+    if (!fullPath.startsWith(FILES_ROOT)) {
+        return sendPlainTextResponse(res, 'Access Denied: Invalid MKPATH.', 403);
+    }
 
     try {
         await mkdir(fullPath, { recursive: true });
-        sendPlainTextResponse(res, `Path created: ${mkPathHeader}`, 200);
+        sendPlainTextResponse(res, `Path created successfully: ${mkPathHeader}`, 200);
     } catch (error) {
         if (error.code === 'EEXIST') {
-            sendPlainTextResponse(res, `Path exists: ${mkPathHeader}`, 200);
+            sendPlainTextResponse(res, `MKPATH Warning: Path already exists: ${mkPathHeader}`, 200);
         } else {
             console.error(`MKPATH Error: ${error.message}`);
-            sendPlainTextResponse(res, 'Internal Server Error', 500);
+            sendPlainTextResponse(res, `MKPATH Internal Server Error: ${error.message}`, 500);
         }
     }
 }
 
-// ===== CORRECTED handleMv with SECURITY + REGEX FIX =====
 async function handleMv(res, mvSourceHeader, mvDestinationHeader) {
-    if (!isPathInsideRoot(FILES_ROOT, mvSourceHeader) || 
-        !isPathInsideRoot(FILES_ROOT, mvDestinationHeader)) {
-        return sendPlainTextResponse(res, 'Access Denied', 403);
-    }
-
     const sourceFullPath = path.join(FILES_ROOT, mvSourceHeader);
     const destinationFullPath = path.join(FILES_ROOT, mvDestinationHeader);
+
+    if (!sourceFullPath.startsWith(FILES_ROOT) || !destinationFullPath.startsWith(FILES_ROOT)) {
+        return sendPlainTextResponse(res, 'Access Denied: Invalid MV source or destination path.', 403);
+    }
 
     try {
         const destinationStats = await stat(destinationFullPath);
         if (!destinationStats.isDirectory()) {
-            return sendPlainTextResponse(res, 'Destination must be directory', 400);
+            return sendPlainTextResponse(res, `MV Error: Destination is not a directory: ${mvDestinationHeader}`, 400);
         }
 
         const hasWildcard = mvSourceHeader.includes('*');
@@ -727,14 +438,13 @@ async function handleMv(res, mvSourceHeader, mvDestinationHeader) {
         if (hasWildcard) {
             try {
                 const sourceFiles = await readdir(baseSourceDir);
-                const safePattern = pattern.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*');
-                const regex = new RegExp('^' + safePattern + '$');
+                const regex = new RegExp('^' + pattern.replace(/\./g, '\\.').replace(/\*/g, '.*') + '$');
                 filesToMove = sourceFiles
                     .filter(file => regex.test(file))
                     .map(file => path.join(baseSourceDir, file));
             } catch (err) {
                 if (err.code === 'ENOENT') {
-                    return sendPlainTextResponse(res, 'Source directory not found', 404);
+                    return sendPlainTextResponse(res, `MV Error: Source directory for wildcard not found: ${path.dirname(mvSourceHeader)}`, 404);
                 }
                 throw err;
             }
@@ -744,22 +454,18 @@ async function handleMv(res, mvSourceHeader, mvDestinationHeader) {
                 filesToMove.push(sourceFullPath);
             } catch (err) {
                 if (err.code === 'ENOENT') {
-                    return sendPlainTextResponse(res, 'Source not found', 404);
+                    return sendPlainTextResponse(res, `MV Error: Source not found: ${mvSourceHeader}`, 404);
                 }
                 throw err;
             }
         }
 
         if (filesToMove.length === 0) {
-            return sendPlainTextResponse(res, 'No files matched source', 200);
+            return sendPlainTextResponse(res, `MV Warning: No files or directories matched the source: ${mvSourceHeader}`, 200);
         }
 
         const results = [];
         for (const fileToMove of filesToMove) {
-            if (!isPathInsideRoot(FILES_ROOT, path.relative(FILES_ROOT, fileToMove))) {
-                results.push(`Skipped invalid path: ${path.relative(FILES_ROOT, fileToMove)}`);
-                continue;
-            }
             const fileName = path.basename(fileToMove);
             const finalDestinationPath = path.join(destinationFullPath, fileName);
             try {
@@ -770,42 +476,39 @@ async function handleMv(res, mvSourceHeader, mvDestinationHeader) {
                 results.push(`Failed to move ${path.relative(FILES_ROOT, fileToMove)}: ${moveError.message}`);
             }
         }
-        sendPlainTextResponse(res, `MV complete:\n${results.join('\n')}`, 200);
+        sendPlainTextResponse(res, `MV Operation complete:\n${results.join('\n')}`, 200);
 
     } catch (error) {
-        console.error(`MV Error: ${error.message}`);
-        sendPlainTextResponse(res, 'Internal Server Error', 500);
+        console.error(`MV Internal Server Error: ${error.message}`);
+        sendPlainTextResponse(res, `MV Internal Server Error: ${error.message}`, 500);
     }
 }
 
-// ===== CORRECTED handleRn with SECURITY FIX =====
 async function handleRn(res, rnSourceHeader, rnDestinationHeader) {
-    if (!isPathInsideRoot(FILES_ROOT, rnSourceHeader) || 
-        !isPathInsideRoot(FILES_ROOT, rnDestinationHeader)) {
-        return sendPlainTextResponse(res, 'Access Denied', 403);
-    }
-
     const sourceFullPath = path.join(FILES_ROOT, rnSourceHeader);
     const destinationFullPath = path.join(FILES_ROOT, rnDestinationHeader);
     
+    if (!sourceFullPath.startsWith(FILES_ROOT) || !destinationFullPath.startsWith(FILES_ROOT)) {
+        return sendPlainTextResponse(res, 'Access Denied: Invalid RN source or destination path.', 403);
+    }
+
     if (path.dirname(sourceFullPath) !== path.dirname(destinationFullPath)) {
-        return sendPlainTextResponse(res, 'Destination must be in same directory', 400);
+        return sendPlainTextResponse(res, 'RN Error: Destination must be in the same directory as the source.', 400);
     }
 
     try {
         await rename(sourceFullPath, destinationFullPath);
-        sendPlainTextResponse(res, `Renamed: ${rnSourceHeader} to ${rnDestinationHeader}`, 200);
+        sendPlainTextResponse(res, `Renamed successfully: ${rnSourceHeader} to ${rnDestinationHeader}`, 200);
     } catch (error) {
         if (error.code === 'ENOENT') {
-            sendPlainTextResponse(res, 'Source not found', 404);
+            sendPlainTextResponse(res, `RN Error: Source not found: ${rnSourceHeader}`, 404);
         } else {
-            console.error(`RN Error: ${error.message}`);
-            sendPlainTextResponse(res, 'Internal Server Error', 500);
+            console.error(`RN Internal Server Error: ${error.message}`);
+            sendPlainTextResponse(res, `RN Internal Server Error: ${error.message}`, 500);
         }
     }
 }
 
-// ===== CORRECTED handleCopy with SECURITY + REGEX FIX =====
 async function copyDirectoryRecursive(src, dest) {
     await mkdir(dest, { recursive: true });
     const entries = await readdir(src, { withFileTypes: true });
@@ -823,20 +526,19 @@ async function copyDirectoryRecursive(src, dest) {
 }
 
 async function handleCopy(res, copySourceHeader, copyDestinationHeader) {
-    if (!isPathInsideRoot(FILES_ROOT, copySourceHeader) || 
-        !isPathInsideRoot(FILES_ROOT, copyDestinationHeader)) {
-        return sendPlainTextResponse(res, 'Access Denied', 403);
-    }
-
     const sourceFullPath = path.join(FILES_ROOT, copySourceHeader);
     const destinationFullPath = path.join(FILES_ROOT, copyDestinationHeader);
+
+    if (!sourceFullPath.startsWith(FILES_ROOT) || !destinationFullPath.startsWith(FILES_ROOT)) {
+        return sendPlainTextResponse(res, 'Access Denied: Invalid COPY source or destination path.', 403);
+    }
 
     try {
         let actualDestinationDir = destinationFullPath;
         try {
             const destStats = await stat(destinationFullPath);
             if (!destStats.isDirectory()) {
-                return sendPlainTextResponse(res, 'Destination must be directory', 400);
+                return sendPlainTextResponse(res, `COPY Error: Destination is not a directory: ${copyDestinationHeader}`, 400);
             }
         } catch (err) {
             if (err.code === 'ENOENT') {
@@ -854,14 +556,13 @@ async function handleCopy(res, copySourceHeader, copyDestinationHeader) {
         if (hasWildcard) {
             try {
                 const sourceEntries = await readdir(baseSourceDir);
-                const safePattern = pattern.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*');
-                const regex = new RegExp('^' + safePattern + '$');
+                const regex = new RegExp('^' + pattern.replace(/\./g, '\\.').replace(/\*/g, '.*') + '$');
                 itemsToCopy = sourceEntries
                     .filter(entry => regex.test(entry))
                     .map(entry => path.join(baseSourceDir, entry));
             } catch (err) {
                 if (err.code === 'ENOENT') {
-                    return sendPlainTextResponse(res, 'Source directory not found', 404);
+                    return sendPlainTextResponse(res, `COPY Error: Source directory for wildcard not found: ${path.dirname(copySourceHeader)}`, 404);
                 }
                 throw err;
             }
@@ -871,22 +572,18 @@ async function handleCopy(res, copySourceHeader, copyDestinationHeader) {
                 itemsToCopy.push(sourceFullPath);
             } catch (err) {
                 if (err.code === 'ENOENT') {
-                    return sendPlainTextResponse(res, 'Source not found', 404);
+                    return sendPlainTextResponse(res, `COPY Error: Source not found: ${copySourceHeader}`, 404);
                 }
                 throw err;
             }
         }
 
         if (itemsToCopy.length === 0) {
-            return sendPlainTextResponse(res, 'No files matched source', 200);
+            return sendPlainTextResponse(res, `COPY Warning: No files or directories matched the source: ${copySourceHeader}`, 200);
         }
 
         const results = [];
         for (const itemToCopy of itemsToCopy) {
-            if (!isPathInsideRoot(FILES_ROOT, path.relative(FILES_ROOT, itemToCopy))) {
-                results.push(`Skipped invalid path: ${path.relative(FILES_ROOT, itemToCopy)}`);
-                continue;
-            }
             const itemName = path.basename(itemToCopy);
             const finalDestinationPath = path.join(destinationFullPath, itemName);
 
@@ -906,21 +603,20 @@ async function handleCopy(res, copySourceHeader, copyDestinationHeader) {
                 results.push(`Failed to copy ${path.relative(FILES_ROOT, itemToCopy)}: ${copyError.message}`);
             }
         }
-        sendPlainTextResponse(res, `COPY complete:\n${results.join('\n')}`, 200);
+        sendPlainTextResponse(res, `COPY Operation complete:\n${results.join('\n')}`, 200);
 
     } catch (error) {
-        console.error(`COPY Error: ${error.message}`);
-        sendPlainTextResponse(res, 'Internal Server Error', 500);
+        console.error(`COPY Internal Server Error: ${error.message}`);
+        sendPlainTextResponse(res, `COPY Internal Server Error: ${error.message}`, 500);
     }
 }
 
-// ===== CORRECTED handleDel with SECURITY + REGEX FIX =====
 async function handleDel(res, delPathHeader) {
-    if (!isPathInsideRoot(FILES_ROOT, delPathHeader)) {
-        return sendPlainTextResponse(res, 'Access Denied', 403);
-    }
-
     const fullPathToDelete = path.join(FILES_ROOT, delPathHeader);
+
+    if (!fullPathToDelete.startsWith(FILES_ROOT)) {
+        return sendPlainTextResponse(res, 'Access Denied: Invalid DEL path.', 403);
+    }
 
     try {
         const hasWildcard = delPathHeader.includes('*');
@@ -931,14 +627,13 @@ async function handleDel(res, delPathHeader) {
         if (hasWildcard) {
             try {
                 const sourceFiles = await readdir(baseDeleteDir);
-                const safePattern = pattern.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*');
-                const regex = new RegExp('^' + safePattern + '$');
+                const regex = new RegExp('^' + pattern.replace(/\./g, '\\.').replace(/\*/g, '.*') + '$');
                 itemsToDelete = sourceFiles
                     .filter(file => regex.test(file))
                     .map(file => path.join(baseDeleteDir, file));
             } catch (err) {
                 if (err.code === 'ENOENT') {
-                    return sendPlainTextResponse(res, 'Source directory not found', 404);
+                    return sendPlainTextResponse(res, `DEL Error: Source directory for wildcard not found: ${path.dirname(delPathHeader)}`, 404);
                 }
                 throw err;
             }
@@ -948,22 +643,18 @@ async function handleDel(res, delPathHeader) {
                 itemsToDelete.push(fullPathToDelete);
             } catch (err) {
                 if (err.code === 'ENOENT') {
-                    return sendPlainTextResponse(res, 'Item not found', 404);
+                    return sendPlainTextResponse(res, `DEL Error: Item not found: ${delPathHeader}`, 404);
                 }
                 throw err;
             }
         }
 
         if (itemsToDelete.length === 0) {
-            return sendPlainTextResponse(res, 'No files matched for deletion', 200);
+            return sendPlainTextResponse(res, `DEL Warning: No files or directories matched for deletion: ${delPathHeader}`, 200);
         }
 
         const results = [];
         for (const itemPath of itemsToDelete) {
-            if (!isPathInsideRoot(FILES_ROOT, path.relative(FILES_ROOT, itemPath))) {
-                results.push(`Skipped invalid path: ${path.relative(FILES_ROOT, itemPath)}`);
-                continue;
-            }
             const relativeItemPath = path.relative(FILES_ROOT, itemPath);
             try {
                 const itemStats = await stat(itemPath);
@@ -988,11 +679,11 @@ async function handleDel(res, delPathHeader) {
                 results.push(`Failed to delete/move ${relativeItemPath}: ${deleteError.message}`);
             }
         }
-        sendPlainTextResponse(res, `DEL complete:\n${results.join('\n')}`, 200);
+        sendPlainTextResponse(res, `DEL Operation complete:\n${results.join('\n')}`, 200);
 
     } catch (error) {
-        console.error(`DEL Error: ${error.message}`);
-        sendPlainTextResponse(res, 'Internal Server Error', 500);
+        console.error(`DEL Internal Server Error: ${error.message}`);
+        sendPlainTextResponse(res, `DEL Internal Server Error: ${error.message}`, 500);
     }
 }
 
@@ -1003,6 +694,7 @@ function webHandler(req, res) {
         return;
     }
 
+    // WebRTC Signaling Endpoints (HTTP Long Polling) - FIXED IMPLEMENTATION
     const requestedUrl = new URL(req.url, `http://${req.headers.host}`);
     const pathname = requestedUrl.pathname;
     
@@ -1016,8 +708,9 @@ function webHandler(req, res) {
                 if (!data.roomId || !data.message || typeof data.roomId !== 'string' || !data.roomId.trim()) {
                     return sendPlainTextResponse(res, 'Invalid roomId or message', 400);
                 }
-                const roomId = data.roomId.trim().substring(0, 100);
+                const roomId = data.roomId.trim().substring(0, 100); // Sanitize + limit length
                 
+                // Clean old rooms if near capacity (simple LRU)
                 if (Object.keys(webrtcRooms).length > MAX_ROOMS) {
                     const oldestRoom = Object.keys(webrtcRooms).sort((a, b) => 
                         (webrtcRooms[a].lastAccessed || 0) - (webrtcRooms[b].lastAccessed || 0)
@@ -1034,24 +727,24 @@ function webHandler(req, res) {
                     }
                 }
 
+                // Deliver to first waiting peer if queue exists (FIFO)
                 if (webrtcRooms[roomId]?.waitingQueue && webrtcRooms[roomId].waitingQueue.length > 0) {
                     const waitingPeer = webrtcRooms[roomId].waitingQueue.shift();
                     clearTimeout(waitingPeer.timeoutId);
                     
+                    // Send message to waiting peer
                     sendJsonResponse(waitingPeer.res, { message: data.message });
                     
-                    if (webrtcRooms[roomId]) {
-                        webrtcRooms[roomId].pendingMessage = null;
-                        webrtcRooms[roomId].lastAccessed = Date.now();
-                        if (webrtcRooms[roomId].waitingQueue.length === 0) {
-                            delete webrtcRooms[roomId];
-                        }
+                    // Cleanup room if no pending message and empty queue
+                    if (!webrtcRooms[roomId].pendingMessage && webrtcRooms[roomId].waitingQueue.length === 0) {
+                        delete webrtcRooms[roomId];
                     }
                     
                     sendPlainTextResponse(res, 'Message delivered', 200);
                     return;
                 }
 
+                // Store message for future poll (overwrite existing)
                 webrtcRooms[roomId] = {
                     pendingMessage: data.message,
                     waitingQueue: [],
@@ -1067,7 +760,7 @@ function webHandler(req, res) {
         return;
     }
 
-    // Wait endpoint: GET /webrtc/wait?roomId=xxx
+    // Wait endpoint: GET /webrtc/wait?roomId=xxx - FIXED: Keep room alive after delivering pending message!
     if (pathname === '/webrtc/wait' && req.method === 'GET') {
         const roomId = requestedUrl.searchParams.get('roomId')?.trim().substring(0, 100);
         
@@ -1075,12 +768,18 @@ function webHandler(req, res) {
             return sendPlainTextResponse(res, 'Missing roomId parameter', 400);
         }
 
+        // Deliver stored message immediately if available
         if (webrtcRooms[roomId]?.pendingMessage !== undefined) {
             sendJsonResponse(res, { message: webrtcRooms[roomId].pendingMessage });
+            // === CRITICAL FIX ===
+            // DO NOT delete pendingMessage or room!
+            // Room must stay alive for reverse signaling (answer going back to offerer)
             webrtcRooms[roomId].lastAccessed = Date.now();
+            // pendingMessage remains until explicitly overwritten or room expires
             return;
         }
 
+        // Initialize room if it doesn't exist
         if (!webrtcRooms[roomId]) {
             webrtcRooms[roomId] = {
                 pendingMessage: null,
@@ -1089,10 +788,13 @@ function webHandler(req, res) {
             };
         }
 
+        // Add to waiting queue (FIFO)
         const timeoutId = setTimeout(() => {
             const room = webrtcRooms[roomId];
             if (room) {
+                // Remove this specific waiter from queue
                 room.waitingQueue = room.waitingQueue.filter(w => w.res !== res);
+                // Cleanup room if truly empty
                 if (!room.pendingMessage && room.waitingQueue.length === 0) {
                     delete webrtcRooms[roomId];
                 }
@@ -1104,6 +806,8 @@ function webHandler(req, res) {
 
         webrtcRooms[roomId].waitingQueue.push({ res, timeoutId });
         webrtcRooms[roomId].lastAccessed = Date.now();
+        
+        // IMPORTANT: Do NOT call res.end() here - response stays open
         return;
     }
 
@@ -1177,127 +881,29 @@ function webHandler(req, res) {
     handleFileRequest(req, res, filePath);
 }
 
-// ===== HTTP SERVER WITH WEBSOCKET UPGRADE =====
 const httpServer = http.createServer(webHandler);
 
-// [WEBSOCKET] Attach upgrade handler BEFORE error listener
-httpServer.on('upgrade', (req, socket, head) => 
-    handleWsUpgrade('HTTP', req, socket, head)
-);
-
-httpServer.on('error', (err) => {
-    console.error(`\x1b[31mHTTP Server error on port ${serverOptions.port}: ${err.message}\x1b[0m`);
-    if (err.code === 'EADDRINUSE') {
-        console.error(`Port ${serverOptions.port} is already in use. Stop other services using this port.`);
-    } else if (err.code === 'EACCES') {
-        console.error(`Permission denied for port ${serverOptions.port}. Use sudo or switch to port > 1024.`);
-    }
-    process.exit(1);
-});
-
 httpServer.listen(serverOptions.port, () => {
-    console.log(`\x1b[32mHTTP Server running on port ${serverOptions.port}\x1b[0m`);
+    console.log(`HTTP Server running on port ${serverOptions.port}`);
     console.log(`WebRTC Signaling: POST /webrtc/signal | GET /webrtc/wait?roomId=xxx`);
-    console.log(`WebSockets: ws://localhost:${serverOptions.port}/ws/<handler>`);
 });
 
-// ===== HTTPS SERVER WITH WEBSOCKET UPGRADE =====
 let httpsServer;
 try {
-    // Verify files exist before reading (prevents vague errors)
-    if (!fs.existsSync(serverOptions.key) || !fs.existsSync(serverOptions.cert)) {
-        throw Object.assign(new Error('SSL certificate files missing'), { code: 'ENOENT' });
-    }
-
     const privateKey = fs.readFileSync(serverOptions.key, 'utf8');
     const certificate = fs.readFileSync(serverOptions.cert, 'utf8');
     const credentials = { key: privateKey, cert: certificate };
 
     httpsServer = https.createServer(credentials, webHandler);
-    
-    // [WEBSOCKET] Attach upgrade handler BEFORE error listener
-    httpsServer.on('upgrade', (req, socket, head) => 
-        handleWsUpgrade('HTTPS', req, socket, head)
-    );
-
-    // CRITICAL: Handle async listen errors (port conflicts, permissions)
-    httpsServer.on('error', (err) => {
-        console.error(`\x1b[31mHTTPS Server error on port ${serverOptions.sslport}: ${err.message}\x1b[0m`);
-        if (err.code === 'EADDRINUSE') {
-            console.error(`Port ${serverOptions.sslport} is already in use. Free the port or change sslport in serverOptions.`);
-        } else if (err.code === 'EACCES') {
-            console.error(`Permission denied for port ${serverOptions.sslport}. Ports < 1024 require root. Try:`);
-            console.error(`  sudo node webserver.js   OR   change sslport to 8443 in serverOptions`);
-        } else if (err.code === 'ERR_SSL_KEY_FORMAT_INVALID') {
-            console.error('Invalid private key format. Ensure key.pem is valid PEM format.');
-        }
-        httpsServer = null;
-    });
 
     httpsServer.listen(serverOptions.sslport, () => {
-        console.log(`\x1b[32mHTTPS Server running on port ${serverOptions.sslport}\x1b[0m`);
+        console.log(`HTTPS Server running on port ${serverOptions.sslport}`);
         console.log(`WebRTC Signaling: POST /webrtc/signal | GET /webrtc/wait?roomId=xxx`);
-        console.log(`WebSockets: wss://localhost:${serverOptions.sslport}/ws/<handler>`);
-        if (typeof webAppReady === 'function') {
-            webAppReady(); // ONLY called when server is actually listening
-        }
     });
+    if (typeof webAppReady === 'function') {
+        webAppReady();
+    }
 } catch (error) {
-    console.error(`\x1b[31m❌ FAILED to start HTTPS server:\x1b[0m ${error.message}`);
-    
-    if (error.code === 'ENOENT') {
-        console.error(`\nMISSING CERTIFICATE FILES! Expected:`);
-        console.error(`  Key:  ${path.resolve(serverOptions.key)}`);
-        console.error(`  Cert: ${path.resolve(serverOptions.cert)}`);
-        console.log(`\n🔧 TO GENERATE SELF-SIGNED CERT (development ONLY):`);
-        console.log(`openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365 -nodes -subj "/CN=localhost"`);
-        console.log(`\n⚠️  WARNING: Browsers will show security warnings with self-signed certs.`);
-        console.log(`✅ For production: Use certs from Let's Encrypt or trusted CA.`);
-    } else if (error.message.includes('PEM') || error.code === 'ERR_OSSL_PEM_NO_START_LINE') {
-        console.error('Certificate/key file is corrupted or invalid PEM format. Regenerate certificates.');
-    }
-    
-    console.log(`\nℹ️  HTTP server is RUNNING on port ${serverOptions.port}`);
-    console.log(`   Access via: http://localhost:${serverOptions.port}`);
-    console.log(`   WebSockets: ws://localhost:${serverOptions.port}/ws/<handler>`);
+    console.error('Error starting HTTPS server: Ensure key.pem and cert.pem exist in the server directory and are valid.', error.message);
+    console.log('HTTPS server will not start.');
 }
-
-// ===== EXAMPLE WEBSOCKET HANDLER (files/api/chat.ws.js) =====
-/*
-// Save as files/api/chat.ws.js
-module.exports.handler = function(ws, request) {
-  console.log('[chat] New connection from', request.socket.remoteAddress);
-  
-  // Optional lifecycle methods (called by server)
-  return {
-    onOpen: () => {
-      ws.send(JSON.stringify({ type: 'system', message: 'Connected to chat server' }));
-    },
-    
-    onMessage: (msg) => {
-      try {
-        const data = JSON.parse(msg);
-        console.log('[chat] Received:', data);
-        
-        // Simple echo with timestamp
-        ws.send(JSON.stringify({
-          type: 'message',
-          content: data.content,
-          timestamp: new Date().toISOString(),
-          from: 'server'
-        }));
-      } catch (e) {
-        ws.send(JSON.stringify({ 
-          type: 'error', 
-          message: 'Invalid JSON' 
-        }));
-      }
-    },
-    
-    onClose: () => {
-      console.log('[chat] Connection closed');
-    }
-  };
-};
-*/
-// ==========================================================

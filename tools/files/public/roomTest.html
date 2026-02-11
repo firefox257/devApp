@@ -1,0 +1,1652 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Room Chat</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: linear-gradient(135deg, #1a2a6c, #2c3e50, #4a6491);
+      color: #333;
+      line-height: 1.6;
+      padding: 20px;
+      min-height: 100vh;
+    }
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 320px 1fr 320px;
+      gap: 20px;
+    }
+    @media (max-width: 1024px) {
+      .container { grid-template-columns: 1fr; }
+    }
+    
+    /* Panel styling */
+    .panel {
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 16px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+      padding: 25px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    
+    .panel-title {
+      font-size: 1.6rem;
+      color: #2c3e50;
+      padding-bottom: 15px;
+      border-bottom: 2px solid #3498db;
+      margin-bottom: 15px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    /* Status section */
+    .status-section {
+      background: #f8f9fa;
+      padding: 20px;
+      border-radius: 12px;
+      border: 1px solid #e9ecef;
+    }
+    .status-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 15px;
+      margin-top: 15px;
+    }
+    .status-item {
+      background: white;
+      padding: 15px;
+      border-radius: 8px;
+      border-left: 4px solid #3498db;
+    }
+    .status-label {
+      font-size: 0.85em;
+      color: #6c757d;
+      margin-bottom: 5px;
+      font-weight: 500;
+    }
+    .status-value {
+      font-size: 1.2em;
+      font-weight: 700;
+      color: #2c3e50;
+      word-break: break-all;
+    }
+    .status-value.connected { color: #27ae60; }
+    .status-value.disconnected { color: #e74c3c; }
+    
+    /* Controls */
+    .controls {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+    .input-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .input-group label {
+      font-weight: 600;
+      color: #2c3e50;
+      font-size: 0.95rem;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .input-group input {
+      padding: 14px;
+      border: 2px solid #ddd;
+      border-radius: 10px;
+      font-size: 1rem;
+      transition: all 0.3s;
+      font-family: inherit;
+    }
+    .input-group input:focus {
+      outline: none;
+      border-color: #3498db;
+      box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.2);
+    }
+    .input-group input:disabled {
+      background: #f8f9fa;
+      cursor: not-allowed;
+    }
+    
+    .btn {
+      padding: 14px 20px;
+      border: none;
+      border-radius: 10px;
+      font-size: 1.05rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      font-family: inherit;
+    }
+    .btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+    .btn-connect { 
+      background: linear-gradient(135deg, #27ae60, #219653); 
+      color: white;
+      box-shadow: 0 4px 15px rgba(39, 174, 96, 0.4);
+    }
+    .btn-connect:hover:not(:disabled) { 
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(39, 174, 96, 0.6);
+    }
+    .btn-connect:active:not(:disabled) {
+      transform: translateY(1px);
+      box-shadow: 0 2px 10px rgba(39, 174, 96, 0.4);
+    }
+    .btn-action { 
+      background: linear-gradient(135deg, #3498db, #2980b9); 
+      color: white;
+      box-shadow: 0 4px 15px rgba(52, 152, 219, 0.4);
+    }
+    .btn-action:hover:not(:disabled) { 
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(52, 152, 219, 0.6);
+    }
+    .btn-danger { 
+      background: linear-gradient(135deg, #e74c3c, #c0392b); 
+      color: white;
+      box-shadow: 0 4px 15px rgba(231, 76, 60, 0.4);
+    }
+    .btn-danger:hover:not(:disabled) { 
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(231, 76, 60, 0.6);
+    }
+    .btn-warning {
+      background: linear-gradient(135deg, #f39c12, #d35400);
+      color: white;
+      box-shadow: 0 4px 15px rgba(243, 156, 18, 0.4);
+    }
+    .btn-warning:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(243, 156, 18, 0.6);
+    }
+    
+    /* Lists */
+    .list-section {
+      max-height: 400px;
+      overflow-y: auto;
+      border: 1px solid #e9ecef;
+      border-radius: 10px;
+      background: white;
+      padding: 10px;
+    }
+    .list-item {
+      padding: 12px 15px;
+      border-bottom: 1px solid #f0f0f0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      transition: all 0.2s;
+    }
+    .list-item:last-child { border-bottom: none; }
+    .list-item:hover {
+      background: #f8f9ff;
+      transform: translateX(3px);
+    }
+    .list-item.active {
+      background: #e3f2fd;
+      border-left: 3px solid #3498db;
+      font-weight: 600;
+    }
+    .list-count {
+      background: #3498db;
+      color: white;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.85rem;
+      flex-shrink: 0;
+      font-weight: 600;
+    }
+    .user-id {
+      font-family: monospace;
+      font-size: 0.85rem;
+      color: #7f8c8d;
+      margin-top: 3px;
+    }
+    .user-actions {
+      display: flex;
+      gap: 5px;
+    }
+    .user-btn {
+      padding: 6px 10px;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .user-btn.pm {
+      background: #3498db;
+      color: white;
+    }
+    .user-btn.pm:hover { background: #2980b9; }
+    .user-btn.remove {
+      background: #e74c3c;
+      color: white;
+    }
+    .user-btn.remove:hover { background: #c0392b; }
+    
+    /* Chat panel */
+    .chat-panel {
+      grid-column: span 3;
+      display: flex;
+      flex-direction: column;
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 16px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+      overflow: hidden;
+    }
+    @media (max-width: 1024px) {
+      .chat-panel { grid-column: span 1; }
+    }
+    
+    .chat-header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 25px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .chat-title {
+      font-size: 2rem;
+      font-weight: 700;
+    }
+    .chat-subtitle {
+      opacity: 0.95;
+      font-size: 1.1rem;
+      margin-top: 8px;
+    }
+    .current-room {
+      font-size: 0.95rem;
+      opacity: 0.9;
+      margin-top: 5px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .chat-messages {
+      flex: 1;
+      padding: 30px;
+      overflow-y: auto;
+      min-height: 500px;
+      max-height: 700px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      background: #f8fafc;
+    }
+    @media (max-width: 768px) {
+      .chat-messages { min-height: 400px; padding: 20px; }
+    }
+    
+    .message {
+      max-width: 80%;
+      padding: 18px 22px;
+      border-radius: 20px;
+      position: relative;
+      animation: fadeIn 0.3s ease-out;
+      line-height: 1.6;
+      box-shadow: 0 3px 15px rgba(0,0,0,0.1);
+    }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    
+    .message.system {
+      background: linear-gradient(135deg, #3498db, #2980b9);
+      color: white;
+      align-self: center;
+      max-width: 90%;
+      font-style: italic;
+      border-radius: 15px;
+    }
+    
+    .message.broadcast {
+      background: white;
+      border: 1px solid #e0e6ef;
+      align-self: flex-start;
+      border-bottom-left-radius: 5px;
+    }
+    
+    .message.sent {
+      background: linear-gradient(135deg, #27ae60, #219653);
+      color: white;
+      align-self: flex-end;
+      border-bottom-right-radius: 5px;
+    }
+    
+    .message.private-received {
+      background: linear-gradient(135deg, #e74c3c, #c0392b);
+      color: white;
+      align-self: flex-start;
+      border-bottom-left-radius: 5px;
+      position: relative;
+    }
+    .message.private-received::before {
+      content: "🔒";
+      position: absolute;
+      left: -25px;
+      top: 50%;
+      transform: translateY(-50%);
+    }
+    
+    .message.private-sent {
+      background: linear-gradient(135deg, #9b59b6, #8e44ad);
+      color: white;
+      align-self: flex-end;
+      border-bottom-right-radius: 5px;
+      position: relative;
+    }
+    .message.private-sent::before {
+      content: "🔒";
+      position: absolute;
+      right: -25px;
+      top: 50%;
+      transform: translateY(-50%);
+    }
+    
+    .message.error {
+      background: #ffebee;
+      color: #c62828;
+      border-left: 4px solid #ef9a9a;
+      align-self: center;
+      max-width: 90%;
+    }
+    
+    .message-header {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      font-size: 0.9rem;
+    }
+    .message-sender {
+      font-weight: 700;
+      color: #2c3e50;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .message-sender.you { color: #27ae60; }
+    .message-time {
+      color: #7f8c8d;
+      white-space: nowrap;
+      font-size: 0.85rem;
+    }
+    
+    .message-content {
+      word-wrap: break-word;
+      font-size: 1.05rem;
+      line-height: 1.6;
+    }
+    .message-content code {
+      background: rgba(0,0,0,0.05);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: monospace;
+    }
+    
+    .chat-input {
+      padding: 25px;
+      border-top: 1px solid #eee;
+      background: white;
+      display: flex;
+      gap: 15px;
+      flex-wrap: wrap;
+    }
+    @media (max-width: 768px) {
+      .chat-input { padding: 15px; flex-direction: column; }
+    }
+    
+    .chat-input input {
+      flex: 1;
+      min-width: 200px;
+      padding: 16px 20px;
+      border: 2px solid #ddd;
+      border-radius: 50px;
+      font-size: 1.05rem;
+      transition: all 0.3s;
+      font-family: inherit;
+    }
+    .chat-input input:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
+    }
+    .chat-input input:disabled {
+      background: #f8f9fa;
+      cursor: not-allowed;
+    }
+    
+    .chat-input button {
+      padding: 0 30px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      border-radius: 50px;
+      font-weight: 600;
+      font-size: 1.05rem;
+      cursor: pointer;
+      transition: all 0.3s;
+      box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+      min-width: 120px;
+    }
+    .chat-input button:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+    }
+    .chat-input button:disabled {
+      opacity: 0.6;
+      transform: none;
+      box-shadow: none;
+    }
+    
+    /* Connection status indicator */
+    .status-indicator {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      margin-right: 8px;
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(46, 204, 113, 0.7); }
+      50% { opacity: 0.5; box-shadow: 0 0 0 8px rgba(46, 204, 113, 0); }
+    }
+    .status-indicator.connected { 
+      background: #2ecc71; 
+      box-shadow: 0 0 0 0 rgba(46, 204, 113, 0.7);
+    }
+    .status-indicator.disconnected { 
+      background: #e74c3c; 
+      animation: none;
+    }
+    
+    /* Quick actions */
+    .quick-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 10px;
+    }
+    .quick-btn {
+      padding: 8px 16px;
+      background: #e9ecef;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: all 0.3s;
+      font-weight: 500;
+    }
+    .quick-btn:hover { background: #3498db; color: white; }
+    .quick-btn.danger:hover { background: #e74c3c; }
+    
+    /* Badge */
+    .badge {
+      background: #e74c3c;
+      color: white;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      margin-left: 8px;
+    }
+    
+    /* Notification badge */
+    .notification-badge {
+      background: #e74c3c;
+      color: white;
+      border-radius: 10px;
+      padding: 2px 6px;
+      font-size: 0.75rem;
+      font-weight: bold;
+      margin-left: 5px;
+    }
+    
+    /* Room creation hint */
+    .room-hint {
+      background: #e3f2fd;
+      border-left: 3px solid #2196f3;
+      padding: 10px;
+      border-radius: 0 4px 4px 0;
+      margin-top: 10px;
+      font-size: 0.85rem;
+      color: #1565c0;
+    }
+    
+    /* Loading spinner */
+    .spinner {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-radius: 50%;
+      border-top-color: white;
+      animation: spin 1s linear infinite;
+      margin-right: 8px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    
+    /* Error toast */
+    #toast {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: #e74c3c;
+      color: white;
+      padding: 15px 25px;
+      border-radius: 8px;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+      transform: translateX(400px);
+      transition: transform 0.3s ease-out;
+      z-index: 1000;
+      font-weight: 500;
+    }
+    #toast.show {
+      transform: translateX(0);
+    }
+    #toast.success { background: #27ae60; }
+    #toast.info { background: #3498db; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Left Panel: Connection & Controls -->
+    <div class="panel">
+      <h2 class="panel-title">🔌 Connection</h2>
+      
+      <div class="status-section">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <strong>Connection Status</strong>
+          <span class="status-indicator disconnected" id="statusIndicator"></span>
+        </div>
+        <div class="status-value disconnected" id="statusText">Disconnected</div>
+        
+        <div class="status-grid">
+          <div class="status-item">
+            <div class="status-label">Connection ID</div>
+            <div class="status-value" id="connId">-</div>
+          </div>
+          <div class="status-item">
+            <div class="status-label">Current Room</div>
+            <div class="status-value" id="currentRoom">-</div>
+          </div>
+          <div class="status-item">
+            <div class="status-label">Room Members</div>
+            <div class="status-value" id="memberCount">0</div>
+          </div>
+          <div class="status-item">
+            <div class="status-label">Messages</div>
+            <div class="status-value" id="msgCount">0</div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="controls">
+        <button class="btn btn-connect" id="connectBtn">
+          <span>🔌 Connect</span>
+        </button>
+        
+        <div class="input-group">
+          <label for="roomIdInput">🏠 Room ID</label>
+          <input type="text" id="roomIdInput" placeholder="Enter room name (alphanumeric)" value="lobby">
+          <div class="room-hint">💡 Rooms are created automatically when you join</div>
+        </div>
+        
+        <button class="btn btn-action" id="subscribeBtn" disabled>
+          <span>🚪 Join Room</span>
+        </button>
+        
+        <button class="btn btn-danger" id="unsubscribeBtn" disabled>
+          <span>🏃 Leave Room</span>
+        </button>
+        
+        <div class="quick-actions">
+          <button class="quick-btn" id="listRoomsBtn" disabled>📋 List Rooms</button>
+          <button class="quick-btn" id="listUsersBtn" disabled>👥 List Members</button>
+          <button class="quick-btn danger" id="disconnectBtn" disabled>❌ Disconnect</button>
+        </div>
+      </div>
+      
+      <div style="text-align: center; padding-top: 15px; color: #7f8c8d; font-size: 0.9rem; border-top: 1px solid #eee; margin-top: 15px;">
+        <p>Connection ID: <span id="connIdDisplay" style="font-family: monospace; font-weight: 600; color: #2c3e50;">-</span></p>
+        <p style="margin-top: 8px; font-size: 0.85rem; opacity: 0.8;">
+          Create rooms by joining them!<br>
+          Send private messages to specific users.
+        </p>
+      </div>
+    </div>
+    
+    <!-- Center Panel: Chat -->
+    <div class="chat-panel">
+      <div class="chat-header">
+        <div>
+          <div class="chat-title" id="chatRoomTitle">Room Chat</div>
+          <div class="chat-subtitle">
+            <span id="roomSubtitle">Connect to start chatting</span>
+            <div class="current-room" id="privateTarget" style="display: none; margin-top: 8px;">
+              <span>🔒 Private to:</span>
+              <span id="privateTargetId" style="font-weight: 600; margin: 0 5px;"></span>
+              <button id="cancelPrivateBtn" class="user-btn remove" style="padding: 2px 8px; font-size: 0.8rem;">Cancel</button>
+            </div>
+          </div>
+        </div>
+        <div style="text-align: right;">
+          <div style="font-size: 1rem; opacity: 0.95;" id="serverTime"></div>
+          <div style="font-size: 0.9rem; opacity: 0.85; margin-top: 5px;" id="roomMemberInfo"></div>
+        </div>
+      </div>
+      
+      <div class="chat-messages" id="chatMessages">
+        <div class="empty-state">
+          <div>💬</div>
+          <p style="margin-top: 20px; font-size: 1.5rem; font-weight: 600;">Welcome to Room Chat!</p>
+          <p style="margin-top: 15px; font-size: 1.1rem;">Connect to the server and join a room to start chatting</p>
+          <p style="margin-top: 10px; opacity: 0.7;">Supports broadcast messages and private messaging to specific users</p>
+        </div>
+      </div>
+      
+      <div class="chat-input">
+        <input type="text" id="messageInput" placeholder="Connect first, then join a room to chat..." disabled>
+        <button id="sendBtn" disabled>Send</button>
+        <button id="clearBtn" class="btn btn-warning" style="padding: 16px; border-radius: 50px;">Clear</button>
+      </div>
+    </div>
+    
+    <!-- Right Panel: Room & User Lists -->
+    <div class="panel">
+      <h2 class="panel-title">📋 Active Rooms 
+        <span id="roomListBadge" class="notification-badge" style="display: none;">0</span>
+      </h2>
+      
+      <div class="list-section" id="roomList">
+        <div class="empty-state" style="padding: 20px;">
+          <p style="margin: 8px 0; background: #e9ecef; height: 20px; border-radius: 4px;"></p>
+          <p style="margin: 8px 0; background: #e9ecef; height: 20px; border-radius: 4px;"></p>
+          <p style="margin: 8px 0; background: #e9ecef; height: 20px; border-radius: 4px;"></p>
+        </div>
+      </div>
+      
+      <h2 class="panel-title" style="margin-top: 25px;">👥 Room Members 
+        <span id="userListBadge" class="notification-badge" style="display: none;">0</span>
+      </h2>
+      
+      <div class="list-section" id="userList">
+        <div class="empty-state" style="padding: 20px;">
+          <p style="margin: 8px 0; background: #e9ecef; height: 20px; border-radius: 4px;"></p>
+          <p style="margin: 8px 0; background: #e9ecef; height: 20px; border-radius: 4px;"></p>
+          <p style="margin: 8px 0; background: #e9ecef; height: 20px; border-radius: 4px;"></p>
+        </div>
+      </div>
+      
+      <div style="background: #e3f2fd; padding: 15px; border-radius: 10px; margin-top: 15px;">
+        <h3 style="font-size: 1.1rem; color: #1a3a6c; margin-bottom: 10px; display: flex; align-items: center; gap: 8px;">
+          <span>💡 Tips</span>
+        </h3>
+        <ul style="font-size: 0.9rem; line-height: 1.6; color: #2c3e50; padding-left: 20px;">
+          <li>Click a user to send private message</li>
+          <li>Click a room to join it</li>
+          <li>Your connection ID is unique per session</li>
+          <li>Private messages show with 🔒 icon</li>
+          <li>Rooms are created automatically when joined</li>
+          <li>Empty rooms are deleted automatically</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+
+  <script>
+    // ===== MINIMAL SELF-CONTAINED WEBSOCKET CLIENT =====
+    class RoomChatClient {
+      constructor(url, options = {}) {
+        this.url = url;
+        this.ws = null;
+        this.isConnected = false;
+        this.connectionId = null;
+        this.currentRooms = new Set();
+        this.eventListeners = new Map();
+        this.reconnectAttempts = 0;
+        this.reconnectTimer = null;
+        this.isClosing = false;
+        this.roomsToResubscribe = new Set();
+        
+        this.options = {
+          reconnectDelay: options.reconnectDelay || 3000,
+          maxReconnectAttempts: options.maxReconnectAttempts || 5,
+          autoReconnect: options.autoReconnect !== false,
+          logger: console
+        };
+      }
+      
+      connect() {
+        return new Promise((resolve, reject) => {
+          if (this.isConnected || (this.ws && this.ws.readyState === WebSocket.OPEN)) {
+            this.options.logger.warn('[RoomChatClient] Already connected');
+            return resolve();
+          }
+          
+          if (this.ws && this.ws.readyState === WebSocket.CONNECTING) {
+            return reject(new Error('Connection already in progress'));
+          }
+          
+          this.isClosing = false;
+          this.options.logger.log('[RoomChatClient] Connecting to', this.url);
+          
+          try {
+            this.ws = new WebSocket(this.url);
+            
+            this.ws.onopen = () => {
+              this.options.logger.log('[RoomChatClient] WebSocket opened');
+            };
+            
+            this.ws.onmessage = (event) => {
+              try {
+                const data = JSON.parse(event.data);
+                this._handleMessage(data);
+              } catch (e) {
+                this.options.logger.error('[RoomChatClient] Parse error:', e);
+              }
+            };
+            
+            this.ws.onclose = (event) => {
+              this.isConnected = false;
+              this.options.logger.log(`[RoomChatClient] Disconnected (Code: ${event.code})`);
+              this._emit('disconnected', { code: event.code, reason: event.reason, wasClean: event.wasClean });
+              
+              if (!this.isClosing && this.options.autoReconnect) {
+                this._attemptReconnect();
+              }
+            };
+            
+            this.ws.onerror = (error) => {
+              this.options.logger.error('[RoomChatClient] WebSocket error:', error);
+              this._emit('error', error);
+            };
+            
+          } catch (error) {
+            this.options.logger.error('[RoomChatClient] Connection error:', error);
+            reject(error);
+          }
+        });
+      }
+      
+      disconnect(code = 1000, reason = 'User initiated disconnect') {
+        this.isClosing = true;
+        if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+        
+        if (this.ws) {
+          this.roomsToResubscribe = new Set(this.currentRooms);
+          if (this.ws.readyState === WebSocket.OPEN) {
+            this.ws.close(code, reason);
+          } else {
+            this._cleanup();
+          }
+        }
+      }
+      
+      subscribe(roomId) {
+        return new Promise((resolve, reject) => {
+          if (!this.isConnected) return reject(new Error('Not connected'));
+          if (!roomId || !/^[a-zA-Z0-9_-]{1,50}$/.test(roomId)) {
+            return reject(new Error('Invalid room ID'));
+          }
+          
+          this._send({ action: 'subscribe', roomId });
+          resolve(); // Note: Resolution happens via room_joined event
+        });
+      }
+      
+      unsubscribe(roomId) {
+        return new Promise((resolve, reject) => {
+          if (!this.isConnected) return reject(new Error('Not connected'));
+          if (!roomId) return reject(new Error('Room ID required'));
+          
+          this._send({ action: 'unsubscribe', roomId });
+          resolve();
+        });
+      }
+      
+      send(roomId, message, to = null) {
+        return new Promise((resolve, reject) => {
+          if (!this.isConnected) return reject(new Error('Not connected'));
+          if (!roomId) return reject(new Error('Room ID required'));
+          if (!message || message.length === 0 || message.length > 10000) {
+            return reject(new Error('Invalid message'));
+          }
+          
+          const payload = { action: 'send', roomId, message };
+          if (to && to.trim().length > 0 && to !== this.connectionId) {
+            payload.to = to.trim();
+          }
+          
+          this._send(payload);
+          resolve();
+        });
+      }
+      
+      listUsers(roomId) {
+        if (!this.isConnected) return Promise.reject(new Error('Not connected'));
+        this._send({ action: 'list_users', roomId });
+        return Promise.resolve();
+      }
+      
+      listRooms() {
+        if (!this.isConnected) return Promise.reject(new Error('Not connected'));
+        this._send({ action: 'list_rooms' });
+        return Promise.resolve();
+      }
+      
+      on(event, callback) {
+        if (typeof callback !== 'function') throw new Error('Callback must be a function');
+        if (!this.eventListeners.has(event)) this.eventListeners.set(event, new Set());
+        this.eventListeners.get(event).add(callback);
+        return () => {
+          const listeners = this.eventListeners.get(event);
+          if (listeners) {
+            listeners.delete(callback);
+            if (listeners.size === 0) this.eventListeners.delete(event);
+          }
+        };
+      }
+      
+      off(event, callback) {
+        if (!event) {
+          this.eventListeners.clear();
+          return;
+        }
+        if (!this.eventListeners.has(event)) return;
+        
+        if (callback) {
+          const listeners = this.eventListeners.get(event);
+          listeners.delete(callback);
+          if (listeners.size === 0) this.eventListeners.delete(event);
+        } else {
+          this.eventListeners.delete(event);
+        }
+      }
+      
+      getStatus() {
+        return {
+          isConnected: this.isConnected,
+          connectionId: this.connectionId,
+          currentRooms: Array.from(this.currentRooms),
+          url: this.url
+        };
+      }
+      
+      getConnectionId() { return this.connectionId; }
+      getSubscribedRooms() { return Array.from(this.currentRooms); }
+      isSubscribed(roomId) { return this.currentRooms.has(roomId); }
+      
+      _send(data) {
+        if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+          this._emit('error', new Error('Not connected'));
+          return false;
+        }
+        try {
+          this.ws.send(JSON.stringify(data));
+          return true;
+        } catch (e) {
+          this._emit('error', e);
+          return false;
+        }
+      }
+      
+      _handleMessage(data) {
+        // Handle welcome message first to set connection ID
+        if (data.type === 'system' && data.event === 'welcome') {
+          this.connectionId = data.connectionId;
+          this.isConnected = true;
+          this.reconnectAttempts = 0;
+          this.currentRooms.clear();
+          this._emit('connected', { 
+            connectionId: this.connectionId,
+            message: data.message
+          });
+          
+          // Auto-resubscribe to previous rooms
+          if (this.roomsToResubscribe.size > 0) {
+            this.roomsToResubscribe.forEach(roomId => {
+              this.subscribe(roomId).catch(err => 
+                console.warn(`Auto-resubscribe failed for ${roomId}:`, err)
+              );
+            });
+            this.roomsToResubscribe.clear();
+          }
+          return;
+        }
+        
+        // Route all other messages
+        switch (data.type) {
+          case 'system':
+            this._handleSystemMessage(data);
+            break;
+          case 'message':
+            this._emit('message', {
+              roomId: data.roomId,
+              from: data.from,
+              content: data.content,
+              timestamp: data.timestamp,
+              isPrivate: false
+            });
+            break;
+          case 'private_message':
+            this._emit('private_message', {
+              roomId: data.roomId,
+              from: data.from,
+              to: data.to,
+              content: data.content,
+              timestamp: data.timestamp,
+              isPrivate: true
+            });
+            this._emit('message', {
+              roomId: data.roomId,
+              from: data.from,
+              to: data.to,
+              content: data.content,
+              timestamp: data.timestamp,
+              isPrivate: true
+            });
+            break;
+          case 'user_list':
+            this._emit('user_list', {
+              roomId: data.roomId,
+              users: data.users || []
+            });
+            break;
+          case 'room_list':
+            this._emit('room_list', data.rooms || []);
+            break;
+          case 'error':
+            this._emit('error', new Error(data.message));
+            break;
+        }
+      }
+      
+      _handleSystemMessage(data) {
+        switch (data.event) {
+          case 'subscribed':
+            this.currentRooms.add(data.roomId);
+            this._emit('room_joined', {
+              roomId: data.roomId,
+              roomSize: data.roomSize,
+              members: data.members || [],
+              message: data.message
+            });
+            break;
+          case 'unsubscribed':
+            this.currentRooms.delete(data.roomId);
+            this._emit('room_left', {
+              roomId: data.roomId,
+              message: data.message
+            });
+            break;
+          case 'user_joined':
+            this._emit('user_joined', {
+              roomId: data.roomId,
+              connectionId: data.connectionId,
+              timestamp: data.timestamp
+            });
+            break;
+          case 'user_left':
+            this._emit('user_left', {
+              roomId: data.roomId,
+              connectionId: data.connectionId,
+              timestamp: data.timestamp
+            });
+            break;
+          case 'private_message_sent':
+            this._emit('private_message_sent', {
+              roomId: data.roomId,
+              to: data.to,
+              timestamp: data.timestamp
+            });
+            break;
+          case 'message_sent':
+            this._emit('message_sent', {
+              roomId: data.roomId,
+              recipients: data.recipients,
+              timestamp: data.timestamp
+            });
+            break;
+        }
+        this._emit('system', data);
+      }
+      
+      _attemptReconnect() {
+        if (!this.options.autoReconnect || this.isClosing) return;
+        
+        this.reconnectAttempts++;
+        if (this.reconnectAttempts > this.options.maxReconnectAttempts) {
+          this.options.logger.error('[RoomChatClient] Max reconnection attempts reached');
+          this._emit('error', new Error('Max reconnection attempts reached'));
+          return;
+        }
+        
+        const delay = this.options.reconnectDelay * Math.min(this.reconnectAttempts, 4);
+        this.options.logger.log(`[RoomChatClient] Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts})`);
+        
+        this.reconnectTimer = setTimeout(() => {
+          this.connect().catch(err => {
+            this.options.logger.error('[RoomChatClient] Reconnection failed:', err);
+          });
+        }, delay);
+      }
+      
+      _cleanup() {
+        this.isConnected = false;
+        this.connectionId = null;
+        this.currentRooms.clear();
+      }
+      
+      _emit(event, data) {
+        const listeners = this.eventListeners.get(event);
+        if (!listeners) return;
+        
+        listeners.forEach(callback => {
+          try {
+            callback(data);
+          } catch (e) {
+            this.options.logger.error(`Error in ${event} listener:`, e);
+          }
+        });
+      }
+    }
+    
+    // ===== PAGE INITIALIZATION =====
+    document.addEventListener('DOMContentLoaded', () => {
+      // Create client with proper WebSocket URL
+      const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+      const wsUrl = `${protocol}://${window.location.host}/ws/room`;
+      const chat = new RoomChatClient(wsUrl, {
+        autoReconnect: true,
+        reconnectDelay: 3000,
+        maxReconnectAttempts: 5
+      });
+      
+      // UI Elements
+      const statusIndicator = document.getElementById('statusIndicator');
+      const statusText = document.getElementById('statusText');
+      const connIdEl = document.getElementById('connId');
+      const connIdDisplay = document.getElementById('connIdDisplay');
+      const currentRoomEl = document.getElementById('currentRoom');
+      const memberCountEl = document.getElementById('memberCount');
+      const msgCountEl = document.getElementById('msgCount');
+      const connectBtn = document.getElementById('connectBtn');
+      const subscribeBtn = document.getElementById('subscribeBtn');
+      const unsubscribeBtn = document.getElementById('unsubscribeBtn');
+      const listRoomsBtn = document.getElementById('listRoomsBtn');
+      const listUsersBtn = document.getElementById('listUsersBtn');
+      const disconnectBtn = document.getElementById('disconnectBtn');
+      const roomIdInput = document.getElementById('roomIdInput');
+      const messageInput = document.getElementById('messageInput');
+      const sendBtn = document.getElementById('sendBtn');
+      const clearBtn = document.getElementById('clearBtn');
+      const chatMessages = document.getElementById('chatMessages');
+      const roomListEl = document.getElementById('roomList');
+      const userListEl = document.getElementById('userList');
+      const chatRoomTitle = document.getElementById('chatRoomTitle');
+      const roomSubtitle = document.getElementById('roomSubtitle');
+      const roomMemberInfo = document.getElementById('roomMemberInfo');
+      const serverTimeEl = document.getElementById('serverTime');
+      const privateTarget = document.getElementById('privateTarget');
+      const privateTargetId = document.getElementById('privateTargetId');
+      const cancelPrivateBtn = document.getElementById('cancelPrivateBtn');
+      const toastEl = document.getElementById('toast');
+      
+      // State
+      let messageCount = 0;
+      let currentRoom = null;
+      let privateTargetUser = null;
+      
+      // Setup event listeners
+      setupEventListeners();
+      setupChatEvents();
+      updateServerTime();
+      setInterval(updateServerTime, 60000);
+      
+      function setupEventListeners() {
+        // Connection events
+        chat.on('connected', (data) => {
+          showToast('✅ Connected to server', 'success');
+          updateStatus('Connected', true);
+          const connId = data.connectionId || 'unknown';
+          connIdEl.textContent = connId;
+          connIdDisplay.textContent = connId;
+          
+          // Enable UI controls
+          connectBtn.disabled = true;
+          disconnectBtn.disabled = false;
+          subscribeBtn.disabled = false;
+          listRoomsBtn.disabled = false;
+          
+          // Auto-list rooms
+          listRooms();
+        });
+        
+        chat.on('disconnected', (data) => {
+          showToast('⚠️ Disconnected from server', 'error');
+          updateStatus('Disconnected', false);
+          
+          // Reset UI state
+          resetChatState();
+          updateRoomList([]);
+          updateUserList([]);
+        });
+        
+        chat.on('error', (error) => {
+          showToast(`❌ ${error.message}`, 'error');
+          addMessage(`❌ ${error.message}`, 'error');
+        });
+        
+        // Room events
+        chat.on('room_joined', (data) => {
+          showToast(`✅ Joined room: ${data.roomId}`, 'success');
+          setCurrentRoom(data.roomId, data.roomSize, data.members || []);
+          listRooms(); // Refresh room list
+        });
+        
+        chat.on('room_left', (data) => {
+          if (currentRoom === data.roomId) {
+            showToast(`🚪 Left room: ${data.roomId}`, 'info');
+            resetCurrentRoom();
+          }
+          setTimeout(listRooms, 500);
+        });
+        
+        chat.on('user_joined', (data) => {
+          if (data.roomId === currentRoom) {
+            addMessage(`👥 User ${data.connectionId} joined the room`, 'system');
+            refreshUserList();
+          }
+        });
+        
+        chat.on('user_left', (data) => {
+          if (data.roomId === currentRoom) {
+            addMessage(`👤 User ${data.connectionId} left the room`, 'system');
+            if (privateTargetUser === data.connectionId) clearPrivateTarget();
+            refreshUserList();
+          }
+        });
+        
+        // Message events
+        chat.on('message', (msg) => {
+          // Skip messages not for current room
+          if (msg.roomId !== currentRoom && msg.type !== 'error') return;
+          
+          messageCount++;
+          msgCountEl.textContent = messageCount;
+          
+          let type = 'broadcast';
+          let senderText = msg.from;
+          
+          if (msg.isPrivate) {
+            if (msg.to === chat.getConnectionId()) {
+              type = 'private-received';
+              senderText = `${msg.from} (private)`;
+            } else if (msg.from === chat.getConnectionId()) {
+              type = 'private-sent';
+              senderText = `You (to ${msg.to})`;
+            } else {
+              return; // Not for us
+            }
+          } else if (msg.from === chat.getConnectionId()) {
+            type = 'sent';
+            senderText = 'You';
+          }
+          
+          addMessage(msg.content, type, senderText, msg.timestamp);
+        });
+        
+        chat.on('room_list', (rooms) => {
+          updateRoomList(rooms);
+        });
+        
+        chat.on('user_list', (data) => {
+          if (data.roomId === currentRoom) {
+            updateUserList(data.users || []);
+          }
+        });
+      }
+      
+      function setupChatEvents() {
+        connectBtn.addEventListener('click', () => {
+          // Visual feedback
+          const originalText = connectBtn.innerHTML;
+          connectBtn.innerHTML = '<span class="spinner"></span> Connecting...';
+          connectBtn.disabled = true;
+          
+          chat.connect()
+            .then(() => {
+              connectBtn.innerHTML = originalText;
+            })
+            .catch(err => {
+              showToast(`❌ Connection failed: ${err.message}`, 'error');
+              connectBtn.innerHTML = originalText;
+              connectBtn.disabled = false;
+            });
+        });
+        
+        disconnectBtn.addEventListener('click', () => {
+          chat.disconnect();
+        });
+        
+        subscribeBtn.addEventListener('click', () => {
+          const roomId = roomIdInput.value.trim();
+          if (!roomId) {
+            showToast('❌ Room ID cannot be empty', 'error');
+            return;
+          }
+          joinRoom(roomId);
+        });
+        
+        unsubscribeBtn.addEventListener('click', () => {
+          if (currentRoom) chat.unsubscribe(currentRoom);
+        });
+        
+        listRoomsBtn.addEventListener('click', listRooms);
+        listUsersBtn.addEventListener('click', refreshUserList);
+        
+        sendBtn.addEventListener('click', sendMessage);
+        clearBtn.addEventListener('click', clearMessages);
+        cancelPrivateBtn.addEventListener('click', clearPrivateTarget);
+        
+        messageInput.addEventListener('keypress', (e) => {
+          if (e.key === 'Enter') sendMessage();
+        });
+        
+        roomIdInput.addEventListener('input', (e) => {
+          roomIdInput.value = e.target.value.replace(/[^a-zA-Z0-9_-]/g, '').toLowerCase();
+        });
+        
+        // Room list click handler
+        roomListEl.addEventListener('click', (e) => {
+          const item = e.target.closest('.list-item');
+          if (item) {
+            const roomId = item.querySelector('strong').textContent.split(' ')[0];
+            if (roomId && roomId !== currentRoom) {
+              roomIdInput.value = roomId;
+              joinRoom(roomId);
+            }
+          }
+        });
+        
+        // User list PM button handler
+        userListEl.addEventListener('click', (e) => {
+          if (e.target.classList.contains('pm')) {
+            const userId = e.target.getAttribute('data-user-id');
+            if (userId) startPrivateMessage(userId);
+          }
+        });
+      }
+      
+      // 🔑 CRITICAL FIX #1: Disable send controls BEFORE sending subscribe
+      function joinRoom(roomId) {
+        // Normalize roomId consistently
+        roomId = String(roomId).trim().toLowerCase();
+        
+        if (!roomId) {
+          showToast('❌ Room ID cannot be empty', 'error');
+          return;
+        }
+        
+        if (!chat.isConnected) {
+          showToast('❌ Not connected to server', 'error');
+          return;
+        }
+        
+        // 🔑 DISABLE SEND CONTROLS IMMEDIATELY to prevent race condition
+        messageInput.disabled = true;
+        sendBtn.disabled = true;
+        subscribeBtn.disabled = true; // Prevent duplicate joins
+        
+        if (chat.isSubscribed(roomId)) {
+          showToast(`ℹ️ Already in room "${roomId}"`, 'info');
+          // Re-enable controls after brief delay
+          setTimeout(() => {
+            subscribeBtn.disabled = false;
+            if (currentRoom === roomId) {
+              messageInput.disabled = false;
+              sendBtn.disabled = false;
+            }
+          }, 300);
+          return;
+        }
+        
+        // Leave current room first if needed
+        if (currentRoom && currentRoom !== roomId) {
+          chat.unsubscribe(currentRoom).finally(() => {
+            chat.subscribe(roomId).catch(err => {
+              showToast(`❌ Failed to join room: ${err.message}`, 'error');
+              subscribeBtn.disabled = false;
+            });
+          });
+        } else {
+          chat.subscribe(roomId).catch(err => {
+            showToast(`❌ Failed to join room: ${err.message}`, 'error');
+            subscribeBtn.disabled = false;
+          });
+        }
+      }
+      
+      // 🔑 CRITICAL FIX #2: Normalize roomId and validate subscription state
+      function sendMessage() {
+        const message = messageInput.value.trim();
+        if (!message || !currentRoom) return;
+        
+        // 🔑 CRITICAL: Verify we're actually subscribed before sending
+        if (!chat.isSubscribed(currentRoom)) {
+          showToast('⚠️ Still joining room... please wait', 'info');
+          return;
+        }
+        
+        // Normalize roomId defensively
+        const targetRoom = String(currentRoom).trim().toLowerCase();
+        
+        chat.send(targetRoom, message, privateTargetUser || null)
+          .then(() => {
+            messageInput.value = '';
+          })
+          .catch(err => {
+            showToast(`❌ Send failed: ${err.message}`, 'error');
+          });
+      }
+      
+      function listRooms() {
+        if (chat.isConnected) chat.listRooms();
+      }
+      
+      function refreshUserList() {
+        if (currentRoom) chat.listUsers(currentRoom);
+      }
+      
+      function updateStatus(text, isConnected) {
+        statusText.textContent = text;
+        statusText.className = `status-value ${isConnected ? 'connected' : 'disconnected'}`;
+        statusIndicator.className = `status-indicator ${isConnected ? 'connected' : 'disconnected'}`;
+      }
+      
+      // 🔑 CRITICAL FIX #3: Only enable send AFTER server confirms subscription
+      function setCurrentRoom(roomId, memberCount, members) {
+        // Normalize roomId
+        roomId = String(roomId).trim().toLowerCase();
+        
+        currentRoom = roomId;
+        currentRoomEl.textContent = roomId;
+        chatRoomTitle.textContent = `Room: #${roomId}`;
+        roomSubtitle.textContent = privateTargetUser 
+          ? `🔒 Private to ${privateTargetUser.substring(0, 8)}` 
+          : 'Broadcast to all members';
+        roomMemberInfo.textContent = `${memberCount} member${memberCount !== 1 ? 's' : ''} online`;
+        memberCountEl.textContent = memberCount;
+        
+        // 🔑 ONLY enable send controls AFTER server confirmation (room_joined event)
+        // The 100ms delay ensures server has fully committed state
+        setTimeout(() => {
+          // Double-check we're still in this room (prevent race on rapid switches)
+          if (currentRoom === roomId && chat.isSubscribed(roomId)) {
+            unsubscribeBtn.disabled = false;
+            listUsersBtn.disabled = false;
+            messageInput.disabled = false;
+            sendBtn.disabled = false;
+            subscribeBtn.disabled = false; // Re-enable join button
+            messageInput.placeholder = 'Type your message...';
+            messageInput.focus();
+          }
+        }, 100);
+        
+        updateUserList(members);
+        clearMessages();
+        addMessage(`✅ Joined room "${roomId}"`, 'system');
+      }
+      
+      function resetCurrentRoom() {
+        currentRoom = null;
+        currentRoomEl.textContent = '-';
+        chatRoomTitle.textContent = 'Room Chat';
+        roomSubtitle.textContent = 'Join a room to chat';
+        roomMemberInfo.textContent = '';
+        memberCountEl.textContent = '0';
+        
+        unsubscribeBtn.disabled = true;
+        listUsersBtn.disabled = true;
+        messageInput.disabled = true;
+        sendBtn.disabled = true;
+        subscribeBtn.disabled = false; // Allow joining new rooms
+        messageInput.placeholder = 'Connect first, then join a room to chat...';
+        
+        clearPrivateTarget();
+        updateUserList([]);
+      }
+      
+      function resetChatState() {
+        connectBtn.disabled = false;
+        disconnectBtn.disabled = true;
+        subscribeBtn.disabled = true;
+        unsubscribeBtn.disabled = true;
+        listRoomsBtn.disabled = true;
+        listUsersBtn.disabled = true;
+        sendBtn.disabled = true;
+        messageInput.disabled = true;
+        
+        connIdEl.textContent = '-';
+        connIdDisplay.textContent = '-';
+        currentRoomEl.textContent = '-';
+        memberCountEl.textContent = '0';
+        msgCountEl.textContent = '0';
+        messageCount = 0;
+        
+        resetCurrentRoom();
+        updateRoomList([]);
+      }
+      
+      function updateRoomList(rooms) {
+        if (!rooms || rooms.length === 0) {
+          roomListEl.innerHTML = `
+            <div style="padding: 20px; text-align: center; color: #7f8c8d;">
+              <p>No active rooms</p>
+              <p style="font-size: 0.9rem; margin-top: 8px;">Join a room to create it</p>
+            </div>
+          `;
+          return;
+        }
+        
+        rooms.sort((a, b) => b.memberCount - a.memberCount || a.roomId.localeCompare(b.roomId));
+        
+        let html = rooms.map(room => {
+          const isActive = currentRoom === room.roomId;
+          return `
+            <div class="list-item ${isActive ? 'active' : ''}" style="cursor: pointer;">
+              <div>
+                <strong>${room.roomId}</strong>
+                ${isActive ? '<span class="badge">Current</span>' : ''}
+                ${room.memberCount > 0 ? `<span style="margin-left: 8px; color: #7f8c8d; font-size: 0.9rem">(${room.memberCount})</span>` : ''}
+              </div>
+              <div class="list-count">${room.memberCount}</div>
+            </div>
+          `;
+        }).join('');
+        
+        roomListEl.innerHTML = html;
+      }
+      
+      function updateUserList(users) {
+        if (!users || users.length === 0) {
+          userListEl.innerHTML = `
+            <div style="padding: 20px; text-align: center; color: #7f8c8d;">
+              <p>No members in room</p>
+              <p style="font-size: 0.9rem; margin-top: 8px;">You're the first one here!</p>
+            </div>
+          `;
+          return;
+        }
+        
+        const myId = chat.getConnectionId();
+        users.sort((a, b) => {
+          if (a.connectionId === myId) return -1;
+          if (b.connectionId === myId) return 1;
+          return a.connectionId.localeCompare(b.connectionId);
+        });
+        
+        let html = users.map(user => {
+          const isMe = user.connectionId === myId;
+          const displayName = isMe ? 'You' : `User ${user.connectionId.substring(0, 6)}`;
+          
+          return `
+            <div class="list-item ${isMe ? 'active' : ''}">
+              <div>
+                <strong>${displayName}</strong>
+                <div class="user-id">${user.connectionId}${isMe ? ' (You)' : ''}</div>
+              </div>
+              <div class="user-actions">
+                ${!isMe ? `
+                  <button class="user-btn pm" data-user-id="${user.connectionId}">🔒 PM</button>
+                ` : `
+                  <span style="color: #27ae60; font-weight: 500;">(You)</span>
+                `}
+              </div>
+            </div>
+          `;
+        }).join('');
+        
+        userListEl.innerHTML = html;
+      }
+      
+      function addMessage(content, type, sender = null, timestamp = null) {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `message ${type}`;
+        
+        const now = timestamp ? new Date(timestamp) : new Date();
+        const timeStr = now.toLocaleTimeString([], { 
+          hour: '2-digit', 
+          minute: '2-digit',
+          hour12: false 
+        });
+        
+        let senderDisplay = sender || (type === 'sent' ? 'You' : 'System');
+        if (type === 'system') senderDisplay = 'System';
+        
+        const safeContent = escapeHtml(content);
+        
+        messageDiv.innerHTML = `
+          <div class="message-header">
+            <span class="message-sender ${sender?.includes('You') || type === 'sent' ? 'you' : ''}">
+              ${escapeHtml(senderDisplay)}
+            </span>
+            <span class="message-time">${timeStr}</span>
+          </div>
+          <div class="message-content">${safeContent}</div>
+        `;
+        
+        chatMessages.appendChild(messageDiv);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+      }
+      
+      function clearMessages() {
+        chatMessages.innerHTML = currentRoom ? `
+          <div class="empty-state">
+            <div>💬</div>
+            <p style="margin-top: 20px; font-size: 1.5rem; font-weight: 600;">Chat for #${currentRoom}</p>
+            <p style="margin-top: 10px">Start chatting!</p>
+          </div>
+        ` : `
+          <div class="empty-state">
+            <div>💬</div>
+            <p style="margin-top: 20px; font-size: 1.5rem; font-weight: 600;">Welcome to Room Chat!</p>
+            <p style="margin-top: 15px; font-size: 1.1rem;">Connect to the server and join a room to start chatting</p>
+          </div>
+        `;
+        messageCount = 0;
+        msgCountEl.textContent = '0';
+      }
+      
+      function clearPrivateTarget() {
+        privateTargetUser = null;
+        privateTarget.style.display = 'none';
+        if (currentRoom) {
+          roomSubtitle.textContent = 'Broadcast to all members';
+        }
+      }
+      
+      function startPrivateMessage(userId) {
+        if (!currentRoom) {
+          showToast('❌ Not in a room', 'error');
+          return;
+        }
+        
+        if (userId === chat.getConnectionId()) {
+          showToast('❌ Cannot message yourself', 'error');
+          return;
+        }
+        
+        privateTargetUser = userId;
+        privateTarget.style.display = 'flex';
+        privateTargetId.textContent = userId.substring(0, 8);
+        messageInput.placeholder = `Private to ${userId.substring(0, 8)}...`;
+        roomSubtitle.textContent = `🔒 Private to ${userId.substring(0, 8)}`;
+        messageInput.focus();
+        
+        showToast(`🔒 Private messaging ${userId.substring(0, 8)}`, 'info');
+      }
+      
+      function updateServerTime() {
+        const now = new Date();
+        serverTimeEl.textContent = now.toLocaleTimeString();
+      }
+      
+      function escapeHtml(unsafe) {
+        if (typeof unsafe !== 'string') return String(unsafe);
+        return unsafe
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#039;");
+      }
+      
+      function showToast(message, type = 'info') {
+        toastEl.textContent = message;
+        toastEl.className = type;
+        toastEl.classList.add('show');
+        
+        setTimeout(() => {
+          toastEl.classList.remove('show');
+        }, 3000);
+      }
+      
+      // Auto-connect on localhost for development
+      if (['localhost', '127.0.0.1'].includes(window.location.hostname)) {
+        setTimeout(() => {
+          if (!chat.isConnected && connectBtn.disabled === false) {
+            connectBtn.click();
+          }
+        }, 1000);
+      }
+    });
+  </script>
+</body>
+</html>

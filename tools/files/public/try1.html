@@ -3,222 +3,240 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Matrix Digital Rain</title>
+    <title>Hacker Login</title>
     <style>
+        /* --- Embedded CSS --- */
+        /* Basic Reset */
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
-        
+
         body {
+            font-family: 'Courier New', Courier, monospace; /* Classic monospace font */
             background-color: #000;
-            overflow: hidden;
-            font-family: 'Courier New', monospace;
+            color: #0f0; /* Green text for a hacker feel */
+            overflow: hidden; /* Hide scrollbars caused by canvas */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .matrix-container {
+            position: relative;
+            width: 100%;
             height: 100vh;
             display: flex;
             justify-content: center;
             align-items: center;
-            color: #0f0;
         }
-        
-        #matrix-container {
-            position: relative;
-            width: 100%;
-            height: 100%;
-        }
-        
-        #matrix-canvas {
+
+        #matrixCanvas {
             position: absolute;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
+            z-index: 1; /* Behind the login box */
         }
-        
-        .title {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
+
+        .login-box {
+            position: relative; /* To be above the canvas */
+            z-index: 2;
+            background-color: rgba(0, 0, 0, 0.7); /* Semi-transparent background */
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.3); /* Green glow */
             text-align: center;
-            z-index: 10;
-            text-shadow: 0 0 10px #0f0;
+            max-width: 400px;
+            width: 90%;
         }
-        
-        h1 {
-            font-size: 4rem;
-            letter-spacing: .3rem;
-            margin-bottom: 1rem;
-            text-transform: uppercase;
-        }
-        
-        .subtitle {
-            font-size: 1.5rem;
-            letter-spacing: 0.2rem;
-            opacity: 0.8;
-        }
-        
-        .controls {
-            position: absolute;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 10;
-            display: flex;
-            gap: 15px;
-        }
-        
-        button {
-            background: rgba(0, 20, 0, 0.7);
+
+        .login-box h1 {
             color: #0f0;
-            border: 1px solid #0f0;
-            padding: 10px 20px;
-            font-family: 'Courier New', monospace;
-            font-size: 1rem;
-            cursor: pointer;
-            transition: all 0.3s;
-            outline: none;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            text-shadow: 0 0 5px #0f0;
         }
-        
-        button:hover {
-            background: rgba(0, 50, 0, 0.9);
-            box-shadow: 0 0 10px #0f0;
+
+        .input-group {
+            margin-bottom: 20px;
+            text-align: left;
         }
-        
-        .scanline {
-            position: absolute;
-            top: 0;
-            left: 0;
+
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #0f0;
+            font-size: 1.1em;
+        }
+
+        .input-group input {
             width: 100%;
-            height: 100%;
-            background: linear-gradient(
-                to bottom,
-                rgba(0, 255, 0, 0.05) 0%,
-                transparent 50%,
-                rgba(0, 255, 0, 0.05) 100%
-            );
-            background-size: 100% 4px;
-            z-index: 5;
-            animation: scan 8s linear infinite;
+            padding: 10px;
+            border: 1px solid #0f0;
+            background-color: #000;
+            color: #0f0;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 1em;
+            outline: none; /* Remove default outline */
+            box-shadow: inset 0 0 5px rgba(0, 255, 0, 0.5); /* Inner glow */
         }
-        
-        @keyframes scan {
-            0% { background-position: 0 0; }
-            100% { background-position: 0 100%; }
+
+        .input-group input:focus {
+            border-color: #0ff; /* Cyan highlight on focus */
+            box-shadow: inset 0 0 8px rgba(0, 255, 255, 0.7);
+        }
+
+        button[type="submit"] {
+            background-color: #0f0;
+            color: #000;
+            border: none;
+            padding: 12px 25px;
+            font-size: 1.2em;
+            font-family: 'Courier New', Courier, monospace;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: background-color 0.3s ease, box-shadow 0.3s ease;
+            text-transform: uppercase;
+            margin-top: 15px;
+            box-shadow: 0 0 8px rgba(0, 255, 0, 0.7);
+        }
+
+        button[type="submit"]:hover {
+            background-color: #0ff; /* Cyan on hover */
+            box-shadow: 0 0 15px rgba(0, 255, 255, 0.9);
+        }
+
+        .error-message {
+            color: #f00; /* Red for errors */
+            margin-top: 15px;
+            font-size: 0.9em;
+            min-height: 1.2em; /* Reserve space for the message */
         }
     </style>
 </head>
 <body>
-    <div id="matrix-container">
-        <canvas id="matrix-canvas"></canvas>
-        <div class="title">
-            <h1>MATRIX</h1>
-            <div class="subtitle">DIGITAL RAIN</div>
-        </div>
-        <div class="scanline"></div>
-        <div class="controls">
-            <button id="speed-up">SPEED UP</button>
-            <button id="speed-down">SLOW DOWN</button>
-            <button id="density-up">MORE DENSITY</>
-            <button id="density-down">LESS DENSITY</button>
+
+    <div class="matrix-container">
+        <canvas id="matrixCanvas"></canvas>
+        <div class="login-box">
+            <h1>Hacker Login</h1>
+            <form id="loginForm">
+                <div class="input-group">
+                    <label for="username">Username:</label>
+                    <input type="text" id="username" name="username" required>
+                </div>
+                <div class="input-group">
+                    <label for="password">Password:</label>
+                    <input type="password" id="password" name="password" required>
+                </div>
+                <button type="submit">Login</button>
+            </form>
+            <p class="error-message" id="errorMessage"></p>
         </div>
     </div>
 
     <script>
-        // Wait for DOM to be fully loaded
-        document.addEventListener('DOMContentLoaded', function() {
-            // Get canvas and context
-            const canvas = document.getElementById('matrix-canvas');
-            const ctx = canvas.getContext('2d');
-            
-            // Set canvas to full window size
+        // --- Embedded JavaScript ---
+        const canvas = document.getElementById('matrixCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Set canvas dimensions to full screen
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        // Matrix characters (Japanese Katakana, numbers, and symbols are common)
+        const matrixChars = 'アァカサタナハマヤャラワガザダバパイィキシチニヒミリヰギジヂビピウゥクスツヌフムユュルヱグズヅブヅヴエェケセテネヘメヱゲゼデベペオォコソトノホモヨョロヲゴゾドボポヴ　ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+=-`~[]{}|;:,.<>?';
+        const charArray = matrixChars.split('');
+
+        const fontSize = 16; // Adjust for desired character size
+        const columns = canvas.width / fontSize;
+        const drops = []; // Array to hold the Y position of each 'drop' (column)
+
+        // Initialize drops array with random starting positions
+        for (let i = 0; i < columns; i++) {
+            drops[i] = 1; // Start each column at the top
+        }
+
+        // Function to draw the matrix effect
+        function drawMatrix() {
+            // Make the background slightly transparent black to create a fading trail
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Set text color and font
+            ctx.fillStyle = '#0f0'; // Green color
+            ctx.font = `${fontSize}px 'Courier New', Courier, monospace`;
+
+            // Loop through each column
+            for (let i = 0; i < drops.length; i++) {
+                // Pick a random character from the charArray
+                const text = charArray[Math.floor(Math.random() * charArray.length)];
+
+                // Draw the character at the current column and drop position
+                ctx.fillText(text, i * fontSize, drops[i] * fontSize);
+
+                // If the drop is below the screen, reset it to the top
+                // and add a random chance to reset it further up to create gaps
+                if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) {
+                    drops[i] = 0; // Reset to top
+                }
+
+                // Move the drop down
+                drops[i]++;
+            }
+        }
+
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+            drawMatrix();
+        }
+
+        // Handle window resizing
+        window.addEventListener('resize', () => {
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
-            
-            // Characters for the digital rain
-            const chars = "アァカサタナハマヤャラワガザダバパイィキシチニヒミリヰギジヂビピウゥクスツヌフムユュルグズブヅプエェケセテネヘメレヱゲゼデベペオォコソトノホモヨョロヲゴゾドボポヴッン0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-            const charArray = chars.split('');
-            
-            // Font size and columns
-            const fontSize = 14;
-            const columns = Math.floor(canvas.width / fontSize);
-            
-            // Array to store the y position of each column
-            const drops = [];
-            for (let i = 0; i < columns; i++) {
-                drops[i] = Math.random() * -100;
+            // Recalculate columns based on new width
+            const newColumns = canvas.width / fontSize;
+            // Adjust drops array if necessary (though often it's fine to let it expand)
+            while (drops.length < newColumns) {
+                drops.push(1);
             }
-            
-            // Animation control variables
-            let speed = 5;
-            let density = 0.98;
-            
-            // Draw function
-            function draw() {
-                // Semi-transparent black overlay for trail effect
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-                
-                ctx.font = `${fontSize}px 'Courier New', monospace`;
-                
-                // Draw characters
-                for (let i = 0; i < drops.length; i++) {
-                    // Only draw if probability allows it based on density
-                    if (Math.random() > density) continue;
-                    
-                    // Get random character
-                    const char = charArray[Math.floor(Math.random() * charArray.length)];
-                    
-                    // Set text color - head is brighter
-                    if (drops[i] < 10) {
-                        ctx.fillStyle = '#ffffff';
-                    } else {
-                        ctx.fillStyle = '#00ff00';
-                    }
-                    
-                    // Draw character
-                    ctx.fillText(char, i * fontSize, drops[i] * fontSize);
-                    
-                    // Reset drop if it reaches bottom or randomly
-                    if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) {
-                        drops[i] = 0;
-                    }
-                    
-                    // Move drop down
-                    drops[i] += speed * 0.1;
-                }
-                
-                // Continue the animation loop
-                requestAnimationFrame(draw);
+            while (drops.length > newColumns) {
+                drops.pop();
             }
-            
-            // Handle window resize
-            window.addEventListener('resize', function() {
-                canvas.width = window.innerWidth;
-                canvas.height = window.innerHeight;
-            });
-            
-            // Control buttons
-            document.getElementById('speed-up').addEventListener('click', function() {
-                speed = Math.min(speed + 0.5, 15);
-            });
-            
-            document.getElementById('speed-down').addEventListener('click', function() {
-                speed = Math.max(speed - 0.5, 1);
-            });
-            
-            document.getElementById('density-up').addEventListener('click', function() {
-                density = Math.min(density + 0.01, 0.99);
-            });
-            
-            document.getElementById('density-down').addEventListener('click', function() {
-                density = Math.max(density - 0.01, 0.95);
-            });
-            
-            // Start animation
-            draw();
         });
+
+        // --- Login Form Logic ---
+        const loginForm = document.getElementById('loginForm');
+        const errorMessage = document.getElementById('errorMessage');
+
+        loginForm.addEventListener('submit', (e) => {
+            e.preventDefault(); // Prevent default form submission
+
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+
+            // Basic validation (replace with actual authentication logic)
+            if (username === 'admin' && password === 'matrix') {
+                errorMessage.textContent = '';
+                alert('Login successful! Welcome, hacker.');
+                // Redirect or do something else upon successful login
+            } else {
+                errorMessage.textContent = 'Access Denied. Invalid credentials.';
+                // Optionally clear the inputs
+                // document.getElementById('username').value = '';
+                // document.getElementById('password').value = '';
+            }
+        });
+
+        // Start the animation
+        animate();
     </script>
+
 </body>
 </html>
