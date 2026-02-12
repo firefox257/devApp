@@ -1,5 +1,5 @@
 // ./ux/aichat.js
-const API_BASE_URL = "https://gen.pollinations.ai/v1"; // ✅ FIXED: Removed trailing spaces
+const API_BASE_URL = "https://gen.pollinations.ai/v1";
 const MODELS_URL = `${API_BASE_URL}/models`;
 const CHAT_COMPLETIONS_URL = `${API_BASE_URL}/chat/completions`;
 
@@ -363,7 +363,7 @@ class AIChat extends HTMLElement {
 					}
 				});
 		}
-		// 🔑 CRITICAL FIX: ENTER KEY BEHAVIOR
+		// 🔑 CRITICAL FIX 1: ENTER KEY BEHAVIOR
 		if (textInputDiv) {
 			textInputDiv.addEventListener('keydown', (event) => {
 					// ONLY send on Ctrl+Enter (Windows/Linux) or Cmd+Enter (Mac)
@@ -409,7 +409,7 @@ class AIChat extends HTMLElement {
 			};
 
 			const jsonString = JSON.stringify(conversationData, null, 2);
-			await this.copyToClipboard(jsonString, this.shadowRoot.getElementById('copyConversationButton'));
+			await navigator.clipboard.writeText(jsonString);
 
 			const copyButton = this.shadowRoot.getElementById('copyConversationButton');
 			if (copyButton) {
@@ -430,111 +430,79 @@ class AIChat extends HTMLElement {
 	}
 
 	async pasteConversation() {
-		// ✅ FIRST: Try system clipboard (modern API)
 		try {
 			const clipboardText = await navigator.clipboard.readText();
-			if (clipboardText?.trim()) {
-				return await this.processPastedContent(clipboardText);
-			}
-		} catch (e) {
-			console.warn('System clipboard read failed:', e.message);
-		}
-
-		// 🔄 SECOND: Try execCommand fallback (legacy)
-		try {
-			const textarea = document.createElement('textarea');
-			textarea.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0;';
-			document.body.appendChild(textarea);
-			textarea.focus();
-			document.execCommand('paste');
-			const pasted = textarea.value;
-			document.body.removeChild(textarea);
-			if (pasted?.trim()) {
-				return await this.processPastedContent(pasted);
-			}
-		} catch (e) {
-			console.warn('execCommand paste failed:', e.message);
-		}
-
-		// 💾 THIRD: Try IndexedDB app clipboard
-		try {
-			const appClipboard = await this.readFromAppClipboard();
-			if (appClipboard?.trim()) {
-				await this.processPastedContent(appClipboard);
-				const pasteButton = this.shadowRoot.getElementById('pasteConversationButton');
-				if (pasteButton) {
-					pasteButton.textContent = '✅';
-					setTimeout(() => pasteButton.textContent = '📥', 1500);
-				}
+			if (!clipboardText || clipboardText.trim() === '') {
 				return;
 			}
-		} catch (e) {
-			console.warn('App clipboard read failed:', e.message);
-		}
 
-		// ❌ All methods failed
-		const pasteButton = this.shadowRoot.getElementById('pasteConversationButton');
-		if (pasteButton) {
-			pasteButton.textContent = '❌';
-			setTimeout(() => pasteButton.textContent = '📥', 1500);
-		}
-	}
+			let parsedData;
+			try {
+				parsedData = JSON.parse(clipboardText);
+			} catch (jsonError) {
+				return this.pasteConversationFromText(clipboardText);
+			}
 
-	async processPastedContent(text) {
-		if (!text || text.trim() === '') {
-			return;
-		}
+			if (!parsedData.messages || !Array.isArray(parsedData.messages)) {
+				return;
+			}
 
-		let parsedData;
-		try {
-			parsedData = JSON.parse(text);
-		} catch (jsonError) {
-			return this.pasteConversationFromText(text);
-		}
+			const systemPromptToUse = parsedData.systemPrompt || this.systemPrompt;
+			const newMessages = [{ role: 'system', content: systemPromptToUse }];
 
-		if (!parsedData.messages || !Array.isArray(parsedData.messages)) {
-			return;
-		}
-
-		const systemPromptToUse = parsedData.systemPrompt || this.systemPrompt;
-		const newMessages = [{ role: 'system', content: systemPromptToUse }];
-
-		parsedData.messages.forEach(msg => {
-				if (msg.role && msg.content) {
-					newMessages.push({
-							role: msg.role,
-							content: msg.content
-						});
-				}
-			});
-
-		this.messages = newMessages;
-		localStorage.setItem(LOCAL_STORAGE_MESSAGES_KEY, JSON.stringify(this.messages));
-
-		this.availableCodeTypes.clear();
-		this.messages.forEach(msg => {
-				const codeBlockRegex = /```(\w*)\s*([\s\S]*?)```/g; // ✅ FIXED regex
-				let match;
-				while ((match = codeBlockRegex.exec(msg.content)) !== null) {
-					const lang = match[1];
-					if (lang) {
-						this.availableCodeTypes.add(lang.toLowerCase());
+			parsedData.messages.forEach(msg => {
+					if (msg.role && msg.content) {
+						newMessages.push({
+								role: msg.role,
+								content: msg.content
+							});
 					}
-				}
-			});
+				});
 
-		if (parsedData.systemPrompt) {
-			this.systemPrompt = parsedData.systemPrompt;
-			this.currentSystemPromptTitle = parsedData.systemPromptTitle || "custom";
-			const systemInput = this.shadowRoot.getElementById('systemInput');
-			const systemPromptSelect = this.shadowRoot.getElementById('systemPromptSelect');
-			if (systemInput) systemInput.textContent = this.systemPrompt;
-			if (systemPromptSelect) systemPromptSelect.value = this.currentSystemPromptTitle;
-			localStorage.setItem(LOCAL_STORAGE_SYSTEM_PROMPT_KEY, this.systemPrompt);
-			localStorage.setItem(LOCAL_STORAGE_SELECTED_SYSTEM_PROMPT_TITLE_KEY, this.currentSystemPromptTitle);
+			this.messages = newMessages;
+			localStorage.setItem(LOCAL_STORAGE_MESSAGES_KEY, JSON.stringify(this.messages));
+
+			this.availableCodeTypes.clear();
+			this.messages.forEach(msg => {
+					const codeBlockRegex = /```(\S*)[\s\S]*?```/g;
+					let match;
+					while ((match = codeBlockRegex.exec(msg.content)) !== null) {
+						const lang = match[1];
+						if (lang) {
+							this.availableCodeTypes.add(lang.toLowerCase());
+						}
+					}
+				});
+
+			if (parsedData.systemPrompt) {
+				this.systemPrompt = parsedData.systemPrompt;
+				this.currentSystemPromptTitle = parsedData.systemPromptTitle || "custom";
+				const systemInput = this.shadowRoot.getElementById('systemInput');
+				const systemPromptSelect = this.shadowRoot.getElementById('systemPromptSelect');
+				if (systemInput) systemInput.textContent = this.systemPrompt;
+				if (systemPromptSelect) systemPromptSelect.value = this.currentSystemPromptTitle;
+				localStorage.setItem(LOCAL_STORAGE_SYSTEM_PROMPT_KEY, this.systemPrompt);
+				localStorage.setItem(LOCAL_STORAGE_SELECTED_SYSTEM_PROMPT_TITLE_KEY, this.currentSystemPromptTitle);
+			}
+
+			this.renderHistory();
+
+			const pasteButton = this.shadowRoot.getElementById('pasteConversationButton');
+			if (pasteButton) {
+				pasteButton.textContent = '✅';
+				setTimeout(() => {
+						pasteButton.textContent = '📥';
+					}, 1500);
+			}
+		} catch (err) {
+			const pasteButton = this.shadowRoot.getElementById('pasteConversationButton');
+			if (pasteButton) {
+				pasteButton.textContent = '❌';
+				setTimeout(() => {
+						pasteButton.textContent = '📥';
+					}, 1500);
+			}
 		}
-
-		this.renderHistory();
 	}
 
 	pasteConversationFromText(text) {
@@ -562,7 +530,7 @@ class AIChat extends HTMLElement {
 
 		this.availableCodeTypes.clear();
 		this.messages.forEach(msg => {
-				const codeBlockRegex = /```(\w*)\s*([\s\S]*?)```/g; // ✅ FIXED regex
+				const codeBlockRegex = /```(\S*)[\s\S]*?```/g;
 				let match;
 				while ((match = codeBlockRegex.exec(msg.content)) !== null) {
 					const lang = match[1];
@@ -630,13 +598,10 @@ class AIChat extends HTMLElement {
 		}
 
 		displayMessages.forEach(msg => {
-				// ✅ FIXED: Wrap entire message with role prefix once
-				const messageContainer = document.createElement('div');
-				messageContainer.style.marginBottom = '12px';
-
-				const codeBlockRegex = /```(\w*)\s*([\s\S]*?)```/g; // ✅ FIXED regex
+				const codeBlockRegex = /```(\S*)\n([\s\S]*?)```/g;
 				let match;
 				let lastIndex = 0;
+				const fragment = document.createDocumentFragment();
 				let containsCode = false;
 
 				while ((match = codeBlockRegex.exec(msg.content)) !== null) {
@@ -647,7 +612,7 @@ class AIChat extends HTMLElement {
 					if (precedingText) {
 						const p = document.createElement('p');
 						p.textContent = precedingText;
-						messageContainer.appendChild(p);
+						fragment.appendChild(p);
 					}
 
 					const codeBlockContainer = document.createElement('div');
@@ -676,7 +641,7 @@ class AIChat extends HTMLElement {
 					pre.appendChild(codeElement);
 					codeBlockContainer.appendChild(pre);
 
-					messageContainer.appendChild(codeBlockContainer);
+					fragment.appendChild(codeBlockContainer);
 
 					if (msg.role === 'assistant' && lang) {
 						this.availableCodeTypes.add(lang.toLowerCase());
@@ -688,23 +653,10 @@ class AIChat extends HTMLElement {
 				const remainingText = msg.content.substring(lastIndex).trim();
 				if (remainingText || (!containsCode && msg.content.trim())) {
 					const p = document.createElement('p');
-					p.textContent = remainingText || msg.content;
-					messageContainer.appendChild(p);
-				}
-
-				// ✅ FIXED: Add role prefix ONCE at the top of the message
-				const rolePrefix = msg.role === 'user' ? '👤 You' : '🤖 AI';
-				const firstChild = messageContainer.firstChild;
-				if (firstChild) {
-					if (firstChild.tagName === 'P') {
-						firstChild.textContent = `${rolePrefix}: ${firstChild.textContent}`;
-					} else {
-						const prefixP = document.createElement('p');
-						prefixP.textContent = `${rolePrefix}:`;
-						prefixP.style.fontWeight = 'bold';
-						prefixP.style.marginBottom = '4px';
-						messageContainer.insertBefore(prefixP, firstChild);
-					}
+					// 🔑 CRITICAL FIX 2: PRESERVE USER FORMATTING
+					// Set full content with role prefix, rely on CSS white-space:pre-wrap
+					p.textContent = `${msg.role === 'user' ? '👤' : '🤖'}: ${remainingText || msg.content}`;
+					fragment.appendChild(p);
 				}
 
 				let shouldDisplay = false;
@@ -721,7 +673,7 @@ class AIChat extends HTMLElement {
 				}
 
 				if (shouldDisplay) {
-					rawTextOutputDiv.appendChild(messageContainer);
+					rawTextOutputDiv.appendChild(fragment);
 				}
 			});
 
@@ -729,164 +681,24 @@ class AIChat extends HTMLElement {
 		rawTextOutputDiv.scrollTop = rawTextOutputDiv.scrollHeight;
 	}
 
-	// ✅ NEW: Robust clipboard handler with 3-tier fallback
 	async copyToClipboard(text, button) {
-		const showFeedback = (icon) => {
-			if (!button) return;
-			const original = button.textContent;
-			button.textContent = icon;
-			setTimeout(() => button.textContent = original, 1500);
-		};
-
-		if (typeof text !== 'string') {
-			console.error('Copy failed: non-string content', text);
-			showFeedback('❌');
-			return;
-		}
-
-		// ✅ ATTEMPT 1: Modern clipboard API (secure contexts only)
 		try {
-			if (navigator.clipboard?.writeText && 
-					(location.protocol === 'https:' || location.hostname === 'localhost' || location.protocol === 'file:')) {
-				await navigator.clipboard.writeText(text);
-				showFeedback('✅');
-				return;
-			}
-		} catch (e) {
-			console.warn('Clipboard API blocked, trying fallbacks:', e.message);
+			await navigator.clipboard.writeText(text);
+			const originalText = button.textContent;
+			button.textContent = '✅';
+			setTimeout(() => {
+					button.textContent = '📋';
+				}, 1500);
+		} catch (err) {
+			button.textContent = '❌';
+			setTimeout(() => {
+					button.textContent = '📋';
+				}, 1500);
 		}
-
-		// 🔄 ATTEMPT 2: execCommand via light DOM textarea (works in HTTP)
-		try {
-			const textarea = document.createElement('textarea');
-			textarea.value = text;
-			textarea.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0;';
-			document.body.appendChild(textarea); // MUST be in light DOM
-			
-			textarea.select();
-			textarea.setSelectionRange(0, textarea.value.length); // Mobile support
-			
-			if (document.execCommand('copy')) {
-				document.body.removeChild(textarea);
-				showFeedback('✅');
-				return;
-			}
-			document.body.removeChild(textarea);
-		} catch (e) {
-			console.warn('execCommand fallback failed:', e.message);
-		}
-
-		// 💾 ATTEMPT 3: IndexedDB fallback (app-scoped storage ONLY)
-		try {
-			await this.storeInAppClipboard(text);
-			showFeedback('💾'); // Visual cue: stored internally, not system clipboard
-			this.showAppClipboardNotice();
-		} catch (e) {
-			console.error('All copy methods failed:', e);
-			showFeedback('❌');
-		}
-	}
-
-	// ✅ NEW: Store in IndexedDB under __system_clipboard
-	async storeInAppClipboard(text) {
-		return new Promise((resolve, reject) => {
-			const request = indexedDB.open('aiChatDB', 1);
-			
-			request.onupgradeneeded = (event) => {
-				const db = event.target.result;
-				if (!db.objectStoreNames.contains('clipboard')) {
-					db.createObjectStore('clipboard');
-				}
-			};
-			
-			request.onsuccess = (event) => {
-				const db = event.target.result;
-				const tx = db.transaction('clipboard', 'readwrite');
-				const store = tx.objectStore('clipboard');
-				const putRequest = store.put(text, '__system_clipboard');
-				
-				putRequest.onsuccess = () => {
-					db.close();
-					resolve();
-				};
-				putRequest.onerror = () => {
-					db.close();
-					reject(putRequest.error);
-				};
-			};
-			
-			request.onerror = () => reject(request.error);
-		});
-	}
-
-	// ✅ NEW: Read from IndexedDB
-	async readFromAppClipboard() {
-		return new Promise((resolve, reject) => {
-			const request = indexedDB.open('aiChatDB', 1);
-			
-			request.onupgradeneeded = (event) => {
-				const db = event.target.result;
-				if (!db.objectStoreNames.contains('clipboard')) {
-					db.createObjectStore('clipboard');
-				}
-			};
-			
-			request.onsuccess = (event) => {
-				const db = event.target.result;
-				const tx = db.transaction('clipboard', 'readonly');
-				const store = tx.objectStore('clipboard');
-				const getRequest = store.get('__system_clipboard');
-				
-				getRequest.onsuccess = () => {
-					db.close();
-					resolve(getRequest.result || null);
-				};
-				getRequest.onerror = () => {
-					db.close();
-					reject(getRequest.error);
-				};
-			};
-			
-			request.onerror = () => reject(request.error);
-		});
-	}
-
-	// ✅ NEW: Show subtle notice about app-scoped clipboard
-	showAppClipboardNotice() {
-		// Find existing notice
-		let notice = document.querySelector('#app-clipboard-notice');
-		if (notice) {
-			// Reset timeout if already showing
-			if (notice._timeout) clearTimeout(notice._timeout);
-		} else {
-			notice = document.createElement('div');
-			notice.id = 'app-clipboard-notice';
-			notice.style.cssText = `
-				position: fixed;
-				bottom: 20px;
-				right: 20px;
-				background: #fff3cd;
-				border: 1px solid #ffeaa7;
-				color: #856404;
-				padding: 8px 12px;
-				border-radius: 4px;
-				font-size: 0.85em;
-				z-index: 10000;
-				box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-				max-width: 300px;
-			`;
-			document.body.appendChild(notice); // Append to light DOM for visibility
-		}
-		
-		notice.textContent = '📋 Copied to app clipboard (Ctrl+V unavailable). Use "📥 Paste" button to retrieve.';
-		
-		// Auto-dismiss after 5s
-		notice._timeout = setTimeout(() => {
-			if (notice.parentNode) notice.parentNode.removeChild(notice);
-		}, 5000);
 	}
 
 	async sendMessage() {
+		// 🔑 CRITICAL FIX 1 CONTINUED: GET USER INPUT WITH FORMATTING PRESERVED
 		const textInput = this.shadowRoot.getElementById('textInput');
 		const userPrompt = textInput.innerText; // PRESERVES newlines, tabs, spaces
 		const temperature = parseFloat(this.shadowRoot.getElementById('temperatureInput').value);
@@ -992,8 +804,7 @@ class AIChat extends HTMLElement {
 					}
 				}
 			}
-			// ✅ FIXED: Removed debug alert("done")
-
+			alert("done")
 			this.messages.push({ role: 'assistant', content: fullResponse });
 			localStorage.setItem(LOCAL_STORAGE_MESSAGES_KEY, JSON.stringify(this.messages));
 			this.renderHistory();
@@ -1148,7 +959,7 @@ class AIChat extends HTMLElement {
 		box-sizing: border-box;
 		color: #333;
 		margin: 0;
-		/* 🔑 CRITICAL FIX: PRESERVE FORMATTING WHILE TYPING */
+		/* 🔑 CRITICAL FIX 2: PRESERVE FORMATTING WHILE TYPING */
 		white-space: pre-wrap; /* Preserves newlines/tabs in input */
 		word-break: break-word;
 		}
@@ -1178,7 +989,7 @@ class AIChat extends HTMLElement {
 		}
 		.chat-area p {
 		margin: 0 0 6px 0;
-		/* 🔑 CRITICAL FIX: PRESERVE FORMATTING IN HISTORY */
+		/* 🔑 CRITICAL FIX 2: PRESERVE FORMATTING IN HISTORY */
 		white-space: pre-wrap; /* CRITICAL: Shows tabs/newlines correctly */
 		word-break: break-word;
 		font-size: 0.9em;
@@ -1316,7 +1127,7 @@ class AIChat extends HTMLElement {
 		</div>
 
 		<div class="input-area-wrapper">
-		<!-- 🔑 CRITICAL FIX: UPDATED PLACEHOLDER TEXT -->
+		<!-- 🔑 CRITICAL FIX 1: UPDATED PLACEHOLDER TEXT -->
 		<div id="textInput" contenteditable="true" placeholder="Type your message (Ctrl+Enter or Cmd+Enter to send)..."></div>
 		<button id="sendButton">➤</button>
 		</div>
