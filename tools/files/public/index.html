@@ -1,0 +1,115 @@
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>File Explorer</title>
+    <style>
+        body { font-family: sans-serif; margin: 0; background-color: #f9f9f9; }
+        .container { padding: 1em; }
+        .path-display { margin-bottom: 0.5em; font-style: italic; color: #666; font-size: 0.9em; }
+        ul { list-style-type: none; padding: 0; margin: 0; }
+        li { padding: 0.2em 0; border: none; display: flex; align-items: center; }
+        .file-icon, .dir-icon { margin-right: 0.5em; font-size: 1.1em; }
+        .file-icon { color: #555; }
+        .dir-icon { color: #007bff; }
+        a { text-decoration: none; color: #333; display: block; flex-grow: 1; }
+        a:hover { color: #007bff; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="path-display" id="current-path">/public/</div>
+        <ul id="file-list"></ul>
+    </div>
+
+    <script type="module">
+        import { api } from './js/apiCalls.js';
+
+        const fileListElement = document.getElementById('file-list');
+        const pathDisplayElement = document.getElementById('current-path');
+        let currentPath = 'public/';
+
+        /**
+         * Renders the file list on the page.
+         * @param {string} path The path to display.
+         */
+        async function renderFileList(path) {
+            try {
+                // Sanitize and update the path
+                currentPath = path.startsWith('public/') ? path : 'public/' + path;
+                pathDisplayElement.textContent = '/' + currentPath;
+
+                // Call the server API to get the list of files/directories
+                const files = await api.ls(currentPath + '*');
+
+                fileListElement.innerHTML = ''; // Clear previous list
+
+                // Add "go up" link if not at the root
+                if (currentPath !== 'public/') {
+                    const upDirItem = document.createElement('li');
+                    upDirItem.innerHTML = `<span class="dir-icon">📂</span><a href="#" data-path="../">..</a>`;
+                    fileListElement.appendChild(upDirItem);
+                }
+
+                // Sort directories first, then files
+                files.sort((a, b) => {
+                    if (a.type === 'directory' && b.type === 'file') return -1;
+                    if (a.type === 'file' && b.type === 'directory') return 1;
+                    return a.name.localeCompare(b.name);
+                });
+
+                // Render each file and directory
+                files.forEach(file => {
+                    const listItem = document.createElement('li');
+                    const isDirectory = file.type === 'directory';
+                    const icon = isDirectory ? '📂' : '📄';
+                    
+                    if (isDirectory) {
+                        const newPath = currentPath + file.name + '/';
+                        listItem.innerHTML = `<span class="dir-icon">${icon}</span><a href="#" data-path="${newPath}">${file.name}</a>`;
+                    } else {
+                        // Create a direct link to the file, removing the /public/ part for the URL
+                        const fileUrl = '/' + currentPath.replace('public/', '') + file.name;
+                        listItem.innerHTML = `<span class="file-icon">${icon}</span><a href="${fileUrl}">${file.name}</a>`;
+                    }
+                    fileListElement.appendChild(listItem);
+                });
+
+            } catch (error) {
+                console.error("Failed to list files:", error);
+                fileListElement.innerHTML = `<li>Error: ${error.message}</li>`;
+            }
+        }
+
+        // Handle navigation clicks
+        fileListElement.addEventListener('click', (event) => {
+            const link = event.target.closest('a');
+            if (link && link.dataset.path) {
+                event.preventDefault(); // Prevent default link behavior
+                const newPath = link.dataset.path;
+                
+                if (newPath === '../') {
+                    // Go up one directory, but not past 'public/'
+                    const pathSegments = currentPath.split('/').filter(p => p);
+                    if (pathSegments.length > 1) {
+                        pathSegments.pop(); // Remove the last segment
+                        const parentPath = pathSegments.join('/') + '/';
+                        renderFileList(parentPath);
+                    }
+                } else {
+                    renderFileList(newPath);
+                }
+            }
+        });
+
+        // Initial render
+        renderFileList(currentPath);
+
+    </script>
+</body>
+</html>
+

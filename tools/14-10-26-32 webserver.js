@@ -5,6 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const { promisify } = require('util');
 const crypto = require('crypto'); // [WEBSOCKET] Required for handshake
+
 const readdir = promisify(fs.readdir);
 const stat = promisify(fs.stat);
 const readFile = promisify(fs.readFile);
@@ -77,8 +78,9 @@ const _mimetype = {
     '.xyz': 'application/octet-stream',
     '.webm': 'video/webm',
     '.wat': 'text/plain',
-    '.pdf': 'application/pdf',
-};
+	'.pdf': 'application/pdf',
+
+}
 
 // ===== CRITICAL SECURITY FIX: PATH VALIDATION HELPER =====
 /**
@@ -109,10 +111,10 @@ function parseWebSocketFrame(buffer) {
     if (opcode !== 1) return null; // Only text frames
     const isMasked = (buffer[1] & 0x80) === 0x80;
     if (!isMasked) return null; // Reject unmasked frames per spec
-
+    
     let payloadLen = buffer[1] & 0x7F;
     let dataStart = 2;
-
+    
     if (payloadLen === 126) {
         if (buffer.length < 4) return null;
         payloadLen = buffer.readUInt16BE(2);
@@ -122,17 +124,15 @@ function parseWebSocketFrame(buffer) {
         payloadLen = Number(buffer.readBigUInt64BE(2));
         dataStart = 10;
     }
-
+    
     if (buffer.length < dataStart + 4 + payloadLen) return null;
-
     const masks = buffer.slice(dataStart, dataStart + 4);
     const payload = buffer.slice(dataStart + 4, dataStart + 4 + payloadLen);
-
+    
     // Unmask payload (XOR with mask bytes)
     for (let i = 0; i < payload.length; i++) {
         payload[i] ^= masks[i % 4];
     }
-
     return payload.toString('utf8');
 }
 
@@ -141,13 +141,13 @@ function createWebSocketFrame(message) {
     const payload = Buffer.from(message, 'utf8');
     const len = payload.length;
     let headerLen = 2;
-
+    
     if (len > 65535) headerLen += 8;
     else if (len > 125) headerLen += 2;
-
+    
     const buffer = Buffer.allocUnsafe(headerLen + len);
     buffer[0] = 0x81; // FIN bit + text frame opcode
-
+    
     if (len <= 125) {
         buffer[1] = len;
     } else if (len <= 65535) {
@@ -157,7 +157,7 @@ function createWebSocketFrame(message) {
         buffer[1] = 127;
         buffer.writeBigUInt64BE(BigInt(len), 2);
     }
-
+    
     payload.copy(buffer, headerLen);
     return buffer;
 }
@@ -179,14 +179,16 @@ const serverOptions = {
     key: './key.pem',
     cert: './cert.pem',
     additionalMethods: []
-};
+}
 
 const allowHead = {
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'OPTIONS, POST, GET, PUT, PATCH, DELETE',
+    'Access-Control-Allow-Methods':
+        'OPTIONS, POST, GET, PUT, PATCH, DELETE',
     'Access-Control-Max-Age': 2592000, //30 days
-    'Access-Control-Allow-Headers': 'Origin, X-Requested-With, Content-Type, Accept, Authorization, X-LS-Path, X-Read-File, X-Read-File-Binary, X-Save-File, X-File-Path, X-File-Content, X-MKPATH, X-MV-Source, X-MV-Destination, X-DEL-Path, X-COPY-Source, X-COPY-Destination, X-RN-Source, X-RN-Destination, X-CMD, X-SRC, X-DST'
-};
+    'Access-Control-Allow-Headers':
+        'Origin, X-Requested-With, Content-Type, Accept, Authorization, X-LS-Path, X-Read-File, X-Read-File-Binary, X-Save-File, X-File-Path, X-File-Content, X-MKPATH, X-MV-Source, X-MV-Destination, X-DEL-Path, X-COPY-Source, X-COPY-Destination, X-RN-Source, X-RN-Destination'
+}
 
 globalThis.sendPlainTextResponse = function (res, message, statusCode = 200, headers = {}) {
     res.writeHead(statusCode, { 'Content-Type': 'text/plain', ...headers });
@@ -235,7 +237,6 @@ globalThis.streamFile = function (req, res, filePath, contentType, statusCode = 
                 'Content-Type': contentType,
                 ...headers
             };
-
             res.writeHead(statusCode, streamHeaders);
             fs.createReadStream(filePath).pipe(res);
         }
@@ -257,6 +258,7 @@ function handleFileRequest(req, res, filePath) {
 
         const ext = path.extname(filePath).toLowerCase();
         const contentType = _mimetype[ext] || 'application/octet-stream';
+
         streamFile(req, res, filePath, contentType);
     });
 }
@@ -267,7 +269,6 @@ async function handleApiRequest(req, res, apiName) {
     if (apiCache.has(apiName)) {
         const cachedApi = apiCache.get(apiName);
         cachedApi.lastAccessed = Date.now();
-
         try {
             await cachedApi.module.handler(req, res);
         } catch (error) {
@@ -284,7 +285,6 @@ async function handleApiRequest(req, res, apiName) {
             try {
                 delete require.cache[require.resolve(apiFilePath)];
                 const apiModule = require(apiFilePath);
-
                 if (typeof apiModule.handler === 'function') {
                     apiCache.set(apiName, { module: apiModule, lastAccessed: Date.now() });
                     await apiModule.handler(req, res);
@@ -299,162 +299,6 @@ async function handleApiRequest(req, res, apiName) {
     }
 }
 
-// ===== FILE UPLOAD HANDLER (MULTIPART/FORM-DATA) =====
-/**
- * Parses multipart/form-data request for file uploads
- * Returns { fields: {}, files: [] } or throws error
- */
-function parseMultipartForm(req) {
-    return new Promise((resolve, reject) => {
-        const contentType = req.headers['content-type'] || '';
-        const boundaryMatch = contentType.match(/boundary=(?:"([^"]+)"|([^;]+))/i);
-        
-        if (!boundaryMatch) {
-            return reject(new Error('Missing boundary in Content-Type'));
-        }
-        
-        const boundary = '--' + (boundaryMatch[1] || boundaryMatch[2]).trim();
-        let bodyChunks = [];
-        let totalSize = 0;
-        
-        req.on('data', (chunk) => {
-            totalSize += chunk.length;
-            if (totalSize > MAX_UPLOAD_SIZE) {
-                req.destroy();
-                reject(new Error('Payload too large (max 10MB)'));
-                return;
-            }
-            bodyChunks.push(chunk);
-        });
-        
-        req.on('end', () => {
-            try {
-                const buffer = Buffer.concat(bodyChunks);
-                const bodyStr = buffer.toString('binary');
-                const parts = bodyStr.split(boundary);
-                
-                const result = {
-                    fields: {},
-                    files: []
-                };
-                
-                // Skip first (empty) and last (boundary end) parts
-                for (let i = 1; i < parts.length - 1; i++) {
-                    const part = parts[i].trim();
-                    if (!part) continue;
-                    
-                    // Split headers from body
-                    const headerEnd = part.indexOf('\r\n\r\n');
-                    if (headerEnd === -1) continue;
-                    
-                    const headersRaw = part.substring(0, headerEnd);
-                    const content = part.substring(headerEnd + 4); // Skip \r\n\r\n
-                    
-                    // Parse Content-Disposition
-                    const dispMatch = headersRaw.match(/Content-Disposition:\s*form-data;\s*name="([^"]+)"/i);
-                    if (!dispMatch) continue;
-                    
-                    const fieldName = dispMatch[1];
-                    
-                    // Check if this is a file field
-                    const filenameMatch = headersRaw.match(/filename="([^"]+)"/i);
-                    if (filenameMatch) {
-                        // This is a file
-                        const filename = filenameMatch[1];
-                        const contentTypeMatch = headersRaw.match(/Content-Type:\s*([^\r\n]+)/i);
-                        const contentType = contentTypeMatch ? contentTypeMatch[1].trim() : 'application/octet-stream';
-                        
-                        // Remove trailing \r\n from content
-                        let fileContent = content;
-                        if (fileContent.endsWith('\r\n')) {
-                            fileContent = fileContent.substring(0, fileContent.length - 2);
-                        }
-                        
-                        // Determine if binary based on content type
-                        const isBinary = !contentType.startsWith('text/');
-                        
-                        result.files.push({
-                            field: fieldName,
-                            name: filename,
-                            type: contentType,
-                            content: fileContent,
-                            isBinary: isBinary
-                        });
-                    } else {
-                        // This is a regular field
-                        let fieldValue = content;
-                        if (fieldValue.endsWith('\r\n')) {
-                            fieldValue = fieldValue.substring(0, fieldValue.length - 2);
-                        }
-                        result.fields[fieldName] = fieldValue;
-                    }
-                }
-                
-                resolve(result);
-            } catch (error) {
-                reject(error);
-            }
-        });
-        
-        req.on('error', (error) => {
-            reject(error);
-        });
-    });
-}
-
-/**
- * Handles file upload via multipart/form-data
- */
-async function handleFileUpload(req, res) {
-    try {
-        const parsed = await parseMultipartForm(req);
-        
-        if (!parsed.files || parsed.files.length === 0) {
-            return sendPlainTextResponse(res, 'No file provided', 400);
-        }
-        
-        if (!parsed.fields.path) {
-            return sendPlainTextResponse(res, 'Missing path parameter', 400);
-        }
-        
-        const filePathHeader = parsed.fields.path;
-        
-        // SECURITY: Validate path is within FILES_ROOT
-        if (!isPathInsideRoot(FILES_ROOT, filePathHeader)) {
-            return sendPlainTextResponse(res, 'Access Denied', 403);
-        }
-        
-        const file = parsed.files[0]; // Only handle first file for now
-        const fullPath = path.join(FILES_ROOT, filePathHeader);
-        const dir = path.dirname(fullPath);
-        
-        // Create directory if it doesn't exist
-        await mkdir(dir, { recursive: true });
-        
-        // Write file based on type
-        if (file.isBinary) {
-            // Binary file - decode from binary string to Buffer
-            await writeFile(fullPath, Buffer.from(file.content, 'binary'));
-        } else {
-            // Text file - write as UTF-8
-            await writeFile(fullPath, file.content, 'utf8');
-        }
-        
-        sendPlainTextResponse(res, `File uploaded: ${filePathHeader}`, 200);
-        
-    } catch (error) {
-        if (error.message.includes('Payload too large')) {
-            sendPlainTextResponse(res, error.message, 413);
-        } else if (error.message.includes('Missing boundary')) {
-            sendPlainTextResponse(res, 'Invalid request format', 400);
-        } else {
-            console.error(`UPLOAD Error: ${error.message}`);
-            sendPlainTextResponse(res, 'Upload failed: ' + error.message, 500);
-        }
-    }
-}
-// ==========================================================
-
 // ===== WEBSOCKET UPGRADE HANDLER (SECURE ROUTING) =====
 // [WEBSOCKET] Handles HTTP Upgrade requests for /ws/* endpoints
 function handleWsUpgrade(serverType, req, socket, head) {
@@ -468,11 +312,11 @@ function handleWsUpgrade(serverType, req, socket, head) {
         // Extract handler name with strict sanitization
         const url = new URL(req.url, `http://${req.headers.host}`);
         const handlerName = path.basename(url.pathname);
-
+        
         // SECURITY: Block path traversal/suspicious characters
-        if (!handlerName ||
-            handlerName.includes('.') ||
-            handlerName.includes('/') ||
+        if (!handlerName || 
+            handlerName.includes('.') || 
+            handlerName.includes('/') || 
             handlerName.includes('\\') ||
             handlerName.length > 100) {
             console.warn(`[WS] Blocked invalid handler name: ${handlerName}`);
@@ -483,7 +327,7 @@ function handleWsUpgrade(serverType, req, socket, head) {
         // Resolve handler path WITH ROOT VALIDATION
         const apiRoot = path.join(__dirname, 'files', 'api');
         const wsFilePath = path.join(apiRoot, `${handlerName}.ws.js`);
-
+        
         if (!isPathInsideRoot(apiRoot, path.relative(apiRoot, wsFilePath))) {
             console.warn(`[WS] Blocked path traversal: ${wsFilePath}`);
             socket.end('HTTP/1.1 403 Forbidden\r\n\r\n');
@@ -508,16 +352,15 @@ function handleWsUpgrade(serverType, req, socket, head) {
                     // Clear require cache for hot reload
                     delete require.cache[require.resolve(wsFilePath)];
                     handlerMod = require(wsFilePath);
-
+                    
                     if (typeof handlerMod.handler !== 'function') {
                         throw new Error('Handler must export "handler" function');
                     }
-
-                    wsCache.set(handlerName, {
-                        module: handlerMod,
-                        lastAccessed: Date.now()
+                    
+                    wsCache.set(handlerName, { 
+                        module: handlerMod, 
+                        lastAccessed: Date.now() 
                     });
-
                     console.log(`[WS] ${serverType} Loaded handler: ${handlerName}`);
                 } catch (e) {
                     console.error(`[WS] ${serverType} Load error ${handlerName}:`, e.message);
@@ -527,7 +370,7 @@ function handleWsUpgrade(serverType, req, socket, head) {
             }
 
             // Validate WebSocket handshake headers
-            if (req.headers.upgrade?.toLowerCase() !== 'websocket' ||
+            if (req.headers.upgrade?.toLowerCase() !== 'websocket' || 
                 !req.headers['sec-websocket-key']) {
                 socket.end('HTTP/1.1 400 Bad Request\r\n\r\n');
                 return;
@@ -560,7 +403,7 @@ function handleWsUpgrade(serverType, req, socket, head) {
                                 Buffer.from([0x88, payload.length]),
                                 payload
                             ]));
-                        } catch (e) { }
+                        } catch (e) {}
                     }
                     socket.destroy();
                 },
@@ -570,18 +413,16 @@ function handleWsUpgrade(serverType, req, socket, head) {
 
             // Frame parsing buffer
             let frameBuffer = Buffer.alloc(0);
-
             socket.on('data', (chunk) => {
                 frameBuffer = Buffer.concat([frameBuffer, chunk]);
-
                 while (frameBuffer.length >= 2) {
                     const message = parseWebSocketFrame(frameBuffer);
                     if (message === null) break; // Need more data
-
+                    
                     // Remove processed frame bytes (simplified)
                     const processedLen = frameBuffer.length; // Actual impl would calculate precisely
                     frameBuffer = Buffer.alloc(0); // Reset buffer
-
+                    
                     try {
                         // Call handler's onMessage if defined
                         const instance = handlerMod.handler(ws, req);
@@ -604,7 +445,7 @@ function handleWsUpgrade(serverType, req, socket, head) {
                 try {
                     const instance = handlerMod.handler(ws, req);
                     if (typeof instance?.onClose === 'function') instance.onClose();
-                } catch (e) { }
+                } catch (e) {}
             });
 
             socket.on('error', (err) => {
@@ -634,7 +475,7 @@ function handleWsUpgrade(serverType, req, socket, head) {
 
 setInterval(() => {
     const now = Date.now();
-
+    
     // Cleanup old APIs
     for (const [apiName, apiInfo] of apiCache.entries()) {
         const oneHour = 60 * 60 * 1000;
@@ -645,7 +486,7 @@ setInterval(() => {
             apiCache.delete(apiName);
         }
     }
-
+    
     // [WEBSOCKET] Cleanup inactive WebSocket handlers
     for (const [name, info] of wsCache.entries()) {
         if (now - info.lastAccessed > 60 * 60 * 1000) { // 1 hour
@@ -653,11 +494,11 @@ setInterval(() => {
             try {
                 const fp = path.join(__dirname, 'files', 'api', `${name}.ws.js`);
                 delete require.cache[require.resolve(fp)];
-            } catch (e) { }
+            } catch (e) {}
             wsCache.delete(name);
         }
     }
-
+    
     // Cleanup expired WebRTC rooms
     for (const roomId in webrtcRooms) {
         const room = webrtcRooms[roomId];
@@ -668,7 +509,7 @@ setInterval(() => {
                 room.waitingQueue.forEach(w => {
                     if (w.timeoutId) clearTimeout(w.timeoutId);
                     if (w.res && !w.res.headersSent) {
-                        try { sendPlainTextResponse(w.res, 'Room expired', 410); } catch (e) { }
+                        try { sendPlainTextResponse(w.res, 'Room expired', 410); } catch (e) {}
                     }
                 });
             }
@@ -719,10 +560,8 @@ async function handleLs(res, lsPath) {
         }
 
         const fileInfoList = [];
-
         for (const file of filesToProcess) {
             const filePath = path.join(targetDirectory, file);
-
             try {
                 const fileStats = await stat(filePath);
                 fileInfoList.push({
@@ -736,8 +575,8 @@ async function handleLs(res, lsPath) {
                 console.warn(`Could not get stats for file: ${err.message}`);
             }
         }
-
         sendJsonResponse(res, fileInfoList);
+
     } catch (error) {
         if (error.code === 'ENOENT') {
             sendPlainTextResponse(res, 'Path not found', 404);
@@ -758,11 +597,9 @@ async function handleReadFile(res, filePathHeader) {
 
     try {
         const stats = await stat(fullPath);
-
         if (stats.isDirectory()) {
             return sendPlainTextResponse(res, 'Cannot read a directory', 400);
         }
-
         const content = await readFile(fullPath, 'utf8');
         sendPlainTextResponse(res, content);
     } catch (error) {
@@ -785,14 +622,15 @@ async function handleReadFileBinary(req, res, filePathHeader) {
 
     try {
         const stats = await stat(fullPath);
-
         if (stats.isDirectory()) {
             return sendPlainTextResponse(res, 'Cannot read a directory', 400);
         }
-
+        
         const ext = path.extname(fullPath).toLowerCase();
         const contentType = _mimetype[ext] || 'application/octet-stream';
+
         streamFile(req, res, fullPath, contentType);
+
     } catch (error) {
         if (error.code === 'ENOENT') {
             sendPlainTextResponse(res, 'File not found', 404);
@@ -816,11 +654,9 @@ async function handleSaveFile(req, res, filePathHeader) {
     req.on('data', chunk => {
         if (sizeExceeded) return;
         body += chunk.toString();
-
         if (body.length > MAX_UPLOAD_SIZE) {
             sizeExceeded = true;
             req.destroy();
-
             if (!res.headersSent) {
                 sendPlainTextResponse(res, 'Payload too large (max 10MB)', 413);
             }
@@ -829,10 +665,10 @@ async function handleSaveFile(req, res, filePathHeader) {
 
     req.on('end', async () => {
         if (sizeExceeded) return;
-
         try {
             const dir = path.dirname(fullPath);
             await mkdir(dir, { recursive: true });
+
             await writeFile(fullPath, body, 'utf8');
             sendPlainTextResponse(res, `File saved: ${filePathHeader}`, 200);
         } catch (error) {
@@ -871,7 +707,7 @@ async function handleMkpath(res, mkPathHeader) {
 
 // ===== CORRECTED handleMv with SECURITY + REGEX FIX =====
 async function handleMv(res, mvSourceHeader, mvDestinationHeader) {
-    if (!isPathInsideRoot(FILES_ROOT, mvSourceHeader) ||
+    if (!isPathInsideRoot(FILES_ROOT, mvSourceHeader) || 
         !isPathInsideRoot(FILES_ROOT, mvDestinationHeader)) {
         return sendPlainTextResponse(res, 'Access Denied', 403);
     }
@@ -881,7 +717,6 @@ async function handleMv(res, mvSourceHeader, mvDestinationHeader) {
 
     try {
         const destinationStats = await stat(destinationFullPath);
-
         if (!destinationStats.isDirectory()) {
             return sendPlainTextResponse(res, 'Destination must be directory', 400);
         }
@@ -922,16 +757,13 @@ async function handleMv(res, mvSourceHeader, mvDestinationHeader) {
         }
 
         const results = [];
-
         for (const fileToMove of filesToMove) {
             if (!isPathInsideRoot(FILES_ROOT, path.relative(FILES_ROOT, fileToMove))) {
                 results.push(`Skipped invalid path: ${path.relative(FILES_ROOT, fileToMove)}`);
                 continue;
             }
-
             const fileName = path.basename(fileToMove);
             const finalDestinationPath = path.join(destinationFullPath, fileName);
-
             try {
                 await rename(fileToMove, finalDestinationPath);
                 results.push(`Moved: ${path.relative(FILES_ROOT, fileToMove)} to ${path.relative(FILES_ROOT, finalDestinationPath)}`);
@@ -940,8 +772,8 @@ async function handleMv(res, mvSourceHeader, mvDestinationHeader) {
                 results.push(`Failed to move ${path.relative(FILES_ROOT, fileToMove)}: ${moveError.message}`);
             }
         }
-
         sendPlainTextResponse(res, `MV complete:\n${results.join('\n')}`, 200);
+
     } catch (error) {
         console.error(`MV Error: ${error.message}`);
         sendPlainTextResponse(res, 'Internal Server Error', 500);
@@ -950,14 +782,14 @@ async function handleMv(res, mvSourceHeader, mvDestinationHeader) {
 
 // ===== CORRECTED handleRn with SECURITY FIX =====
 async function handleRn(res, rnSourceHeader, rnDestinationHeader) {
-    if (!isPathInsideRoot(FILES_ROOT, rnSourceHeader) ||
+    if (!isPathInsideRoot(FILES_ROOT, rnSourceHeader) || 
         !isPathInsideRoot(FILES_ROOT, rnDestinationHeader)) {
         return sendPlainTextResponse(res, 'Access Denied', 403);
     }
 
     const sourceFullPath = path.join(FILES_ROOT, rnSourceHeader);
     const destinationFullPath = path.join(FILES_ROOT, rnDestinationHeader);
-
+    
     if (path.dirname(sourceFullPath) !== path.dirname(destinationFullPath)) {
         return sendPlainTextResponse(res, 'Destination must be in same directory', 400);
     }
@@ -993,7 +825,7 @@ async function copyDirectoryRecursive(src, dest) {
 }
 
 async function handleCopy(res, copySourceHeader, copyDestinationHeader) {
-    if (!isPathInsideRoot(FILES_ROOT, copySourceHeader) ||
+    if (!isPathInsideRoot(FILES_ROOT, copySourceHeader) || 
         !isPathInsideRoot(FILES_ROOT, copyDestinationHeader)) {
         return sendPlainTextResponse(res, 'Access Denied', 403);
     }
@@ -1003,10 +835,8 @@ async function handleCopy(res, copySourceHeader, copyDestinationHeader) {
 
     try {
         let actualDestinationDir = destinationFullPath;
-
         try {
             const destStats = await stat(destinationFullPath);
-
             if (!destStats.isDirectory()) {
                 return sendPlainTextResponse(res, 'Destination must be directory', 400);
             }
@@ -1054,19 +884,16 @@ async function handleCopy(res, copySourceHeader, copyDestinationHeader) {
         }
 
         const results = [];
-
         for (const itemToCopy of itemsToCopy) {
             if (!isPathInsideRoot(FILES_ROOT, path.relative(FILES_ROOT, itemToCopy))) {
                 results.push(`Skipped invalid path: ${path.relative(FILES_ROOT, itemToCopy)}`);
                 continue;
             }
-
             const itemName = path.basename(itemToCopy);
             const finalDestinationPath = path.join(destinationFullPath, itemName);
 
             try {
                 const itemStats = await stat(itemToCopy);
-
                 if (itemStats.isDirectory()) {
                     await copyDirectoryRecursive(itemToCopy, finalDestinationPath);
                     results.push(`Copied directory: ${path.relative(FILES_ROOT, itemToCopy)} to ${path.relative(FILES_ROOT, finalDestinationPath)}`);
@@ -1081,8 +908,8 @@ async function handleCopy(res, copySourceHeader, copyDestinationHeader) {
                 results.push(`Failed to copy ${path.relative(FILES_ROOT, itemToCopy)}: ${copyError.message}`);
             }
         }
-
         sendPlainTextResponse(res, `COPY complete:\n${results.join('\n')}`, 200);
+
     } catch (error) {
         console.error(`COPY Error: ${error.message}`);
         sendPlainTextResponse(res, 'Internal Server Error', 500);
@@ -1134,15 +961,12 @@ async function handleDel(res, delPathHeader) {
         }
 
         const results = [];
-
         for (const itemPath of itemsToDelete) {
             if (!isPathInsideRoot(FILES_ROOT, path.relative(FILES_ROOT, itemPath))) {
                 results.push(`Skipped invalid path: ${path.relative(FILES_ROOT, itemPath)}`);
                 continue;
             }
-
             const relativeItemPath = path.relative(FILES_ROOT, itemPath);
-
             try {
                 const itemStats = await stat(itemPath);
                 const isDirectory = itemStats.isDirectory();
@@ -1166,8 +990,8 @@ async function handleDel(res, delPathHeader) {
                 results.push(`Failed to delete/move ${relativeItemPath}: ${deleteError.message}`);
             }
         }
-
         sendPlainTextResponse(res, `DEL complete:\n${results.join('\n')}`, 200);
+
     } catch (error) {
         console.error(`DEL Error: ${error.message}`);
         sendPlainTextResponse(res, 'Internal Server Error', 500);
@@ -1183,14 +1007,7 @@ function webHandler(req, res) {
 
     const requestedUrl = new URL(req.url, `http://${req.headers.host}`);
     const pathname = requestedUrl.pathname;
-
-    // ===== FILE UPLOAD ENDPOINT =====
-    if (pathname === '/upload' && req.method === 'POST') {
-        handleFileUpload(req, res);
-        return;
-    }
-    // =================================
-
+    
     // Signal endpoint: POST /webrtc/signal { roomId, message }
     if (pathname === '/webrtc/signal' && req.method === 'POST') {
         let body = '';
@@ -1198,27 +1015,22 @@ function webHandler(req, res) {
         req.on('end', () => {
             try {
                 const data = JSON.parse(body);
-
                 if (!data.roomId || !data.message || typeof data.roomId !== 'string' || !data.roomId.trim()) {
                     return sendPlainTextResponse(res, 'Invalid roomId or message', 400);
                 }
-
                 const roomId = data.roomId.trim().substring(0, 100);
-
+                
                 if (Object.keys(webrtcRooms).length > MAX_ROOMS) {
-                    const oldestRoom = Object.keys(webrtcRooms).sort((a, b) =>
+                    const oldestRoom = Object.keys(webrtcRooms).sort((a, b) => 
                         (webrtcRooms[a].lastAccessed || 0) - (webrtcRooms[b].lastAccessed || 0)
                     )[0];
-
                     if (oldestRoom) {
                         const room = webrtcRooms[oldestRoom];
-
                         if (room.waitingQueue) {
                             room.waitingQueue.forEach(w => {
                                 if (w.timeoutId) clearTimeout(w.timeoutId);
                             });
                         }
-
                         delete webrtcRooms[oldestRoom];
                         console.log(`Cleaned oldest room due to capacity: ${oldestRoom}`);
                     }
@@ -1227,17 +1039,17 @@ function webHandler(req, res) {
                 if (webrtcRooms[roomId]?.waitingQueue && webrtcRooms[roomId].waitingQueue.length > 0) {
                     const waitingPeer = webrtcRooms[roomId].waitingQueue.shift();
                     clearTimeout(waitingPeer.timeoutId);
+                    
                     sendJsonResponse(waitingPeer.res, { message: data.message });
-
+                    
                     if (webrtcRooms[roomId]) {
                         webrtcRooms[roomId].pendingMessage = null;
                         webrtcRooms[roomId].lastAccessed = Date.now();
-
                         if (webrtcRooms[roomId].waitingQueue.length === 0) {
                             delete webrtcRooms[roomId];
                         }
                     }
-
+                    
                     sendPlainTextResponse(res, 'Message delivered', 200);
                     return;
                 }
@@ -1247,14 +1059,12 @@ function webHandler(req, res) {
                     waitingQueue: [],
                     lastAccessed: Date.now()
                 };
-
                 sendPlainTextResponse(res, 'Message stored', 200);
             } catch (e) {
                 console.error('Signal parse error:', e.message);
                 sendPlainTextResponse(res, 'Invalid JSON payload', 400);
             }
         });
-
         req.on('error', () => sendPlainTextResponse(res, 'Request error', 500));
         return;
     }
@@ -1262,7 +1072,7 @@ function webHandler(req, res) {
     // Wait endpoint: GET /webrtc/wait?roomId=xxx
     if (pathname === '/webrtc/wait' && req.method === 'GET') {
         const roomId = requestedUrl.searchParams.get('roomId')?.trim().substring(0, 100);
-
+        
         if (!roomId) {
             return sendPlainTextResponse(res, 'Missing roomId parameter', 400);
         }
@@ -1283,15 +1093,12 @@ function webHandler(req, res) {
 
         const timeoutId = setTimeout(() => {
             const room = webrtcRooms[roomId];
-
             if (room) {
                 room.waitingQueue = room.waitingQueue.filter(w => w.res !== res);
-
                 if (!room.pendingMessage && room.waitingQueue.length === 0) {
                     delete webrtcRooms[roomId];
                 }
             }
-
             if (!res.headersSent) {
                 sendPlainTextResponse(res, 'Signaling timeout', 408);
             }
@@ -1303,7 +1110,6 @@ function webHandler(req, res) {
     }
 
     const xcmd = req.headers['x-cmd'];
-
     if (xcmd) {
         switch (xcmd) {
             case "ls":
@@ -1377,19 +1183,17 @@ function webHandler(req, res) {
 const httpServer = http.createServer(webHandler);
 
 // [WEBSOCKET] Attach upgrade handler BEFORE error listener
-httpServer.on('upgrade', (req, socket, head) =>
+httpServer.on('upgrade', (req, socket, head) => 
     handleWsUpgrade('HTTP', req, socket, head)
 );
 
 httpServer.on('error', (err) => {
     console.error(`\x1b[31mHTTP Server error on port ${serverOptions.port}: ${err.message}\x1b[0m`);
-
     if (err.code === 'EADDRINUSE') {
         console.error(`Port ${serverOptions.port} is already in use. Stop other services using this port.`);
     } else if (err.code === 'EACCES') {
         console.error(`Permission denied for port ${serverOptions.port}. Use sudo or switch to port > 1024.`);
     }
-
     process.exit(1);
 });
 
@@ -1397,12 +1201,10 @@ httpServer.listen(serverOptions.port, () => {
     console.log(`\x1b[32mHTTP Server running on port ${serverOptions.port}\x1b[0m`);
     console.log(`WebRTC Signaling: POST /webrtc/signal | GET /webrtc/wait?roomId=xxx`);
     console.log(`WebSockets: ws://localhost:${serverOptions.port}/ws/<handler>`);
-    console.log(`File Upload: POST /upload (multipart/form-data)`);
 });
 
 // ===== HTTPS SERVER WITH WEBSOCKET UPGRADE =====
 let httpsServer;
-
 try {
     // Verify files exist before reading (prevents vague errors)
     if (!fs.existsSync(serverOptions.key) || !fs.existsSync(serverOptions.cert)) {
@@ -1414,16 +1216,15 @@ try {
     const credentials = { key: privateKey, cert: certificate };
 
     httpsServer = https.createServer(credentials, webHandler);
-
+    
     // [WEBSOCKET] Attach upgrade handler BEFORE error listener
-    httpsServer.on('upgrade', (req, socket, head) =>
+    httpsServer.on('upgrade', (req, socket, head) => 
         handleWsUpgrade('HTTPS', req, socket, head)
     );
 
     // CRITICAL: Handle async listen errors (port conflicts, permissions)
     httpsServer.on('error', (err) => {
         console.error(`\x1b[31mHTTPS Server error on port ${serverOptions.sslport}: ${err.message}\x1b[0m`);
-
         if (err.code === 'EADDRINUSE') {
             console.error(`Port ${serverOptions.sslport} is already in use. Free the port or change sslport in serverOptions.`);
         } else if (err.code === 'EACCES') {
@@ -1432,7 +1233,6 @@ try {
         } else if (err.code === 'ERR_SSL_KEY_FORMAT_INVALID') {
             console.error('Invalid private key format. Ensure key.pem is valid PEM format.');
         }
-
         httpsServer = null;
     });
 
@@ -1440,71 +1240,66 @@ try {
         console.log(`\x1b[32mHTTPS Server running on port ${serverOptions.sslport}\x1b[0m`);
         console.log(`WebRTC Signaling: POST /webrtc/signal | GET /webrtc/wait?roomId=xxx`);
         console.log(`WebSockets: wss://localhost:${serverOptions.sslport}/ws/<handler>`);
-        console.log(`File Upload: POST /upload (multipart/form-data)`);
-        
         if (typeof webAppReady === 'function') {
             webAppReady(); // ONLY called when server is actually listening
         }
     });
 } catch (error) {
     console.error(`\x1b[31m❌ FAILED to start HTTPS server:\x1b[0m ${error.message}`);
-
+    
     if (error.code === 'ENOENT') {
-        console.error(`
-MISSING CERTIFICATE FILES! Expected:`);
+        console.error(`\nMISSING CERTIFICATE FILES! Expected:`);
         console.error(`  Key:  ${path.resolve(serverOptions.key)}`);
         console.error(`  Cert: ${path.resolve(serverOptions.cert)}`);
-        console.log(`
-🔐 TO GENERATE SELF-SIGNED CERT (development ONLY):`);
+        console.log(`\n🔧 TO GENERATE SELF-SIGNED CERT (development ONLY):`);
         console.log(`openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365 -nodes -subj "/CN=localhost"`);
-        console.log(`
-⚠️  WARNING: Browsers will show security warnings with self-signed certs.`);
+        console.log(`\n⚠️  WARNING: Browsers will show security warnings with self-signed certs.`);
         console.log(`✅ For production: Use certs from Let's Encrypt or trusted CA.`);
     } else if (error.message.includes('PEM') || error.code === 'ERR_OSSL_PEM_NO_START_LINE') {
         console.error('Certificate/key file is corrupted or invalid PEM format. Regenerate certificates.');
     }
-
-    console.log(`
-ℹ️  HTTP server is RUNNING on port ${serverOptions.port}`);
+    
+    console.log(`\nℹ️  HTTP server is RUNNING on port ${serverOptions.port}`);
     console.log(`   Access via: http://localhost:${serverOptions.port}`);
     console.log(`   WebSockets: ws://localhost:${serverOptions.port}/ws/<handler>`);
-    console.log(`   File Upload: POST /upload (multipart/form-data)`);
 }
 
 // ===== EXAMPLE WEBSOCKET HANDLER (files/api/chat.ws.js) =====
 /*
 // Save as files/api/chat.ws.js
 module.exports.handler = function(ws, request) {
-    console.log('[chat] New connection from', request.socket.remoteAddress);
-
-    // Optional lifecycle methods (called by server)
-    return {
-        onOpen: () => {
-            ws.send(JSON.stringify({ type: 'system', message: 'Connected to chat server' }));
-        },
-        onMessage: (msg) => {
-            try {
-                const data = JSON.parse(msg);
-                console.log('[chat] Received:', data);
-
-                // Simple echo with timestamp
-                ws.send(JSON.stringify({
-                    type: 'message',
-                    content: data.content,
-                    timestamp: new Date().toISOString(),
-                    from: 'server'
-                }));
-            } catch (e) {
-                ws.send(JSON.stringify({
-                    type: 'error',
-                    message: 'Invalid JSON'
-                }));
-            }
-        },
-        onClose: () => {
-            console.log('[chat] Connection closed');
-        }
-    };
+  console.log('[chat] New connection from', request.socket.remoteAddress);
+  
+  // Optional lifecycle methods (called by server)
+  return {
+    onOpen: () => {
+      ws.send(JSON.stringify({ type: 'system', message: 'Connected to chat server' }));
+    },
+    
+    onMessage: (msg) => {
+      try {
+        const data = JSON.parse(msg);
+        console.log('[chat] Received:', data);
+        
+        // Simple echo with timestamp
+        ws.send(JSON.stringify({
+          type: 'message',
+          content: data.content,
+          timestamp: new Date().toISOString(),
+          from: 'server'
+        }));
+      } catch (e) {
+        ws.send(JSON.stringify({ 
+          type: 'error', 
+          message: 'Invalid JSON' 
+        }));
+      }
+    },
+    
+    onClose: () => {
+      console.log('[chat] Connection closed');
+    }
+  };
 };
 */
 // ==========================================================

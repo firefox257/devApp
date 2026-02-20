@@ -1,6 +1,6 @@
 // ./ux/filePicker.js
 
-import { api } from '../js/apiCalls.js';
+import { api } from 'apiCalls';
 import { 
     injectStyles,
     formatBytes,
@@ -617,14 +617,14 @@ function setupFilePickerInstance(originalElement = null) {
     };
     
     /**
-     * Handles file upload using FormData for large file support
+     * Handles file upload when no file is selected.
+     * Uses a temporary hidden input to prompt the user for a file.
      */
     const handleUpload = () => {
         // Create a temporary hidden file input
         const fileInput = document.createElement('input');
         fileInput.type = 'file';
         fileInput.style.display = 'none';
-        fileInput.multiple = false; // Single file upload for now
         
         // Listen for when a file is selected
         fileInput.addEventListener('change', async (e) => {
@@ -638,51 +638,21 @@ function setupFilePickerInstance(originalElement = null) {
             const destinationPath = instanceCurrentPath.endsWith('/') ? instanceCurrentPath : instanceCurrentPath + '/';
             const fullPath = destinationPath + file.name;
 
-            // Show initial upload message
-            showPopupMessage(`Uploading '${file.name}' (${formatBytes(file.size)})...`);
+            showPopupMessage(`Uploading '${file.name}'...`);
 
             try {
-                // Create FormData
-                const formData = new FormData();
-                formData.append('file', file);
-                formData.append('path', fullPath);
+                // Read the file content
+                // Note: file.text() is used assuming the server primarily handles text/plain or JSON content.
+                // For large files or non-text files, this should be adjusted to read as ArrayBuffer.
+                const fileContent = await file.text(); 
+                
+                // Save the file content to the server
+                await api.saveFile(fullPath, fileContent);
 
-                // Track upload progress
-                const xhr = new XMLHttpRequest();
-                
-                xhr.upload.addEventListener('progress', (event) => {
-                    if (event.lengthComputable) {
-                        const percentComplete = Math.round((event.loaded / event.total) * 100);
-                        showPopupMessage(`Uploading '${file.name}': ${percentComplete}% (${formatBytes(event.loaded)} / ${formatBytes(event.total)})`);
-                    }
-                });
-                
-                xhr.addEventListener('load', () => {
-                    if (xhr.status === 200) {
-                        showPopupMessage(`✅ File '${file.name}' uploaded successfully!`);
-                        renderFileList(instanceCurrentPath); // Refresh the list
-                    } else {
-                        const errorText = xhr.responseText || 'Unknown error';
-                        console.error("Upload failed:", errorText);
-                        showPopupMessage(`❌ Upload failed: ${errorText}`, true);
-                    }
-                });
-                
-                xhr.addEventListener('error', () => {
-                    console.error("Network error during upload");
-                    showPopupMessage(`❌ Network error during upload`, true);
-                });
-                
-                xhr.addEventListener('abort', () => {
-                    showPopupMessage(`Upload cancelled`, true);
-                });
-                
-                // Open and send the request
-                xhr.open('POST', '/upload', true);
-                xhr.send(formData);
-                
+                showPopupMessage(`File '${file.name}' uploaded successfully.`);
+                renderFileList(instanceCurrentPath); // Refresh the list
             } catch (error) {
-                console.error("Error initiating file upload:", error);
+                console.error("Error during file upload:", error);
                 showPopupMessage(`Upload failed for '${file.name}': ${error.message}`, true);
             } finally {
                 // Clean up the temporary input

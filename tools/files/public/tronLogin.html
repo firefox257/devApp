@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TRON SYSTEM // CIRCUIT CORE</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: #000;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            color: #fff;
+            background-image: 
+                radial-gradient(circle at 10% 20%, rgba(0, 30, 60, 0.3) 0%, transparent 25%),
+                radial-gradient(circle at 90% 80%, rgba(0, 40, 80, 0.3) 0%, transparent 25%);
+        }
+
+        /* Circuit Board Background */
+        #circuitBackground {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -3;
+        }
+
+        /* Animated Light Cycles */
+        .light-cycle {
+            position: absolute;
+            background: linear-gradient(90deg, transparent, #0af, #00ffff, #0af, transparent);
+            box-shadow: 
+                0 0 10px #0af,
+                0 0 20px #0af,
+                0 0 30px rgba(0, 255, 255, 0.7);
+            border-radius: 2px;
+            z-index: -2;
+        }
+
+        .horizontal-cycle {
+            height: 2px;
+            width: 12%;
+            animation: moveHorizontal 18s linear infinite;
+        }
+
+        .vertical-cycle {
+            width: 2px;
+            height: 12%;
+            animation: moveVertical 15s linear infinite;
+        }
+
+        @keyframes moveHorizontal {
+            0% { left: -15%; top: 15%; }
+            25% { left: 110%; top: 15%; }
+            26% { left: -15%; top: 45%; }
+            50% { left: 110%; top: 45%; }
+            51% { left: -15%; top: 75%; }
+            75% { left: 110%; top: 75%; }
+            76% { left: -15%; top: 30%; }
+            100% { left: 110%; top: 30%; }
+        }
+
+        @keyframes moveVertical {
+            0% { top: -15%; left: 25%; }
+            25% { top: 110%; left: 25%; }
+            26% { top: -15%; left: 55%; }
+            50% { top: 110%; left: 55%; }
+            51% { top: -15%; left: 80%; }
+            75% { top: 110%; left: 80%; }
+            76% { top: -15%; left: 10%; }
+            100% { top: 110%; left: 10%; }
+        }
+
+        /* Login Container */
+        .login-container {
+            background: rgba(0, 15, 35, 0.88);
+            border: 1px solid #0af;
+            border-radius: 12px;
+            box-shadow: 
+                0 0 30px rgba(0, 170, 255, 0.7),
+                inset 0 0 20px rgba(0, 100, 180, 0.4);
+            padding: 45px;
+            width: 100%;
+            max-width: 450px;
+            position: relative;
+            z-index: 10;
+            overflow: hidden;
+            backdrop-filter: blur(2px);
+            animation: containerGlow 5s infinite alternate;
+            border-image: linear-gradient(to right, #0af, #00ffff, #0af) 1;
+        }
+
+        @keyframes containerGlow {
+            0% { 
+                box-shadow: 0 0 30px rgba(0, 170, 255, 0.7), inset 0 0 20px rgba(0, 100, 180, 0.4);
+                transform: scale(1);
+            }
+            100% { 
+                box-shadow: 0 0 45px rgba(0, 200, 255, 0.9), inset 0 0 30px rgba(0, 150, 255, 0.6);
+                transform: scale(1.01);
+            }
+        }
+
+        .login-container::before {
+            content: "";
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(
+                45deg,
+                transparent,
+                rgba(0, 100, 180, 0.15),
+                transparent
+            );
+            transform: rotate(45deg);
+            animation: scanLine 10s linear infinite;
+        }
+
+        @keyframes scanLine {
+            0% { top: -50%; opacity: 0.7; }
+            100% { top: 150%; opacity: 0.3; }
+        }
+
+        /* Header */
+        .login-container::after {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: 
+                linear-gradient(0deg, rgba(0, 30, 60, 0.9) 0%, transparent 60%),
+                repeating-linear-gradient(
+                    90deg,
+                    rgba(0, 80, 150, 0.2) 0px,
+                    rgba(0, 80, 150, 0.2) 1px,
+                    transparent 1px,
+                    transparent 40px
+                ),
+                repeating-linear-gradient(
+                    0deg,
+                    rgba(0, 80, 150, 0.2) 0px,
+                    rgba(0, 80, 150, 0.2) 1px,
+                    transparent 1px,
+                    transparent 40px
+                );
+            z-index: -1;
+            opacity: 0.6;
+            pointer-events: none;
+        }
+
+        .login-header {
+            text-align: center;
+            margin-bottom: 35px;
+            position: relative;
+            padding-bottom: 20px;
+        }
+
+        .login-header h1 {
+            font-size: 3.2rem;
+            letter-spacing: 4px;
+            margin-bottom: 12px;
+            background: linear-gradient(to right, #0af, #00ffff, #0af);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            text-shadow: 0 0 15px rgba(0, 170, 255, 0.8);
+            font-weight: 800;
+            position: relative;
+            font-family: 'Courier New', monospace;
+        }
+
+        .login-header h1::after {
+            content: "CIRCUIT CORE AUTHENTICATION";
+            position: absolute;
+            bottom: -28px;
+            left: 0;
+            width: 100%;
+            font-size: 0.85rem;
+            letter-spacing: 3px;
+            color: #4daaff;
+            text-shadow: 0 0 8px rgba(0, 170, 255, 0.7);
+            font-weight: 600;
+        }
+
+        .login-header::after {
+            content: "";
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 85%;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #0af, #00ffff, #0af, transparent);
+            box-shadow: 0 0 10px #0af, 0 0 20px #00ffff;
+            border-radius: 2px;
+        }
+
+        /* Form Elements */
+        .form-group {
+            margin-bottom: 28px;
+            position: relative;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 10px;
+            letter-spacing: 1.5px;
+            font-size: 0.95rem;
+            color: #5da4ff;
+            text-shadow: 0 0 5px rgba(0, 170, 255, 0.6);
+            font-weight: 500;
+            position: relative;
+            padding-left: 8px;
+        }
+
+        .form-group label::before {
+            content: ">";
+            position: absolute;
+            left: 0;
+            color: #0af;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.7; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.2); }
+        }
+
+        .form-control {
+            width: 100%;
+            background: rgba(0, 25, 55, 0.75);
+            border: 1px solid rgba(0, 170, 255, 0.6);
+            border-radius: 6px;
+            color: white;
+            padding: 16px 22px;
+            font-size: 1.15rem;
+            letter-spacing: 1px;
+            transition: all 0.4s ease;
+            box-shadow: 
+                0 0 8px rgba(0, 100, 180, 0.4),
+                inset 0 0 5px rgba(0, 80, 150, 0.5);
+            font-family: 'Courier New', monospace;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: #00ffff;
+            box-shadow: 
+                0 0 15px rgba(0, 200, 255, 0.7),
+                inset 0 0 10px rgba(0, 150, 255, 0.6),
+                0 0 25px rgba(0, 255, 255, 0.4);
+            background: rgba(0, 35, 75, 0.9);
+            transform: translateX(2px);
+        }
+
+        .form-control::placeholder {
+            color: rgba(100, 200, 255, 0.4);
+            opacity: 1;
+            font-family: 'Courier New', monospace;
+        }
+
+        /* Login Button */
+        .login-btn {
+            background: linear-gradient(45deg, rgba(0, 30, 60, 0.95), rgba(0, 40, 80, 0.95));
+            border: 1px solid #0af;
+            color: white;
+            width: 100%;
+            padding: 18px;
+            font-size: 1.25rem;
+            letter-spacing: 2.5px;
+            text-transform: uppercase;
+            cursor: pointer;
+            border-radius: 6px;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.4s ease;
+            font-weight: bold;
+            box-shadow: 
+                0 0 15px rgba(0, 170, 255, 0.6),
+                inset 0 0 10px rgba(0, 100, 180, 0.5);
+            margin-top: 8px;
+            font-family: 'Courier New', monospace;
+            position: relative;
+            z-index: 1;
+        }
+
+        .login-btn::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(0, 255, 255, 0.3), transparent);
+            transition: left 0.7s;
+            z-index: -1;
+        }
+
+        .login-btn:hover::before {
+            left: 100%;
+        }
+
+        .login-btn:hover {
+            background: linear-gradient(45deg, rgba(0, 40, 80, 0.95), rgba(0, 50, 100, 0.95));
+            box-shadow: 
+                0 0 20px rgba(0, 170, 255, 0.8),
+                0 0 30px rgba(0, 255, 255, 0.5),
+                inset 0 0 15px rgba(0, 150, 255, 0.7);
+            transform: translateY(-2px) translateX(1px);
+            letter-spacing: 3px;
+        }
+
+        .login-btn:active {
+            transform: translateY(1px) translateX(0);
+            box-shadow: 
+                0 0 10px rgba(0, 170, 255, 0.7),
+                inset 0 0 12px rgba(0, 120, 220, 0.8);
+        }
+
+        /* System Status */
+        .system-status {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 30px;
+            padding-top: 18px;
+            border-top: 1px solid rgba(0, 170, 255, 0.35);
+            font-size: 0.9rem;
+            color: #5da4ff;
+            font-family: 'Courier New', monospace;
+            letter-spacing: 1px;
+        }
+
+        .status-dot {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            background: #0f0;
+            border-radius: 50%;
+            margin-right: 8px;
+            box-shadow: 0 0 8px #0f0, 0 0 15px #0f0;
+            position: relative;
+            animation: pulseStatus 1.5s infinite;
+        }
+
+        @keyframes pulseStatus {
+            0%, 100% { opacity: 0.8; box-shadow: 0 0 8px #0f0, 0 0 15px #0f0; }
+            50% { opacity: 1; box-shadow: 0 0 12px #0f0, 0 0 25px #5fff5f; }
+        }
+
+        .status-container {
+            display: flex;
+            align-items: center;
+        }
+
+        .security-level {
+            background: rgba(0, 30, 60, 0.7);
+            padding: 3px 10px;
+            border-radius: 12px;
+            border: 1px solid #5da4ff;
+            box-shadow: 0 0 8px rgba(93, 164, 255, 0.4);
+        }
+
+        /* Glitch Effect for Title */
+        @keyframes glitch {
+            0% { text-shadow: 0 0 0 #0af, 0 0 0 #00ffff; }
+            25% { text-shadow: 2px 0 0 #0af, -2px 0 0 #00ffff; }
+            50% { text-shadow: -2px 0 0 #0af, 2px 0 0 #00ffff; }
+            75% { text-shadow: 2px 0 0 #0af, -2px 0 0 #00ffff; }
+            100% { text-shadow: 0 0 0 #0af, 0 0 0 #00ffff; }
+        }
+
+        .login-header h1 {
+            animation: glitch 4s infinite;
+        }
+
+        /* Circuit Node Animation */
+        @keyframes nodePulse {
+            0%, 100% { 
+                box-shadow: 0 0 8px #0af, 0 0 15px #0af;
+                transform: scale(1);
+            }
+            50% { 
+                box-shadow: 0 0 12px #00ffff, 0 0 25px #00ffff;
+                transform: scale(1.15);
+            }
+        }
+
+        /* Responsive Design */
+        @media (max-width: 480px) {
+            .login-container {
+                padding: 35px 28px;
+                margin: 15px;
+                border-radius: 10px;
+            }
+            
+            .login-header h1 {
+                font-size: 2.5rem;
+            }
+            
+            .login-header h1::after {
+                font-size: 0.75rem;
+                bottom: -25px;
+            }
+            
+            .form-control {
+                padding: 14px 18px;
+                font-size: 1.05rem;
+            }
+            
+            .login-btn {
+                padding: 16px;
+                font-size: 1.15rem;
+                letter-spacing: 2px;
+            }
+            
+            .system-status {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 8px;
+            }
+        }
+
+        /* Floating Circuit Elements */
+        .circuit-element {
+            position: absolute;
+            background: rgba(0, 100, 180, 0.2);
+            border: 1px solid rgba(0, 170, 255, 0.4);
+            border-radius: 50%;
+            box-shadow: 0 0 10px rgba(0, 170, 255, 0.3);
+            z-index: -1;
+            animation: floatElement 25s infinite linear;
+            opacity: 0.7;
+        }
+
+        @keyframes floatElement {
+            0% { transform: translate(0, 0) rotate(0deg) scale(1); opacity: 0.7; }
+            25% { transform: translate(50px, 30px) rotate(90deg) scale(1.1); opacity: 0.9; }
+            50% { transform: translate(20px, 80px) rotate(180deg) scale(0.9); opacity: 0.7; }
+            75% { transform: translate(-30px, 40px) rotate(270deg) scale(1.05); opacity: 0.85; }
+            100% { transform: translate(0, 0) rotate(360deg) scale(1); opacity: 0.7; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Circuit Board Background Canvas -->
+    <canvas id="circuitBackground"></canvas>
+    
+    <!-- Light Cycles for Animation -->
+    <div class="light-cycle horizontal-cycle"></div>
+    <div class="light-cycle horizontal-cycle" style="animation-delay: -5s; animation-duration: 20s;"></div>
+    <div class="light-cycle vertical-cycle"></div>
+    <div class="light-cycle vertical-cycle" style="animation-delay: -4s;"></div>
+    <div class="light-cycle vertical-cycle" style="animation-delay: -7s; animation-duration: 17s;"></div>
+    
+    <!-- Floating Circuit Elements -->
+    <div class="circuit-element" style="width: 80px; height: 80px; top: 15%; left: 10%; animation-delay: 0s;"></div>
+    <div class="circuit-element" style="width: 60px; height: 60px; top: 70%; left: 85%; animation-delay: -5s;"></div>
+    <div class="circuit-element" style="width: 100px; height: 100px; top: 40%; left: 80%; animation-delay: -10s;"></div>
+    <div class="circuit-element" style="width: 70px; height: 70px; top: 85%; left: 25%; animation-delay: -15s;"></div>
+    <div class="circuit-element" style="width: 90px; height: 90px; top: 5%; left: 75%; animation-delay: -20s;"></div>
+    
+    <div class="login-container">
+        <div class="login-header">
+            <h1>TRON CORE</h1>
+        </div>
+        
+        <form id="loginForm">
+            <div class="form-group">
+                <label for="userId">SYSTEM IDENTIFIER</label>
+                <input type="text" id="userId" class="form-control" placeholder="ENTER USER ID" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="password">BIOMETRIC SIGNATURE</label>
+                <input type="password" id="password" class="form-control" placeholder="ENTER SECURITY KEY" required>
+            </div>
+            
+            <button type="submit" class="login-btn">ESTABLISH CONNECTION</button>
+            
+            <div class="system-status">
+                <div class="status-container">
+                    <span class="status-dot"></span> NEURAL NETWORK ACTIVE
+                </div>
+                <div class="security-level">SECURITY PROTOCOL: OMEGA</div>
+            </div>
+        </form>
+    </div>
+
+    <script>
+        // Circuit Board Background Generator
+        document.addEventListener('DOMContentLoaded', () => {
+            const canvas = document.getElementById('circuitBackground');
+            const ctx = canvas.getContext('2d');
+            
+            // Set canvas size
+            function resizeCanvas() {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+                drawCircuitBoard();
+            }
+            
+            // Circuit board parameters
+            const circuitParams = {
+                nodeCount: 80,
+                minDistance: 80,
+                maxConnections: 4,
+                lineGlow: 15,
+                nodeGlow: 20,
+                animationSpeed: 0.008
+            };
+            
+            let nodes = [];
+            let connections = [];
+            let time = 0;
+            
+            // Create circuit nodes
+            function createNodes() {
+                nodes = [];
+                const padding = 80;
+                
+                for (let i = 0; i < circuitParams.nodeCount; i++) {
+                    nodes.push({
+                        x: Math.random() * (canvas.width - padding * 2) + padding,
+                        y: Math.random() * (canvas.height - padding * 2) + padding,
+                        radius: Math.random() * 1.5 + 1.5,
+                        pulseOffset: Math.random() * Math.PI * 2,
+                        connections: []
+                    });
+                }
+                
+                // Create connections between nearby nodes
+                connections = [];
+                for (let i = 0; i < nodes.length; i++) {
+                    for (let j = i + 1; j < nodes.length; j++) {
+                        const dx = nodes[i].x - nodes[j].x;
+                        const dy = nodes[i].y - nodes[j].y;
+                        const distance = Math.sqrt(dx * dx + dy * dy);
+                        
+                        // Connect nodes that are close enough
+                        if (distance < circuitParams.minDistance && Math.random() > 0.6) {
+                            if (nodes[i].connections.length < circuitParams.maxConnections && 
+                                nodes[j].connections.length < circuitParams.maxConnections) {
+                                nodes[i].connections.push(j);
+                                nodes[j].connections.push(i);
+                                connections.push({
+                                    from: i,
+                                    to: j,
+                                    width: Math.random() * 0.8 + 0.4,
+                                    pulseOffset: Math.random() * Math.PI * 2
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Draw the circuit board
+            function drawCircuitBoard() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                time += circuitParams.animationSpeed;
+                
+                // Draw connections with glow effect
+                ctx.lineWidth = 1.5;
+                connections.forEach(conn => {
+                    const nodeA = nodes[conn.from];
+                    const nodeB = nodes[conn.to];
+                    
+                    // Calculate pulse effect along the line
+                    const pulsePosition = (time + conn.pulseOffset) % 1;
+                    const pulseIntensity = Math.sin(pulsePosition * Math.PI * 2) * 0.5 + 0.5;
+                    
+                    // Draw glowing line
+                    ctx.strokeStyle = `rgba(0, 170, 255, ${0.3 + pulseIntensity * 0.2})`;
+                    ctx.lineWidth = conn.width + pulseIntensity * 0.7;
+                    ctx.beginPath();
+                    ctx.moveTo(nodeA.x, nodeA.y);
+                    ctx.lineTo(nodeB.x, nodeB.y);
+                    ctx.stroke();
+                    
+                    // Draw energy pulse dot moving along the connection
+                    if (pulseIntensity > 0.7) {
+                        const pulseX = nodeA.x + (nodeB.x - nodeA.x) * pulsePosition;
+                        const pulseY = nodeA.y + (nodeB.y - nodeA.y) * pulsePosition;
+                        const pulseSize = 3 + pulseIntensity * 4;
+                        
+                        ctx.fillStyle = `rgba(0, 255, 255, ${pulseIntensity * 0.8})`;
+                        ctx.beginPath();
+                        ctx.arc(pulseX, pulseY, pulseSize, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                });
+                
+                // Draw nodes with glow effect
+                nodes.forEach((node, index) => {
+                    const pulseIntensity = Math.sin(time * 2 + node.pulseOffset) * 0.3 + 0.7;
+                    
+                    // Outer glow
+                    const gradient = ctx.createRadialGradient(
+                        node.x, node.y, 0,
+                        node.x, node.y, node.radius * 3
+                    );
+                    gradient.addColorStop(0, `rgba(0, 200, 255, ${0.8 * pulseIntensity})`);
+                    gradient.addColorStop(0.4, `rgba(0, 150, 255, ${0.4 * pulseIntensity})`);
+                    gradient.addColorStop(1, 'transparent');
+                    
+                    ctx.fillStyle = gradient;
+                    ctx.beginPath();
+                    ctx.arc(node.x, node.y, node.radius * 3.5, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    // Node core
+                    ctx.fillStyle = `rgba(0, 220, 255, ${0.9 + pulseIntensity * 0.2})`;
+                    ctx.beginPath();
+                    ctx.arc(node.x, node.y, node.radius + pulseIntensity * 0.8, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    // Connection points
+                    node.connections.forEach(targetIndex => {
+                        const targetNode = nodes[targetIndex];
+                        const angle = Math.atan2(targetNode.y - node.y, targetNode.x - node.x);
+                        
+                        ctx.fillStyle = `rgba(0, 255, 255, ${0.7 + pulseIntensity * 0.3})`;
+                        ctx.beginPath();
+                        ctx.arc(
+                            node.x + Math.cos(angle) * (node.radius + 1),
+                            node.y + Math.sin(angle) * (node.radius + 1),
+                            1.5,
+                            0,
+                            Math.PI * 2
+                        );
+                        ctx.fill();
+                    });
+                });
+                
+                // Draw circuit board grid pattern overlay
+                ctx.strokeStyle = 'rgba(0, 80, 150, 0.15)';
+                ctx.lineWidth = 1;
+                const gridSize = 40;
+                
+                for (let x = 0; x < canvas.width; x += gridSize) {
+                    ctx.beginPath();
+                    ctx.moveTo(x, 0);
+                    ctx.lineTo(x, canvas.height);
+                    ctx.stroke();
+                }
+                
+                for (let y = 0; y < canvas.height; y += gridSize) {
+                    ctx.beginPath();
+                    ctx.moveTo(0, y);
+                    ctx.lineTo(canvas.width, y);
+                    ctx.stroke();
+                }
+                
+                requestAnimationFrame(drawCircuitBoard);
+            }
+            
+            // Initialize and handle resize
+            window.addEventListener('resize', resizeCanvas);
+            resizeCanvas();
+            
+            // Form submission handling
+            document.getElementById('loginForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const userId = document.getElementById('userId').value;
+                const password = document.getElementById('password').value;
+                
+                // Simple validation
+                if (userId.length < 3) {
+                    alert('SYSTEM IDENTIFIER must be at least 3 characters');
+                    return;
+                }
+                
+                if (password.length < 6) {
+                    alert('BIOMETRIC SIGNATURE must be at least 6 characters');
+                    return;
+                }
+                
+                // Add button animation
+                const loginBtn = document.querySelector('.login-btn');
+                loginBtn.innerHTML = 'AUTHENTICATING...';
+                loginBtn.disabled = true;
+                loginBtn.style.background = 'linear-gradient(45deg, rgba(0, 40, 80, 0.95), rgba(0, 60, 100, 0.95))';
+                
+                // Simulate authentication delay
+                setTimeout(() => {
+                    // Create success animation
+                    loginBtn.innerHTML = 'ACCESS GRANTED';
+                    loginBtn.style.background = 'linear-gradient(45deg, rgba(0, 50, 30, 0.95), rgba(0, 70, 40, 0.95))';
+                    loginBtn.style.borderColor = '#0f0';
+                    loginBtn.style.boxShadow = '0 0 20px rgba(0, 255, 0, 0.7), 0 0 30px rgba(0, 255, 100, 0.5), inset 0 0 15px rgba(0, 200, 100, 0.7)';
+                    
+                    // Redirect after delay
+                    setTimeout(() => {
+                        alert(`SECURE CONNECTION ESTABLISHED\n\nWelcome, ${userId}.\n\nYou have accessed the TRON CIRCUIT CORE.`);
+                        loginBtn.innerHTML = 'ESTABLISH CONNECTION';
+                        loginBtn.disabled = false;
+                        loginBtn.style.background = 'linear-gradient(45deg, rgba(0, 30, 60, 0.95), rgba(0, 40, 80, 0.95))';
+                        loginBtn.style.borderColor = '#0af';
+                        loginBtn.style.boxShadow = '0 0 15px rgba(0, 170, 255, 0.6), inset 0 0 10px rgba(0, 100, 180, 0.5)';
+                        document.getElementById('loginForm').reset();
+                    }, 2500);
+                }, 1800);
+            });
+            
+            // Add keyboard effects
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter' && !document.querySelector('.login-btn').disabled) {
+                    document.querySelector('.login-btn').click();
+                }
+            });
+            
+            // Create additional energy particles
+            function createEnergyParticle() {
+                const particle = document.createElement('div');
+                particle.className = 'light-cycle';
+                particle.style.width = '3px';
+                particle.style.height = '3px';
+                particle.style.borderRadius = '50%';
+                particle.style.position = 'absolute';
+                particle.style.background = '#0af';
+                particle.style.boxShadow = '0 0 8px #0af, 0 0 15px #00ffff';
+                particle.style.zIndex = '-1';
+                particle.style.opacity = '0.8';
+                
+                // Random position around the edges
+                const side = Math.floor(Math.random() * 4);
+                let x, y;
+                
+                switch(side) {
+                    case 0: // top
+                        x = Math.random() * 100;
+                        y = -2;
+                        particle.style.left = `${x}%`;
+                        particle.style.top = `${y}%`;
+                        break;
+                    case 1: // right
+                        x = 102;
+                        y = Math.random() * 100;
+                        particle.style.left = `${x}%`;
+                        particle.style.top = `${y}%`;
+                        break;
+                    case 2: // bottom
+                        x = Math.random() * 100;
+                        y = 102;
+                        particle.style.left = `${x}%`;
+                        particle.style.top = `${y}%`;
+                        break;
+                    case 3: // left
+                        x = -2;
+                        y = Math.random() * 100;
+                        particle.style.left = `${x}%`;
+                        particle.style.top = `${y}%`;
+                        break;
+                }
+                
+                // Random size
+                const size = 2 + Math.random() * 3;
+                particle.style.width = `${size}px`;
+                particle.style.height = `${size}px`;
+                
+                // Animation
+                particle.style.animation = `moveParticle ${3 + Math.random() * 4}s linear forwards`;
+                
+                document.body.appendChild(particle);
+                
+                // Remove after animation
+                setTimeout(() => {
+                    particle.remove();
+                }, 4500);
+            }
+            
+            // Particle animation keyframes
+            const styleSheet = document.createElement('style');
+            styleSheet.innerHTML = `
+                @keyframes moveParticle {
+                    0% { 
+                        transform: translate(0, 0) scale(1); 
+                        opacity: 0.8; 
+                    }
+                    30% {
+                        opacity: 1;
+                    }
+                    70% {
+                        opacity: 1;
+                    }
+                    100% { 
+                        transform: translate(${Math.random() * 200 - 100}px, ${Math.random() * 200 - 100}px) scale(0.1); 
+                        opacity: 0; 
+                    }
+                }
+            `;
+            document.head.appendChild(styleSheet);
+            
+            // Generate particles
+            setInterval(createEnergyParticle, 400);
+        });
+    </script>
+</body>
+</html>
