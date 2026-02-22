@@ -177,7 +177,7 @@ const serverOptions = {
     port: 80,
     sslport: 443,
     key: './files/key.pem',
-    cert: './files/cert.pem',
+    cert: './files/cert.crt',
     additionalMethods: []
 };
 
