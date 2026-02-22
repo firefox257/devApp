@@ -176,8 +176,8 @@ const wsCache = new Map(); // handlerName -> { module, lastAccessed }
 const serverOptions = {
     port: 80,
     sslport: 443,
-    key: './key.pem',
-    cert: './cert.pem',
+    key: './files/key.pem',
+    cert: './files/cert.pem',
     additionalMethods: []
 };
 
