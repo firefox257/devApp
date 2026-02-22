@@ -1,0 +1,1060 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Dev</title>
+    
+    <script type="importmap">
+    {
+        "imports": {
+            "apiCalls": "./js/apiCalls.js",
+            "filePicker": "./ux/filePicker.js",
+            "filePickerUI": "./ux/filePickerUI.js",
+            "textCode": "./ux/textCode.js",
+            "textCodeUI": "./ux/textCodeUI.js",
+            "aiChat": "./ux/aichat.js"
+        }
+    }
+    </script>
+    
+    <style>
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body {
+            font-family: 'Fira Code', monospace;
+            background:#1e1e1e;
+            color:#ccc;
+            height:100vh;
+            overflow:hidden;
+            font-size:12px;
+        }
+        .container { display:flex; flex-direction:column; height:100vh; width:100vw; }
+        
+        /* Minimal nav bar */
+        .nav { 
+            background:#252526; 
+            padding:2px 6px; 
+            display:flex; 
+            align-items:center; 
+            gap:4px; 
+            border-bottom:1px solid #3e3e42;
+            height:24px;
+        }
+        .page-control { 
+            display:flex; 
+            align-items:center; 
+            gap:2px; 
+            flex-grow:1; 
+        }
+        select { 
+            background:#2d2d30; 
+            color:#fff; 
+            border:1px solid #3e3e42; 
+            border-radius:2px; 
+            padding:1px 16px 1px 4px; 
+            font:inherit; 
+            font-size:11px; 
+            height:20px;
+            min-width:120px;
+            appearance:none;
+            background-image:url("image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='%23888' d='M4 6l4 4 4-4z'/%3E%3C/svg%3E");
+            background-repeat:no-repeat;
+            background-position:right 4px center;
+            background-size:10px;
+        }
+        select:focus { outline:none; border-color:#007acc; }
+        
+        /* Action buttons */
+        .close-btn {
+            background:#c50f1f; 
+            color:white; 
+            border:none; 
+            border-radius:2px; 
+            width:22px; 
+            height:20px; 
+            display:flex; 
+            align-items:center; 
+            justify-content:center; 
+            font-size:11px; 
+            cursor:pointer; 
+            padding:0;
+            margin-left:4px;
+        }
+        .close-btn:hover { background:#a50d19; }
+        .close-btn:disabled { opacity:0.4; cursor:not-allowed; }
+        
+        .save-status {
+            color:#555;
+            font-size:10px;
+            margin-left:6px;
+            height:20px;
+            display:flex;
+            align-items:center;
+        }
+        .save-status.dirty::after {
+            content: "•";
+            color:#c50f1f;
+            margin-left:2px;
+        }
+        
+        /* Settings page styles */
+        .settings-page {
+            padding: 20px;
+            color: #ccc;
+            font-family: inherit;
+            overflow-y: auto;
+            height: 100%;
+        }
+        .settings-section {
+            background: #252526;
+            border: 1px solid #3e3e42;
+            border-radius: 4px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+        .settings-section h3 {
+            color: #007acc;
+            font-size: 14px;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .settings-row {
+            margin-bottom: 12px;
+        }
+        .settings-row label {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 12px;
+            color: #ccc;
+        }
+        .settings-input {
+            width: 100%;
+            padding: 6px 8px;
+            background: #2d2d30;
+            color: #fff;
+            border: 1px solid #3e3e42;
+            border-radius: 3px;
+            font: inherit;
+            font-size: 12px;
+            box-sizing: border-box;
+        }
+        .settings-input:focus {
+            outline: none;
+            border-color: #007acc;
+            box-shadow: 0 0 0 2px rgba(0, 122, 204, 0.3);
+        }
+        .settings-btn {
+            background: #13a10e;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            padding: 6px 12px;
+            cursor: pointer;
+            font: inherit;
+            font-size: 12px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .settings-btn:hover {
+            background: #10890c;
+        }
+        .settings-btn:active {
+            transform: scale(0.98);
+        }
+        .settings-status {
+            margin-top: 10px;
+            padding: 8px;
+            border-radius: 3px;
+            font-size: 11px;
+            display: none;
+        }
+        .settings-status.success {
+            background: rgba(19, 161, 14, 0.15);
+            color: #13a10e;
+            display: block;
+        }
+        .settings-status.error {
+            background: rgba(197, 15, 31, 0.15);
+            color: #c50f1f;
+            display: block;
+        }
+        
+        /* Content area */
+        .content { 
+            flex-grow:1; 
+            position:relative; 
+            background:#1e1e1e;
+        }
+        .page { 
+            position:absolute; 
+            top:0; 
+            left:0; 
+            width:100%; 
+            height:100%; 
+            display:none;
+        }
+        .page.active { 
+            display:block;
+        }
+        
+        /* Iframe containers (PRESERVED for Viewer tabs) */
+        .iframe-container { 
+            width:100%; 
+            height:100%; 
+            position:relative;
+            background:#000;
+        }
+        iframe { 
+            width:100%; 
+            height:100%; 
+            border:none; 
+            display:block;
+        }
+        .iframe-fallback {
+            position:absolute;
+            top:0;
+            left:0;
+            width:100%;
+            height:100%;
+            display:flex;
+            flex-direction:column;
+            align-items:center;
+            justify-content:center;
+            background:#1e1e1e;
+            color:#666;
+            padding:20px;
+            text-align:center;
+        }
+        .iframe-fallback h3 {
+            color:#c50f1f;
+            margin-bottom:10px;
+            font-size:14px;
+        }
+        .iframe-fallback a {
+            display:inline-block;
+            margin-top:15px;
+            padding:6px 12px;
+            background:#007acc;
+            color:#fff;
+            text-decoration:none;
+            border-radius:3px;
+            font-size:12px;
+        }
+        
+        /* File picker */
+        .fp-container { 
+            width:100%; 
+            height:100%; 
+        }
+        .fp-placeholder { 
+            height:100%; 
+            display:flex; 
+            align-items:center; 
+            justify-content:center; 
+            color:#666; 
+            font-size:13px; 
+            flex-direction:column; 
+            gap:8px;
+        }
+        .spinner {
+            border:2px solid #333; 
+            border-top:2px solid #007acc; 
+            border-radius:50%; 
+            width:20px; 
+            height:20px; 
+            animation:spin 1s linear infinite;
+        }
+        
+        /* Status bar */
+        .status { 
+            background:#252526; 
+            padding:1px 6px; 
+            font-size:10px; 
+            color:#888; 
+            border-top:1px solid #3e3e42; 
+            height:18px;
+            display:flex;
+            align-items:center;
+        }
+        .status::before { 
+            content:""; 
+            display:inline-block; 
+            width:6px; 
+            height:6px; 
+            background:#13a10e; 
+            border-radius:50%; 
+            margin-right:4px; 
+        }
+        
+        @keyframes spin { to { transform:rotate(360deg); } }
+        
+        /* Toast notifications */
+        .toast {
+            position:fixed;
+            bottom:10px;
+            right:10px;
+            background:#2d2d30;
+            color:#fff;
+            padding:5px 10px;
+            border-radius:3px;
+            box-shadow:0 2px 6px rgba(0,0,0,0.3);
+            font-size:11px;
+            transform:translateX(400px);
+            transition:transform 0.2s;
+            z-index:10000;
+            max-width:80%;
+        }
+        .toast.show { transform:translateX(0); }
+        .toast.error { background:#c50f1f; }
+        .toast.success { background:#13a10e; }
+        .toast.info { background:#007acc; }
+        
+        /* Open Mode Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 20000;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background: #252526;
+            border: 1px solid #3e3e42;
+            border-radius: 4px;
+            width: 90%;
+            max-width: 500px;
+            padding: 16px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #3e3e42;
+        }
+        .modal-header h2 {
+            color: #007acc;
+            font-size: 16px;
+            margin: 0;
+            font-weight: 500;
+        }
+        .close-modal {
+            color: #888;
+            font-size: 24px;
+            cursor: pointer;
+            line-height: 1;
+            padding: 0 4px;
+        }
+        .close-modal:hover { color: #ccc; }
+        .modal-body {
+            color: #ccc;
+            line-height: 1.5;
+        }
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            justify-content: flex-end;
+        }
+        .modal-btn {
+            border: none;
+            border-radius: 3px;
+            padding: 6px 16px;
+            font-family: inherit;
+            font-size: 13px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .editor-btn {
+            background: #007acc;
+            color: white;
+        }
+        .editor-btn:hover { background: #0066b3; }
+        .viewer-btn {
+            background: #13a10e;
+            color: white;
+        }
+        .viewer-btn:hover { background: #10890c; }
+        
+        /* AIChat Component Theme - Match DevApp Dark Theme */
+        ai-chat {
+            --ai-chat-bg: #1e1e1e;
+            --ai-chat-text: #ccc;
+            --ai-chat-border: #3e3e42;
+            --ai-chat-input-bg: #2d2d30;
+            --ai-chat-input-text: #fff;
+            --ai-chat-button-bg: #007acc;
+            --ai-chat-button-hover: #005c99;
+            --ai-chat-user-bg: #252526;
+            --ai-chat-ai-bg: #2d2d30;
+            --ai-chat-code-bg: #1e1e1e;
+            --ai-chat-code-text: #d4d4d4;
+            --ai-chat-scrollbar-thumb: #444;
+            --ai-chat-scrollbar-track: #252526;
+            --ai-chat-error: #c50f1f;
+            --ai-chat-success: #13a10e;
+            --ai-chat-warning: #ffc107;
+            --ai-chat-warning-text: #000;
+        }
+        
+        /* Override AIChat internal styles for perfect theme matching */
+        ai-chat .section {
+            border-bottom: 1px solid #3e3e42 !important;
+        }
+        
+        ai-chat .top-menu button,
+        ai-chat .top-menu select {
+            background-color: #2d2d30 !important;
+            border: 1px solid #3e3e42 !important;
+            color: #fff !important;
+        }
+        
+        ai-chat .top-menu button:hover,
+        ai-chat .top-menu select:hover {
+            background-color: #3e3e42 !important;
+        }
+        
+        ai-chat #textInput,
+        ai-chat #systemInput {
+            background-color: #2d2d30 !important;
+            border: 1px solid #3e3e42 !important;
+            color: #fff !important;
+        }
+        
+        ai-chat #textInput:focus,
+        ai-chat #systemInput:focus {
+            border-color: #007acc !important;
+            box-shadow: 0 0 0 2px rgba(0, 122, 204, 0.3) !important;
+        }
+        
+        ai-chat .chat-area {
+            background-color: #1e1e1e !important;
+            color: #ccc !important;
+        }
+        
+        ai-chat .code-block-container {
+            background-color: #252526 !important;
+            border: 1px solid #3e3e42 !important;
+        }
+        
+        ai-chat .code-block-header {
+            background-color: #2d2d30 !important;
+            border-bottom: 1px solid #3e3e42 !important;
+            color: #ccc !important;
+        }
+        
+        ai-chat #sendButton {
+            background-color: #007acc !important;
+        }
+        
+        ai-chat #sendButton:hover {
+            background-color: #005c99 !important;
+        }
+        
+        ai-chat #conversationBigButton {
+            background-color: #007acc !important;
+        }
+        
+        ai-chat #conversationBigButton:hover {
+            background-color: #005c99 !important;
+        }
+        
+        ai-chat #conversationBigButton.listening {
+            background-color: #c50f1f !important;
+            box-shadow: 0 0 0 0.5em rgba(197, 15, 31, 0.5) !important;
+        }
+        
+        ai-chat #conversationBigButton.speaking {
+            background-color: #13a10e !important;
+            color: #fff !important;
+            box-shadow: 0 0 0 0.5em rgba(19, 161, 14, 0.5) !important;
+        }
+        
+        ai-chat .close-button {
+            color: #888 !important;
+        }
+        
+        ai-chat .close-button:hover {
+            color: #ccc !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="nav">
+            <div class="page-control">
+                <select id="pageSelector">
+                    <option value="chat">💬 Chat</option>
+                    <option value="settings">⚙️ Settings</option>
+                    <option value="filepicker">📁 Files</option>
+                </select>
+                <button id="closePageBtn" class="close-btn" disabled title="Close tab">🗑️</button>
+                <div class="save-status" id="saveStatus"></div>
+            </div>
+        </div>
+        
+        <div class="content">
+            <!-- Chat Page - REPLACED WITH AIChat Component -->
+            <div id="chatPage" class="page active">
+                <ai-chat 
+                    title="Dev AI Assistant" 
+                    style="width:100%;height:100%;"
+                    id="aiChatComponent"
+                ></ai-chat>
+            </div>
+            
+            <!-- Settings Page (SIMPLIFIED) -->
+            <div id="settingsPage" class="page">
+                <div class="settings-page">
+                    <div class="settings-section">
+                        <h3>ℹ️ About</h3>
+                        <p style="font-size:11px;line-height:1.5;">
+                            Dev Environment v1.0<br>
+                            • Chat: AI Assistant with voice support<br>
+                            • File Editor: Code editing with syntax support<br>
+                            • File Viewer: Live preview with refresh<br>
+                            • Settings: Persistent configuration
+                        </p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- File Picker Page -->
+            <div id="filePickerPage" class="page">
+                <div class="fp-container" id="filePickerContainer">
+                    <div class="fp-placeholder">
+                        <div class="spinner"></div>
+                        <div>Loading files...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="status" id="statusBar">Ready</div>
+    </div>
+    
+    <div class="toast" id="toast"></div>
+    
+    <!-- Open Mode Modal -->
+    <div id="openModeModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span class="close-modal">&times;</span>
+                <h2>Open File As</h2>
+            </div>
+            <div class="modal-body">
+                <p>How would you like to open <span id="modalFileName" style="color:#007acc;font-weight:500;"></span>?</p>
+                <div class="modal-buttons">
+                    <button id="openInEditorBtn" class="modal-btn editor-btn">📝 Editor (textCode)</button>
+                    <button id="openInViewerBtn" class="modal-btn viewer-btn">👁️ Viewer (Preview)</button>
+                </div>
+                <p style="font-size:10px;color:#888;margin-top:8px;">
+                    Viewer URL: <span id="viewerUrlPreview" style="color:#555;"></span>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        // Load modules
+        const mods = { api: null, fp: null, tc: null, aiChat: null };
+        try {
+            const apiMod = await import('apiCalls');
+            mods.api = apiMod.api;
+            
+            await import('filePickerUI');
+            const fpMod = await import('filePicker');
+            mods.fp = fpMod.createfilePicker;
+            
+            await import('textCodeUI');
+            const tcMod = await import('textCode');
+            mods.tc = tcMod.createTexCode;
+            
+            // Load AIChat component
+            await import('aiChat');
+            mods.aiChat = true;
+            
+        } catch (e) {
+            console.error('Module load failed:', e);
+            document.getElementById('statusBar').textContent = `❌ Error: ${e.message}`;
+        }
+        
+        // DOM elements (APP VIEW ELEMENTS REMOVED)
+        const pageSel = document.getElementById('pageSelector');
+        const closeBtn = document.getElementById('closePageBtn');
+        const saveStatus = document.getElementById('saveStatus');
+        const statusEl = document.getElementById('statusBar');
+        const toastEl = document.getElementById('toast');
+        const fpContainer = document.getElementById('filePickerContainer');
+        const contentArea = document.querySelector('.content');
+        
+        // Modal elements
+        const modal = document.getElementById('openModeModal');
+        const closeModalBtn = document.querySelector('.close-modal');
+        const openEditorBtn = document.getElementById('openInEditorBtn');
+        const openViewerBtn = document.getElementById('openInViewerBtn');
+        const modalFileName = document.getElementById('modalFileName');
+        const viewerUrlPreview = document.getElementById('viewerUrlPreview');
+        
+        // Load settings from localStorage (SIMPLIFIED - no app view settings)
+        const SETTINGS_KEY = 'devEnvSettings';
+        let appSettings = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
+        
+        // State (APP VIEW REMOVED)
+        const state = {
+            currentPage: 'chat',
+            systemPages: {
+                chat: { id:'chat', el:document.getElementById('chatPage') },
+                settings: { id:'settings', el:document.getElementById('settingsPage') },
+                filepicker: { id:'filepicker', el:document.getElementById('filePickerPage'), init:false }
+            },
+            tabs: {} // { id, name, el, editor, filePath, content, type }
+        };
+        
+        // Utilities
+        function showToast(msg, type='info') {
+            toastEl.textContent = msg;
+            toastEl.className = `toast ${type}`;
+            toastEl.classList.add('show');
+            setTimeout(() => toastEl.classList.remove('show'), 2500);
+        }
+        
+        function updateStatus(msg) {
+            statusEl.textContent = msg;
+        }
+        
+        function updateSaveStatus(isDirty) {
+            saveStatus.className = 'save-status';
+            if (isDirty) saveStatus.classList.add('dirty');
+            saveStatus.title = isDirty ? 'Unsaved changes' : 'All changes saved';
+        }
+        
+        function switchPage(id) {
+            // Hide current page
+            if (state.currentPage in state.systemPages) {
+                state.systemPages[state.currentPage].el.classList.remove('active');
+            } else if (state.tabs[state.currentPage]) {
+                state.tabs[state.currentPage].el.classList.remove('active');
+            }
+            
+            // Show new page
+            if (id in state.systemPages) {
+                state.systemPages[id].el.classList.add('active');
+            } else if (state.tabs[id]) {
+                state.tabs[id].el.classList.add('active');
+            }
+            
+            state.currentPage = id;
+            pageSel.value = id;
+            closeBtn.disabled = (id === 'chat' || id === 'filepicker' || id === 'settings');
+            
+            // Update save status for tabs
+            if (id in state.tabs) {
+                const tab = state.tabs[id];
+                if (tab.type === 'viewer') {
+                    updateSaveStatus(false);
+                    saveStatus.textContent = '👁️ Preview mode';
+                    saveStatus.title = 'Live preview - changes require refresh';
+                } else {
+                    const isDirty = tab.editor?.value !== tab.content;
+                    updateSaveStatus(isDirty);
+                    saveStatus.textContent = '';
+                }
+            } else {
+                updateSaveStatus(false);
+                saveStatus.textContent = '';
+            }
+            
+            // Handle special pages
+            if (id === 'filepicker' && !state.systemPages.filepicker.init) {
+                initFilePicker();
+            }
+            
+            if (id === 'settings') {
+                updateStatus('Settings');
+            }
+            
+            // Update status bar
+            if (id === 'chat') {
+                updateStatus('AI Assistant ready');
+                setTimeout(() => {
+                    const aiChat = document.getElementById('aiChatComponent');
+                    if (aiChat) {
+                        const textInput = aiChat.shadowRoot?.getElementById('textInput');
+                        if (textInput) textInput.focus();
+                    }
+                }, 100);
+            } else if (id === 'settings') {
+                updateStatus('Settings');
+            } else if (id === 'filepicker') {
+                updateStatus('File browser');
+            } else if (state.tabs[id]) {
+                const tab = state.tabs[id];
+                const cleanName = tab.name.replace(/^(📝|👁️)\s*/, '');
+                if (tab.type === 'viewer') {
+                    updateStatus(`Previewing: ${cleanName}`);
+                } else {
+                    updateStatus(`Editing: ${cleanName}`);
+                }
+            }
+        }
+        
+        function addTab(id, name, el, editor, filePath, content) {
+            state.tabs[id] = { id, name, el, editor, filePath, content };
+            const opt = document.createElement('option');
+            opt.value = id;
+            opt.textContent = name;
+            pageSel.appendChild(opt);
+        }
+        
+        function removeTab(id) {
+            if (!state.tabs[id]) return;
+            const opt = Array.from(pageSel.options).find(o => o.value === id);
+            if (opt) pageSel.removeChild(opt);
+            if (state.tabs[id].el.parentNode) {
+                state.tabs[id].el.parentNode.removeChild(state.tabs[id].el);
+            }
+            delete state.tabs[id];
+        }
+        
+        // ===== FILE OPERATIONS =====
+        async function openFile(path) {
+            try {
+                const content = await mods.api.readFile(path);
+                const name = path.split('/').pop();
+                
+                // Prevent duplicate EDITOR tabs for same file
+                const existingEditor = Object.values(state.tabs).find(t => 
+                    t.filePath === path && (t.type === 'editor' || t.type === undefined)
+                );
+                if (existingEditor) {
+                    switchPage(existingEditor.id);
+                    return showToast(`✅ Already open in Editor: ${name}`, 'info');
+                }
+                
+                const id = `editor-${Date.now()}-${encodeURIComponent(path)}`;
+                
+                // Create editor container
+                const page = document.createElement('div');
+                page.className = 'page';
+                page.innerHTML = `<div style="width:100%;height:100%"></div>`;
+                contentArea.appendChild(page);
+                
+                const editorContainer = page.firstChild;
+                const editor = mods.tc(content);
+                editorContainer.appendChild(editor);
+                
+                // Save handler
+                editor.addEventListener('save', async (e) => {
+                    try {
+                        await mods.api.saveFile(path, editor.value);
+                        state.tabs[id].content = editor.value;
+                        if (state.currentPage === id) updateSaveStatus(false);
+                        showToast(`✅ Saved: ${name}`, 'success');
+                        updateStatus(`Saved: ${name}`);
+                    } catch (error) {
+                        showToast(`❌ Save failed: ${error.message}`, 'error');
+                        console.error('Save error:', error);
+                    }
+                });
+                
+                // Dirty tracking
+                let changeTimeout;
+                editor.addEventListener('input', () => {
+                    clearTimeout(changeTimeout);
+                    changeTimeout = setTimeout(() => {
+                        if (state.currentPage === id) {
+                            const isDirty = editor.value !== state.tabs[id].content;
+                            updateSaveStatus(isDirty);
+                        }
+                    }, 300);
+                });
+                
+                // Register tab WITH TYPE
+                addTab(id, `📝 ${name}`, page, editor, path, content);
+                state.tabs[id].type = 'editor';
+                state.tabs[id].content = content;
+                
+                switchPage(id);
+                showToast(`✏️ Opened in Editor: ${name}`, 'success');
+                
+            } catch (e) {
+                showToast(`❌ Open failed: ${e.message}`, 'error');
+                console.error('Open error:', e);
+            }
+        }
+        
+        // URL converter for viewer
+        function convertFilePathToUrl(filePath) {
+            let cleanPath = filePath.startsWith('/') ? filePath : `/${filePath}`;
+            cleanPath = cleanPath.replace(/^\/public(?=\/|$)/i, '');
+            cleanPath = cleanPath || '/';
+            return `${window.location.origin}${cleanPath}`;
+        }
+        
+        // Viewer tab creator (WITH UNICODE REFRESH BUTTON)
+        async function openFileInViewer(filePath) {
+            try {
+                const url = convertFilePathToUrl(filePath);
+                const fileName = filePath.split('/').pop() || 'preview';
+                
+                // Prevent duplicate VIEWER tabs for same file
+                const existingViewer = Object.values(state.tabs).find(t => 
+                    t.filePath === filePath && t.type === 'viewer'
+                );
+                if (existingViewer) {
+                    switchPage(existingViewer.id);
+                    return showToast(`✅ Already open in Viewer: ${fileName}`, 'info');
+                }
+                
+                const tabId = `viewer-${Date.now()}-${encodeURIComponent(filePath)}`;
+                
+                // Create viewer page WITH UNICODE REFRESH BUTTON
+                const page = document.createElement('div');
+                page.className = 'page';
+                page.innerHTML = `
+                    <div style="display:flex;flex-direction:column;height:100%;">
+                        <div class="app-toolbar" style="display:flex;height:28px;background:#252526;border-bottom:1px solid #3e3e42;padding:2px 6px;align-items:center;">
+                            <button class="go-btn" id="refreshBtn-${tabId}" title="Refresh preview" 
+                                    style="width:28px;height:24px;font-size:16px;padding:0;display:flex;align-items:center;justify-content:center;">🔄</button>
+                            <div style="color:#888;font-size:11px;margin-left:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                                ${url}
+                            </div>
+                        </div>
+                        <div class="iframe-container" style="flex-grow:1;position:relative;">
+                            <iframe id="viewerIframe-${tabId}" src="${url}" 
+                                allow="camera; microphone; geolocation; clipboard-read; clipboard-write; autoplay; fullscreen" 
+                                allowfullscreen style="width:100%;height:100%;border:none;"></iframe>
+                            <div class="iframe-fallback" id="viewerFallback-${tabId}" style="display:none;">
+                                <h3>⚠️ Preview Unavailable</h3>
+                                <p>Could not load preview for:</p>
+                                <p style="color:#007acc;margin:8px 0;font-size:13px;">${fileName}</p>
+                                <p id="viewerError-${tabId}" style="color:#c50f1f;margin:8px 0;font-size:12px;">Loading...</p>
+                                <button class="go-btn" id="viewerRetry-${tabId}" style="margin-top:12px;width:auto;padding:5px 15px;">Retry</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                contentArea.appendChild(page);
+                
+                // Setup iframe elements
+                const iframe = document.getElementById(`viewerIframe-${tabId}`);
+                const fallback = document.getElementById(`viewerFallback-${tabId}`);
+                const errorEl = document.getElementById(`viewerError-${tabId}`);
+                const retryBtn = document.getElementById(`viewerRetry-${tabId}`);
+                const refreshBtn = document.getElementById(`refreshBtn-${tabId}`);
+                
+                // Load handling
+                let loadTimeout;
+                const resetTimeout = () => {
+                    clearTimeout(loadTimeout);
+                    loadTimeout = setTimeout(() => {
+                        if (fallback.style.display === 'none') {
+                            showError('Preview timeout. Check file type and permissions.');
+                        }
+                    }, 8000);
+                };
+                
+                const showError = (msg) => {
+                    errorEl.textContent = msg;
+                    fallback.style.display = 'flex';
+                    iframe.style.display = 'none';
+                    updateStatus(`Preview error: ${msg}`);
+                };
+                
+                iframe.addEventListener('load', () => {
+                    clearTimeout(loadTimeout);
+                    fallback.style.display = 'none';
+                    iframe.style.display = 'block';
+                    updateStatus(`Preview loaded: ${fileName}`);
+                });
+                
+                iframe.addEventListener('error', () => showError('Iframe load error'));
+                iframe.onerror = () => showError('Blocked by security policy (CORS)');
+                
+                // Button handlers
+                retryBtn?.addEventListener('click', () => {
+                    iframe.src = url;
+                    fallback.style.display = 'none';
+                    iframe.style.display = 'block';
+                    resetTimeout();
+                });
+                
+                refreshBtn?.addEventListener('click', () => {
+                    iframe.src = iframe.src;
+                    resetTimeout();
+                    showToast('🔄 Refreshing...', 'info');
+                });
+                
+                // Initial load
+                resetTimeout();
+                
+                // Register tab WITH TYPE
+                addTab(tabId, `👁️ ${fileName}`, page, null, filePath, null);
+                state.tabs[tabId].type = 'viewer';
+                state.tabs[tabId].previewUrl = url;
+                
+                switchPage(tabId);
+                showToast(`👁️ Opened in Viewer: ${fileName}`, 'success');
+                
+            } catch (e) {
+                showToast(`Preview failed: ${e.message}`, 'error');
+                console.error('Viewer error:', e);
+            }
+        }
+        
+        function closeCurrent() {
+            const id = state.currentPage;
+            if (id === 'chat' || id === 'filepicker' || id === 'settings') return;
+            
+            const tab = state.tabs[id];
+            if (!tab) return;
+            
+            // Skip confirmation for viewer tabs
+            if (tab.type === 'viewer') {
+                switchPage('filepicker');
+                removeTab(id);
+                const cleanName = tab.name.replace('👁️ ', '');
+                showToast(`Closed preview: ${cleanName}`, 'info');
+                return;
+            }
+            
+            // Editor tab confirmation
+            if (tab.editor?.value !== tab.content) {
+                const cleanName = tab.name.replace('📝 ', '');
+                if (!confirm(`Unsaved changes in "${cleanName}". Close anyway?`)) return;
+            }
+            
+            switchPage('filepicker');
+            removeTab(id);
+            const cleanName = tab.name.replace('📝 ', '');
+            showToast(`Closed: ${cleanName}`, 'info');
+        }
+        
+        // File picker init
+        function initFilePicker() {
+            if (state.systemPages.filepicker.init) return;
+            
+            try {
+                fpContainer.innerHTML = '<div class="fp-placeholder"><div class="spinner"></div><div>Initializing...</div></div>';
+                const wrapper = mods.fp();
+                const picker = wrapper.querySelector('.file-picker-container-wrapper');
+                
+                if (!picker) throw new Error('Picker container not found');
+                
+                // Show modal on file selection
+                picker.addEventListener('filepick', (e) => {
+                    const filePath = e.detail.filePath;
+                    pendingFilePath = filePath;
+                    modalFileName.textContent = filePath.split('/').pop() || filePath;
+                    viewerUrlPreview.textContent = convertFilePathToUrl(filePath);
+                    modal.style.display = 'flex';
+                });
+                
+                fpContainer.innerHTML = '';
+                fpContainer.appendChild(picker);
+                state.systemPages.filepicker.init = true;
+                showToast('File picker ready', 'info');
+                
+            } catch (e) {
+                fpContainer.innerHTML = `<div class="fp-placeholder" style="color:#c50f1f">Error: ${e.message}</div>`;
+                showToast(`Picker error: ${e.message}`, 'error');
+                console.error('Picker init failed:', e);
+            }
+        }
+        
+        // Modal handling
+        let pendingFilePath = null;
+        
+        function hideOpenModal() {
+            modal.style.display = 'none';
+            pendingFilePath = null;
+            viewerUrlPreview.textContent = '';
+        }
+        
+        closeModalBtn?.addEventListener('click', hideOpenModal);
+        modal?.addEventListener('click', (e) => {
+            if (e.target === modal) hideOpenModal();
+        });
+        
+        openEditorBtn?.addEventListener('click', () => {
+            if (pendingFilePath) openFile(pendingFilePath);
+            hideOpenModal();
+        });
+        
+        openViewerBtn?.addEventListener('click', () => {
+            if (pendingFilePath) openFileInViewer(pendingFilePath);
+            hideOpenModal();
+        });
+        
+        // Events
+        pageSel.addEventListener('change', e => switchPage(e.target.value));
+        closeBtn.addEventListener('click', closeCurrent);
+        
+        // Keyboard shortcuts (UPDATED - removed app view shortcuts)
+        document.addEventListener('keydown', e => {
+            const isEditorTab = state.currentPage in state.tabs && 
+                (state.tabs[state.currentPage].type === 'editor' || state.tabs[state.currentPage].type === undefined);
+            const isSettings = state.currentPage === 'settings';
+            const isModalOpen = modal.style.display === 'flex';
+            
+            // Close modal with Escape
+            if (e.key === 'Escape' && isModalOpen) {
+                e.preventDefault();
+                hideOpenModal();
+                return;
+            }
+            
+            if ((e.ctrlKey || e.metaKey) && e.key === 'w') {
+                e.preventDefault();
+                !closeBtn.disabled && closeCurrent();
+            }
+            if ((e.ctrlKey || e.metaKey) && e.key === 'o') {
+                e.preventDefault();
+                switchPage('filepicker');
+            }
+            if (e.key === 'Escape') {
+                if (isEditorTab) {
+                    switchPage('filepicker');
+                } else if (isSettings) {
+                    document.activeElement?.blur();
+                }
+            }
+            
+            // Settings shortcut: Ctrl+, to open settings
+            if ((e.ctrlKey || e.metaKey) && e.key === ',') {
+                e.preventDefault();
+                switchPage('settings');
+            }
+        });
+        
+        // Initialize
+        setTimeout(() => {
+            showToast('Ready', 'info');
+            updateStatus('Ready');
+        }, 300);
+        
+        // Debug access (CLEANED UP)
+        window.dev = { 
+            state, 
+            openFile, 
+            openFileInViewer,
+            closeCurrent, 
+            switchPage,
+            convertFilePathToUrl
+        };
+    </script>
+</body>
+</html>

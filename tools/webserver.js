@@ -680,7 +680,7 @@ setInterval(() => {
 
 const FILES_ROOT = path.join(__dirname, 'files');
 const TRASH_DIR = path.join(FILES_ROOT, 'trash');
-const MAX_UPLOAD_SIZE = 10 * 1024 * 1024; // 10MB upload limit
+const MAX_UPLOAD_SIZE = 500 * 1024 * 1024; // 500MB upload limit
 
 // ===== CORRECTED handleLs with SECURITY FIX =====
 async function handleLs(res, lsPath) {

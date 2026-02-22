@@ -5,6 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Dev</title>
     
+    <!-- PDF.js Library -->
+    <script src="/js/pdf.min.js"></script>
+    <script>
+        // Set PDF.js worker
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    </script>
+    
     <script type="importmap">
     {
         "imports": {
@@ -200,14 +207,14 @@
             display:block;
         }
         
-        /* Iframe containers (PRESERVED for Viewer tabs) */
+        /* Object/Viewer containers */
         .iframe-container { 
             width:100%; 
             height:100%; 
             position:relative;
             background:#000;
         }
-        iframe { 
+        iframe, object { 
             width:100%; 
             height:100%; 
             border:none; 
@@ -242,6 +249,92 @@
             text-decoration:none;
             border-radius:3px;
             font-size:12px;
+        }
+        
+        /* PDF Viewer Toolbar */
+        .pdf-toolbar {
+            display:flex;
+            height:40px;
+            background:#252526;
+            border-bottom:1px solid #3e3e42;
+            padding:4px 8px;
+            align-items:center;
+            gap:8px;
+            flex-shrink: 0;
+        }
+        .pdf-toolbar button {
+            background:#2d2d30;
+            color:#fff;
+            border:1px solid #3e3e42;
+            border-radius:3px;
+            padding:4px 10px;
+            font-size:11px;
+            cursor:pointer;
+            display:flex;
+            align-items:center;
+            gap:4px;
+            min-width: 32px;
+            justify-content: center;
+        }
+        .pdf-toolbar button:hover {
+            background:#3e3e42;
+        }
+        .pdf-toolbar button:disabled {
+            opacity:0.5;
+            cursor:not-allowed;
+        }
+        .pdf-toolbar .page-info {
+            color:#888;
+            font-size:11px;
+            margin-left: 4px;
+            white-space: nowrap;
+        }
+        .pdf-toolbar input[type="number"] {
+            background:#2d2d30;
+            color:#fff;
+            border:1px solid #3e3e42;
+            border-radius:3px;
+            padding:4px 6px;
+            font-size:11px;
+            width:50px;
+            text-align:center;
+        }
+        .pdf-toolbar input[type="number"]:focus {
+            outline:none;
+            border-color:#007acc;
+        }
+        .pdf-toolbar .zoom-controls {
+            display:flex;
+            align-items:center;
+            gap:4px;
+        }
+        .pdf-toolbar select {
+            background:#2d2d30;
+            color:#fff;
+            border:1px solid #3e3e42;
+            border-radius:3px;
+            padding:4px 6px;
+            font-size:11px;
+            height:26px;
+            min-width: 80px;
+        }
+        
+        /* PDF Canvas Container - FIXED for proper scaling */
+        .pdf-canvas-container {
+            width:100%;
+            height: calc(100% - 40px);
+            overflow: auto;
+            background:#1e1e1e;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            padding: 20px;
+            position: relative;
+        }
+        .pdf-canvas-container canvas {
+            box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+            background: #fff;
+            display: block;
         }
         
         /* File picker */
@@ -591,7 +684,7 @@
             document.getElementById('statusBar').textContent = `❌ Error: ${e.message}`;
         }
         
-        // DOM elements (APP VIEW ELEMENTS REMOVED)
+        // DOM elements
         const pageSel = document.getElementById('pageSelector');
         const closeBtn = document.getElementById('closePageBtn');
         const saveStatus = document.getElementById('saveStatus');
@@ -608,11 +701,11 @@
         const modalFileName = document.getElementById('modalFileName');
         const viewerUrlPreview = document.getElementById('viewerUrlPreview');
         
-        // Load settings from localStorage (SIMPLIFIED - no app view settings)
+        // Load settings from localStorage
         const SETTINGS_KEY = 'devEnvSettings';
         let appSettings = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
         
-        // State (APP VIEW REMOVED)
+        // State
         const state = {
             currentPage: 'chat',
             systemPages: {
@@ -620,7 +713,7 @@
                 settings: { id:'settings', el:document.getElementById('settingsPage') },
                 filepicker: { id:'filepicker', el:document.getElementById('filePickerPage'), init:false }
             },
-            tabs: {} // { id, name, el, editor, filePath, content, type }
+            tabs: {}
         };
         
         // Utilities
@@ -642,14 +735,12 @@
         }
         
         function switchPage(id) {
-            // Hide current page
             if (state.currentPage in state.systemPages) {
                 state.systemPages[state.currentPage].el.classList.remove('active');
             } else if (state.tabs[state.currentPage]) {
                 state.tabs[state.currentPage].el.classList.remove('active');
             }
             
-            // Show new page
             if (id in state.systemPages) {
                 state.systemPages[id].el.classList.add('active');
             } else if (state.tabs[id]) {
@@ -660,7 +751,6 @@
             pageSel.value = id;
             closeBtn.disabled = (id === 'chat' || id === 'filepicker' || id === 'settings');
             
-            // Update save status for tabs
             if (id in state.tabs) {
                 const tab = state.tabs[id];
                 if (tab.type === 'viewer') {
@@ -677,7 +767,6 @@
                 saveStatus.textContent = '';
             }
             
-            // Handle special pages
             if (id === 'filepicker' && !state.systemPages.filepicker.init) {
                 initFilePicker();
             }
@@ -686,7 +775,6 @@
                 updateStatus('Settings');
             }
             
-            // Update status bar
             if (id === 'chat') {
                 updateStatus('AI Assistant ready');
                 setTimeout(() => {
@@ -735,7 +823,6 @@
                 const content = await mods.api.readFile(path);
                 const name = path.split('/').pop();
                 
-                // Prevent duplicate EDITOR tabs for same file
                 const existingEditor = Object.values(state.tabs).find(t => 
                     t.filePath === path && (t.type === 'editor' || t.type === undefined)
                 );
@@ -746,7 +833,6 @@
                 
                 const id = `editor-${Date.now()}-${encodeURIComponent(path)}`;
                 
-                // Create editor container
                 const page = document.createElement('div');
                 page.className = 'page';
                 page.innerHTML = `<div style="width:100%;height:100%"></div>`;
@@ -756,7 +842,6 @@
                 const editor = mods.tc(content);
                 editorContainer.appendChild(editor);
                 
-                // Save handler
                 editor.addEventListener('save', async (e) => {
                     try {
                         await mods.api.saveFile(path, editor.value);
@@ -770,7 +855,6 @@
                     }
                 });
                 
-                // Dirty tracking
                 let changeTimeout;
                 editor.addEventListener('input', () => {
                     clearTimeout(changeTimeout);
@@ -782,7 +866,6 @@
                     }, 300);
                 });
                 
-                // Register tab WITH TYPE
                 addTab(id, `📝 ${name}`, page, editor, path, content);
                 state.tabs[id].type = 'editor';
                 state.tabs[id].content = content;
@@ -796,7 +879,6 @@
             }
         }
         
-        // URL converter for viewer
         function convertFilePathToUrl(filePath) {
             let cleanPath = filePath.startsWith('/') ? filePath : `/${filePath}`;
             cleanPath = cleanPath.replace(/^\/public(?=\/|$)/i, '');
@@ -804,13 +886,281 @@
             return `${window.location.origin}${cleanPath}`;
         }
         
-        // Viewer tab creator (WITH UNICODE REFRESH BUTTON)
+        function isPDFFile(filePath) {
+            return filePath.toLowerCase().endsWith('.pdf');
+        }
+        
+        // Format scale for display
+        function formatScale(scale) {
+            return Math.round(scale * 100) + '%';
+        }
+        
+        // PDF Viewer with FIXED zoom functionality
+        async function createPDFViewer(tabId, url, fileName) {
+            const page = document.createElement('div');
+            page.className = 'page';
+            page.innerHTML = `
+                <div style="display:flex;flex-direction:column;height:100%;">
+                    <div class="pdf-toolbar">
+                        <button id="pdfPrev-${tabId}" title="Previous page">⏮️</button>
+                        <button id="pdfNext-${tabId}" title="Next page">⏭️</button>
+                        <input type="number" id="pdfPageInput-${tabId}" min="1" value="1" title="Page number">
+                        <span class="page-info" id="pdfPageInfo-${tabId}">of --</span>
+                        <div class="zoom-controls">
+                            <button id="pdfZoomOut-${tabId}" title="Zoom out">🔍-</button>
+                            <select id="pdfZoomSelect-${tabId}">
+                                <option value="0.5">50%</option>
+                                <option value="0.75">75%</option>
+                                <option value="1">100%</option>
+                                <option value="1.25">125%</option>
+                                <option value="1.5">150%</option>
+                                <option value="2">200%</option>
+                                <option value="fit">Fit Width</option>
+                            </select>
+                            <button id="pdfZoomIn-${tabId}" title="Zoom in">🔍+</button>
+                        </div>
+                        <button id="pdfRefresh-${tabId}" title="Refresh" style="margin-left:auto;">🔄</button>
+                    </div>
+                    <div class="pdf-canvas-container" id="pdfContainer-${tabId}">
+                        <canvas id="pdfCanvas-${tabId}"></canvas>
+                    </div>
+                </div>
+            `;
+            contentArea.appendChild(page);
+            
+            const canvas = document.getElementById(`pdfCanvas-${tabId}`);
+            const ctx = canvas.getContext('2d');
+            const container = document.getElementById(`pdfContainer-${tabId}`);
+            const zoomSelect = document.getElementById(`pdfZoomSelect-${tabId}`);
+            
+            // PDF viewer state
+            const pdfState = {
+                pdfDoc: null,
+                pageNum: 1,
+                pageRendering: false,
+                pageNumPending: null,
+                scale: 1.0,
+                canvas: canvas,
+                ctx: ctx,
+                container: container,
+                url: url,
+                zoomSelect: zoomSelect
+            };
+            
+            // Update zoom dropdown to match current scale
+            function updateZoomSelect() {
+                const scaleStr = pdfState.scale.toString();
+                const options = Array.from(zoomSelect.options);
+                const matchingOption = options.find(opt => opt.value === scaleStr);
+                
+                if (matchingOption) {
+                    zoomSelect.value = scaleStr;
+                } else {
+                    // For custom scales, show the percentage
+                    const customOption = document.createElement('option');
+                    customOption.value = scaleStr;
+                    customOption.textContent = formatScale(pdfState.scale);
+                    customOption.selected = true;
+                    zoomSelect.add(customOption);
+                }
+            }
+            
+            // Calculate proper scale for fit width
+            async function getFitWidthScale() {
+                const containerWidth = container.clientWidth - 40;
+                if (!pdfState.pdfDoc || containerWidth <= 0) return 1.0;
+                
+                const firstPage = await pdfState.pdfDoc.getPage(1);
+                const viewport = firstPage.getViewport({ scale: 1 });
+                const fitScale = containerWidth / viewport.width;
+                return Math.min(fitScale, 2.0);
+            }
+            
+            // Render page with proper scaling
+            async function renderPage(num) {
+                if (pdfState.pageRendering) {
+                    pdfState.pageNumPending = num;
+                    return;
+                }
+                
+                pdfState.pageRendering = true;
+                
+                try {
+                    const page = await pdfState.pdfDoc.getPage(num);
+                    const viewport = page.getViewport({ scale: pdfState.scale });
+                    
+                    canvas.width = viewport.width;
+                    canvas.height = viewport.height;
+                    
+                    const renderContext = {
+                        canvasContext: ctx,
+                        viewport: viewport
+                    };
+                    
+                    await page.render(renderContext).promise;
+                    
+                    pdfState.pageRendering = false;
+                    
+                    if (pdfState.pageNumPending !== null) {
+                        renderPage(pdfState.pageNumPending);
+                        pdfState.pageNumPending = null;
+                    }
+                    
+                    document.getElementById(`pdfPageInput-${tabId}`).value = num;
+                    document.getElementById(`pdfPageInfo-${tabId}`).textContent = `of ${pdfState.pdfDoc.numPages}`;
+                    
+                    document.getElementById(`pdfPrev-${tabId}`).disabled = num <= 1;
+                    document.getElementById(`pdfNext-${tabId}`).disabled = num >= pdfState.pdfDoc.numPages;
+                    
+                    updateStatus(`PDF: Page ${num} of ${pdfState.pdfDoc.numPages} - ${fileName} (${formatScale(pdfState.scale)})`);
+                    
+                } catch (error) {
+                    console.error('PDF render error:', error);
+                    showToast(`❌ PDF render error: ${error.message}`, 'error');
+                    pdfState.pageRendering = false;
+                }
+            }
+            
+            function queueRenderPage(num) {
+                if (pdfState.pageRendering) {
+                    pdfState.pageNumPending = num;
+                } else {
+                    renderPage(num);
+                }
+            }
+            
+            function onPrevPage() {
+                if (pdfState.pageNum <= 1) return;
+                pdfState.pageNum--;
+                queueRenderPage(pdfState.pageNum);
+            }
+            
+            function onNextPage() {
+                if (pdfState.pageNum >= pdfState.pdfDoc.numPages) return;
+                pdfState.pageNum++;
+                queueRenderPage(pdfState.pageNum);
+            }
+            
+            // FIXED: Zoom In function
+            function onZoomIn() {
+                const newScale = Math.min(pdfState.scale + 0.25, 3.0);
+                if (newScale !== pdfState.scale) {
+                    pdfState.scale = newScale;
+                    updateZoomSelect();
+                    queueRenderPage(pdfState.pageNum);
+                    showToast(`🔍 Zoom: ${formatScale(pdfState.scale)}`, 'info');
+                }
+            }
+            
+            // FIXED: Zoom Out function
+            function onZoomOut() {
+                const newScale = Math.max(pdfState.scale - 0.25, 0.5);
+                if (newScale !== pdfState.scale) {
+                    pdfState.scale = newScale;
+                    updateZoomSelect();
+                    queueRenderPage(pdfState.pageNum);
+                    showToast(`🔍 Zoom: ${formatScale(pdfState.scale)}`, 'info');
+                }
+            }
+            
+            // FIXED: Zoom Change from dropdown
+            async function onZoomChange(e) {
+                const value = e.target.value;
+                
+                if (value === 'fit') {
+                    const fitScale = await getFitWidthScale();
+                    pdfState.scale = fitScale;
+                } else {
+                    pdfState.scale = parseFloat(value);
+                }
+                
+                queueRenderPage(pdfState.pageNum);
+                showToast(`🔍 Zoom: ${formatScale(pdfState.scale)}`, 'info');
+            }
+            
+            function onPageInputChange(e) {
+                const num = parseInt(e.target.value);
+                if (!isNaN(num) && num >= 1 && num <= pdfState.pdfDoc.numPages) {
+                    pdfState.pageNum = num;
+                    queueRenderPage(pdfState.pageNum);
+                }
+            }
+            
+            function onRefresh() {
+                loadPDF(url);
+            }
+            
+            // Handle window resize for fit width
+            let resizeTimeout;
+            function onResize() {
+                clearTimeout(resizeTimeout);
+                resizeTimeout = setTimeout(() => {
+                    if (zoomSelect && zoomSelect.value === 'fit') {
+                        onZoomChange({ target: { value: 'fit' } });
+                    }
+                }, 250);
+            }
+            
+            window.addEventListener('resize', onResize);
+            
+            // Load PDF document
+            async function loadPDF(pdfUrl) {
+                try {
+                    showToast('📄 Loading PDF...', 'info');
+                    
+                    const timestampedUrl = `${pdfUrl}${pdfUrl.includes('?') ? '&' : '?'}t=${Date.now()}`;
+                    
+                    pdfState.pdfDoc = await pdfjsLib.getDocument(timestampedUrl).promise;
+                    pdfState.pageNum = 1;
+                    
+                    showToast(`✅ PDF loaded: ${pdfState.pdfDoc.numPages} pages`, 'success');
+                    updateStatus(`PDF: ${fileName} (${pdfState.pdfDoc.numPages} pages)`);
+                    
+                    // Start with fit width scale
+                    const fitScale = await getFitWidthScale();
+                    pdfState.scale = fitScale;
+                    zoomSelect.value = 'fit';
+                    
+                    renderPage(1);
+                    
+                } catch (error) {
+                    console.error('PDF load error:', error);
+                    showToast(`❌ PDF load failed: ${error.message}`, 'error');
+                    updateStatus(`PDF error: ${error.message}`);
+                }
+            }
+            
+            // Attach event listeners
+            document.getElementById(`pdfPrev-${tabId}`).addEventListener('click', onPrevPage);
+            document.getElementById(`pdfNext-${tabId}`).addEventListener('click', onNextPage);
+            document.getElementById(`pdfZoomIn-${tabId}`).addEventListener('click', onZoomIn);
+            document.getElementById(`pdfZoomOut-${tabId}`).addEventListener('click', onZoomOut);
+            document.getElementById(`pdfZoomSelect-${tabId}`).addEventListener('change', onZoomChange);
+            document.getElementById(`pdfPageInput-${tabId}`).addEventListener('change', onPageInputChange);
+            document.getElementById(`pdfRefresh-${tabId}`).addEventListener('click', onRefresh);
+            
+            // Keyboard navigation
+            page.addEventListener('keydown', (e) => {
+                if (e.key === 'ArrowLeft') onPrevPage();
+                if (e.key === 'ArrowRight') onNextPage();
+                if (e.key === '+' || e.key === '=') onZoomIn();
+                if (e.key === '-') onZoomOut();
+            });
+            
+            page.setAttribute('tabindex', '0');
+            
+            await loadPDF(url);
+            
+            return { page, pdfState };
+        }
+        
+        // Viewer tab creator
         async function openFileInViewer(filePath) {
             try {
                 const url = convertFilePathToUrl(filePath);
                 const fileName = filePath.split('/').pop() || 'preview';
+                const isPDF = isPDFFile(filePath);
                 
-                // Prevent duplicate VIEWER tabs for same file
                 const existingViewer = Object.values(state.tabs).find(t => 
                     t.filePath === filePath && t.type === 'viewer'
                 );
@@ -821,90 +1171,102 @@
                 
                 const tabId = `viewer-${Date.now()}-${encodeURIComponent(filePath)}`;
                 
-                // Create viewer page WITH UNICODE REFRESH BUTTON
-                const page = document.createElement('div');
-                page.className = 'page';
-                page.innerHTML = `
-                    <div style="display:flex;flex-direction:column;height:100%;">
-                        <div class="app-toolbar" style="display:flex;height:28px;background:#252526;border-bottom:1px solid #3e3e42;padding:2px 6px;align-items:center;">
-                            <button class="go-btn" id="refreshBtn-${tabId}" title="Refresh preview" 
-                                    style="width:28px;height:24px;font-size:16px;padding:0;display:flex;align-items:center;justify-content:center;">🔄</button>
-                            <div style="color:#888;font-size:11px;margin-left:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
-                                ${url}
+                let page;
+                let viewerElement;
+                
+                if (isPDF) {
+                    const pdfViewer = await createPDFViewer(tabId, url, fileName);
+                    page = pdfViewer.page;
+                    viewerElement = pdfViewer.pdfState;
+                } else {
+                    page = document.createElement('div');
+                    page.className = 'page';
+                    page.innerHTML = `
+                        <div style="display:flex;flex-direction:column;height:100%;">
+                            <div class="app-toolbar" style="display:flex;height:28px;background:#252526;border-bottom:1px solid #3e3e42;padding:2px 6px;align-items:center;">
+                                <button class="go-btn" id="refreshBtn-${tabId}" title="Refresh preview" 
+                                        style="width:28px;height:24px;font-size:16px;padding:0;display:flex;align-items:center;justify-content:center;">🔄</button>
+                                <div style="color:#888;font-size:11px;margin-left:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                                    ${url}
+                                </div>
+                            </div>
+                            <div class="iframe-container" style="flex-grow:1;position:relative;">
+                                <object 
+                                    id="viewerObject-${tabId}"
+                                    data="${url}" 
+                                    type="text/html"
+                                    style="width:100%;height:100%;border:none;display:block;"
+                                    allowfullscreen
+                                >
+                                    <div class="iframe-fallback" id="viewerFallback-${tabId}">
+                                        <h3>⚠️ Preview Unavailable</h3>
+                                        <p>Could not load preview for:</p>
+                                        <p style="color:#007acc;margin:8px 0;font-size:13px;">${fileName}</p>
+                                        <p id="viewerError-${tabId}" style="color:#c50f1f;margin:8px 0;font-size:12px;">Object embed not supported</p>
+                                        <button class="go-btn" id="viewerRetry-${tabId}" style="margin-top:12px;width:auto;padding:5px 15px;">Retry</button>
+                                        <a href="${url}" target="_blank" style="display:inline-block;margin-top:10px;padding:5px 12px;background:#007acc;color:#fff;text-decoration:none;border-radius:3px;font-size:12px;">Open in new tab ↗</a>
+                                    </div>
+                                </object>
                             </div>
                         </div>
-                        <div class="iframe-container" style="flex-grow:1;position:relative;">
-                            <iframe id="viewerIframe-${tabId}" src="${url}" 
-                                allow="camera; microphone; geolocation; clipboard-read; clipboard-write; autoplay; fullscreen" 
-                                allowfullscreen style="width:100%;height:100%;border:none;"></iframe>
-                            <div class="iframe-fallback" id="viewerFallback-${tabId}" style="display:none;">
-                                <h3>⚠️ Preview Unavailable</h3>
-                                <p>Could not load preview for:</p>
-                                <p style="color:#007acc;margin:8px 0;font-size:13px;">${fileName}</p>
-                                <p id="viewerError-${tabId}" style="color:#c50f1f;margin:8px 0;font-size:12px;">Loading...</p>
-                                <button class="go-btn" id="viewerRetry-${tabId}" style="margin-top:12px;width:auto;padding:5px 15px;">Retry</button>
-                            </div>
-                        </div>
-                    </div>
-                `;
-                contentArea.appendChild(page);
-                
-                // Setup iframe elements
-                const iframe = document.getElementById(`viewerIframe-${tabId}`);
-                const fallback = document.getElementById(`viewerFallback-${tabId}`);
-                const errorEl = document.getElementById(`viewerError-${tabId}`);
-                const retryBtn = document.getElementById(`viewerRetry-${tabId}`);
-                const refreshBtn = document.getElementById(`refreshBtn-${tabId}`);
-                
-                // Load handling
-                let loadTimeout;
-                const resetTimeout = () => {
-                    clearTimeout(loadTimeout);
-                    loadTimeout = setTimeout(() => {
-                        if (fallback.style.display === 'none') {
-                            showError('Preview timeout. Check file type and permissions.');
-                        }
-                    }, 8000);
-                };
-                
-                const showError = (msg) => {
-                    errorEl.textContent = msg;
-                    fallback.style.display = 'flex';
-                    iframe.style.display = 'none';
-                    updateStatus(`Preview error: ${msg}`);
-                };
-                
-                iframe.addEventListener('load', () => {
-                    clearTimeout(loadTimeout);
-                    fallback.style.display = 'none';
-                    iframe.style.display = 'block';
-                    updateStatus(`Preview loaded: ${fileName}`);
-                });
-                
-                iframe.addEventListener('error', () => showError('Iframe load error'));
-                iframe.onerror = () => showError('Blocked by security policy (CORS)');
-                
-                // Button handlers
-                retryBtn?.addEventListener('click', () => {
-                    iframe.src = url;
-                    fallback.style.display = 'none';
-                    iframe.style.display = 'block';
+                    `;
+                    contentArea.appendChild(page);
+                    
+                    viewerElement = {
+                        objectEl: document.getElementById(`viewerObject-${tabId}`),
+                        fallback: document.getElementById(`viewerFallback-${tabId}`),
+                        errorEl: document.getElementById(`viewerError-${tabId}`),
+                        retryBtn: document.getElementById(`viewerRetry-${tabId}`),
+                        refreshBtn: document.getElementById(`refreshBtn-${tabId}`)
+                    };
+                    
+                    let loadTimeout;
+                    const resetTimeout = () => {
+                        clearTimeout(loadTimeout);
+                        loadTimeout = setTimeout(() => {
+                            if (viewerElement.fallback && viewerElement.fallback.offsetParent !== null) {
+                                showError('Preview timeout. Check file type and permissions.');
+                            }
+                        }, 8000);
+                    };
+                    
+                    const showError = (msg) => {
+                        if (viewerElement.errorEl) viewerElement.errorEl.textContent = msg;
+                        updateStatus(`Preview error: ${msg}`);
+                    };
+                    
+                    if (viewerElement.objectEl) {
+                        viewerElement.objectEl.addEventListener('load', () => {
+                            clearTimeout(loadTimeout);
+                            if (viewerElement.fallback) viewerElement.fallback.style.display = 'none';
+                            updateStatus(`Preview loaded: ${fileName}`);
+                        });
+                    }
+                    
+                    if (viewerElement.retryBtn) {
+                        viewerElement.retryBtn.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            if (viewerElement.objectEl) viewerElement.objectEl.data = url;
+                            resetTimeout();
+                        });
+                    }
+                    
+                    if (viewerElement.refreshBtn) {
+                        viewerElement.refreshBtn.addEventListener('click', () => {
+                            if (viewerElement.objectEl) viewerElement.objectEl.data = viewerElement.objectEl.data;
+                            resetTimeout();
+                            showToast('🔄 Refreshing...', 'info');
+                        });
+                    }
+                    
                     resetTimeout();
-                });
+                }
                 
-                refreshBtn?.addEventListener('click', () => {
-                    iframe.src = iframe.src;
-                    resetTimeout();
-                    showToast('🔄 Refreshing...', 'info');
-                });
-                
-                // Initial load
-                resetTimeout();
-                
-                // Register tab WITH TYPE
                 addTab(tabId, `👁️ ${fileName}`, page, null, filePath, null);
                 state.tabs[tabId].type = 'viewer';
                 state.tabs[tabId].previewUrl = url;
+                state.tabs[tabId].isPDF = isPDF;
+                state.tabs[tabId].viewerElement = viewerElement;
                 
                 switchPage(tabId);
                 showToast(`👁️ Opened in Viewer: ${fileName}`, 'success');
@@ -922,7 +1284,6 @@
             const tab = state.tabs[id];
             if (!tab) return;
             
-            // Skip confirmation for viewer tabs
             if (tab.type === 'viewer') {
                 switchPage('filepicker');
                 removeTab(id);
@@ -931,7 +1292,6 @@
                 return;
             }
             
-            // Editor tab confirmation
             if (tab.editor?.value !== tab.content) {
                 const cleanName = tab.name.replace('📝 ', '');
                 if (!confirm(`Unsaved changes in "${cleanName}". Close anyway?`)) return;
@@ -943,7 +1303,6 @@
             showToast(`Closed: ${cleanName}`, 'info');
         }
         
-        // File picker init
         function initFilePicker() {
             if (state.systemPages.filepicker.init) return;
             
@@ -954,7 +1313,6 @@
                 
                 if (!picker) throw new Error('Picker container not found');
                 
-                // Show modal on file selection
                 picker.addEventListener('filepick', (e) => {
                     const filePath = e.detail.filePath;
                     pendingFilePath = filePath;
@@ -975,7 +1333,6 @@
             }
         }
         
-        // Modal handling
         let pendingFilePath = null;
         
         function hideOpenModal() {
@@ -999,18 +1356,15 @@
             hideOpenModal();
         });
         
-        // Events
         pageSel.addEventListener('change', e => switchPage(e.target.value));
         closeBtn.addEventListener('click', closeCurrent);
         
-        // Keyboard shortcuts (UPDATED - removed app view shortcuts)
         document.addEventListener('keydown', e => {
             const isEditorTab = state.currentPage in state.tabs && 
                 (state.tabs[state.currentPage].type === 'editor' || state.tabs[state.currentPage].type === undefined);
             const isSettings = state.currentPage === 'settings';
             const isModalOpen = modal.style.display === 'flex';
             
-            // Close modal with Escape
             if (e.key === 'Escape' && isModalOpen) {
                 e.preventDefault();
                 hideOpenModal();
@@ -1033,27 +1387,25 @@
                 }
             }
             
-            // Settings shortcut: Ctrl+, to open settings
             if ((e.ctrlKey || e.metaKey) && e.key === ',') {
                 e.preventDefault();
                 switchPage('settings');
             }
         });
         
-        // Initialize
         setTimeout(() => {
             showToast('Ready', 'info');
             updateStatus('Ready');
         }, 300);
         
-        // Debug access (CLEANED UP)
         window.dev = { 
             state, 
             openFile, 
             openFileInViewer,
             closeCurrent, 
             switchPage,
-            convertFilePathToUrl
+            convertFilePathToUrl,
+            isPDFFile
         };
     </script>
 </body>
