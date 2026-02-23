@@ -270,9 +270,10 @@ function setupFilePickerInstance(originalElement = null) {
                 fileListHtml += `
                     <tr class="up-directory-row" data-type="directory">
                         <td>⬆️</td>
+						<td><input type="checkbox" class="file-checkbox" data-path="${upPath}/.." disabled></td>
                         <td class="file-name up-directory" data-path="${upPath}">..</td>
                         <td></td>
-                        <td><input type="checkbox" class="file-checkbox" data-path="${upPath}/.." disabled></td>
+                        
                     </tr>
                 `;
             }
@@ -296,9 +297,10 @@ function setupFilePickerInstance(originalElement = null) {
                 fileListHtml += `
                     <tr ${dataType}>
                         <td class="file-icon">${icon}</td>
+						<td><input type="checkbox" class="file-checkbox" data-path="${fullPath}"></td>
                         <td class="file-name" data-path="${fullPath}">${file.name}</td>
                         <td class="file-size-cell">${size}</td>
-                        <td><input type="checkbox" class="file-checkbox" data-path="${fullPath}"></td>
+                        
                     </tr>
                 `;
             });

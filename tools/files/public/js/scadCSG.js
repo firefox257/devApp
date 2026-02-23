@@ -3337,6 +3337,24 @@ function isPath2d(item) {
 const applyToPath2d = (item, applyFunction, ...args) =>
     applyFilter(item, isPath2d, applyFunction, ...args)
 
+	
+	
+	
+// 🌟 Helper: Calculate signed area to determine winding order
+// Positive area = Counter-Clockwise (CCW), Negative = Clockwise (CW)
+const getSignedArea = (points) => {
+    let area = 0
+    for (let i = 0; i < points.length; i++) {
+        const p1 = points[i]
+        const p2 = points[(i + 1) % points.length]
+        area += p1.x * p2.y - p2.x * p1.y
+    }
+    return area / 2
+}
+
+const isClockwise = (points) => getSignedArea(points) < 0	
+	
+	
 /**
  * Executes a 3D extrusion along a 3D path, using Path2d instances
  * extracted from a target object to define the 2D cross-section profile.
@@ -3557,13 +3575,16 @@ function extrude3d(target, commandPath) {
                     const idx_d =
                         contourStartVertexCount + (i + 1) * numPoints + j
 
-                    //if (reverseWinding) {
-                        //indices.push(idx_a, idx_d, idx_c)
-                        //indices.push(idx_a, idx_c, idx_b)
-                    //} else {
+                    if (reverseWinding) 
+					{
+                        indices.push(idx_a, idx_d, idx_c)
+                        indices.push(idx_a, idx_c, idx_b)
+                    }
+					else 
+					{
                         indices.push(idx_a, idx_b, idx_c)
                         indices.push(idx_a, idx_c, idx_d)
-                    //}
+                    }
                 }
             }
         }
@@ -3573,10 +3594,12 @@ function extrude3d(target, commandPath) {
             addCap(true) // Add the top cap
             addCap(false) // Add the bottom cap
         }
-
-        extrudeContour(contourPoints, false) // Extrude main outline
+		
+		
+		
+        extrudeContour(contourPoints, isClockwise(contourPoints)) // Extrude main outline
         for (const hole of holePoints) {
-            extrudeContour(hole, true) // Extrude holes with reversed winding
+            extrudeContour(hole, !isClockwise(hole)) // Extrude holes with reversed winding
         }
 
         // Finalize Geometry
