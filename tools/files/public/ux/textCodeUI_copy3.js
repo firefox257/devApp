@@ -33,7 +33,9 @@ export function injectStyles() {
             line-height: 1;
             letter-spacing: normal;
             text-transform: none;
-            display: inline-block;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
             white-space: nowrap;
             word-wrap: normal;
             direction: ltr;
@@ -137,15 +139,16 @@ export function injectStyles() {
             height: 24px;
             box-sizing: border-box;
             width: 100%;
+            gap: 4px;
         }
 
         .code-editor-menu-bar button .material-icon {
-            font-size: 18px;
-            width: 18px;
-            height: 18px;
+            font-size: 1.2em;
             display: flex;
             align-items: center;
             justify-content: center;
+            width: 20px;
+            height: 20px;
         }
 
         .code-editor-menu-bar button:hover:not(:disabled) {
@@ -172,7 +175,7 @@ export function injectStyles() {
         .code-editor-line-numbers {
             flex-shrink: 0;
             text-align: right;
-            padding: 5mm 0 200vh 0;
+            padding: 10mm 0 200vh 0;
             background-color: #f0f0f0;
             color: #888;
             user-select: none;
@@ -217,41 +220,45 @@ export function injectStyles() {
             padding: 0 10px;
         }
 
-        /* ✨ Beautify Button - Just Icon, No Circle */
+        /* ✨ Circular Beautify Button with Border Circle */
         .code-editor-beautify-button-container {
             position: absolute;
-            top: 0;
-            right: 15px;
+            top: 48px;
+            right: 10px;
             z-index: 10;
-			
         }
 
         .code-editor-beautify-button-container button {
             background-color: transparent;
             color: #007bff;
-            border: none;
-            padding: 5px 8px;
+            border: 2px solid #007bff;
+            width: 40px;
+            height: 40px;
+            padding: 0;
             cursor: pointer;
-            font-size: 1.5em;
+            border-radius: 50%;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            font-size: 1em;
             display: flex;
             align-items: center;
             justify-content: center;
             transition: all 0.2s ease;
-            box-shadow: none;
         }
 
         .code-editor-beautify-button-container button .material-icon {
-            font-size: 24px;
-            width: 24px;
-            height: 24px;
+            font-size: 1.4em;
             display: flex;
             align-items: center;
             justify-content: center;
+            width: 24px;
+            height: 24px;
         }
 
         .code-editor-beautify-button-container button:hover {
-            color: #0056b3;
+            background-color: #007bff;
+            color: white;
             transform: scale(1.1);
+            box-shadow: 0 4px 10px rgba(0,123,255,0.4);
         }
 
         .code-editor-beautify-button-container button:active {
@@ -353,9 +360,9 @@ export function injectStyles() {
         }
 
         .code-editor-clipboard-menu button .material-icon {
-            font-size: 18px;
-            width: 18px;
-            height: 18px;
+            font-size: 1.1em;
+            width: 20px;
+            text-align: center;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -574,7 +581,6 @@ export async function getFromClipboard() {
  * Updated with Material Icons ligatures and semantic color classes.
  */
 export const editorHtml = `
-
     <table class="code-editor-menu-bar">
         <tbody>
             <tr class="code-editor-title-bar-row">
@@ -606,26 +612,21 @@ export const editorHtml = `
             </tr>
         </tbody>
     </table>
-	
-	<span style="position:relative; top:0; left:0; border:1px solid:#0f0;padding:0;margin:0;display:block;">
-    	<!-- ✨ Beautify Button - Just Icon, No Circle -->
-	    <div class="code-editor-beautify-button-container">
-	        <button class="beautify-btn" title="Beautify Code">
-	            <span class="material-icon icon-primary" aria-hidden="true">star</span>
-	        </button>
-	    </div>
-	</span>
-
     <div class="code-editor-wrapper">
         <div class="code-editor-line-numbers"></div>
         <div class="code-editor-content-scroller">
-            <span style="font-size:0; height:5mm; width:2000%; display:flex;padding:0; margin:0;border:0;"></span>
+            <span style="font-size:0; height:10mm; width:2000%; display:flex;padding:0; margin:0;border:0;"></span>
             <div class="code-editor-content" contenteditable="true" spellcheck="false" autocorrect="off" autocapitalize="off"></div>
             <span style="height:100vh; width:2000%; display:inline-block;"></span>
         </div>
     </div>
     
-	
+    <!-- ✨ Circular Beautify Button with Border Circle -->
+    <div class="code-editor-beautify-button-container">
+        <button class="beautify-btn" title="Beautify Code">
+            <span class="material-icon icon-primary" aria-hidden="true">sparkles</span>
+        </button>
+    </div>
     
     <div class="code-editor-goto-dialog">
         <span>Go to Line:</span>
@@ -644,5 +645,4 @@ export const editorHtml = `
         <button class="clipboard-copy-all" title="Copy All Text"><span class="material-icon icon-primary" aria-hidden="true">content_copy</span> Copy All</button>
         <button class="clipboard-replace-all" title="Replace All with Clipboard"><span class="material-icon icon-warning" aria-hidden="true">autorenew</span> Replace All</button>
     </div>
-
 `;

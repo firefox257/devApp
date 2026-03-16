@@ -78,6 +78,7 @@ function setupFilePickerInstance(originalElement = null) {
     const downloadButton = document.createElement('button');
     downloadButton.className = 'download-btn';
     downloadButton.title = 'Download/Upload'; 
+    downloadButton.textContent = '🔄'; // Placeholder icon
     
     // Inject the download button into the menu bar's table row (after delete)
     const menuRow = pickerContainer.querySelector('.file-picker-menu-bar tbody tr');
@@ -98,37 +99,6 @@ function setupFilePickerInstance(originalElement = null) {
     const fileListTable = pickerContainer.querySelector('.file-picker-list-table');
     const fileListTbody = pickerContainer.querySelector('.file-picker-list-table tbody');
     const selectAllCheckbox = pickerContainer.querySelector('.file-picker-select-all-checkbox');
-
-    // --- UPDATE BUTTON ICONS WITH MATERIAL ICONS (WITH COLOR CLASSES) ---
-    createButton.innerHTML = '<i class="material-icons material-icons-lg icon-create" aria-hidden="true">create_new_folder</i>';
-    createButton.title = "Create New File or Directory";
-
-    renameButton.innerHTML = '<i class="material-icons material-icons-lg icon-rename" aria-hidden="true">edit</i>';
-    renameButton.title = "Rename";
-
-    copyButton.innerHTML = '<i class="material-icons material-icons-lg icon-copy" aria-hidden="true">content_copy</i>';
-    copyButton.title = "Copy Selected";
-
-    cutButton.innerHTML = '<i class="material-icons material-icons-lg icon-cut" aria-hidden="true">content_cut</i>';
-    cutButton.title = "Cut Selected";
-
-    pasteButton.innerHTML = '<i class="material-icons material-icons-lg icon-paste" aria-hidden="true">content_paste</i>';
-    pasteButton.title = "Paste";
-
-    deleteButton.innerHTML = '<i class="material-icons material-icons-lg icon-delete" aria-hidden="true">delete_outline</i>';
-    deleteButton.title = "Delete Selected";
-
-    downloadButton.innerHTML = '<i class="material-icons material-icons-lg icon-download" aria-hidden="true">file_download</i>';
-    downloadButton.title = 'Download/Upload';
-
-    cancelButton.innerHTML = '<i class="material-icons material-icons-lg icon-cancel" aria-hidden="true">close</i>';
-    cancelButton.title = "Cancel";
-
-    usePathButton.innerHTML = '<i class="material-icons material-icons-lg icon-confirm" aria-hidden="true">check</i> <span class="btn-text">Use</span>';
-
-    refreshButton.innerHTML = '<i class="material-icons material-icons-sm icon-refresh" aria-hidden="true">refresh</i>';
-    refreshButton.title = "Refresh";
-    // --- END BUTTON ICON UPDATES ---
 
     /** Executes a string-based event handler from an HTML attribute. */
     const executeAttributeHandler = (handlerCode, scope, ...args) => {
@@ -206,20 +176,10 @@ function setupFilePickerInstance(originalElement = null) {
     });
 
     Object.defineProperty(pickerContainer, 'dom.buttonText', {
-        get() { 
-            const span = usePathButton.querySelector('.btn-text');
-            return span ? span.textContent : usePathButton.textContent; 
-        },
+        get() { return usePathButton.textContent; },
         set(newValue) {
             if (newValue && typeof newValue === 'string') {
-                let span = usePathButton.querySelector('.btn-text');
-                if (!span) {
-                    // Create span if it doesn't exist (fallback for initial render)
-                    span = document.createElement('span');
-                    span.className = 'btn-text';
-                    usePathButton.appendChild(span);
-                }
-                span.textContent = newValue; // Update button text
+                usePathButton.textContent = newValue; // Update button text
                 usePathButton.title = `Use Selected File Path (${newValue})`;
             }
         },
@@ -257,13 +217,13 @@ function setupFilePickerInstance(originalElement = null) {
         const isSingleFileSelection = isSingleSelection && 
             fileListTbody.querySelector(`.file-checkbox[data-path="${instanceSelectedFilePath}"]`)?.closest('tr')?.dataset.type === 'file';
         
-        // DUAL FUNCTIONALITY LOGIC - Update icon dynamically with color class
+        // DUAL FUNCTIONALITY LOGIC
         if (isSingleFileSelection) {
-            downloadButton.innerHTML = '<i class="material-icons material-icons-lg icon-download" aria-hidden="true">file_download</i>';
+            downloadButton.textContent = '📥'; // Download Icon
             downloadButton.title = 'Download Selected File';
             downloadButton.disabled = false;
         } else {
-            downloadButton.innerHTML = '<i class="material-icons material-icons-lg icon-upload" aria-hidden="true">file_upload</i>';
+            downloadButton.textContent = '⬆️'; // Upload Icon
             downloadButton.title = 'Upload File to Current Directory';
             downloadButton.disabled = false; // Always enabled for upload
         }
@@ -302,17 +262,18 @@ function setupFilePickerInstance(originalElement = null) {
             const files = await api.ls(instanceCurrentPath === '/' ? '*' : `${instanceCurrentPath.endsWith('/') ? instanceCurrentPath + '*' : instanceCurrentPath + '/*'}`);
             let fileListHtml = '';
             
-            // Add '..' row if not at root - with Material Icon (colored)
+            // Add '..' row if not at root
             if (instanceCurrentPath !== '/') {
                 const parentPath = instanceCurrentPath.split('/').filter(p => p).slice(0, -1).join('/') + '/';
                 const upPath = parentPath === '/' ? '/' : parentPath || '/';
 
                 fileListHtml += `
                     <tr class="up-directory-row" data-type="directory">
-                        <td><i class="material-icons material-icons-sm icon-up-dir" aria-hidden="true">arrow_upward</i></td>
-						<td><input type="checkbox" class="file-checkbox" data-path="${upPath}/.." disabled aria-label="Parent directory"></td>
+                        <td>⬆️</td>
+						<td><input type="checkbox" class="file-checkbox" data-path="${upPath}/.." disabled></td>
                         <td class="file-name up-directory" data-path="${upPath}">..</td>
                         <td></td>
+                        
                     </tr>
                 `;
             }
@@ -328,11 +289,7 @@ function setupFilePickerInstance(originalElement = null) {
             const normalizedCurrentPath = instanceCurrentPath.endsWith('/') ? instanceCurrentPath : instanceCurrentPath + '/';
 
             files.forEach(file => {
-                // Use Material Icons for file/folder icons with color classes
-                const icon = file.type === 'directory' 
-                    ? '<i class="material-icons material-icons-sm icon-folder" aria-hidden="true">folder</i>' 
-                    : '<i class="material-icons material-icons-sm icon-file" aria-hidden="true">insert_drive_file</i>';
-                
+                const icon = file.type === 'directory' ? '📂' : '📄';
                 const size = file.type === 'file' ? formatBytes(file.size) : '';
                 const fullPath = normalizedCurrentPath + file.name;
                 const dataType = file.type === 'directory' ? 'data-type="directory"' : 'data-type="file"';
@@ -340,9 +297,10 @@ function setupFilePickerInstance(originalElement = null) {
                 fileListHtml += `
                     <tr ${dataType}>
                         <td class="file-icon">${icon}</td>
-						<td><input type="checkbox" class="file-checkbox" data-path="${fullPath}" aria-label="Select ${file.name}"></td>
+						<td><input type="checkbox" class="file-checkbox" data-path="${fullPath}"></td>
                         <td class="file-name" data-path="${fullPath}">${file.name}</td>
                         <td class="file-size-cell">${size}</td>
+                        
                     </tr>
                 `;
             });

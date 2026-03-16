@@ -151,6 +151,11 @@ function createWebSocketFrame(message) {
     return buffer;
 }
 
+// ==========================================================
+// WebRTC Signaling Store
+const webrtcRooms = {}; // roomId -> { pendingMessage: *, waitingQueue: [{res, timeoutId}], lastAccessed: Date }
+const MAX_ROOMS = 1000; // Prevent memory exhaustion
+const WAIT_TIMEOUT = 30000; // 30 seconds wait timeout
 
 // ===== WEBSOCKET HANDLER CACHE (MIRRORS API CACHE PATTERN) =====
 // [WEBSOCKET] Cache structure identical to apiCache
@@ -1136,7 +1141,96 @@ function webHandler(req, res) {
         return;
     }
     
+    // =================================
+    // Signal endpoint: POST /webrtc/signal { roomId, message }
+    if (pathname === '/webrtc/signal' && req.method === 'POST') {
+        let body = '';
+        req.on('data', chunk => body += chunk.toString());
+        req.on('end', () => {
+            try {
+                const data = JSON.parse(body);
+                if (!data.roomId || !data.message || typeof data.roomId !== 'string' || !data.roomId.trim()) {
+                    return sendPlainTextResponse(res, 'Invalid roomId or message', 400);
+                }
+                const roomId = data.roomId.trim().substring(0, 100);
+                if (Object.keys(webrtcRooms).length > MAX_ROOMS) {
+                    const oldestRoom = Object.keys(webrtcRooms).sort((a, b) =>
+                        (webrtcRooms[a].lastAccessed || 0) - (webrtcRooms[b].lastAccessed || 0)
+                    )[0];
+                    if (oldestRoom) {
+                        const room = webrtcRooms[oldestRoom];
+                        if (room.waitingQueue) {
+                            room.waitingQueue.forEach(w => {
+                                if (w.timeoutId) clearTimeout(w.timeoutId);
+                            });
+                        }
+                        delete webrtcRooms[oldestRoom];
+                        console.log(`Cleaned oldest room due to capacity: ${oldestRoom}`);
+                    }
+                }
+                if (webrtcRooms[roomId]?.waitingQueue && webrtcRooms[roomId].waitingQueue.length > 0) {
+                    const waitingPeer = webrtcRooms[roomId].waitingQueue.shift();
+                    clearTimeout(waitingPeer.timeoutId);
+                    sendJsonResponse(waitingPeer.res, { message: data.message });
+                    if (webrtcRooms[roomId]) {
+                        webrtcRooms[roomId].pendingMessage = null;
+                        webrtcRooms[roomId].lastAccessed = Date.now();
+                        if (webrtcRooms[roomId].waitingQueue.length === 0) {
+                            delete webrtcRooms[roomId];
+                        }
+                    }
+                    sendPlainTextResponse(res, 'Message delivered', 200);
+                    return;
+                }
+                webrtcRooms[roomId] = {
+                    pendingMessage: data.message,
+                    waitingQueue: [],
+                    lastAccessed: Date.now()
+                };
+                sendPlainTextResponse(res, 'Message stored', 200);
+            } catch (e) {
+                console.error('Signal parse error:', e.message);
+                sendPlainTextResponse(res, 'Invalid JSON payload', 400);
+            }
+        });
+        req.on('error', () => sendPlainTextResponse(res, 'Request error', 500));
+        return;
+    }
     
+    // Wait endpoint: GET /webrtc/wait?roomId=xxx
+    if (pathname === '/webrtc/wait' && req.method === 'GET') {
+        const roomId = requestedUrl.searchParams.get('roomId')?.trim().substring(0, 100);
+        if (!roomId) {
+            return sendPlainTextResponse(res, 'Missing roomId parameter', 400);
+        }
+        if (webrtcRooms[roomId]?.pendingMessage !== undefined) {
+            sendJsonResponse(res, { message: webrtcRooms[roomId].pendingMessage });
+            webrtcRooms[roomId].lastAccessed = Date.now();
+            return;
+        }
+        if (!webrtcRooms[roomId]) {
+            webrtcRooms[roomId] = {
+                pendingMessage: null,
+                waitingQueue: [],
+                lastAccessed: Date.now()
+            };
+        }
+        const timeoutId = setTimeout(() => {
+            const room = webrtcRooms[roomId];
+            if (room) {
+                room.waitingQueue = room.waitingQueue.filter(w => w.res !== res);
+                if (!room.pendingMessage && room.waitingQueue.length === 0) {
+                    delete webrtcRooms[roomId];
+                }
+            }
+            if (!res.headersSent) {
+                sendPlainTextResponse(res, 'Signaling timeout', 408);
+            }
+        }, WAIT_TIMEOUT);
+        webrtcRooms[roomId].waitingQueue.push({ res, timeoutId });
+        webrtcRooms[roomId].lastAccessed = Date.now();
+        return;
+    }
     
     const xcmd = req.headers['x-cmd'];
     if (xcmd) {

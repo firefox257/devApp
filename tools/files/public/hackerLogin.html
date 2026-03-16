@@ -3,25 +3,27 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hacker Login</title>
+    <title>The Matrix Login</title>
     <style>
-        /* --- Embedded CSS --- */
-        /* Basic Reset */
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=VT323&display=swap');
+
+        :root {
+            --matrix-green: #00ff00;
+            --dark-background: #000000;
+            --glow-shadow: 0 0 5px var(--matrix-green), 0 0 10px var(--matrix-green), 0 0 20px var(--matrix-green);
         }
 
         body {
-            font-family: 'Courier New', Courier, monospace; /* Classic monospace font */
-            background-color: #000;
-            color: #0f0; /* Green text for a hacker feel */
-            overflow: hidden; /* Hide scrollbars caused by canvas */
+            margin: 0;
+            overflow: hidden;
+            background-color: var(--dark-background);
+            color: var(--matrix-green);
+            font-family: 'VT323', monospace; /* Monospaced font for terminal feel */
             display: flex;
             justify-content: center;
             align-items: center;
             min-height: 100vh;
+            position: relative;
         }
 
         .matrix-container {
@@ -33,210 +35,210 @@
             align-items: center;
         }
 
-        #matrixCanvas {
+        /* Matrix Rain Effect */
+        .matrix-rain {
             position: absolute;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            z-index: 1; /* Behind the login box */
+            background: var(--dark-background);
+            opacity: 0.8; /* Keep opacity for rain itself */
+            z-index: 0;
+            overflow: hidden;
         }
 
+        .matrix-rain span {
+            position: absolute;
+            display: block;
+            font-size: 16px;
+            color: #00ff00; /* Green */
+            animation: drop 3s infinite linear;
+            opacity: 0; /* Initially hidden, will be revealed by JS */
+            text-shadow: 0 0 5px var(--matrix-green); /* Add slight shadow to rain characters */
+        }
+
+        @keyframes drop {
+            0% {
+                transform: translateY(-20px);
+                opacity: 0.2;
+            }
+            50% {
+                opacity: 1;
+            }
+            100% {
+                transform: translateY(105vh);
+                opacity: 0.2;
+            }
+        }
+
+        /* Login Box */
         .login-box {
-            position: relative; /* To be above the canvas */
-            z-index: 2;
-            background-color: rgba(0, 0, 0, 0.7); /* Semi-transparent background */
+            position: relative;
+            z-index: 1;
+            /* --- Translucent Background --- */
+            background-color: rgba(0, 0, 0, 0.1); /* Lowered opacity for more background visibility */
             padding: 40px;
-            border-radius: 8px;
-            box-shadow: 0 0 20px rgba(0, 255, 0, 0.3); /* Green glow */
+            border-radius: 10px;
+            box-shadow: var(--glow-shadow);
             text-align: center;
-            max-width: 400px;
-            width: 90%;
+            border: 1px solid var(--matrix-green);
+            backdrop-filter: blur(2mm); /* Increased blur for a softer background */
+            -webkit-backdrop-filter: blur(8px); /* For Safari compatibility */
         }
 
-        .login-box h1 {
-            color: #0f0;
-            margin-bottom: 30px;
-            font-size: 2.5em;
-            text-shadow: 0 0 5px #0f0;
+        .login-header h1 {
+            font-family: 'Orbitron', sans-serif; /* More futuristic font for titles */
+            font-size: 3em;
+            margin: 0;
+            text-shadow: var(--glow-shadow);
+            letter-spacing: 5px;
+        }
+
+        .login-header p {
+            font-size: 1.2em;
+            margin-top: 5px;
+            text-transform: uppercase;
+            color: var(--matrix-green);
+            text-shadow: 0 0 3px var(--matrix-green);
         }
 
         .input-group {
-            margin-bottom: 20px;
+            margin-top: 30px;
             text-align: left;
         }
 
         .input-group label {
             display: block;
-            margin-bottom: 5px;
-            color: #0f0;
+            margin-bottom: 10px;
             font-size: 1.1em;
+            text-transform: uppercase;
+            color: var(--matrix-green);
+            text-shadow: 0 0 3px var(--matrix-green);
         }
 
         .input-group input {
-            width: 100%;
+            width: calc(100% - 20px); /* Account for padding */
             padding: 10px;
-            border: 1px solid #0f0;
-            background-color: #000;
-            color: #0f0;
-            font-family: 'Courier New', Courier, monospace;
-            font-size: 1em;
-            outline: none; /* Remove default outline */
-            box-shadow: inset 0 0 5px rgba(0, 255, 0, 0.5); /* Inner glow */
+            background-color: rgba(0, 0, 0, 0.5);
+            border: 1px solid var(--matrix-green);
+            color: var(--matrix-green);
+            font-family: 'VT323', monospace;
+            font-size: 1.2em;
+            outline: none;
+            box-shadow: inset var(--glow-shadow);
+            transition: box-shadow 0.3s ease;
         }
 
         .input-group input:focus {
-            border-color: #0ff; /* Cyan highlight on focus */
-            box-shadow: inset 0 0 8px rgba(0, 255, 255, 0.7);
+            box-shadow: inset 0 0 10px var(--matrix-green), 0 0 15px var(--matrix-green);
         }
 
-        button[type="submit"] {
-            background-color: #0f0;
-            color: #000;
-            border: none;
-            padding: 12px 25px;
-            font-size: 1.2em;
-            font-family: 'Courier New', Courier, monospace;
+        .matrix-button {
+            margin-top: 30px;
+            padding: 12px 30px;
+            background-color: transparent;
+            border: 2px solid var(--matrix-green);
+            color: var(--matrix-green);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.3em;
             cursor: pointer;
-            border-radius: 4px;
-            transition: background-color 0.3s ease, box-shadow 0.3s ease;
             text-transform: uppercase;
-            margin-top: 15px;
-            box-shadow: 0 0 8px rgba(0, 255, 0, 0.7);
+            letter-spacing: 2px;
+            box-shadow: var(--glow-shadow);
+            transition: all 0.3s ease;
+            outline: none;
         }
 
-        button[type="submit"]:hover {
-            background-color: #0ff; /* Cyan on hover */
-            box-shadow: 0 0 15px rgba(0, 255, 255, 0.9);
+        .matrix-button:hover {
+            background-color: var(--matrix-green);
+            color: var(--dark-background);
+            box-shadow: 0 0 15px var(--matrix-green), 0 0 25px var(--matrix-green), 0 0 35px var(--matrix-green);
         }
 
-        .error-message {
-            color: #f00; /* Red for errors */
-            margin-top: 15px;
+        .login-footer {
+            margin-top: 40px;
             font-size: 0.9em;
-            min-height: 1.2em; /* Reserve space for the message */
+            color: rgba(0, 255, 0, 0.7); /* Slightly muted green for footer */
+        }
+
+        .login-footer p {
+            margin: 0;
+            text-transform: uppercase;
         }
     </style>
 </head>
 <body>
-
     <div class="matrix-container">
-        <canvas id="matrixCanvas"></canvas>
+        <div class="matrix-rain">
+            <!-- This div will be filled by JavaScript -->
+        </div>
         <div class="login-box">
-            <h1>Hacker Login</h1>
+            <div class="login-header">
+                <h1>MATRIX</h1>
+                <p>ACCESS GRANTED</p>
+            </div>
             <form id="loginForm">
                 <div class="input-group">
-                    <label for="username">Username:</label>
+                    <label for="username">USER ID</label>
                     <input type="text" id="username" name="username" required>
                 </div>
                 <div class="input-group">
-                    <label for="password">Password:</label>
+                    <label for="password">PASSWORD</label>
                     <input type="password" id="password" name="password" required>
                 </div>
-                <button type="submit">Login</button>
+                <button type="submit" class="matrix-button">ENTER</button>
             </form>
-            <p class="error-message" id="errorMessage"></p>
+            <div class="login-footer">
+                <p>SYSTEM STATUS: ONLINE</p>
+            </div>
         </div>
     </div>
 
     <script>
-        // --- Embedded JavaScript ---
-        const canvas = document.getElementById('matrixCanvas');
-        const ctx = canvas.getContext('2d');
+        const matrixRainContainer = document.querySelector('.matrix-rain');
+        const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789アァカサタナハマヤャラワヰヱヲンヴヵヶ'; // Characters from The Matrix
+        const fontSize = 16; // Should match CSS font-size for .matrix-rain span
+        let columns, rows;
 
-        // Set canvas dimensions to full screen
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
+        function setupMatrixRain() {
+            // Clear previous spans before re-calculating
+            matrixRainContainer.innerHTML = '';
 
-        // Matrix characters (Japanese Katakana, numbers, and symbols are common)
-        const matrixChars = 'アァカサタナハマヤャラワガザダバパイィキシチニヒミリヰギジヂビピウゥクスツヌフムユュルヱグズヅブヅヴエェケセテネヘメヱゲゼデベペオォコソトノホモヨョロヲゴゾドボポヴ　ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+=-`~[]{}|;:,.<>?';
-        const charArray = matrixChars.split('');
+            columns = Math.floor(window.innerWidth / fontSize);
+            rows = Math.floor(window.innerHeight / fontSize);
 
-        const fontSize = 16; // Adjust for desired character size
-        const columns = canvas.width / fontSize;
-        const drops = []; // Array to hold the Y position of each 'drop' (column)
+            // Calculate the total number of spans needed
+            const totalSpans = columns * rows;
 
-        // Initialize drops array with random starting positions
-        for (let i = 0; i < columns; i++) {
-            drops[i] = 1; // Start each column at the top
+            for (let i = 0; i < totalSpans; i++) {
+                const span = document.createElement('span');
+                span.textContent = characters[Math.floor(Math.random() * characters.length)];
+                span.style.left = `${(i % columns) * fontSize}px`;
+                span.style.top = `${Math.floor(i / columns) * fontSize}px`;
+                matrixRainContainer.appendChild(span);
+            }
+
+            const rainSpans = matrixRainContainer.querySelectorAll('span');
+            rainSpans.forEach(span => {
+                // Randomize animation properties for a more dynamic effect
+                const delay = Math.random() * 15; // Longer potential delay for more spread
+                const duration = Math.random() * 7 + 3; // Longer duration for slower drops
+                const opacityStart = Math.random() * 0.3 + 0.2; // Varying start opacity
+                const translateYStart = Math.random() * -100; // Varying start position
+
+                span.style.animation = `drop ${duration}s infinite linear`;
+                span.style.animationDelay = `-${delay}s`; // Start animation at a random point
+                span.style.opacity = opacityStart;
+                span.style.transform = `translateY(${translateYStart}px)`;
+            });
         }
 
-        // Function to draw the matrix effect
-        function drawMatrix() {
-            // Make the background slightly transparent black to create a fading trail
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        // Initial setup when the page loads
+        setupMatrixRain();
 
-            // Set text color and font
-            ctx.fillStyle = '#0f0'; // Green color
-            ctx.font = `${fontSize}px 'Courier New', Courier, monospace`;
-
-            // Loop through each column
-            for (let i = 0; i < drops.length; i++) {
-                // Pick a random character from the charArray
-                const text = charArray[Math.floor(Math.random() * charArray.length)];
-
-                // Draw the character at the current column and drop position
-                ctx.fillText(text, i * fontSize, drops[i] * fontSize);
-
-                // If the drop is below the screen, reset it to the top
-                // and add a random chance to reset it further up to create gaps
-                if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) {
-                    drops[i] = 0; // Reset to top
-                }
-
-                // Move the drop down
-                drops[i]++;
-            }
-        }
-
-        // Animation loop
-        function animate() {
-            requestAnimationFrame(animate);
-            drawMatrix();
-        }
-
-        // Handle window resizing
-        window.addEventListener('resize', () => {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-            // Recalculate columns based on new width
-            const newColumns = canvas.width / fontSize;
-            // Adjust drops array if necessary (though often it's fine to let it expand)
-            while (drops.length < newColumns) {
-                drops.push(1);
-            }
-            while (drops.length > newColumns) {
-                drops.pop();
-            }
-        });
-
-        // --- Login Form Logic ---
-        const loginForm = document.getElementById('loginForm');
-        const errorMessage = document.getElementById('errorMessage');
-
-        loginForm.addEventListener('submit', (e) => {
-            e.preventDefault(); // Prevent default form submission
-
-            const username = document.getElementById('username').value;
-            const password = document.getElementById('password').value;
-
-            // Basic validation (replace with actual authentication logic)
-            if (username === 'admin' && password === 'matrix') {
-                errorMessage.textContent = '';
-                alert('Login successful! Welcome, hacker.');
-                // Redirect or do something else upon successful login
-            } else {
-                errorMessage.textContent = 'Access Denied. Invalid credentials.';
-                // Optionally clear the inputs
-                // document.getElementById('username').value = '';
-                // document.getElementById('password').value = '';
-            }
-        });
-
-        // Start the animation
-        animate();
+        // Adjust rain on window resize
+        window.addEventListener('resize', setupMatrixRain);
     </script>
-
 </body>
 </html>

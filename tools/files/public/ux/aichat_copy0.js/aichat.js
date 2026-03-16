@@ -1,5 +1,5 @@
 // ./ux/aichat.js
-const API_BASE_URL = "https://gen.pollinations.ai/v1";
+const API_BASE_URL = "https://gen.pollinations.ai/v1"; // ✅ FIXED: Removed trailing spaces
 const MODELS_URL = `${API_BASE_URL}/models`;
 const CHAT_COMPLETIONS_URL = `${API_BASE_URL}/chat/completions`;
 
@@ -11,17 +11,6 @@ const LOCAL_STORAGE_SYSTEM_PROMPT_KEY = 'aiChatSystemPrompt';
 const LOCAL_STORAGE_MESSAGES_KEY = 'aiChatMessages';
 const LOCAL_STORAGE_SELECTED_SYSTEM_PROMPT_TITLE_KEY = 'aiChatSelectedSystemPromptTitle';
 const LOCAL_STORAGE_SELECTED_CODE_FILTER_KEY = 'aiChatSelectedCodeFilter';
-
-// 🎨 Material Icons Semantic Colors (from documentation)
-const ICON_COLORS = {
-  primary: '#007bff',    // Blue: Copy, Paste, Create, Confirm
-  secondary: '#6c757d',  // Gray: Settings, Refresh, Edit, neutral
-  destructive: '#dc3545',// Red: Delete, Close, Cancel, Error
-  success: '#28a745',    // Green: Confirm, Check, User identity
-  warning: '#fd7e14',    // Orange: Cut, Save/Stored states
-  ai: '#6f42c1',         // Purple: AI assistant identity
-  white: '#ffffff'       // White: Send button on blue bg
-};
 
 class AIChat extends HTMLElement {
 	constructor() {
@@ -374,12 +363,16 @@ class AIChat extends HTMLElement {
 					}
 				});
 		}
+		// 🔑 CRITICAL FIX: ENTER KEY BEHAVIOR
 		if (textInputDiv) {
 			textInputDiv.addEventListener('keydown', (event) => {
+					// ONLY send on Ctrl+Enter (Windows/Linux) or Cmd+Enter (Mac)
 					if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
 						event.preventDefault();
 						this.sendMessage();
 					}
+					// NO preventDefault() for plain Enter → preserves natural newline insertion
+					// Tab key works normally for indentation
 				});
 		}
 		if (closeButton) {
@@ -420,35 +413,24 @@ class AIChat extends HTMLElement {
 
 			const copyButton = this.shadowRoot.getElementById('copyConversationButton');
 			if (copyButton) {
-				const icon = copyButton.querySelector('.material-icon');
-				if (icon) {
-					const original = icon.textContent;
-					icon.textContent = 'check';
-					icon.style.color = ICON_COLORS.success;
-					setTimeout(() => {
-						icon.textContent = original;
-						icon.style.color = ICON_COLORS.primary;
+				copyButton.textContent = '✅';
+				setTimeout(() => {
+						copyButton.textContent = '📋';
 					}, 1500);
-				}
 			}
 		} catch (err) {
 			const copyButton = this.shadowRoot.getElementById('copyConversationButton');
 			if (copyButton) {
-				const icon = copyButton.querySelector('.material-icon');
-				if (icon) {
-					const original = icon.textContent;
-					icon.textContent = 'error';
-					icon.style.color = ICON_COLORS.destructive;
-					setTimeout(() => {
-						icon.textContent = original;
-						icon.style.color = ICON_COLORS.primary;
+				copyButton.textContent = '❌';
+				setTimeout(() => {
+						copyButton.textContent = '📋';
 					}, 1500);
-				}
 			}
 		}
 	}
 
 	async pasteConversation() {
+		// ✅ FIRST: Try system clipboard (modern API)
 		try {
 			const clipboardText = await navigator.clipboard.readText();
 			if (clipboardText?.trim()) {
@@ -458,6 +440,7 @@ class AIChat extends HTMLElement {
 			console.warn('System clipboard read failed:', e.message);
 		}
 
+		// 🔄 SECOND: Try execCommand fallback (legacy)
 		try {
 			const textarea = document.createElement('textarea');
 			textarea.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0;';
@@ -473,22 +456,15 @@ class AIChat extends HTMLElement {
 			console.warn('execCommand paste failed:', e.message);
 		}
 
+		// 💾 THIRD: Try IndexedDB app clipboard
 		try {
 			const appClipboard = await this.readFromAppClipboard();
 			if (appClipboard?.trim()) {
 				await this.processPastedContent(appClipboard);
 				const pasteButton = this.shadowRoot.getElementById('pasteConversationButton');
 				if (pasteButton) {
-					const icon = pasteButton.querySelector('.material-icon');
-					if (icon) {
-						const original = icon.textContent;
-						icon.textContent = 'check';
-						icon.style.color = ICON_COLORS.success;
-						setTimeout(() => {
-							icon.textContent = original;
-							icon.style.color = ICON_COLORS.primary;
-						}, 1500);
-					}
+					pasteButton.textContent = '✅';
+					setTimeout(() => pasteButton.textContent = '📥', 1500);
 				}
 				return;
 			}
@@ -496,18 +472,11 @@ class AIChat extends HTMLElement {
 			console.warn('App clipboard read failed:', e.message);
 		}
 
+		// ❌ All methods failed
 		const pasteButton = this.shadowRoot.getElementById('pasteConversationButton');
 		if (pasteButton) {
-			const icon = pasteButton.querySelector('.material-icon');
-			if (icon) {
-				const original = icon.textContent;
-				icon.textContent = 'error';
-				icon.style.color = ICON_COLORS.destructive;
-				setTimeout(() => {
-					icon.textContent = original;
-					icon.style.color = ICON_COLORS.primary;
-				}, 1500);
-			}
+			pasteButton.textContent = '❌';
+			setTimeout(() => pasteButton.textContent = '📥', 1500);
 		}
 	}
 
@@ -544,7 +513,7 @@ class AIChat extends HTMLElement {
 
 		this.availableCodeTypes.clear();
 		this.messages.forEach(msg => {
-				const codeBlockRegex = /```(\w*)\s*([\s\S]*?)```/g;
+				const codeBlockRegex = /```(\w*)\s*([\s\S]*?)```/g; // ✅ FIXED regex
 				let match;
 				while ((match = codeBlockRegex.exec(msg.content)) !== null) {
 					const lang = match[1];
@@ -593,7 +562,7 @@ class AIChat extends HTMLElement {
 
 		this.availableCodeTypes.clear();
 		this.messages.forEach(msg => {
-				const codeBlockRegex = /```(\w*)\s*([\s\S]*?)```/g;
+				const codeBlockRegex = /```(\w*)\s*([\s\S]*?)```/g; // ✅ FIXED regex
 				let match;
 				while ((match = codeBlockRegex.exec(msg.content)) !== null) {
 					const lang = match[1];
@@ -607,16 +576,10 @@ class AIChat extends HTMLElement {
 
 		const pasteButton = this.shadowRoot.getElementById('pasteConversationButton');
 		if (pasteButton) {
-			const icon = pasteButton.querySelector('.material-icon');
-			if (icon) {
-				const original = icon.textContent;
-				icon.textContent = 'check';
-				icon.style.color = ICON_COLORS.success;
-				setTimeout(() => {
-					icon.textContent = original;
-					icon.style.color = ICON_COLORS.primary;
+			pasteButton.textContent = '✅';
+			setTimeout(() => {
+					pasteButton.textContent = '📥';
 				}, 1500);
-			}
 		}
 	}
 
@@ -660,16 +623,18 @@ class AIChat extends HTMLElement {
 
 		if (displayMessages.length === 0) {
 			const welcomeP = document.createElement('p');
-			// 🎨 AI welcome with Material Icon
-			welcomeP.innerHTML = `<span class="material-icon" style="color:${ICON_COLORS.ai};margin-right:4px;vertical-align:middle" aria-hidden="true">smart_toy</span><span style="color:#888;font-size:0.9em">AI: How can I help you today?</span>`;
+			welcomeP.textContent = '🤖: How can I help you today?';
+			welcomeP.style.color = '#888';
+			welcomeP.style.fontSize = '0.9em';
 			rawTextOutputDiv.appendChild(welcomeP);
 		}
 
 		displayMessages.forEach(msg => {
+				// ✅ FIXED: Wrap entire message with role prefix once
 				const messageContainer = document.createElement('div');
 				messageContainer.style.marginBottom = '12px';
 
-				const codeBlockRegex = /```(\w*)\s*([\s\S]*?)```/g;
+				const codeBlockRegex = /```(\w*)\s*([\s\S]*?)```/g; // ✅ FIXED regex
 				let match;
 				let lastIndex = 0;
 				let containsCode = false;
@@ -681,7 +646,7 @@ class AIChat extends HTMLElement {
 
 					if (precedingText) {
 						const p = document.createElement('p');
-						p.textContent = precedingText; // ✅ Safe: textContent escapes HTML
+						p.textContent = precedingText;
 						messageContainer.appendChild(p);
 					}
 
@@ -698,8 +663,7 @@ class AIChat extends HTMLElement {
 
 					const copyButton = document.createElement('button');
 					copyButton.classList.add('copy-button');
-					// 🎨 Material Icon for copy
-					copyButton.innerHTML = `<span class="material-icon" aria-hidden="true" style="font-size:1em;vertical-align:middle">content_copy</span>`;
+					copyButton.textContent = '📋';
 					copyButton.title = 'Copy';
 					copyButton.onclick = () => this.copyToClipboard(code, copyButton);
 					header.appendChild(copyButton);
@@ -708,7 +672,7 @@ class AIChat extends HTMLElement {
 
 					const pre = document.createElement('pre');
 					const codeElement = document.createElement('code');
-					codeElement.textContent = code; // ✅ Safe: textContent escapes HTML
+					codeElement.textContent = code;
 					pre.appendChild(codeElement);
 					codeBlockContainer.appendChild(pre);
 
@@ -724,23 +688,19 @@ class AIChat extends HTMLElement {
 				const remainingText = msg.content.substring(lastIndex).trim();
 				if (remainingText || (!containsCode && msg.content.trim())) {
 					const p = document.createElement('p');
-					p.textContent = remainingText || msg.content; // ✅ Safe
+					p.textContent = remainingText || msg.content;
 					messageContainer.appendChild(p);
 				}
 
-				// 🎨 Role prefix with Material Icons and semantic colors
-				const rolePrefix = msg.role === 'user' 
-					? `<span class="material-icon" style="color:${ICON_COLORS.success};margin-right:4px;vertical-align:middle" aria-hidden="true">person</span><strong>You</strong>:`
-					: `<span class="material-icon" style="color:${ICON_COLORS.ai};margin-right:4px;vertical-align:middle" aria-hidden="true">smart_toy</span><strong>AI</strong>:`;
-				
+				// ✅ FIXED: Add role prefix ONCE at the top of the message
+				const rolePrefix = msg.role === 'user' ? '👤 You' : '🤖 AI';
 				const firstChild = messageContainer.firstChild;
 				if (firstChild) {
 					if (firstChild.tagName === 'P') {
-						// ✅ Safe: prefix is controlled, content uses textContent above
-						firstChild.innerHTML = `${rolePrefix} ${firstChild.textContent}`;
+						firstChild.textContent = `${rolePrefix}: ${firstChild.textContent}`;
 					} else {
 						const prefixP = document.createElement('p');
-						prefixP.innerHTML = rolePrefix;
+						prefixP.textContent = `${rolePrefix}:`;
 						prefixP.style.fontWeight = 'bold';
 						prefixP.style.marginBottom = '4px';
 						messageContainer.insertBefore(prefixP, firstChild);
@@ -769,53 +729,46 @@ class AIChat extends HTMLElement {
 		rawTextOutputDiv.scrollTop = rawTextOutputDiv.scrollHeight;
 	}
 
+	// ✅ NEW: Robust clipboard handler with 3-tier fallback
 	async copyToClipboard(text, button) {
-		const showFeedback = (ligature, color) => {
+		const showFeedback = (icon) => {
 			if (!button) return;
-			const icon = button.querySelector('.material-icon');
-			if (icon) {
-				const originalLigature = icon.textContent;
-				const originalColor = icon.style.color;
-				icon.textContent = ligature;
-				icon.style.color = color;
-				setTimeout(() => {
-					icon.textContent = originalLigature;
-					icon.style.color = originalColor;
-				}, 1500);
-			}
+			const original = button.textContent;
+			button.textContent = icon;
+			setTimeout(() => button.textContent = original, 1500);
 		};
 
 		if (typeof text !== 'string') {
 			console.error('Copy failed: non-string content', text);
-			showFeedback('error', ICON_COLORS.destructive);
+			showFeedback('❌');
 			return;
 		}
 
-		// ✅ ATTEMPT 1: Modern clipboard API
+		// ✅ ATTEMPT 1: Modern clipboard API (secure contexts only)
 		try {
 			if (navigator.clipboard?.writeText && 
 					(location.protocol === 'https:' || location.hostname === 'localhost' || location.protocol === 'file:')) {
 				await navigator.clipboard.writeText(text);
-				showFeedback('check', ICON_COLORS.success);
+				showFeedback('✅');
 				return;
 			}
 		} catch (e) {
 			console.warn('Clipboard API blocked, trying fallbacks:', e.message);
 		}
 
-		// 🔄 ATTEMPT 2: execCommand fallback
+		// 🔄 ATTEMPT 2: execCommand via light DOM textarea (works in HTTP)
 		try {
 			const textarea = document.createElement('textarea');
 			textarea.value = text;
 			textarea.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0;';
-			document.body.appendChild(textarea);
+			document.body.appendChild(textarea); // MUST be in light DOM
 			
 			textarea.select();
-			textarea.setSelectionRange(0, textarea.value.length);
+			textarea.setSelectionRange(0, textarea.value.length); // Mobile support
 			
 			if (document.execCommand('copy')) {
 				document.body.removeChild(textarea);
-				showFeedback('check', ICON_COLORS.success);
+				showFeedback('✅');
 				return;
 			}
 			document.body.removeChild(textarea);
@@ -823,17 +776,18 @@ class AIChat extends HTMLElement {
 			console.warn('execCommand fallback failed:', e.message);
 		}
 
-		// 💾 ATTEMPT 3: IndexedDB fallback
+		// 💾 ATTEMPT 3: IndexedDB fallback (app-scoped storage ONLY)
 		try {
 			await this.storeInAppClipboard(text);
-			showFeedback('save', ICON_COLORS.warning);
+			showFeedback('💾'); // Visual cue: stored internally, not system clipboard
 			this.showAppClipboardNotice();
 		} catch (e) {
 			console.error('All copy methods failed:', e);
-			showFeedback('error', ICON_COLORS.destructive);
+			showFeedback('❌');
 		}
 	}
 
+	// ✅ NEW: Store in IndexedDB under __system_clipboard
 	async storeInAppClipboard(text) {
 		return new Promise((resolve, reject) => {
 			const request = indexedDB.open('aiChatDB', 1);
@@ -865,6 +819,7 @@ class AIChat extends HTMLElement {
 		});
 	}
 
+	// ✅ NEW: Read from IndexedDB
 	async readFromAppClipboard() {
 		return new Promise((resolve, reject) => {
 			const request = indexedDB.open('aiChatDB', 1);
@@ -896,9 +851,12 @@ class AIChat extends HTMLElement {
 		});
 	}
 
+	// ✅ NEW: Show subtle notice about app-scoped clipboard
 	showAppClipboardNotice() {
+		// Find existing notice
 		let notice = document.querySelector('#app-clipboard-notice');
 		if (notice) {
+			// Reset timeout if already showing
 			if (notice._timeout) clearTimeout(notice._timeout);
 		} else {
 			notice = document.createElement('div');
@@ -917,35 +875,30 @@ class AIChat extends HTMLElement {
 				box-shadow: 0 2px 6px rgba(0,0,0,0.1);
 				max-width: 300px;
 			`;
-			document.body.appendChild(notice);
+			document.body.appendChild(notice); // Append to light DOM for visibility
 		}
 		
-		// 🎨 Material Icon in notice
-		notice.innerHTML = `<span class="material-icon" style="color:${ICON_COLORS.warning};margin-right:4px;vertical-align:middle" aria-hidden="true">save</span>Copied to app clipboard. Use "Paste" button to retrieve.`;
+		notice.textContent = '📋 Copied to app clipboard (Ctrl+V unavailable). Use "📥 Paste" button to retrieve.';
 		
+		// Auto-dismiss after 5s
 		notice._timeout = setTimeout(() => {
 			if (notice.parentNode) notice.parentNode.removeChild(notice);
 		}, 5000);
 	}
 
-	// ✅ Helper: Escape HTML to prevent XSS when injecting error messages
-	escapeHtml(text) {
-		const div = document.createElement('div');
-		div.textContent = text;
-		return div.innerHTML;
-	}
-
 	async sendMessage() {
 		const textInput = this.shadowRoot.getElementById('textInput');
-		const userPrompt = textInput.innerText;
+		const userPrompt = textInput.innerText; // PRESERVES newlines, tabs, spaces
 		const temperature = parseFloat(this.shadowRoot.getElementById('temperatureInput').value);
 		const rawTextOutputDiv = this.shadowRoot.getElementById('rawTextOutput');
 
-		if (!userPrompt.trim()) return;
+		// Skip if only whitespace
+		if (!userPrompt.trim()) {
+			return;
+		}
 
 		if (!this.apiKey || this.apiKey.trim() === '') {
-			// 🎨 Error with Material Icon
-			rawTextOutputDiv.innerHTML = `<p style="color:${ICON_COLORS.destructive};font-size:0.9em"><span class="material-icon" aria-hidden="true" style="margin-right:4px;vertical-align:middle">error</span>API key required</p>`;
+			rawTextOutputDiv.innerHTML = '<p style="color:red;font-size:0.9em;">⚠️ API key required</p>';
 			return;
 		}
 
@@ -954,17 +907,17 @@ class AIChat extends HTMLElement {
 		}
 
 		if (isNaN(temperature) || temperature < 0 || temperature > 1) {
-			rawTextOutputDiv.innerHTML = `<p style="color:${ICON_COLORS.destructive};font-size:0.9em"><span class="material-icon" aria-hidden="true" style="margin-right:4px;vertical-align:middle">error</span>Invalid temperature</p>`;
+			rawTextOutputDiv.innerHTML = '<p style="color:red;font-size:0.9em;">⚠️ Invalid temperature</p>';
 			return;
 		}
 
+		// Store RAW user input with all formatting intact
 		this.messages.push({ role: 'user', content: userPrompt });
 		this.renderHistory();
-		textInput.innerHTML = '';
+		textInput.innerHTML = ''; // Clear input after sending
 
 		const aiResponseContainer = document.createElement('div');
-		// 🎨 AI response container with icon
-		aiResponseContainer.innerHTML = `<p><span class="material-icon" style="color:${ICON_COLORS.ai};margin-right:4px;vertical-align:middle" aria-hidden="true">smart_toy</span><span id="ai-response-content"></span></p>`;
+		aiResponseContainer.innerHTML = '<p>🤖: <span id="ai-response-content"></span></p>';
 		rawTextOutputDiv.appendChild(aiResponseContainer);
 		const responseSpan = aiResponseContainer.querySelector('#ai-response-content');
 		rawTextOutputDiv.scrollTop = rawTextOutputDiv.scrollHeight;
@@ -1015,8 +968,7 @@ class AIChat extends HTMLElement {
 						continue;
 					}
 
-					// ✅ CRITICAL FIX: Must be 'data:' to parse SSE chunks correctly
-					if (line.startsWith('')) {
+					if (line.startsWith('data: ')) {
 						const data = line.substring(5).trim();
 
 						if (data === '[DONE]') {
@@ -1028,19 +980,19 @@ class AIChat extends HTMLElement {
 							const content = parsed.choices?.[0]?.delta?.content;
 							if (content) {
 								fullResponse += content;
-								responseSpan.textContent = fullResponse; // ✅ Safe: textContent escapes HTML
+								responseSpan.textContent = fullResponse;
 								setTimeout(() => {
-									rawTextOutputDiv.scrollTop = rawTextOutputDiv.scrollHeight;
-								}, 0);
+										rawTextOutputDiv.scrollTop = rawTextOutputDiv.scrollHeight;
+									}, 0);
 							}
 						} catch (jsonError) {
-							// Silently ignore parse errors for incomplete chunks
 						}
 					} else {
 						buffer += line + '\n';
 					}
 				}
 			}
+			// ✅ FIXED: Removed debug alert("done")
 
 			this.messages.push({ role: 'assistant', content: fullResponse });
 			localStorage.setItem(LOCAL_STORAGE_MESSAGES_KEY, JSON.stringify(this.messages));
@@ -1048,9 +1000,8 @@ class AIChat extends HTMLElement {
 
 		} catch (error) {
 			if (responseSpan) {
-				// 🎨 Error display with icon (escaped for XSS safety)
-				responseSpan.innerHTML = `<span class="material-icon" style="color:${ICON_COLORS.destructive};margin-right:4px;vertical-align:middle" aria-hidden="true">error</span>${this.escapeHtml(error.message || 'Error')}`;
-				responseSpan.style.color = ICON_COLORS.destructive;
+				responseSpan.textContent = `⚠️ ${error.message || 'Error'}`;
+				responseSpan.style.color = 'red';
 			}
 
 			if (this.messages[this.messages.length - 1]?.role === 'user' && this.messages[this.messages.length - 1]?.content === userPrompt) {
@@ -1066,335 +1017,279 @@ class AIChat extends HTMLElement {
 	render() {
 		this.shadowRoot.innerHTML = `
 		<style>
-		/* 🎨 Material Icons Font */
-		@font-face {
-			font-family: 'Material Icons';
-			font-style: normal;
-			font-weight: 400;
-			src: url('/fonts/MaterialIcons-Regular.ttf') format('truetype');
-			font-display: block;
-		}
-		
-		.material-icon {
-			font-family: 'Material Icons';
-			font-weight: normal;
-			font-style: normal;
-			font-size: 1em;
-			line-height: 1;
-			letter-spacing: normal;
-			text-transform: none;
-			display: inline-flex;
-			align-items: center;
-			justify-content: center;
-			white-space: nowrap;
-			word-wrap: normal;
-			direction: ltr;
-			-webkit-font-smoothing: antialiased;
-			-moz-osx-font-smoothing: grayscale;
-			text-rendering: optimizeLegibility;
-			vertical-align: middle;
-		}
-		
 		:host {
-			display: flex;
-			flex-direction: column;
-			width: 100%;
-			height: 100%;
-			box-sizing: border-box;
-			font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-			background-color: #fff;
-			color: #333;
-			overflow: hidden;
+		display: flex;
+		flex-direction: column;
+		width: 100%;
+		height: 100%;
+		box-sizing: border-box;
+		font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+		background-color: #fff;
+		color: #333;
+		overflow: hidden;
 		}
 		#mainChatTool {
-			display: flex;
-			flex-direction: column;
-			width: 100%;
-			height: 100%;
-			box-sizing: border-box;
+		display: flex;
+		flex-direction: column;
+		width: 100%;
+		height: 100%;
+		box-sizing: border-box;
 		}
 		.section {
-			padding: 6px 8px;
-			border-bottom: 1px solid #eee;
-			box-sizing: border-box;
+		padding: 6px 8px;
+		border-bottom: 1px solid #eee;
+		box-sizing: border-box;
 		}
 		.section:last-of-type {
-			border-bottom: none;
+		border-bottom: none;
 		}
 		.title-bar {
-			display: flex;
-			align-items: center;
-			justify-content: space-between;
-			font-weight: bold;
-			white-space: nowrap;
-			overflow: hidden;
-			text-overflow: ellipsis;
-			flex-shrink: 0;
-			padding-bottom: 3px;
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		font-weight: bold;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		flex-shrink: 0;
+		padding-bottom: 3px;
 		}
 		.title-text {
-			overflow: hidden;
-			text-overflow: clip;
-			white-space: nowrap;
-			font-size: 0.95em;
+		overflow: hidden;
+		text-overflow: clip;
+		white-space: nowrap;
+		font-size: 0.95em;
 		}
 		.top-menu {
-			display: flex;
-			justify-content: space-between;
-			align-items: center;
-			flex-shrink: 0;
-			gap: 4px;
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		flex-shrink: 0;
+		gap: 4px;
 		}
 		.top-menu > div {
-			display: flex;
-			gap: 4px;
-			flex-grow: 1;
-			min-width: 0;
-			align-items: center;
+		display: flex;
+		gap: 4px;
+		flex-grow: 1;
+		min-width: 0;
+		align-items: center;
 		}
 		.top-menu button, .top-menu select {
-			padding: 4px 8px;
-			border: 1px solid #ddd;
-			border-radius: 4px;
-			background-color: #fff;
-			cursor: pointer;
-			font-family: inherit;
-			font-size: 0.85em;
-			color: #333;
-			box-sizing: border-box;
-			min-height: 28px;
-			display: flex;
-			align-items: center;
-			gap: 4px;
+		padding: 4px 8px;
+		border: 1px solid #ddd;
+		border-radius: 4px;
+		background-color: #fff;
+		cursor: pointer;
+		font-family: inherit;
+		font-size: 0.85em;
+		color: #333;
+		box-sizing: border-box;
+		min-height: 28px;
 		}
 		.top-menu button:hover, .top-menu select:hover {
-			background-color: #f5f5f5;
+		background-color: #f5f5f5;
 		}
 		#modelSelect, #systemPromptSelect, #codeFilterSelect {
-			flex-grow: 1;
-			min-width: 0;
-			overflow: hidden;
-			text-overflow: ellipsis;
-			white-space: nowrap;
+		flex-grow: 1;
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
 		}
 		#systemInputContainer {
-			display: none;
-			padding-top: 8px;
-			padding-bottom: 4px;
+		display: none;
+		padding-top: 8px;
+		padding-bottom: 4px;
 		}
 		.input-group {
-			margin-bottom: 6px;
+		margin-bottom: 6px;
 		}
 		.input-group label {
-			display: block;
-			margin-bottom: 3px;
-			font-weight: bold;
-			font-size: 0.8em;
-			color: #555;
+		display: block;
+		margin-bottom: 3px;
+		font-weight: bold;
+		font-size: 0.8em;
+		color: #555;
 		}
 		.input-group input[type="number"],
 		.input-group input[type="password"] {
-			width: calc(100% - 2px);
-			padding: 6px;
-			border: 1px solid #ddd;
-			border-radius: 4px;
-			font-size: 0.85em;
-			box-sizing: border-box;
-			font-family: inherit;
-			color: #333;
+		width: calc(100% - 2px);
+		padding: 6px;
+		border: 1px solid #ddd;
+		border-radius: 4px;
+		font-size: 0.85em;
+		box-sizing: border-box;
+		font-family: inherit;
+		color: #333;
 		}
 		.input-group select {
-			width: calc(100% - 2px);
-			padding: 6px;
-			border: 1px solid #ddd;
-			border-radius: 4px;
-			font-size: 0.85em;
-			box-sizing: border-box;
-			font-family: inherit;
-			color: #333;
+		width: calc(100% - 2px);
+		padding: 6px;
+		border: 1px solid #ddd;
+		border-radius: 4px;
+		font-size: 0.85em;
+		box-sizing: border-box;
+		font-family: inherit;
+		color: #333;
 		}
 		#textInput, #systemInput {
-			flex-grow: 1;
-			border: 1px solid #ddd;
-			background-color: #fff;
-			padding: 10px;
-			min-height: 110px;
-			max-height: 150px;
-			overflow-y: auto;
-			border-radius: 4px;
-			cursor: text;
-			font-family: inherit;
-			font-size: 0.95em;
-			line-height: 1.4;
-			box-sizing: border-box;
-			color: #333;
-			margin: 0;
-			white-space: pre-wrap;
-			word-break: break-word;
+		flex-grow: 1;
+		border: 1px solid #ddd;
+		background-color: #fff;
+		padding: 10px;
+		min-height: 110px;
+		max-height: 150px;
+		overflow-y: auto;
+		border-radius: 4px;
+		cursor: text;
+		font-family: inherit;
+		font-size: 0.95em;
+		line-height: 1.4;
+		box-sizing: border-box;
+		color: #333;
+		margin: 0;
+		/* 🔑 CRITICAL FIX: PRESERVE FORMATTING WHILE TYPING */
+		white-space: pre-wrap; /* Preserves newlines/tabs in input */
+		word-break: break-word;
 		}
 		#textInput[contenteditable="true"]:focus,
 		#systemInput[contenteditable="true"]:focus {
-			outline: none;
-			border-color: #007bff;
-			box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.2);
+		outline: none;
+		border-color: #007bff;
+		box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.2);
 		}
 		#textInput:empty:before, #systemInput:empty:before {
-			content: attr(placeholder);
-			color: #aaa;
-			pointer-events: none;
-			display: block;
+		content: attr(placeholder);
+		color: #aaa;
+		pointer-events: none;
+		display: block;
 		}
 		.chat-area {
-			flex-grow: 1;
-			overflow-x: hidden;
-			overflow-y: auto;
-			font-size: 0.9em;
-			line-height: 1.4;
-			background-color: #f9f9f9;
-			min-height: 50px;
-			box-sizing: border-box;
-			padding: 8px;
-			margin: 0;
+		flex-grow: 1;
+		overflow-x: hidden;
+		overflow-y: auto;
+		font-size: 0.9em;
+		line-height: 1.4;
+		background-color: #f9f9f9;
+		min-height: 50px;
+		box-sizing: border-box;
+		padding: 8px;
+		margin: 0;
 		}
 		.chat-area p {
-			margin: 0 0 6px 0;
-			white-space: pre-wrap;
-			word-break: break-word;
-			font-size: 0.9em;
+		margin: 0 0 6px 0;
+		/* 🔑 CRITICAL FIX: PRESERVE FORMATTING IN HISTORY */
+		white-space: pre-wrap; /* CRITICAL: Shows tabs/newlines correctly */
+		word-break: break-word;
+		font-size: 0.9em;
 		}
 		.chat-area p:last-child {
-			margin-bottom: 0;
+		margin-bottom: 0;
 		}
 		.code-block-container {
-			background-color: #f4f4f4;
-			border: 1px solid #e1e1e1;
-			border-radius: 4px;
-			margin: 8px 0;
-			overflow: hidden;
-			font-size: 0.85em;
+		background-color: #f4f4f4;
+		border: 1px solid #e1e1e1;
+		border-radius: 4px;
+		margin: 8px 0;
+		overflow: hidden;
+		font-size: 0.85em;
 		}
 		.code-block-header {
-			display: flex;
-			justify-content: space-between;
-			align-items: center;
-			background-color: #e9e9e9;
-			padding: 4px 8px;
-			border-bottom: 1px solid #e1e1e1;
-			font-size: 0.75em;
-			color: #555;
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		background-color: #e9e9e9;
+		padding: 4px 8px;
+		border-bottom: 1px solid #e1e1e1;
+		font-size: 0.75em;
+		color: #555;
 		}
 		.code-lang {
-			font-weight: bold;
-			text-transform: uppercase;
+		font-weight: bold;
+		text-transform: uppercase;
 		}
 		.code-block-container pre {
-			margin: 0;
-			padding: 8px;
-			overflow-x: auto;
-			font-size: 0.85em;
-			line-height: 1.3;
-			white-space: pre-wrap;
-			word-break: break-all;
-			font-family: 'Courier New', monospace;
+		margin: 0;
+		padding: 8px;
+		overflow-x: auto;
+		font-size: 0.85em;
+		line-height: 1.3;
+		white-space: pre-wrap;
+		word-break: break-all;
+		font-family: 'Courier New', monospace;
 		}
 		.code-block-container code {
-			display: block;
+		display: block;
 		}
 		.copy-button {
-			background-color: ${ICON_COLORS.primary};
-			color: white;
-			border: none;
-			border-radius: 3px;
-			padding: 2px 6px;
-			font-size: 0.75em;
-			cursor: pointer;
-			min-width: 24px;
-			display: flex;
-			align-items: center;
-			justify-content: center;
+		background-color: #007bff;
+		color: white;
+		border: none;
+		border-radius: 3px;
+		padding: 2px 6px;
+		font-size: 0.75em;
+		cursor: pointer;
+		min-width: 24px;
 		}
 		.copy-button:hover {
-			background-color: #0056b3;
+		background-color: #0056b3;
 		}
 		.input-area-wrapper {
-			display: flex;
-			align-items: flex-end;
-			gap: 6px;
-			flex-shrink: 0;
-			padding: 6px 8px;
-			background-color: #fff;
-			border-top: 1px solid #eee;
-			box-sizing: border-box;
+		display: flex;
+		align-items: flex-end;
+		gap: 6px;
+		flex-shrink: 0;
+		padding: 6px 8px;
+		background-color: #fff;
+		border-top: 1px solid #eee;
+		box-sizing: border-box;
 		}
 		#sendButton {
-			padding: 0;
-			background-color: ${ICON_COLORS.primary};
-			color: white;
-			border: none;
-			border-radius: 4px;
-			cursor: pointer;
-			font-size: 1.3em;
-			flex-shrink: 0;
-			line-height: 1;
-			min-width: 44px;
-			height: 44px;
-			display: flex;
-			align-items: center;
-			justify-content: center;
+		padding: 8px 12px;
+		background-color: #007bff;
+		color: white;
+		border: none;
+		border-radius: 4px;
+		cursor: pointer;
+		font-size: 1.3em;
+		flex-shrink: 0;
+		line-height: 1;
+		min-width: 44px;
+		height: 44px;
 		}
 		#sendButton:hover {
-			background-color: #0056b3;
+		background-color: #0056b3;
 		}
 		.close-button {
-			background: none;
-			border: none;
-			font-size: 1.2em;
-			cursor: pointer;
-			color: ${ICON_COLORS.destructive};
-			padding: 0;
-			min-width: 28px;
-			height: 28px;
-			display: flex;
-			align-items: center;
-			justify-content: center;
+		background: none;
+		border: none;
+		font-size: 1.2em;
+		cursor: pointer;
+		color: #888;
+		padding: 0;
+		min-width: 28px;
+		height: 28px;
 		}
 		.close-button:hover {
-			color: #a71d2a;
-		}
-		/* Icon button base styles */
-		.icon-btn {
-			display: flex;
-			align-items: center;
-			justify-content: center;
-			gap: 4px;
+		color: #333;
 		}
 		</style>
 		<div id="mainChatTool">
 		<div class="title-bar section" style="display: none;">
 		<span class="title-text"></span>
-		<button id="closeButton" class="close-button" style="display: none;" aria-label="Close chat">
-			<span class="material-icon" aria-hidden="true">close</span>
-		</button>
+		<button id="closeButton" class="close-button" style="display: none;">✕</button>
 		</div>
 
 		<div class="top-menu section">
 		<div>
-		<button id="systemPromptButton" class="icon-btn" title="Settings" aria-label="Settings">
-			<span class="material-icon" style="color:${ICON_COLORS.secondary}" aria-hidden="true">settings</span>
-		</button>
+		<button id="systemPromptButton" title="Settings">⚙️</button>
 		<select id="modelSelect"></select>
 		</div>
 		<div>
 		<select id="codeFilterSelect" title="Filter"></select>
-		<button id="copyConversationButton" class="icon-btn" title="Copy conversation" aria-label="Copy">
-			<span class="material-icon" style="color:${ICON_COLORS.primary}" aria-hidden="true">content_copy</span>
-		</button>
-		<button id="pasteConversationButton" class="icon-btn" title="Paste conversation" aria-label="Paste">
-			<span class="material-icon" style="color:${ICON_COLORS.primary}" aria-hidden="true">content_paste</span>
-		</button>
-		<button id="clearChatButton" class="icon-btn" title="Clear chat" aria-label="Clear">
-			<span class="material-icon" style="color:${ICON_COLORS.destructive}" aria-hidden="true">delete_outline</span>
-		</button>
+		<button id="copyConversationButton" title="Copy">📋</button>
+		<button id="pasteConversationButton" title="Paste">📥</button>
+		<button id="clearChatButton" title="Clear">🗑️</button>
 		</div>
 		</div>
 
@@ -1417,14 +1312,13 @@ class AIChat extends HTMLElement {
 		</div>
 
 		<div id="rawTextOutput" class="chat-area" spellcheck="false">
-		<p style="color:#888;font-size:0.9em"><span class="material-icon" style="color:${ICON_COLORS.ai};margin-right:4px;vertical-align:middle" aria-hidden="true">smart_toy</span>AI: How can I help you today?</p>
+		<p style="color:#888;font-size:0.9em;">🤖: How can I help you today?</p>
 		</div>
 
 		<div class="input-area-wrapper">
+		<!-- 🔑 CRITICAL FIX: UPDATED PLACEHOLDER TEXT -->
 		<div id="textInput" contenteditable="true" placeholder="Type your message (Ctrl+Enter or Cmd+Enter to send)..."></div>
-		<button id="sendButton" aria-label="Send message">
-			<span class="material-icon" style="color:${ICON_COLORS.white}" aria-hidden="true">send</span>
-		</button>
+		<button id="sendButton">➤</button>
 		</div>
 		</div>
 		`;

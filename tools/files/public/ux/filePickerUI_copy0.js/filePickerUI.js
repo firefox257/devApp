@@ -19,162 +19,6 @@ export function injectStyles() {
     style.id = 'file-picker-styles';
     
 	style.textContent = `
-    /* ===== MATERIAL ICONS FONT & BASE STYLES ===== */
-    @import url('https://fonts.googleapis.com/icon?family=Material+Icons|Material+Icons+Round');
-
-    .material-icons {
-        font-family: 'Material Icons', 'Material Icons Round', sans-serif;
-        font-weight: normal;
-        font-style: normal;
-        font-size: 1.1em;
-        line-height: 1;
-        letter-spacing: normal;
-        text-transform: none;
-        display: inline-block;
-        white-space: nowrap;
-        word-wrap: normal;
-        direction: ltr;
-        vertical-align: middle;
-        -webkit-font-feature-settings: 'liga';
-        -webkit-font-smoothing: antialiased;
-        user-select: none;
-        cursor: inherit;
-    }
-
-    .material-icons-sm {
-        font-size: 1em;
-        vertical-align: text-bottom;
-    }
-
-    .material-icons-lg {
-        font-size: 1.3em;
-    }
-
-    /* ===== MATERIAL ICONS COLOR CODING ===== */
-    
-    /* File Type Icons */
-    .material-icons.icon-folder {
-        color: #FFB300; /* Amber - folders */
-    }
-    
-    .material-icons.icon-file {
-        color: #1976D2; /* Blue - files */
-    }
-    
-    .material-icons.icon-up-dir {
-        color: #0288D1; /* Light Blue - parent directory */
-    }
-    
-    /* Toolbar Action Icons */
-    .material-icons.icon-create {
-        color: #388E3C; /* Green - create new */
-    }
-    
-    .material-icons.icon-rename {
-        color: #1976D2; /* Blue - edit/rename */
-    }
-    
-    .material-icons.icon-copy {
-        color: #0288D1; /* Light Blue - copy */
-    }
-    
-    .material-icons.icon-cut {
-        color: #F57C00; /* Orange - cut */
-    }
-    
-    .material-icons.icon-paste {
-        color: #388E3C; /* Green - paste */
-    }
-    
-    .material-icons.icon-delete {
-        color: #D32F2F; /* Red - delete */
-    }
-    
-    .material-icons.icon-download {
-        color: #388E3C; /* Green - download */
-    }
-    
-    .material-icons.icon-upload {
-        color: #1976D2; /* Blue - upload */
-    }
-    
-    .material-icons.icon-cancel {
-        color: #757575; /* Gray - cancel/close */
-    }
-    
-    .material-icons.icon-confirm {
-        color: #388E3C; /* Green - confirm/check */
-    }
-    
-    .material-icons.icon-refresh {
-        color: #1976D2; /* Blue - refresh */
-    }
-    
-    /* Hover States - Brighten colors on hover */
-    .file-picker-menu-bar button:hover:not(:disabled) .material-icons.icon-folder,
-    .file-picker-list-table .file-icon .material-icons.icon-folder:hover {
-        color: #FFC107;
-    }
-    
-    .file-picker-menu-bar button:hover:not(:disabled) .material-icons.icon-file,
-    .file-picker-list-table .file-icon .material-icons.icon-file:hover {
-        color: #2196F3;
-    }
-    
-    .file-picker-menu-bar button:hover:not(:disabled) .material-icons.icon-up-dir {
-        color: #03A9F4;
-    }
-    
-    .file-picker-menu-bar button:hover:not(:disabled) .material-icons.icon-create {
-        color: #4CAF50;
-    }
-    
-    .file-picker-menu-bar button:hover:not(:disabled) .material-icons.icon-rename {
-        color: #2196F3;
-    }
-    
-    .file-picker-menu-bar button:hover:not(:disabled) .material-icons.icon-copy {
-        color: #03A9F4;
-    }
-    
-    .file-picker-menu-bar button:hover:not(:disabled) .material-icons.icon-cut {
-        color: #FF9800;
-    }
-    
-    .file-picker-menu-bar button:hover:not(:disabled) .material-icons.icon-paste {
-        color: #4CAF50;
-    }
-    
-    .file-picker-menu-bar button:hover:not(:disabled) .material-icons.icon-delete {
-        color: #F44336;
-    }
-    
-    .file-picker-menu-bar button:hover:not(:disabled) .material-icons.icon-download {
-        color: #4CAF50;
-    }
-    
-    .file-picker-menu-bar button:hover:not(:disabled) .material-icons.icon-upload {
-        color: #2196F3;
-    }
-    
-    .file-picker-menu-bar button:hover:not(:disabled) .material-icons.icon-cancel {
-        color: #9E9E9E;
-    }
-    
-    .file-picker-menu-bar button:hover:not(:disabled) .material-icons.icon-confirm {
-        color: #4CAF50;
-    }
-    
-    .file-picker-menu-bar button:hover:not(:disabled) .material-icons.icon-refresh {
-        color: #2196F3;
-    }
-    
-    /* Disabled State - Gray out all icons */
-    .file-picker-menu-bar button:disabled .material-icons {
-        color: #BDBDBD !important;
-    }
-    /* ===== END MATERIAL ICONS COLOR CODING ===== */
-
     /* Main container for the file picker */
     .file-picker-container-wrapper {
         position: relative;
@@ -249,10 +93,9 @@ export function injectStyles() {
         cursor: pointer;
         border-radius: 0;
         font-size: 1em;
-        display: inline-flex;
+        display: flex;
         align-items: center;
         justify-content: center;
-        gap: 4px;
         transition: background-color 0.2s, border-color 0.2s;
         line-height: 1;
         height: 24px;
@@ -346,7 +189,7 @@ export function injectStyles() {
     
     /* Column 1: Icon */
     .file-picker-list-table td:nth-child(1) { 
-        width: 36px; 
+        width: 30px; 
         text-align: center; 
         padding: 4px 2px;
     } 
@@ -354,9 +197,9 @@ export function injectStyles() {
     /* Column 2: Checkbox - Reduced width and padding */
     .file-picker-list-table th:nth-child(2),
     .file-picker-list-table td:nth-child(2) {
-        width: 35px;
+        width: 35px; /* Reduced from 40px */
         text-align: center !important;
-        padding: 2px 4px !important;
+        padding: 2px 4px !important; /* Reduced from 4px 8px */
     }
 
     /* Column 3: Name - Reduced left padding to pull closer to checkbox */
@@ -364,7 +207,7 @@ export function injectStyles() {
     .file-picker-list-table td:nth-child(3) {
         width: auto;
         text-align: left !important;
-        padding-left: 4px !important;
+        padding-left: 4px !important; /* Reduced from 8px */
     }
     
     /* Column 4: Size */
@@ -599,36 +442,6 @@ export function injectStyles() {
         justify-content: flex-end;
         gap: 10px;
     }
-    
-    .file-picker-creation-dialog-buttons button {
-        background-color: #007bff;
-        color: white;
-        border: none;
-        padding: 8px 16px;
-        border-radius: 5px;
-        cursor: pointer;
-        transition: background-color 0.2s;
-        font-size: 1em;
-    }
-
-    .file-picker-creation-dialog-buttons button.cancel {
-        background-color: #6c757d;
-    }
-
-    .file-picker-creation-dialog-buttons button:hover {
-        background-color: #0056b3;
-    }
-
-    .file-picker-creation-dialog-buttons button.cancel:hover {
-        background-color: #5a6268;
-    }
-    
-    /* Button text span for "Use Path" button */
-    .file-picker-menu-bar button .btn-text {
-        font-size: 0.9em;
-        margin-left: 2px;
-        vertical-align: middle;
-    }
 `;
 	
     document.head.appendChild(style);
@@ -777,11 +590,11 @@ export function showCreationDialog() {
                 <div class="file-picker-creation-dialog-options">
                     <label>
                         <input type="radio" name="creationType" value="file" checked>
-                        <span class="material-icons material-icons-sm icon-file" aria-hidden="true">insert_drive_file</span> File
+                        📄 File
                     </label>
                     <label>
                         <input type="radio" name="creationType" value="directory">
-                        <span class="material-icons material-icons-sm icon-folder" aria-hidden="true">folder</span> Directory
+                        📁 Directory
                     </label>
                 </div>
 
@@ -872,21 +685,21 @@ export function createPickerDOM(originalClass, originalId, initialPath) {
             <table class="file-picker-menu-bar">
                 <tbody>
                     <tr>
-                        <td><button class="create-btn" title="Create New File or Directory"></button></td>
-                        <td><button class="rename-btn" title="Rename" disabled></button></td>
-                        <td><button class="copy-btn" title="Copy Selected" disabled></button></td>
-                        <td><button class="cut-btn" title="Cut Selected" disabled></button></td>
-                        <td><button class="paste-btn" title="Paste" disabled></button></td>
-                        <td><button class="delete-btn" title="Delete Selected" disabled></button></td>
-                        <td><button class="cancel-btn" title="Cancel"></button></td>
-                        <td><button class="use-path-btn" title="Use Selected File Path"></button></td>
+                        <td><button class="create-btn" title="Create New File or Directory">➕</button></td>
+                        <td><button class="rename-btn" title="Rename" disabled>✏️</button></td>
+                        <td><button class="copy-btn" title="Copy Selected" disabled>📋</button></td>
+                        <td><button class="cut-btn" title="Cut Selected" disabled>✂️</button></td>
+                        <td><button class="paste-btn" title="Paste" disabled>📌</button></td>
+                        <td><button class="delete-btn" title="Delete Selected" disabled>🗑️</button></td>
+                        <td><button class="cancel-btn" title="Cancel">✕</button></td>
+                        <td><button class="use-path-btn" title="Use Selected File Path" disabled>✔</button></td>
                     </tr>
                 </tbody>
             </table>
 
             <div class="file-picker-path-display">
                 <span class="file-picker-current-path">Path: ${initialPath}</span>
-                <button class="file-picker-refresh-button" title="Refresh"></button>
+                <button class="file-picker-refresh-button" title="Refresh">🔄</button>
             </div>
 
             <div class="file-picker-list-container">
