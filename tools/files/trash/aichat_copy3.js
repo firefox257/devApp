@@ -283,9 +283,6 @@ class AIChat extends HTMLElement {
         const codeFilterSelect = this.shadowRoot.getElementById('codeFilterSelect');
         const copyConversationButton = this.shadowRoot.getElementById('copyConversationButton');
         const pasteConversationButton = this.shadowRoot.getElementById('pasteConversationButton');
-        // Added Reset button functionality
-        const resetSettingsButton = this.shadowRoot.getElementById('resetSettingsButton');
-
         if (sendButton) sendButton.addEventListener('click', () => this.sendMessage());
         if (modelSelect) {
             modelSelect.addEventListener('change', (event) => {
@@ -371,64 +368,6 @@ class AIChat extends HTMLElement {
         }
         if (pasteConversationButton) {
             pasteConversationButton.addEventListener('click', () => this.pasteConversation());
-        }
-        // Added Reset button event listener
-        if (resetSettingsButton) {
-            resetSettingsButton.addEventListener('click', async () => {
-                // Clear local storage for models and system prompts
-                localStorage.removeItem(LOCAL_STORAGE_MODELS_KEY);
-                localStorage.removeItem(LOCAL_STORAGE_SELECTED_MODEL_KEY);
-                localStorage.removeItem(LOCAL_STORAGE_SYSTEM_PROMPT_KEY);
-                localStorage.removeItem(LOCAL_STORAGE_SELECTED_SYSTEM_PROMPT_TITLE_KEY);
-
-                // Re-fetch models and system prompts
-                await this.fetchModels();
-                await this.fetchSystemPrompts();
-
-                // Optionally reset current selection to default or first available
-                const modelSelect = this.shadowRoot.getElementById('modelSelect');
-                if (this.models.length > 0) {
-                    this.currentModel = this.models[0].id;
-                    localStorage.setItem(LOCAL_STORAGE_SELECTED_MODEL_KEY, this.currentModel);
-                    modelSelect.value = this.currentModel;
-                }
-
-                const systemPromptSelect = this.shadowRoot.getElementById('systemPromptSelect');
-                if (Object.keys(this.systemPrompts).length > 0) {
-                    const defaultTitle = Object.keys(this.systemPrompts)[0];
-                    this.currentSystemPromptTitle = defaultTitle;
-                    this.systemPrompt = this.systemPrompts[defaultTitle];
-                    systemPromptSelect.value = defaultTitle;
-                    localStorage.setItem(LOCAL_STORAGE_SELECTED_SYSTEM_PROMPT_TITLE_KEY, defaultTitle);
-                    localStorage.setItem(LOCAL_STORAGE_SYSTEM_PROMPT_KEY, this.systemPrompt);
-                } else {
-                    // Fallback if no system prompts are fetched
-                    this.currentSystemPromptTitle = "custom";
-                    this.systemPrompt = "You are a helpful AI assistant.";
-                    systemPromptSelect.value = "custom";
-                    localStorage.setItem(LOCAL_STORAGE_SELECTED_SYSTEM_PROMPT_TITLE_KEY, "custom");
-                    localStorage.setItem(LOCAL_STORAGE_SYSTEM_PROMPT_KEY, this.systemPrompt);
-                }
-                const systemInput = this.shadowRoot.getElementById('systemInput');
-                if (systemInput) {
-                    systemInput.textContent = this.systemPrompt;
-                }
-
-                // Provide user feedback
-                const resetButton = this.shadowRoot.getElementById('resetSettingsButton');
-                if (resetButton) {
-                    const icon = resetButton.querySelector('.material-icon');
-                    if (icon) {
-                        const original = icon.textContent;
-                        icon.textContent = 'check';
-                        icon.style.color = ICON_COLORS.success;
-                        setTimeout(() => {
-                            icon.textContent = original;
-                            icon.style.color = ICON_COLORS.secondary;
-                        }, 1500);
-                    }
-                }
-            });
         }
     }
     async copyConversation() {
@@ -1379,12 +1318,6 @@ class AIChat extends HTMLElement {
                     <div class="input-group">
                         <label for="temperatureInput">Temp:</label>
                         <input type="number" id="temperatureInput" value="0.7" min="0" max="1" step="0.1">
-                    </div>
-                    <div class="input-group">
-                        <button id="resetSettingsButton" class="icon-btn" title="Reset models and system prompts" aria-label="Reset Settings">
-                            <span class="material-icon" style="color:${ICON_COLORS.secondary}" aria-hidden="true">refresh</span>
-                            Reset Settings
-                        </button>
                     </div>
                 </div>
                 <div id="rawTextOutput" class="chat-area" spellcheck="false">
