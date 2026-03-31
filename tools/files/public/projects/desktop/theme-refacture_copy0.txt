@@ -1,0 +1,991 @@
+================================================================================
+MATERIAL ICONS OS - THEME SYSTEM REFACTOR GUIDE v3.0
+Complete Architecture for Scoped Themes + Isolated Apps with Theme Sync
+================================================================================
+
+TABLE OF CONTENTS
+--------------------------------------------------------------------------------
+1.  Overview & Architecture
+2.  Critical Rules (Non-Negotiable)
+3.  File Structure
+4.  CSS Variables & Design Tokens
+5.  System Component Classes (.system-*)
+6.  Theme CSS Scoping Requirements
+7.  iframe App Isolation Architecture
+8.  ThemeBridge.js SDK (For Apps)
+9.  ThemeManager Updates (For OS)
+10. themes.json Configuration
+11. Example: Complete Matrix Theme
+12. Example: Iframe App with Theme Sync
+13. Security Best Practices
+14. Testing Checklist
+15. Migration Guide (From Old to New)
+16. Troubleshooting
+17. Quick Reference
+
+================================================================================
+1. OVERVIEW & ARCHITECTURE
+================================================================================
+
+GOAL: Create a theme system where:
+- Themes are fully scoped (no style bleeding between themes)
+- Apps run in isolated iframes with full DOM/JS separation
+- Apps automatically inherit OS theme changes via postMessage
+- Developers use .system-* classes for consistent UI across themes
+
+ARCHITECTURE DIAGRAM:
+
+┌─────────────────────────────────────────────────────────────────┐
+│ desktop.html (Parent OS)                                        │
+│                                                                 │
+│  ┌───────────────────────────────────────────────────────────┐ │
+│  │ :root { --system-* CSS variables }                        │ │
+│  │ • Source of truth for all theme values                    │ │
+│  │ • Overridden by theme CSS: body[data-theme="matrix"] {...}│ │
+│  └───────────────────────────────────────────────────────────┘ │
+│                                                                 │
+│  ┌───────────────────────────────────────────────────────────┐ │
+│  │ ThemeManager                                              │ │
+│  │ • loadCSS() / loadScript()                                │ │
+│  │ • broadcastThemeToApps() ← postMessage →                  │ │
+│  │ • cleanup() - cancels animations, removes listeners       │ │
+│  └───────────────────────────────────────────────────────────┘ │
+│                                                                 │
+│  ┌───────────────────────────────────────────────────────────┐ │
+│  │ Window: <iframe src="/apps/notes/" data-os-app="true">   │ │
+│  │ • sandbox="allow-scripts allow-same-origin"               │ │
+│  │ • Isolated DOM, JS, CSS                                   │ │
+│  │ • Includes ThemeBridge.js                                 │ │
+│  └───────────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────┘
+         ↓ postMessage({type: 'themeUpdate', variables: {...}})
+┌─────────────────────────────────────────────────────────────────┐
+│ /apps/notes/index.html (Child App)                              │
+│                                                                 │
+│  ┌───────────────────────────────────────────────────────────┐ │
+│  │ ThemeBridge.js                                            │ │
+│  │ • Listens for 'themeUpdate' messages                      │ │
+│  │ • Applies variables to document.documentElement           │ │
+│  │ • Dispatches 'osThemeChanged' event                       │ │
+│  └───────────────────────────────────────────────────────────┘ │
+│                                                                 │
+│  ┌───────────────────────────────────────────────────────────┐ │
+│  │ App HTML uses .system-* classes                           │ │
+│  │ • <button class="system-btn">Save</button>                │ │
+│  │ • <input class="system-input">                            │ │
+│  │ • Automatically inherits theme colors                     │ │
+│  └───────────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────┘
+
+================================================================================
+2. CRITICAL RULES (NON-NEGOTIABLE)
+================================================================================
+
+*** THEME CSS ***
+1. ALL selectors MUST be scoped with body[data-theme="theme-id"]
+2. Background overrides need high specificity + !important
+3. Never force #themeCanvas display:block (ThemeManager controls this)
+4. Include reduced-motion media query
+5. Include backdrop-filter fallback
+
+*** THEME SCRIPTS ***
+1. Wrap entire script in IIFE: (function() { ... })();
+2. Set window.ThemeCleanup = function cleanup() {...} at global scope
+3. Canvas MUST use clearRect(), never fillRect() with solid color
+4. Store event listener references for removal in cleanup
+5. Cancel all requestAnimationFrame, setInterval, setTimeout
+
+*** IFRAME APPS ***
+1. Include <script src="/os-theme-bridge.js">
+2. Use .system-* classes for all UI components
+3. Never use hardcoded colors (#0078d4)
+4. Listen for 'osThemeChanged' event for dynamic updates
+5. Use sandbox attributes for security
+
+*** THEME MANAGER ***
+1. cleanup() MUST run before loading new theme
+2. broadcastThemeToApps() MUST be called after theme apply
+3. Track all animations/intervals/timeouts for cleanup
+4. Validate message origins in production
+
+================================================================================
+3. FILE STRUCTURE
+================================================================================
+
+RECOMMENDED ORGANIZATION:
+
+/webos/
+├── desktop.html              # Main OS file with ThemeManager
+├── themes.json               # Theme registry (REQUIRED)
+├── os-theme-bridge.js        # SDK for iframe apps (REQUIRED)
+├── themes/
+│   ├── matrix/
+│   │   ├── styles.css        # Scoped CSS overrides
+│   │   ├── script.js         # Canvas animation + cleanup
+│   │   └── preview.jpg       # Theme thumbnail (300x200px)
+│   ├── default/
+│   │   ├── styles.css
+│   │   └── preview.jpg
+│   └── frosted-glass/
+│       ├── styles.css
+│       ├── script.js
+│       └── preview.jpg
+└── apps/
+    ├── notes/
+    │   └── index.html        # Iframe app with ThemeBridge
+    ├── calculator/
+    │   └── index.html
+    └── dashboard/
+        └── index.html
+
+REQUIRED FILES:
+
+File                        | Required | Purpose
+----------------------------|----------|----------------------------------
+desktop.html                | Yes      | Main OS with ThemeManager
+themes.json                 | Yes      # Theme registry/metadata
+os-theme-bridge.js          | Yes      # SDK for iframe theme sync
+themes/*/styles.css         | Yes      # Scoped theme CSS
+themes/*/script.js          | Optional # Canvas animations (with cleanup)
+apps/*/index.html           | Optional # Iframe apps
+
+================================================================================
+4. CSS VARIABLES & DESIGN TOKENS
+================================================================================
+
+CORE SYSTEM VARIABLES (Define in desktop.html :root):
+
+Variable                  | Default                | Override Example
+--------------------------|------------------------|------------------------
+--system-bg               | #004e92                | #000 (Matrix)
+--system-window-bg        | #ffffff                | #0a0a0a (Matrix)
+--system-header-bg        | #e8e8e8                | #1a1a1a (Matrix)
+--system-accent           | #0078d4                | #00ff41 (Matrix)
+--system-text             | #333                   | #00ff41 (Matrix)
+--system-text-dim         | #666                   | #008f11 (Matrix)
+--system-border           | #ccc                   | #003300 (Matrix)
+--system-menu-bg          | rgba(30,30,30,0.95)    | rgba(10,10,10,0.95)
+--system-radius           | 8px                    | (fixed)
+--system-shadow           | 0 4px 12px rgba(0,0,0,0.15) | (fixed)
+--system-font             | -apple-system, ...     | 'Courier New', ... (Matrix)
+
+THEME OVERRIDE EXAMPLE (themes/matrix/styles.css):
+
+body[data-theme="matrix"] {
+  --system-bg: #000;
+  --system-window-bg: #0a0a0a;
+  --system-header-bg: #1a1a1a;
+  --system-accent: #00ff41;
+  --system-text: #00ff41;
+  --system-text-dim: #008f11;
+  --system-border: #003300;
+  --system-font: 'Courier New', Courier, monospace;
+}
+
+ACCESSING VARIABLES IN APPS:
+
+/* CSS */
+.system-btn {
+  background: var(--system-accent);
+  color: white;
+}
+
+/* JavaScript */
+const accentColor = getComputedStyle(document.documentElement)
+  .getPropertyValue('--system-accent').trim();
+
+================================================================================
+5. SYSTEM COMPONENT CLASSES (.system-*)
+================================================================================
+
+COMPLETE CLASS REFERENCE:
+
+TYPOGRAPHY:
+  .system-text          - Base text style
+  .system-text-large    - Large body text
+  .system-text-small    - Small/caption text
+  .system-title         - Page/section title (h1)
+  .system-subtitle      - Section subtitle (h2)
+  .system-label         - Form labels
+  .system-heading       - Card/panel heading (h3)
+
+BUTTONS:
+  .system-btn           - Primary button
+  .system-btn-secondary - Secondary button
+  .system-btn-ghost     - Ghost/transparent button
+  .system-btn-danger    - Danger/delete button
+  .system-btn-sm        - Small button
+  .system-btn-lg        - Large button
+  .system-btn-icon      - Icon-only button
+  .system-btn-group     - Button group container
+  .system-btn-block     - Full-width button
+
+FORMS & INPUTS:
+  .system-input         - Text input
+  .system-input-lg      - Large input
+  .system-input-sm      - Small input
+  .system-textarea      - Multi-line input
+  .system-select        - Dropdown select
+  .system-checkbox      - Checkbox wrapper
+  .system-radio         - Radio button wrapper
+  .system-switch        - Toggle switch
+  .system-form-group    - Form field container
+  .system-form-help     - Help text below input
+  .system-form-error    - Error message
+  .system-input-icon    - Input with icon
+
+CONTAINERS & LAYOUT:
+  .system-card          - Basic card container
+  .system-card-header   - Card header section
+  .system-card-body     - Card content area
+  .system-card-footer   - Card footer/actions
+  .system-panel         - Section panel
+  .system-container     - Centered content container
+  .system-grid          - Grid layout container
+  .system-grid-item     - Grid item
+  .system-flex          - Flex container
+  .system-flex-item     - Flex item
+  .system-divider       - Horizontal divider
+  .system-spacer        - Vertical spacing
+
+NAVIGATION & MENUS:
+  .system-nav           - Navigation container
+  .system-nav-item      - Nav link/item
+  .system-nav-item-active - Active nav item
+  .system-menu          - Dropdown menu
+  .system-menu-item     - Menu item
+  .system-menu-divider  - Menu separator
+  .system-menu-header   - Menu section header
+  .system-breadcrumb    - Breadcrumb navigation
+  .system-tabs          - Tab container
+  .system-tab           - Individual tab
+  .system-tab-active    - Active tab
+  .system-tab-panel     - Tab content panel
+
+DATA DISPLAY:
+  .system-table         - Data table
+  .system-table-header  - Table header row
+  .system-table-row     - Table row
+  .system-table-cell    - Table cell
+  .system-list          - List container
+  .system-list-item     - List item
+  .system-badge         - Status badge
+  .system-badge-success - Success badge (green)
+  .system-badge-warning - Warning badge (yellow)
+  .system-badge-danger  - Danger badge (red)
+  .system-tag           - Tag/label
+  .system-avatar        - User avatar
+  .system-progress      - Progress bar container
+  .system-progress-bar  - Progress fill
+  .system-stat          - Statistic display
+  .system-stat-value    - Stat number
+  .system-stat-label    - Stat label
+
+FEEDBACK & STATUS:
+  .system-alert         - Alert box
+  .system-alert-success - Success alert (green)
+  .system-alert-warning - Warning alert (yellow)
+  .system-alert-danger  - Error alert (red)
+  .system-alert-info    - Info alert (blue)
+  .system-spinner       - Loading spinner
+  .system-skeleton      - Skeleton loader
+  .system-empty         - Empty state
+
+MEDIA & ICONS:
+  .system-icon          - Icon wrapper
+  .system-icon-sm       - Small icon
+  .system-icon-lg       - Large icon
+  .system-image         - Responsive image
+  .system-thumbnail     - Thumbnail image
+
+UTILITIES:
+  .system-hidden        - Hide element
+  .system-text-center   - Center text
+  .system-text-left     - Left align text
+  .system-text-right    - Right align text
+  .system-mt-1 to 5     - Margin top (1-5 scale)
+  .system-mb-1 to 5     - Margin bottom (1-5 scale)
+  .system-p-1 to 5      - Padding (1-5 scale)
+  .system-rounded       - Rounded corners
+  .system-shadow        - Drop shadow
+  .system-border        - Border
+
+================================================================================
+6. THEME CSS SCOPING REQUIREMENTS
+================================================================================
+
+CORRECT SCOPING PATTERN:
+
+/* ✅ GOOD: All selectors scoped */
+body[data-theme="matrix"] .system-btn {
+  background: var(--system-accent);
+}
+
+body[data-theme="matrix"] .system-card {
+  border-color: var(--system-border);
+}
+
+/* ✅ GOOD: High specificity for background */
+html body[data-theme="matrix"],
+body[data-theme="matrix"] {
+  background: var(--system-bg) !important;
+}
+
+WRONG SCOPING (WILL CAUSE STYLE BLEEDING):
+
+/* ❌ BAD: Global selector affects all themes */
+.system-btn {
+  background: #00ff41;
+}
+
+/* ❌ BAD: Canvas display forced (ThemeManager controls this) */
+#themeCanvas {
+  display: block !important;
+}
+
+CANVAS HANDLING:
+
+/* ✅ CORRECT: Let ThemeManager control canvas display */
+body[data-theme="matrix"] #themeCanvas {
+  background: transparent !important;
+  /* Do NOT set display property */
+}
+
+ACCESSIBILITY REQUIREMENTS:
+
+/* ✅ REQUIRED: Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  body[data-theme="matrix"] .system-btn,
+  body[data-theme="matrix"] .system-input {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+/* ✅ REQUIRED: Backdrop-filter fallback */
+@supports not (backdrop-filter: blur(10px)) {
+  body[data-theme="matrix"] .system-card {
+    background: rgba(10, 10, 10, 0.95) !important;
+  }
+}
+
+================================================================================
+7. IFRAME APP ISOLATION ARCHITECTURE
+================================================================================
+
+WHY IFRAME (NOT object OR Shadow DOM):
+
+Feature              | iframe | object | Shadow DOM
+---------------------|--------|--------|------------
+DOM Isolation        | ✅ Yes | ⚠️ Limited | ❌ No
+JS Context           | ✅ Yes | ❌ No  | ❌ No
+Cross-Origin         | ✅ Yes | ⚠️ Limited | ❌ No
+postMessage Support  | ✅ Yes | ❌ No  | N/A
+Sandbox Attributes   | ✅ Yes | ❌ No  | ❌ No
+CSS Isolation        | ✅ Yes | ⚠️ Partial | ⚠️ Leaks
+
+IFRAME TEMPLATE (In desktop.html window content):
+
+<iframe 
+  src="/apps/notes/index.html" 
+  data-os-app="true"
+  data-app-id="win-123456"
+  sandbox="allow-scripts allow-same-origin allow-forms allow-pointer-lock"
+  style="width:100%;height:100%;border:none;background:transparent;"
+></iframe>
+
+SANDBOX ATTRIBUTES EXPLAINED:
+
+Attribute              | Purpose
+-----------------------|------------------------------------------
+allow-scripts          | Enable JavaScript (REQUIRED)
+allow-same-origin      | Allow localStorage/cookies (REQUIRED for most apps)
+allow-forms            | Allow form submission
+allow-pointer-lock     | Allow pointer lock API (games)
+allow-popups           | Allow popup windows (use sparingly)
+allow-downloads        | Allow file downloads
+
+SECURITY NOTE: For cross-origin apps, remove allow-same-origin:
+  sandbox="allow-scripts allow-forms"
+  (This restricts localStorage/cookies but improves security)
+
+================================================================================
+8. THEMEBRIDGE.JS SDK (FOR APPS)
+================================================================================
+
+FILE: /os-theme-bridge.js
+
+PURPOSE: Enable iframe apps to sync with OS theme changes
+
+USAGE: Include in app's <head>
+  <script src="/os-theme-bridge.js"></script>
+
+FEATURES:
+- Auto-applies default variables on load
+- Listens for 'themeUpdate' postMessage from parent
+- Applies CSS variables to document.documentElement
+- Dispatches 'osThemeChanged' event for app to react
+- Provides ThemeBridge.getCurrentTheme() method
+
+APP EXAMPLE:
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>My App</title>
+  <script src="/os-theme-bridge.js"></script>
+  <style>
+    body {
+      background: var(--system-bg);
+      color: var(--system-text);
+    }
+  </style>
+</head>
+<body>
+  <button class="system-btn">Click Me</button>
+  
+  <script>
+    // Listen for theme changes
+    window.addEventListener('osThemeChanged', (e) => {
+      console.log('Theme updated:', e.detail.themeId);
+      // Update app UI if needed
+    });
+    
+    // Get current theme
+    const currentTheme = ThemeBridge.getCurrentTheme();
+  </script>
+</body>
+</html>
+
+THEMEBRIDGE API:
+
+Method                      | Description
+----------------------------|------------------------------------------
+ThemeBridge.init()          | Initialize (auto-called on DOM ready)
+ThemeBridge.getCurrentTheme() | Get current theme ID
+ThemeBridge.refreshTheme()  | Manually request theme sync
+ThemeBridge.registerVariable(name, value) | Add custom variable
+
+================================================================================
+9. THEMEMANAGER UPDATES (FOR OS)
+================================================================================
+
+REQUIRED METHODS TO ADD/UPDATE IN ThemeManager:
+
+// 1. Get system CSS variables
+getSystemVariables() {
+  const root = document.documentElement;
+  const style = getComputedStyle(root);
+  const varNames = [
+    '--system-bg', '--system-window-bg', '--system-header-bg',
+    '--system-accent', '--system-text', '--system-text-dim',
+    '--system-border', '--system-menu-bg', '--system-radius',
+    '--system-shadow', '--system-font'
+  ];
+  const vars = {};
+  for (const name of varNames) {
+    vars[name] = style.getPropertyValue(name).trim();
+  }
+  return vars;
+},
+
+// 2. Broadcast theme to all iframe apps
+broadcastThemeToApps(themeId = this.currentTheme) {
+  if (!themeId) return;
+  const systemVars = this.getSystemVariables();
+  const iframes = document.querySelectorAll('iframe[data-os-app]');
+  iframes.forEach(iframe => {
+    try {
+      const targetOrigin = iframe.src.startsWith('http') 
+        ? new URL(iframe.src).origin 
+        : window.location.origin;
+      iframe.contentWindow.postMessage({
+        type: 'themeUpdate',
+        themeId: themeId,
+        variables: systemVars,
+        timestamp: Date.now()
+      }, targetOrigin);
+    } catch (e) {
+      console.warn('⚠ Could not sync theme to iframe:', e);
+    }
+  });
+},
+
+// 3. Register iframe for theme syncing
+registerIframeApp(iframe) {
+  if (!iframe.hasAttribute('data-os-app')) {
+    iframe.setAttribute('data-os-app', 'true');
+  }
+  setTimeout(() => {
+    this.broadcastThemeToApps(this.currentTheme);
+  }, 100);
+},
+
+// 4. Listen for app messages
+initAppMessageListener() {
+  window.addEventListener('message', (e) => {
+    if (e.data?.type === 'themeRequest') {
+      this.broadcastThemeToApps(this.currentTheme);
+    }
+    if (e.data?.type === 'appReady') {
+      const iframe = document.querySelector(`iframe[src*="${e.data.appId}"]`);
+      if (iframe) this.registerIframeApp(iframe);
+    }
+  });
+},
+
+// 5. Call in ThemeManager.init()
+async init() {
+  // ... existing code ...
+  this.initAppMessageListener(); // ✅ ADD THIS
+  // ... rest of init ...
+},
+
+// 6. Call in ThemeManager.apply() after theme loads
+async apply(themeId) {
+  // ... existing cleanup/load logic ...
+  this.currentTheme = themeId;
+  this.saveThemePreference(themeId);
+  this.broadcastThemeToApps(themeId); // ✅ ADD THIS
+  // ... rest of apply ...
+}
+
+================================================================================
+10. THEMES.JSON CONFIGURATION
+================================================================================
+
+STRUCTURE:
+
+{
+  "theme-id": {
+    "name": "Display Name",
+    "description": "Brief description",
+    "css": "themes/theme-id/styles.css",
+    "script": "themes/theme-id/script.js",
+    "canvas": true,
+    "preview": "themes/theme-id/preview.jpg",
+    "author": "Your Name",
+    "version": "1.0.0",
+    "settings": {
+      "customSetting": "value"
+    }
+  }
+}
+
+PROPERTIES:
+
+Property     | Type    | Required | Description
+-------------|---------|----------|------------------------------------------
+name         | String  | Yes      | Human-readable theme name
+description  | String  | Optional | Description for theme selector
+css          | String  | Yes      | Path to CSS file (relative to desktop.html)
+script       | String  | Optional | Path to JS file (must set window.ThemeCleanup)
+canvas       | Boolean | Yes      | true to show canvas, false to hide
+preview      | String  | Optional | Thumbnail image for theme selector
+author       | String  | Optional | Theme author name
+version      | String  | Optional | Theme version (semver)
+settings     | Object  | Optional | Config passed to theme scripts
+
+EXAMPLE ENTRY:
+
+{
+  "matrix": {
+    "name": "Matrix Digital Rain",
+    "description": "Cyberpunk terminal aesthetic with animated code rain",
+    "css": "themes/matrix/styles.css",
+    "script": "themes/matrix/script.js",
+    "canvas": true,
+    "preview": "themes/matrix/preview.jpg",
+    "author": "Your Name",
+    "version": "1.0.0",
+    "settings": {
+      "rainSpeed": 50,
+      "particleDensity": 0.3
+    }
+  }
+}
+
+================================================================================
+11. EXAMPLE: COMPLETE MATRIX THEME
+================================================================================
+
+FILE: themes/matrix/styles.css
+
+body[data-theme="matrix"] {
+  --system-bg: #000;
+  --system-window-bg: #0a0a0a;
+  --system-header-bg: #1a1a1a;
+  --system-accent: #00ff41;
+  --system-text: #00ff41;
+  --system-text-dim: #008f11;
+  --system-border: #003300;
+  --system-font: 'Courier New', Courier, monospace;
+}
+
+html body[data-theme="matrix"],
+body[data-theme="matrix"] {
+  background: var(--system-bg) !important;
+}
+
+body[data-theme="matrix"] .system-btn {
+  background: var(--system-accent);
+  text-shadow: 0 0 10px rgba(0, 255, 65, 0.5);
+}
+
+body[data-theme="matrix"] .system-card {
+  box-shadow: 0 0 40px rgba(0, 255, 65, 0.2);
+  border-color: var(--system-border);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body[data-theme="matrix"] .system-btn,
+  body[data-theme="matrix"] .system-card {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+FILE: themes/matrix/script.js
+
+(function() {
+  'use strict';
+  
+  const canvas = document.getElementById('themeCanvas');
+  if (!canvas) { window.ThemeCleanup = function() {}; return; }
+  
+  const ctx = canvas.getContext('2d');
+  let animationFrame = null;
+  let resizeHandler = null;
+  
+  function resizeCanvas() {
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = window.innerWidth * dpr;
+    canvas.height = window.innerHeight * dpr;
+    canvas.style.width = window.innerWidth + 'px';
+    canvas.style.height = window.innerHeight + 'px';
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.scale(dpr, dpr);
+  }
+  
+  resizeCanvas();
+  resizeHandler = resizeCanvas;
+  window.addEventListener('resize', resizeHandler);
+  
+  function animate() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // Draw Matrix rain here
+    animationFrame = requestAnimationFrame(animate);
+    if (ThemeManager?.trackAnimation) ThemeManager.trackAnimation(animationFrame);
+  }
+  
+  animate();
+  
+  window.ThemeCleanup = function cleanup() {
+    if (animationFrame) cancelAnimationFrame(animationFrame);
+    if (resizeHandler) window.removeEventListener('resize', resizeHandler);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  };
+  
+  if (ThemeManager?.registerCleanup) ThemeManager.registerCleanup(() => {});
+})();
+
+================================================================================
+12. EXAMPLE: IFRAME APP WITH THEME SYNC
+================================================================================
+
+FILE: /apps/notes/index.html
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Notes App</title>
+  <script src="/os-theme-bridge.js"></script>
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <style>
+    body {
+      margin: 0;
+      padding: 20px;
+      background: var(--system-bg);
+      color: var(--system-text);
+      font-family: var(--system-font);
+    }
+  </style>
+</head>
+<body>
+  <div class="system-card">
+    <div class="system-card-header">
+      <h3 class="system-heading">📝 Notes</h3>
+    </div>
+    <div class="system-card-body">
+      <div class="system-form-group">
+        <label class="system-label">Note Title</label>
+        <input type="text" class="system-input" placeholder="Enter title">
+      </div>
+      <div class="system-form-group">
+        <label class="system-label">Content</label>
+        <textarea class="system-input system-textarea" placeholder="Start typing..."></textarea>
+      </div>
+      <div class="system-flex" style="justify-content: flex-end; gap: 8px;">
+        <button class="system-btn system-btn-secondary">Cancel</button>
+        <button class="system-btn">Save</button>
+      </div>
+    </div>
+  </div>
+  
+  <div class="system-alert system-alert-info system-mt-4">
+    Current Theme: <span id="currentTheme">Loading...</span>
+  </div>
+
+  <script>
+    window.addEventListener('osThemeChanged', (e) => {
+      document.getElementById('currentTheme').textContent = e.detail.themeId;
+    });
+    
+    setTimeout(() => {
+      const theme = ThemeBridge?.getCurrentTheme() || 'unknown';
+      document.getElementById('currentTheme').textContent = theme;
+    }, 500);
+  </script>
+</body>
+</html>
+
+================================================================================
+13. SECURITY BEST PRACTICES
+================================================================================
+
+POSTMESSAGE SECURITY:
+
+// In ThemeBridge.js (app side):
+const parentOrigin = 'https://your-os-domain.com'; // 🔒 Set specific origin
+window.parent.postMessage(data, parentOrigin);
+
+window.addEventListener('message', (e) => {
+  if (e.origin !== parentOrigin) {
+    console.warn('⚠ Blocked message from:', e.origin);
+    return;
+  }
+  // ... handle message
+});
+
+// In ThemeManager (OS side):
+const targetOrigin = iframe.src.startsWith('http') 
+  ? new URL(iframe.src).origin 
+  : window.location.origin;
+iframe.contentWindow.postMessage(data, targetOrigin);
+
+SANDBOX ATTRIBUTES:
+
+<!-- Minimum for most apps -->
+sandbox="allow-scripts allow-same-origin allow-forms"
+
+<!-- For apps that need more features -->
+sandbox="allow-scripts allow-same-origin allow-forms allow-pointer-lock allow-popups"
+
+<!-- For untrusted cross-origin apps (restricted) -->
+sandbox="allow-scripts allow-forms"
+<!-- Note: Removes localStorage/cookies access -->
+
+CSP HEADERS (Recommended for production):
+
+Content-Security-Policy: 
+  default-src 'self';
+  script-src 'self' 'unsafe-inline';
+  style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+  frame-ancestors 'self';
+
+================================================================================
+14. TESTING CHECKLIST
+================================================================================
+
+THEME CSS TESTING:
+[ ] Apply theme → Switch to default → No styles remain
+[ ] Inspect elements → All selectors have body[data-theme="..."]
+[ ] Background visible through canvas (if canvas enabled)
+[ ] Reduced motion preference disables animations
+[ ] Backdrop-filter fallback works in unsupported browsers
+
+THEME SCRIPT TESTING:
+[ ] window.ThemeCleanup set at global scope
+[ ] Switch themes rapidly 10x → No memory growth
+[ ] Canvas cleared on cleanup (check with dev tools)
+[ ] All event listeners removed (check Event Listeners panel)
+[ ] No console errors during cleanup
+
+IFRAME APP TESTING:
+[ ] App loads in iframe without errors
+[ ] Theme sync works (change OS theme → app updates)
+[ ] 'osThemeChanged' event fires correctly
+[ ] Sandbox attributes don't block required features
+[ ] Cross-origin apps work (if applicable)
+
+THEMEMANAGER TESTING:
+[ ] broadcastThemeToApps() sends to all iframes
+[ ] initAppMessageListener() handles requests
+[ ] Theme preference saves to localStorage
+[ ] URL parameter ?theme=matrix applies on load
+[ ] themes.json refresh works (Settings → 🔄 button)
+
+PERFORMANCE TESTING:
+[ ] Canvas animation runs at 60fps
+[ ] HiDPI displays render sharply
+[ ] Resize window → Canvas resizes smoothly
+[ ] No memory leaks (check Performance tab)
+[ ] Tab hidden → Animation pauses (optional optimization)
+
+================================================================================
+15. MIGRATION GUIDE (FROM OLD TO NEW)
+================================================================================
+
+STEP 1: UPDATE desktop.html
+- Add system CSS variables to :root
+- Add .system-* component classes
+- Add ThemeManager.getSystemVariables()
+- Add ThemeManager.broadcastThemeToApps()
+- Add ThemeManager.initAppMessageListener()
+- Call initAppMessageListener() in ThemeManager.init()
+- Call broadcastThemeToApps() in ThemeManager.apply()
+
+STEP 2: CREATE os-theme-bridge.js
+- Save to web root (/os-theme-bridge.js)
+- Test with simple iframe app
+
+STEP 3: REFACTOR EXISTING THEMES
+- Add body[data-theme="..."] to all selectors
+- Replace hardcoded colors with var(--system-*)
+- Add reduced-motion media query
+- Add backdrop-filter fallback
+- Test cleanup thoroughly
+
+STEP 4: CONVERT APPS TO IFRAME
+- Move app to /apps/appname/index.html
+- Add ThemeBridge.js script tag
+- Replace custom classes with .system-* classes
+- Remove hardcoded colors
+- Test theme sync
+
+STEP 5: UPDATE desktop.html ICONS
+- Change onclick handlers to use openIframeApp()
+- Example:
+  OLD: onclick="appManager.open('Notes', 'note', 'notes')"
+  NEW: onclick="appManager.openIframeApp('Notes', 'note', '/apps/notes/index.html')"
+
+================================================================================
+16. TROUBLESHOOTING
+================================================================================
+
+PROBLEM: Theme styles bleeding to other themes
+SOLUTION: Add body[data-theme="..."] to ALL selectors
+         Use high specificity for background overrides
+
+PROBLEM: Canvas blocking CSS background
+SOLUTION: Use clearRect() not fillRect()
+         Check canvas.style.background = 'transparent'
+         Verify ThemeManager shows/hides canvas correctly
+
+PROBLEM: Animations continue after theme switch
+SOLUTION: Verify window.ThemeCleanup is set globally
+         Cancel all requestAnimationFrame calls
+         Remove event listeners with stored references
+         Use ThemeManager.trackAnimation() helper
+
+PROBLEM: Iframe app not receiving theme updates
+SOLUTION: Check iframe has data-os-app="true" attribute
+         Verify ThemeBridge.js is included in app
+         Check console for postMessage errors
+         Test with ThemeManager.broadcastThemeToApps() manually
+
+PROBLEM: Hardcoded colors not updating with theme
+SOLUTION: Replace #0078d4 with var(--system-accent)
+         Check CSS variable is defined in :root
+         Verify theme overrides the variable correctly
+
+PROBLEM: 404 errors for theme files
+SOLUTION: Check paths in themes.json are relative to desktop.html
+         Verify filenames match exactly (case-sensitive)
+         Clear browser cache or add ?reload=1 to URL
+
+PROBLEM: Sandbox blocking app features
+SOLUTION: Add required sandbox attributes:
+         - allow-scripts (REQUIRED)
+         - allow-same-origin (for localStorage)
+         - allow-forms (for form submission)
+         - allow-popups (for new windows)
+
+================================================================================
+17. QUICK REFERENCE
+================================================================================
+
+CSS SCOPING TEMPLATE:
+
+body[data-theme="your-theme"] {
+  --system-accent: #your-color;
+}
+
+html body[data-theme="your-theme"],
+body[data-theme="your-theme"] {
+  background: var(--system-bg) !important;
+}
+
+CLEANUP TEMPLATE:
+
+(function() {
+  const canvas = document.getElementById('themeCanvas');
+  if (!canvas) { window.ThemeCleanup = function() {}; return; }
+  
+  const ctx = canvas.getContext('2d');
+  let animationFrame = null;
+  
+  function animate() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    animationFrame = requestAnimationFrame(animate);
+  }
+  animate();
+  
+  window.ThemeCleanup = function cleanup() {
+    if (animationFrame) cancelAnimationFrame(animationFrame);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  };
+})();
+
+IFRAME APP TEMPLATE:
+
+<!DOCTYPE html>
+<html>
+<head>
+  <script src="/os-theme-bridge.js"></script>
+  <style>
+    body { background: var(--system-bg); color: var(--system-text); }
+  </style>
+</head>
+<body>
+  <button class="system-btn">Click</button>
+  <script>
+    window.addEventListener('osThemeChanged', (e) => {
+      console.log('Theme:', e.detail.themeId);
+    });
+  </script>
+</body>
+</html>
+
+COMMON .system-* CLASSES:
+
+Buttons:    .system-btn, .system-btn-secondary, .system-btn-danger
+Inputs:     .system-input, .system-textarea, .system-select
+Cards:      .system-card, .system-card-header, .system-card-body
+Forms:      .system-form-group, .system-label, .system-form-help
+Layout:     .system-grid, .system-flex, .system-container
+Feedback:   .system-alert, .system-spinner, .system-badge
+Nav:        .system-nav, .system-menu, .system-tabs
+
+================================================================================
+END OF DOCUMENTATION
+================================================================================
+Material Icons OS - Theme System Refactor Guide v3.0
+Architecture: Scoped Themes + Isolated Iframe Apps + Theme Sync
+For support, check browser console logs or ThemeManager API
+================================================================================

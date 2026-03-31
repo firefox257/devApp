@@ -1,0 +1,675 @@
+/* ============================================
+   TRANSPARENT BLUR HEAVEN THEME
+   Material Icons OS - Theme v2.7+
+   Author: Your Name
+   Version: 1.0.0
+   ============================================ */
+
+/* ============================================
+   CSS VARIABLES - Core System Overrides
+   ============================================ */
+:root {
+  /* Core System Colors - Ethereal Heaven Palette */
+  --system-bg: linear-gradient(135deg, #e0f7ff 0%, #f5e6ff 50%, #fff5f5 100%);
+  --system-window-bg: rgba(255, 255, 255, 0.15);
+  --system-header-bg: rgba(255, 255, 255, 0.25);
+  --system-accent: #7dd3fc;
+  --system-accent-dim: #a78bfa;
+  --system-highlight: rgba(125, 211, 252, 0.3);
+  --system-text: #1e293b;
+  --system-text-dim: #64748b;
+  --system-text-on-accent: #0f172a;
+  --system-border: rgba(255, 255, 255, 0.4);
+  --system-border-hover: rgba(255, 255, 255, 0.7);
+  --system-menu-bg: rgba(255, 255, 255, 0.2);
+  --system-radius: 12px;
+  --system-radius-lg: 24px;
+  --system-shadow: 0 8px 32px rgba(30, 58, 138, 0.1);
+  --system-font: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif;
+  --system-font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+  --system-success: #22c55e;
+  --system-warning: #f59e0b;
+  --system-danger: #ef4444;
+  --system-info: #3b82f6;
+  
+  /* ✅ REQUIRED: Icon Variables (v2.7+) */
+  --system-icon-bg: rgba(255, 255, 255, 0.2);
+  --system-icon-bg-hover: rgba(255, 255, 255, 0.4);
+  --system-icon-border: 1px solid rgba(255, 255, 255, 0.5);
+  --system-icon-border-hover: 1px solid rgba(255, 255, 255, 0.8);
+  
+  /* ✨ Desktop Enhancement Variables (v2.7+) */
+  --system-taskbar-height: 56px;
+  --system-taskbar-blur: 25px;
+  --system-taskbar-glow: 0 0 20px rgba(125, 211, 252, 0.3);
+  --system-start-menu-blur: 25px;
+  --system-window-glow: 0 0 35px rgba(167, 139, 250, 0.15);
+  --system-icon-glow: 0 0 18px rgba(255, 255, 255, 0.5);
+}
+
+/* ============================================
+   BACKGROUND & CANVAS
+   ============================================ */
+html, html body, body {
+  background-color: #f0f9ff !important;
+  background-image: url('background.png') !important;
+  background-repeat: no-repeat !important;
+  background-position: center center !important;
+  background-attachment: fixed !important;
+  background-size: cover !important;
+  min-height: 100dvh !important;
+  min-width: 100vw !important;
+}
+
+#themeCanvas {
+  display: block !important;
+  opacity: 0.6 !important;
+  background: transparent !important;
+}
+
+/* ============================================
+   DESKTOP SHELL ENHANCEMENTS (v2.7+)
+   ============================================ */
+
+/* --- Taskbar - MAIN FIX --- */
+.system-desktop-taskbar {
+  background: rgba(255, 255, 255, 0.12) !important;
+  backdrop-filter: blur(var(--system-taskbar-blur)) !important;
+  -webkit-backdrop-filter: blur(var(--system-taskbar-blur)) !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.3) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+  box-shadow: var(--system-taskbar-glow) !important;
+  height: var(--system-taskbar-height) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  padding: 0 10px !important;
+  z-index: 3000 !important;
+}
+
+/* Fallback for .taskbar class (if desktop.html uses original class) */
+.taskbar {
+  background: rgba(255, 255, 255, 0.12) !important;
+  backdrop-filter: blur(25px) !important;
+  -webkit-backdrop-filter: blur(25px) !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.3) !important;
+  box-shadow: 0 0 20px rgba(125, 211, 252, 0.3) !important;
+  height: var(--system-taskbar-height) !important;
+}
+
+/* --- Taskbar Items (App Buttons) --- */
+.system-desktop-taskbar__item,
+.taskbar-item,
+.taskbar-apps > * {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border: 1px solid rgba(255, 255, 255, 0.25) !important;
+  border-radius: 12px !important;
+  color: #1e293b !important;
+  min-width: 48px !important;
+  height: 48px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  margin: 0 4px !important;
+  cursor: pointer !important;
+  position: relative !important;
+}
+
+.system-desktop-taskbar__item:hover,
+.taskbar-item:hover {
+  background: rgba(255, 255, 255, 0.25) !important;
+  border-color: rgba(255, 255, 255, 0.5) !important;
+  box-shadow: 0 0 15px rgba(125, 211, 252, 0.4) !important;
+  transform: translateY(-2px) !important;
+}
+
+.system-desktop-taskbar__item:active,
+.taskbar-item:active {
+  transform: translateY(0) scale(0.98) !important;
+}
+
+/* Active/Focused Taskbar Item */
+.system-desktop-taskbar__item--active,
+.taskbar-item.active {
+  background: rgba(125, 211, 252, 0.3) !important;
+  border-color: rgba(125, 211, 252, 0.6) !important;
+  box-shadow: 0 0 20px rgba(125, 211, 252, 0.5) !important;
+}
+
+/* Active Indicator Dot */
+.system-desktop-taskbar__item--active::after {
+  content: '' !important;
+  position: absolute !important;
+  bottom: 6px !important;
+  width: 16px !important;
+  height: 4px !important;
+  background: #7dd3fc !important;
+  border-radius: 2px !important;
+  box-shadow: 0 0 10px rgba(125, 211, 252, 0.6) !important;
+}
+
+/* --- Start Button --- */
+.system-desktop-start-btn,
+.start-btn {
+  background: rgba(255, 255, 255, 0.15) !important;
+  border: 1px solid rgba(255, 255, 255, 0.35) !important;
+  border-radius: 12px !important;
+  color: #1e293b !important;
+  padding: 8px 16px !important;
+  transition: all 0.25s ease !important;
+  cursor: pointer !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  font-weight: 500 !important;
+}
+
+.system-desktop-start-btn:hover,
+.start-btn:hover {
+  background: rgba(125, 211, 252, 0.25) !important;
+  border-color: rgba(125, 211, 252, 0.5) !important;
+  box-shadow: 0 0 18px rgba(125, 211, 252, 0.4) !important;
+}
+
+/* --- System Tray / Clock --- */
+.system-desktop-tray,
+.system-tray,
+.clock {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  border-radius: 10px !important;
+  color: #1e293b !important;
+  padding: 6px 14px !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  font-size: 13px !important;
+}
+
+#time, #date, .clock * {
+  color: #1e293b !important;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.5) !important;
+  font-weight: 500 !important;
+}
+
+/* --- Windows --- */
+.system-desktop-window {
+  background: var(--system-window-bg) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  border: 1px solid var(--system-border) !important;
+  border-radius: var(--system-radius-lg) !important;
+  box-shadow: var(--system-window-glow), var(--system-shadow) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+}
+
+.system-desktop-window__header {
+  background: var(--system-header-bg) !important;
+  border-bottom: 1px solid var(--system-border) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  padding: 0 10px !important;
+  height: 40px !important;
+  cursor: grab !important;
+}
+
+.system-desktop-window__title {
+  color: var(--system-text) !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.system-desktop-window__controls {
+  display: flex !important;
+  gap: 8px !important;
+}
+
+.system-desktop-window__control {
+  width: 28px !important;
+  height: 28px !important;
+  border-radius: 6px !important;
+  border: 1px solid var(--system-border) !important;
+  background: rgba(255, 255, 255, 0.1) !important;
+  color: var(--system-text) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+}
+
+.system-desktop-window__control:hover {
+  background: rgba(255, 255, 255, 0.25) !important;
+  border-color: var(--system-border-hover) !important;
+}
+
+.system-desktop-window__control--close:hover {
+  background: var(--system-danger) !important;
+  border-color: var(--system-danger) !important;
+  box-shadow: 0 0 15px rgba(239, 68, 68, 0.4) !important;
+}
+
+.system-desktop-window__control--close:hover .mat-icon {
+  color: #ffffff !important;
+}
+
+.system-desktop-window__content {
+  background: var(--system-window-bg) !important;
+  color: var(--system-text) !important;
+  flex: 1 !important;
+  overflow: auto !important;
+}
+
+/* --- Desktop Icons --- */
+.system-desktop-icon {
+  background: var(--system-icon-bg) !important;
+  border: var(--system-icon-border) !important;
+  border-radius: var(--system-radius) !important;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  padding: 8px !important;
+  cursor: pointer !important;
+  min-width: 80px !important;
+}
+
+.system-desktop-icon:hover {
+  background: var(--system-icon-bg-hover) !important;
+  border: var(--system-icon-border-hover) !important;
+  box-shadow: var(--system-icon-glow) !important;
+  transform: translateY(-3px) scale(1.03) !important;
+}
+
+.system-desktop-icon__icon {
+  font-size: 32px !important;
+  color: var(--system-text) !important;
+  margin-bottom: 4px !important;
+}
+
+.system-desktop-icon__label {
+  color: var(--system-text) !important;
+  font-size: 11px !important;
+  text-align: center !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  max-width: 100% !important;
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.4) !important;
+}
+
+/* Subtle floating animation for icons */
+@media (prefers-reduced-motion: no-preference) {
+  .system-desktop-icon {
+    animation: gentleFloat 6s ease-in-out infinite;
+  }
+  .system-desktop-icon:nth-child(odd) {
+    animation-delay: -3s;
+  }
+  @keyframes gentleFloat {
+    0%, 100% { transform: translateY(0) scale(1); }
+    50% { transform: translateY(-4px) scale(1.02); }
+  }
+}
+
+/* --- Start Menu --- */
+.system-desktop-start-menu {
+  background: var(--system-menu-bg) !important;
+  backdrop-filter: blur(var(--system-start-menu-blur)) !important;
+  -webkit-backdrop-filter: blur(var(--system-start-menu-blur)) !important;
+  border-radius: var(--system-radius-lg) !important;
+  border: 1px solid rgba(255, 255, 255, 0.3) !important;
+  box-shadow: var(--system-shadow) !important;
+  padding: 10px !important;
+  animation: slideUp 0.2s ease-out !important;
+  min-width: 320px !important;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.system-desktop-start-menu__header {
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+  padding: 12px !important;
+  border-bottom: 1px solid var(--system-border) !important;
+  margin-bottom: 10px !important;
+}
+
+.system-desktop-start-menu__avatar {
+  width: 48px !important;
+  height: 48px !important;
+  border-radius: 50% !important;
+  background: var(--system-accent) !important;
+  color: var(--system-text-on-accent) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-weight: 600 !important;
+  font-size: 18px !important;
+}
+
+.system-desktop-start-menu__list {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 4px !important;
+}
+
+.system-desktop-start-menu__item {
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+  padding: 12px !important;
+  border-radius: var(--system-radius) !important;
+  color: var(--system-text) !important;
+  cursor: pointer !important;
+  transition: background 0.2s ease !important;
+}
+
+.system-desktop-start-menu__item:hover {
+  background: rgba(255, 255, 255, 0.15) !important;
+}
+
+.system-desktop-start-menu__item .mat-icon {
+  color: var(--system-accent) !important;
+  font-size: 20px !important;
+}
+
+/* --- Browser Window Components --- */
+.system-desktop-browser__toolbar {
+  background: var(--system-header-bg) !important;
+  border-bottom: 1px solid var(--system-border) !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  padding: 8px 10px !important;
+}
+
+.system-desktop-browser__btn {
+  width: 32px !important;
+  height: 32px !important;
+  border-radius: 8px !important;
+  border: 1px solid var(--system-border) !important;
+  background: rgba(255, 255, 255, 0.1) !important;
+  color: var(--system-text) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+}
+
+.system-desktop-browser__btn:hover {
+  background: rgba(255, 255, 255, 0.25) !important;
+  border-color: var(--system-border-hover) !important;
+}
+
+.system-desktop-browser__address {
+  flex: 1 !important;
+  background: var(--system-window-bg) !important;
+  border: 1px solid var(--system-border) !important;
+  border-radius: 8px !important;
+  padding: 8px 12px !important;
+  color: var(--system-text) !important;
+  font-size: 13px !important;
+  outline: none !important;
+}
+
+.system-desktop-browser__address:focus {
+  border-color: var(--system-accent) !important;
+  box-shadow: 0 0 0 3px rgba(125, 211, 252, 0.2) !important;
+}
+
+/* ============================================
+   SYSTEM COMPONENT CLASSES (.system-*)
+   ============================================ */
+
+/* Cards */
+.system-card {
+  background: var(--system-window-bg) !important;
+  border: 1px solid var(--system-border) !important;
+  border-radius: var(--system-radius-lg) !important;
+  box-shadow: var(--system-shadow) !important;
+  backdrop-filter: blur(15px) !important;
+  -webkit-backdrop-filter: blur(15px) !important;
+}
+
+.system-card-header {
+  background: var(--system-header-bg) !important;
+  border-bottom: 1px solid var(--system-border) !important;
+  padding: 16px !important;
+  color: var(--system-text) !important;
+  font-weight: 600 !important;
+}
+
+.system-card-body {
+  padding: 16px !important;
+  color: var(--system-text) !important;
+}
+
+.system-card-footer {
+  border-top: 1px solid var(--system-border) !important;
+  padding: 12px 16px !important;
+  display: flex !important;
+  justify-content: flex-end !important;
+  gap: 8px !important;
+}
+
+/* Buttons */
+.system-btn {
+  background: var(--system-accent) !important;
+  color: var(--system-text-on-accent, #0f172a) !important;
+  border: none !important;
+  border-radius: var(--system-radius) !important;
+  padding: 10px 20px !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+
+.system-btn:hover {
+  opacity: 0.9 !important;
+  box-shadow: 0 0 20px rgba(125, 211, 252, 0.4) !important;
+  transform: translateY(-1px) !important;
+}
+
+.system-btn:active {
+  transform: translateY(0) scale(0.98) !important;
+}
+
+.system-btn-secondary {
+  background: transparent !important;
+  border: 1px solid var(--system-border) !important;
+  color: var(--system-text) !important;
+}
+
+.system-btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+  border-color: var(--system-border-hover) !important;
+}
+
+/* Inputs */
+.system-input {
+  background: var(--system-window-bg) !important;
+  border: 1px solid var(--system-border) !important;
+  border-radius: var(--system-radius) !important;
+  padding: 10px 14px !important;
+  color: var(--system-text) !important;
+  font-size: 14px !important;
+  outline: none !important;
+  transition: all 0.2s ease !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.system-input:focus {
+  border-color: var(--system-accent) !important;
+  box-shadow: 0 0 0 3px rgba(125, 211, 252, 0.2) !important;
+}
+
+/* Typography */
+.system-text {
+  color: var(--system-text) !important;
+  font-size: 14px !important;
+  line-height: 1.5 !important;
+}
+
+.system-title {
+  color: var(--system-text) !important;
+  font-size: 24px !important;
+  font-weight: 700 !important;
+  margin-bottom: 16px !important;
+}
+
+/* ============================================
+   ACCESSIBILITY - Reduced Motion
+   ============================================ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  
+  .system-btn,
+  .system-card,
+  .system-app *,
+  .system-desktop-icon,
+  .system-desktop-window,
+  .taskbar-item,
+  .start-btn {
+    transition: none !important;
+    animation: none !important;
+    transform: none !important;
+  }
+  
+  .system-desktop-icon {
+    animation: none !important;
+  }
+}
+
+/* ============================================
+   FALLBACK - No backdrop-filter Support
+   ============================================ */
+@supports not (backdrop-filter: blur(10px)) {
+  .system-desktop-taskbar,
+  .taskbar,
+  .system-desktop-start-menu,
+  .system-desktop-window,
+  .system-card {
+    background: rgba(255, 255, 255, 0.92) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+}
+
+/* ============================================
+   MOBILE RESPONSIVE ADJUSTMENTS
+   ============================================ */
+@media (max-width: 768px) {
+  :root {
+    --system-taskbar-height: 64px;
+  }
+  
+  .system-desktop-taskbar,
+  .taskbar {
+    height: 64px !important;
+    padding: 0 8px !important;
+  }
+  
+  .system-desktop-taskbar__item,
+  .taskbar-item {
+    min-width: 56px !important;
+    height: 56px !important;
+    margin: 0 6px !important;
+  }
+  
+  .system-desktop-start-btn,
+  .start-btn {
+    padding: 10px 20px !important;
+    font-size: 14px !important;
+  }
+  
+  .system-desktop-icon {
+    min-width: 70px !important;
+    padding: 6px !important;
+  }
+  
+  .system-desktop-icon__icon {
+    font-size: 28px !important;
+  }
+  
+  .system-desktop-icon__label {
+    font-size: 10px !important;
+  }
+  
+  .system-desktop-start-menu {
+    min-width: 280px !important;
+    margin: 0 10px !important;
+  }
+}
+
+/* ============================================
+   ULTRAWIDE MONITOR SUPPORT
+   ============================================ */
+@media (min-width: 2560px) {
+  :root {
+    --system-taskbar-height: 60px;
+    --system-radius: 14px;
+    --system-radius-lg: 28px;
+  }
+  
+  .system-desktop-taskbar__item,
+  .taskbar-item {
+    min-width: 52px !important;
+    height: 52px !important;
+  }
+  
+  .system-desktop-icon {
+    min-width: 90px !important;
+    padding: 10px !important;
+  }
+  
+  .system-desktop-icon__icon {
+    font-size: 36px !important;
+  }
+}
+
+/* ============================================
+   PRINT STYLES
+   ============================================ */
+@media print {
+  .system-desktop-taskbar,
+  .taskbar,
+  .system-desktop-start-menu,
+  #themeCanvas {
+    display: none !important;
+  }
+  
+  .system-desktop-window {
+    box-shadow: none !important;
+    border: 1px solid #000 !important;
+  }
+}

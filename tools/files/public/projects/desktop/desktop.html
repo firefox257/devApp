@@ -1,0 +1,1476 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="default">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Material Icons OS</title>
+
+<!-- === LOCAL MATERIAL ICONS FONT (replaces Google Fonts CDN) === -->
+<style id="material-icons-font">
+@font-face {
+  font-family: 'Material Icons';
+  src: url('/system/fonts/MaterialIcons-Regular.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: block;
+}
+</style>
+
+<!-- === CORE SYSTEM VARIABLES (:root) - Source of truth for all themes === -->
+<style id="system-variables">
+:root {
+	/* Layout */
+	--system-taskbar-height: 50px;
+	--system-safe-bottom: env(safe-area-inset-bottom, 20px);
+
+	/* Design Tokens - Themes override these via :root */
+	--system-bg: #004e92;
+	--system-window-bg: #ffffff;
+	--system-header-bg: #e8e8e8;
+	--system-accent: #0078d4;
+	--system-accent-dim: #005a9e;
+	--system-highlight: #4da3ff;
+	--system-text: #333;
+	--system-text-dim: #666;
+	--system-text-on-accent: #ffffff;
+	--system-border: #ccc;
+	--system-border-hover: #999;
+	--system-menu-bg: rgba(30, 30, 30, 0.95);
+	--system-radius: 8px;
+	--system-radius-lg: 16px;
+	--system-shadow: 0 4px 12px rgba(0,0,0,0.15);
+	--system-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+	--system-font-mono: 'Courier New', Courier, monospace;
+
+	/* Extended palette for components */
+	--system-success: #4caf50;
+	--system-warning: #ffc107;
+	--system-danger: #f44336;
+	--system-info: #2196f3;
+
+	/* ✅ Icon variables (for theme override) */
+	--system-icon-border: none;
+	--system-icon-border-hover: 1px solid rgba(255,255,255,0.2);
+	--system-icon-bg: transparent;
+	--system-icon-bg-hover: rgba(255, 255, 255, 0.15);
+	
+	/* ✅ Desktop enhancement variables (v2.7+) */
+	--system-taskbar-glow: none;
+	--system-window-glow: none;
+	--system-icon-glow: none;
+	--system-start-menu-blur: 15px;
+	--system-taskbar-blur: 15px;
+}
+
+/* === BASE RESET & GLOBAL STYLES === */
+* { box-sizing: border-box; user-select: none; -webkit-user-select: none; touch-action: none; -webkit-tap-highlight-color: transparent; }
+
+/* === THEME CANVAS - MUST BE z-index 0 TO STAY BEHIND TASKBAR === */
+#themeCanvas {
+	position: fixed !important;
+	top: 0 !important;
+	left: 0 !important;
+	width: 100% !important;
+	height: 100% !important;
+	z-index: 0 !important;
+	pointer-events: none !important;
+	background: transparent !important;
+	display: none;
+}
+
+body {
+	margin: 0; padding: 0;
+	font-family: var(--system-font);
+	overflow: hidden;
+	height: 100dvh; width: 100vw;
+	background-color: var(--system-bg) !important;
+	transition: background 0.3s ease;
+	position: relative;
+	color: var(--system-text);
+	z-index: 1;
+}
+
+/* === MATERIAL ICONS - BASE CLASS (with ligature support for local font) === */
+.material-icons {
+	font-family: 'Material Icons' !important;
+	font-weight: normal !important;
+	font-style: normal !important;
+	font-size: 24px !important;
+	line-height: 1 !important;
+	letter-spacing: normal !important;
+	text-transform: none !important;
+	display: inline-flex !important;
+	align-items: center !important;
+	justify-content: center !important;
+	white-space: nowrap !important;
+	word-wrap: normal !important;
+	direction: ltr !important;
+	-webkit-font-feature-settings: 'liga' !important;
+	font-feature-settings: 'liga' !important;
+	-webkit-font-smoothing: antialiased !important;
+	color: var(--system-text);
+	vertical-align: middle;
+	transition: color 0.2s, text-shadow 0.2s;
+}
+
+/* === ICON BUTTONS - CENTERED & PROPERLY STYLED === */
+.icon-btn,
+.system-btn-icon,
+.taskbar-scroll-btn,
+.start-btn {
+	display: inline-flex !important;
+	align-items: center !important;
+	justify-content: center !important;
+	text-align: center !important;
+	vertical-align: middle !important;
+	
+	/* Material Icons font properties for icon buttons */
+	font-family: 'Material Icons' !important;
+	font-weight: normal !important;
+	font-style: normal !important;
+	line-height: 1 !important;
+	letter-spacing: normal !important;
+	text-transform: none !important;
+	white-space: nowrap !important;
+	word-wrap: normal !important;
+	direction: ltr !important;
+	-webkit-font-feature-settings: 'liga' !important;
+	font-feature-settings: 'liga' !important;
+	-webkit-font-smoothing: antialiased !important;
+	
+	cursor: pointer;
+	transition: all 0.2s ease;
+	background: transparent;
+	border: none;
+	color: var(--system-text);
+}
+
+/* Size variants */
+.icon-btn,
+.system-btn-icon {
+	width: 32px;
+	height: 32px;
+	border-radius: 6px;
+	font-size: 18px !important;
+}
+
+.taskbar-scroll-btn {
+	width: 32px;
+	height: 40px;
+	border-radius: 6px;
+	font-size: 18px !important;
+	background: rgba(255,255,255,0.1);
+}
+
+.start-btn {
+	width: 40px;
+	height: 40px;
+	border-radius: 6px;
+	font-size: 24px !important;
+}
+
+/* Hover/active states */
+.icon-btn:hover,
+.system-btn-icon:hover,
+.taskbar-scroll-btn:hover,
+.start-btn:hover {
+	background: rgba(0,0,0,0.1);
+}
+.icon-btn:active,
+.system-btn-icon:active,
+.taskbar-scroll-btn:active,
+.start-btn:active {
+	background: rgba(0,0,0,0.15);
+	transform: scale(0.95);
+}
+
+/* Close button special styling */
+.icon-btn.close-btn:hover {
+	background: #e81123 !important;
+	color: white !important;
+}
+
+/* Taskbar scroll button visibility */
+.taskbar-scroll-btn {
+	opacity: 0;
+	pointer-events: none;
+}
+.taskbar-scroll-btn.visible {
+	opacity: 1;
+	pointer-events: auto;
+}
+
+/* === DESKTOP LAYOUT === */
+.desktop-area,
+.system-desktop__container {
+	height: calc(100dvh - var(--system-taskbar-height) - var(--system-safe-bottom));
+	width: 100%;
+	padding: 10px;
+	display: flex;
+	flex-wrap: wrap;
+	align-content: flex-start;
+	gap: 8px;
+	position: relative;
+	z-index: 1;
+	overflow: hidden;
+}
+
+.system-desktop__grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
+	gap: 8px;
+	align-content: start;
+}
+
+/* === DESKTOP ICONS === */
+.icon,
+.system-desktop-icon {
+	width: 70px;
+	height: 80px;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	border-radius: var(--system-radius);
+	color: var(--system-text);
+	text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+	cursor: pointer;
+	background: var(--system-icon-bg);
+	border: var(--system-icon-border);
+	transition: all 0.2s ease;
+}
+.icon:hover,
+.system-desktop-icon:hover {
+	background: var(--system-icon-bg-hover);
+	border: var(--system-icon-border-hover);
+	box-shadow: var(--system-icon-glow);
+}
+.icon:active,
+.system-desktop-icon:active { background: var(--system-icon-bg-hover); }
+.icon .material-icons,
+.system-desktop-icon__icon { font-size: 32px; margin-bottom: 4px; color: var(--system-text); }
+.icon span,
+.system-desktop-icon__label { font-size: 11px; text-align: center; width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--system-text); }
+
+/* === 🍎 iOS/TOUCH DEVICE HOVER FIX - Prevents stuck highlight after window close === */
+@media (hover: none) and (pointer: coarse) {
+	.icon:hover,
+	.system-desktop-icon:hover {
+		background: var(--system-icon-bg) !important;
+		border: var(--system-icon-border) !important;
+		box-shadow: none !important;
+		transform: none !important;
+	}
+	/* Keep tap feedback via :active only */
+	.icon:active,
+	.system-desktop-icon:active {
+		background: var(--system-icon-bg-hover) !important;
+		transform: none !important;
+	}
+	/* Also fix taskbar items */
+	.taskbar-item:hover,
+	.system-desktop-taskbar__item:hover {
+		background: rgba(255,255,255,0.05) !important;
+		border-color: rgba(255,255,255,0.1) !important;
+	}
+	.taskbar-item:active,
+	.system-desktop-taskbar__item:active {
+		background: rgba(255,255,255,0.15) !important;
+		transform: none !important;
+	}
+	/* Fix menu items too */
+	.menu-item:hover,
+	.system-desktop-start-menu__item:hover {
+		background: transparent !important;
+	}
+	.menu-item:active,
+	.system-desktop-start-menu__item:active {
+		background: rgba(255,255,255,0.1) !important;
+	}
+}
+
+/* === START MENU === */
+.start-menu,
+.system-desktop-start-menu {
+	position: absolute;
+	bottom: calc(var(--system-taskbar-height) + var(--system-safe-bottom) + 10px);
+	left: 10px;
+	width: 280px;
+	background: var(--system-menu-bg);
+	backdrop-filter: blur(var(--system-start-menu-blur));
+	-webkit-backdrop-filter: blur(var(--system-start-menu-blur));
+	border-radius: var(--system-radius-lg);
+	padding: 10px;
+	z-index: 3001;
+	display: none;
+	box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+	border: 1px solid rgba(255,255,255,0.1);
+	animation: slideUp 0.2s ease-out;
+}
+@keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+.menu-header,
+.system-desktop-start-menu__header { padding: 10px; border-bottom: 1px solid var(--system-border); margin-bottom: 5px; display: flex; align-items: center; gap: 10px; }
+.menu-avatar,
+.system-desktop-start-menu__avatar { width: 36px; height: 36px; background: var(--system-accent); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; color: var(--system-text-on-accent); }
+.menu-list,
+.system-desktop-start-menu__list { display: flex; flex-direction: column; gap: 2px; }
+.menu-item,
+.system-desktop-start-menu__item { display: flex; align-items: center; padding: 12px; border-radius: 8px; color: var(--system-text); cursor: pointer; transition: all 0.2s ease; }
+.menu-item:hover,
+.system-desktop-start-menu__item:hover { background: rgba(255,255,255,0.1); }
+.menu-item:active,
+.system-desktop-start-menu__item:active { background: rgba(255,255,255,0.15); }
+.menu-item .material-icons { margin-right: 15px; font-size: 20px; color: var(--system-text-dim); }
+
+/* === WINDOWS CONTAINER === */
+#windowsContainer,
+.system-desktop__windows-container {
+	position: absolute; top: 0; left: 0; width: 100%;
+	height: calc(100dvh - var(--system-taskbar-height) - var(--system-safe-bottom));
+	overflow: hidden; pointer-events: none; z-index: 100;
+}
+#windowsContainer > .window { pointer-events: auto; }
+
+/* === WINDOWS === */
+.window,
+.system-desktop-window {
+	position: absolute; top: 10%; left: 5%; width: 90%; height: 70%;
+	background: var(--system-window-bg); border-radius: var(--system-radius-lg);
+	box-shadow: var(--system-window-glow), var(--system-shadow);
+	display: flex; flex-direction: column; overflow: hidden;
+	border: 1px solid var(--system-border);
+	min-width: 200px; min-height: 150px;
+	transition: transform 0.2s, opacity 0.2s;
+}
+.window.minimized,
+.system-desktop-window--minimized { transform: scale(0.8) translateY(200px); opacity: 0; pointer-events: none; }
+.window.maximized,
+.system-desktop-window--maximized { width: 100% !important; height: calc(100dvh - var(--system-taskbar-height) - var(--system-safe-bottom)) !important; top: 0 !important; left: 0 !important; border-radius: 0 !important; }
+
+.window-header,
+.system-desktop-window__header {
+	height: 40px; background: var(--system-header-bg);
+	display: flex; align-items: center; justify-content: space-between;
+	padding: 0 10px; border-bottom: 1px solid var(--system-border);
+	cursor: grab;
+}
+.window-header:active,
+.system-desktop-window__header:active { cursor: grabbing; }
+.window-title-area { display: flex; align-items: center; gap: 8px; flex: 1; overflow: hidden; }
+.window-title,
+.system-desktop-window__title { font-size: 13px; color: var(--system-text); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.window-controls,
+.system-desktop-window__controls { display: flex; gap: 4px; align-items: center; }
+.window-content,
+.system-desktop-window__content { flex: 1; background: var(--system-window-bg); color: var(--system-text); overflow: hidden; display: flex; flex-direction: column; position: relative; }
+
+/* Click Blocker for iframes */
+.click-blocker { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: transparent; z-index: 100; cursor: pointer; }
+.click-blocker.hidden { display: none; }
+
+/* === BROWSER TOOLBAR === */
+.browser-toolbar,
+.system-desktop-browser__toolbar { display: flex; align-items: center; gap: 8px; padding: 8px; background: var(--system-header-bg); border-bottom: 1px solid var(--system-border); }
+.address-bar,
+.system-desktop-browser__address { flex: 1; height: 32px; border: 1px solid var(--system-border); border-radius: 16px; padding: 0 12px; font-size: 13px; background: var(--system-window-bg); color: var(--system-text); outline: none; user-select: text; -webkit-user-select: text; }
+.address-bar::placeholder,
+.system-desktop-browser__address::placeholder { color: var(--system-text-dim); }
+.address-bar:focus,
+.system-desktop-browser__address:focus { border-color: var(--system-accent); box-shadow: 0 0 10px rgba(0, 120, 212, 0.3); }
+.iframe-container,
+.system-desktop-browser__iframe-container { flex: 1; position: relative; background: var(--system-window-bg); }
+.web-iframe { width: 100%; height: 100%; border: none; background: white; }
+.content-padding { padding: 15px; overflow-y: auto; -webkit-overflow-scrolling: touch; font-size: 14px; line-height: 1.5; flex: 1; color: var(--system-text); }
+.content-padding h3 { color: var(--system-accent); border-bottom: 1px solid var(--system-border); padding-bottom: 8px; margin-top: 0; }
+
+/* === RESIZE HANDLE === */
+.resize-handle { position: absolute; bottom: 0; right: 0; width: 20px; height: 20px; cursor: nwse-resize; z-index: 10; background: linear-gradient(135deg, transparent 50%, var(--system-accent) 50%); opacity: 0.5; transition: opacity 0.2s; }
+.resize-handle:active { opacity: 1; box-shadow: 0 0 15px rgba(0, 120, 212, 0.6); }
+
+/* === TASKBAR - z-index MUST BE HIGHER THAN CANVAS === */
+.taskbar,
+.system-desktop-taskbar {
+	position: absolute !important;
+	bottom: 0 !important;
+	width: 100% !important;
+	height: calc(var(--system-taskbar-height) + var(--system-safe-bottom));
+	background: rgba(20, 20, 20, 0.9);
+	backdrop-filter: blur(var(--system-taskbar-blur)); -webkit-backdrop-filter: blur(var(--system-taskbar-blur));
+	display: flex; align-items: flex-end; justify-content: space-between;
+	padding: 0 10px; padding-bottom: var(--system-safe-bottom);
+	z-index: 3000 !important;
+	border-top: 1px solid rgba(255,255,255,0.1);
+	box-shadow: var(--system-taskbar-glow);
+}
+
+.start-btn,
+.system-desktop-taskbar__start-btn { 
+	flex-shrink: 0; 
+	padding: 0 !important;
+	margin: 0 !important;
+}
+
+.taskbar-apps-wrapper,
+.system-desktop-taskbar__apps-wrapper {
+	flex: 1; display: flex; align-items: flex-end;
+	padding-left: 10px; padding-right: 10px; gap: 6px;
+	position: relative; overflow: hidden;
+}
+.taskbar-apps,
+.system-desktop-taskbar__apps {
+	display: flex; gap: 6px; overflow-x: auto; -webkit-overflow-scrolling: touch;
+	scroll-behavior: smooth; scrollbar-width: none; -ms-overflow-style: none; padding: 3px 0;
+}
+.taskbar-apps::-webkit-scrollbar { display: none; }
+
+.taskbar-item,
+.system-desktop-taskbar__item {
+	min-width: 44px; height: 44px; display: flex; align-items: center; justify-content: center;
+	border-radius: 6px; position: relative; color: var(--system-text); cursor: pointer;
+	background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
+	flex-shrink: 0; transition: all 0.2s ease;
+}
+.taskbar-item:hover,
+.system-desktop-taskbar__item:hover { background: rgba(255,255,255,0.15); border-color: rgba(255,255,255,0.2); }
+.taskbar-item:active,
+.system-desktop-taskbar__item:active { background: rgba(255,255,255,0.2); transform: scale(0.95); }
+.taskbar-item.active,
+.system-desktop-taskbar__item--active { background: rgba(255,255,255,0.25); border-color: rgba(255,255,255,0.3); }
+.taskbar-item::after,
+.system-desktop-taskbar__item--active::after {
+	content: ''; position: absolute; bottom: 4px; width: 4px; height: 4px;
+	background: var(--system-accent); border-radius: 50%; transition: width 0.2s;
+}
+.taskbar-item.active::after,
+.system-desktop-taskbar__item--active::after { width: 16px; border-radius: 2px; }
+
+.system-tray,
+.system-desktop-tray { display: flex; align-items: center; gap: 8px; color: var(--system-text); font-size: 12px; padding-right: 5px; padding-bottom: 5px; text-align: right; flex-shrink: 0; }
+.clock,
+.system-desktop-clock { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.1; font-weight: 500; }
+#time, #date { text-shadow: 0 0 10px rgba(255,255,255,0.3); }
+#date { font-size: 10px; opacity: 0.7; color: var(--system-text-dim); }
+
+/* === SCROLLBARS === */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: var(--system-window-bg); border-radius: 4px; }
+::-webkit-scrollbar-thumb { background: var(--system-border); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--system-border-hover); }
+
+/* === ANIMATIONS === */
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+/* === ACCESSIBILITY: REDUCED MOTION === */
+@media (prefers-reduced-motion: reduce) {
+	*, *::before, *::after,
+	.system-desktop-icon,
+	.system-desktop-window,
+	.system-desktop-taskbar,
+	.system-desktop-start-menu {
+		animation-duration: 0.01ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.01ms !important;
+		transform: none !important;
+	}
+}
+
+/* === BACKDROP-FILTER FALLBACK === */
+@supports not (backdrop-filter: blur(10px)) {
+	.start-menu, .taskbar,
+	.system-desktop-start-menu, .system-desktop-taskbar {
+		background: rgba(30, 30, 30, 0.98) !important;
+	}
+}
+</style>
+
+<!-- === SYSTEM COMPONENT CLASSES (.system-*) - For iframe apps ONLY === -->
+<style id="system-components">
+/* === TYPOGRAPHY === */
+.system-text { font-size: 14px; line-height: 1.4; color: var(--system-text); margin: 0 0 8px; }
+.system-text-large { font-size: 16px; font-weight: 500; }
+.system-text-small { font-size: 12px; color: var(--system-text-dim); }
+.system-text-dim { color: var(--system-text-dim); }
+.system-title { font-size: 24px; font-weight: 700; margin: 0 0 16px; color: var(--system-text); }
+.system-subtitle { font-size: 18px; font-weight: 600; margin: 0 0 12px; color: var(--system-text); }
+.system-heading { font-size: 16px; font-weight: 600; margin: 0 0 8px; color: var(--system-text); }
+.system-label { font-size: 14px; font-weight: 500; margin: 0 0 4px; color: var(--system-text); display: block; }
+.system-font-mono { font-family: var(--system-font-mono); }
+
+/* === BUTTONS === */
+.system-btn {
+	padding: 8px 16px; border-radius: var(--system-radius);
+	background: var(--system-accent); color: var(--system-text-on-accent);
+	border: none; font-size: 14px; font-weight: 500; cursor: pointer;
+	display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+	transition: opacity 0.2s, transform 0.1s, box-shadow 0.2s;
+}
+.system-btn:hover { opacity: 0.9; box-shadow: 0 0 15px rgba(0, 120, 212, 0.4); }
+.system-btn:active { transform: scale(0.98); }
+.system-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.system-btn-secondary { background: transparent; color: var(--system-text); border: 1px solid var(--system-border); }
+.system-btn-secondary:hover { background: rgba(0,0,0,0.05); border-color: var(--system-accent); }
+.system-btn-ghost { background: transparent; color: var(--system-text); border: none; }
+.system-btn-ghost:hover { background: rgba(0,0,0,0.05); }
+.system-btn-danger { background: var(--system-danger); color: #fff; }
+.system-btn-danger:hover { box-shadow: 0 0 15px rgba(244, 67, 54, 0.5); }
+.system-btn-sm { padding: 4px 12px; font-size: 12px; }
+.system-btn-lg { padding: 12px 24px; font-size: 16px; }
+
+/* === FORMS & INPUTS === */
+.system-input, .system-select, .system-textarea {
+	width: 100%; padding: 8px 12px; border-radius: var(--system-radius);
+	border: 1px solid var(--system-border); background: var(--system-window-bg);
+	color: var(--system-text); font-size: 14px; font-family: var(--system-font);
+	transition: border-color 0.2s, box-shadow 0.2s;
+}
+.system-input:focus, .system-select:focus, .system-textarea:focus {
+	outline: none; border-color: var(--system-accent);
+	box-shadow: 0 0 0 3px rgba(0, 120, 212, 0.15);
+}
+.system-input-lg { padding: 12px 16px; font-size: 16px; }
+.system-input-sm { padding: 4px 8px; font-size: 12px; }
+.system-textarea { min-height: 80px; resize: vertical; font-family: inherit; }
+.system-select { appearance: none; background-image: url("image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23666' d='M6 8L1 3h10z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 32px; }
+.system-checkbox, .system-radio { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.system-checkbox input, .system-radio input { width: 16px; height: 16px; cursor: pointer; accent-color: var(--system-accent); }
+.system-switch { position: relative; display: inline-block; width: 44px; height: 24px; }
+.system-switch input { opacity: 0; width: 0; height: 0; }
+.system-switch-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--system-border); border-radius: 24px; transition: 0.3s; }
+.system-switch-slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: var(--system-text); border-radius: 50%; transition: 0.3s; }
+.system-switch input:checked + .system-switch-slider { background-color: var(--system-accent); }
+.system-switch input:checked + .system-switch-slider:before { transform: translateX(20px); }
+.system-form-group { margin: 0 0 16px; }
+.system-form-help { font-size: 12px; color: var(--system-text-dim); display: block; margin-top: 4px; }
+.system-form-error { font-size: 12px; color: var(--system-danger); display: block; margin-top: 4px; }
+.system-input-icon { position: relative; }
+.system-input-icon .material-icons { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--system-text-dim); font-size: 18px; pointer-events: none; }
+.system-input-icon input { padding-left: 36px; }
+.system-fieldset { border: 1px solid var(--system-border); border-radius: var(--system-radius); padding: 12px; margin: 0 0 16px; }
+.system-fieldset legend { padding: 0 8px; font-size: 12px; font-weight: 500; color: var(--system-text-dim); }
+
+/* === CONTAINERS & LAYOUT === */
+.system-card { background: var(--system-window-bg); border-radius: var(--system-radius); border: 1px solid var(--system-border); box-shadow: var(--system-shadow); overflow: hidden; }
+.system-card-header { padding: 12px 16px; border-bottom: 1px solid var(--system-border); background: var(--system-header-bg); font-weight: 600; }
+.system-card-body { padding: 16px; }
+.system-card-footer { padding: 12px 16px; border-top: 1px solid var(--system-border); display: flex; justify-content: flex-end; gap: 8px; }
+.system-panel { background: rgba(0,0,0,0.03); border: 1px solid var(--system-border); border-radius: var(--system-radius); padding: 12px; }
+.system-container { max-width: 1200px; margin: 0 auto; padding: 0 16px; }
+.system-grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+.system-grid-item { min-width: 0; }
+.system-flex { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.system-flex-item { flex: 1; min-width: 0; }
+.system-stack { display: flex; flex-direction: column; gap: 12px; }
+.system-divider { border-top: 1px solid var(--system-border); margin: 16px 0; }
+.system-spacer { height: 16px; }
+
+/* === NAVIGATION & MENUS === */
+.system-nav { display: flex; list-style: none; padding: 0; margin: 0; gap: 4px; }
+.system-nav-item { padding: 8px 12px; border-radius: var(--system-radius); color: var(--system-text); cursor: pointer; font-size: 14px; }
+.system-nav-item:hover { background: rgba(0,0,0,0.05); }
+.system-nav-item-active { background: var(--system-accent); color: var(--system-text-on-accent); }
+.system-menu { position: absolute; background: var(--system-menu-bg); border-radius: var(--system-radius); padding: 4px 0; min-width: 180px; box-shadow: var(--system-shadow); border: 1px solid rgba(255,255,255,0.1); z-index: 1000; }
+.system-menu-item { padding: 10px 16px; color: var(--system-text); cursor: pointer; display: flex; align-items: center; gap: 10px; font-size: 14px; }
+.system-menu-item:hover { background: rgba(255,255,255,0.1); }
+.system-menu-divider { border-top: 1px solid rgba(255,255,255,0.1); margin: 4px 0; }
+.system-tabs { display: flex; border-bottom: 1px solid var(--system-border); gap: 4px; }
+.system-tab { padding: 10px 16px; border-bottom: 2px solid transparent; color: var(--system-text-dim); cursor: pointer; font-size: 14px; }
+.system-tab:hover { color: var(--system-text); }
+.system-tab-active { border-bottom-color: var(--system-accent); color: var(--system-accent); font-weight: 500; }
+.system-tab-panel { padding: 16px 0; }
+
+/* === DATA DISPLAY === */
+.system-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.system-table th, .system-table td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--system-border); }
+.system-table th { background: var(--system-header-bg); font-weight: 600; color: var(--system-text); }
+.system-table tr:hover { background: rgba(0,0,0,0.03); }
+.system-list { list-style: none; padding: 0; margin: 0; }
+.system-list-item { padding: 10px 12px; border-bottom: 1px solid var(--system-border); display: flex; align-items: center; justify-content: space-between; }
+.system-list-item:last-child { border-bottom: none; }
+.system-badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 500; background: var(--system-border); color: var(--system-text); }
+.system-badge-success { background: var(--system-success); color: #fff; }
+.system-badge-warning { background: var(--system-warning); color: #212529; }
+.system-badge-danger { background: var(--system-danger); color: #fff; }
+.system-tag { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; background: rgba(0,0,0,0.05); border-radius: 16px; font-size: 12px; border: 1px solid var(--system-border); }
+.system-avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--system-accent); color: var(--system-text-on-accent); display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 14px; }
+.system-avatar-lg { width: 48px; height: 48px; font-size: 18px; }
+.system-progress { height: 6px; background: var(--system-border); border-radius: 3px; overflow: hidden; }
+.system-progress-bar { height: 100%; background: var(--system-accent); border-radius: 3px; transition: width 0.3s; }
+.system-stat { display: flex; flex-direction: column; }
+.system-stat-value { font-size: 24px; font-weight: 700; color: var(--system-accent); }
+.system-stat-label { font-size: 12px; color: var(--system-text-dim); }
+.system-thumbnail { width: 100%; height: 80px; object-fit: cover; border-radius: var(--system-radius); border: 1px solid var(--system-border); transition: transform 0.2s, box-shadow 0.2s; cursor: pointer; }
+.system-thumbnail:hover { transform: scale(1.02); box-shadow: 0 0 15px rgba(0, 120, 212, 0.4); }
+
+/* === FEEDBACK & STATUS === */
+.system-alert { padding: 12px 16px; border-radius: var(--system-radius); border-left: 4px solid var(--system-accent); background: rgba(0, 120, 212, 0.1); margin: 0 0 12px; display: flex; align-items: flex-start; gap: 10px; }
+.system-alert-success { border-left-color: var(--system-success); background: rgba(76, 175, 80, 0.1); }
+.system-alert-warning { border-left-color: var(--system-warning); background: rgba(255, 193, 7, 0.1); }
+.system-alert-danger { border-left-color: var(--system-danger); background: rgba(244, 67, 54, 0.1); }
+.system-alert-info { border-left-color: var(--system-info); background: rgba(33, 150, 243, 0.1); }
+.system-spinner { width: 24px; height: 24px; border: 2px solid var(--system-border); border-top-color: var(--system-accent); border-radius: 50%; animation: spin 0.8s linear infinite; display: inline-block; }
+.system-skeleton { background: linear-gradient(90deg, rgba(0,0,0,0.05) 25%, rgba(0,0,0,0.1) 50%, rgba(0,0,0,0.05) 75%); background-size: 200% 100%; animation: skeleton-loading 1.5s infinite; border-radius: var(--system-radius); height: 16px; }
+@keyframes skeleton-loading { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+.system-empty { text-align: center; padding: 40px 20px; color: var(--system-text-dim); }
+.system-empty .material-icons { font-size: 48px; color: var(--system-border); margin-bottom: 12px; }
+
+/* === MEDIA & ICONS === */
+.system-icon { display: inline-flex; align-items: center; justify-content: center; color: var(--system-text); }
+.system-icon-sm { font-size: 16px; }
+.system-icon-lg { font-size: 32px; }
+.system-image { max-width: 100%; height: auto; border-radius: var(--system-radius); }
+
+/* === UTILITIES === */
+.system-hidden { display: none !important; }
+.system-text-center { text-align: center !important; }
+.system-text-left { text-align: left !important; }
+.system-text-right { text-align: right !important; }
+.system-mt-1 { margin-top: 4px; } .system-mt-2 { margin-top: 8px; }
+.system-mt-3 { margin-top: 12px; } .system-mt-4 { margin-top: 16px; }
+.system-mt-5 { margin-top: 20px; }
+.system-mb-1 { margin-bottom: 4px; } .system-mb-2 { margin-bottom: 8px; }
+.system-mb-3 { margin-bottom: 12px; } .system-mb-4 { margin-bottom: 16px; }
+.system-mb-5 { margin-bottom: 20px; }
+.system-p-1 { padding: 4px; } .system-p-2 { padding: 8px; }
+.system-p-3 { padding: 12px; } .system-p-4 { padding: 16px; }
+.system-p-5 { padding: 20px; }
+.system-rounded { border-radius: var(--system-radius); }
+.system-rounded-lg { border-radius: var(--system-radius-lg); }
+.system-shadow { box-shadow: var(--system-shadow); }
+.system-border { border: 1px solid var(--system-border); }
+.system-overflow-auto { overflow: auto; -webkit-overflow-scrolling: touch; }
+.system-truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; display: block; }
+
+/* === .system-app ZERO-CONFIG CONTAINER === */
+.system-app {
+	font-family: var(--system-font);
+	color: var(--system-text);
+	background: transparent;
+	padding: 16px;
+	font-size: 14px;
+	line-height: 1.5;
+}
+.system-app h1, .system-app h2, .system-app h3, .system-app h4, .system-app h5, .system-app h6 {
+	font-family: var(--system-font);
+	color: var(--system-text);
+	margin: 0 0 12px;
+	font-weight: 600;
+}
+.system-app h1 { font-size: 24px; }
+.system-app h2 { font-size: 20px; }
+.system-app h3 { font-size: 18px; }
+.system-app p { margin: 0 0 12px; color: var(--system-text); }
+.system-app a { color: var(--system-accent); text-decoration: none; }
+.system-app a:hover { text-decoration: underline; }
+.system-app input, .system-app textarea, .system-app select, .system-app button { font-family: var(--system-font); }
+.system-app button {
+	padding: 8px 16px; border-radius: var(--system-radius);
+	background: var(--system-accent); color: var(--system-text-on-accent);
+	border: none; cursor: pointer; font-size: 14px; font-weight: 500;
+}
+.system-app button:hover { opacity: 0.9; box-shadow: 0 0 15px rgba(0, 120, 212, 0.4); }
+.system-app input, .system-app textarea, .system-app select {
+	padding: 8px 12px; border-radius: var(--system-radius);
+	border: 1px solid var(--system-border); background: var(--system-window-bg);
+	color: var(--system-text); width: 100%; box-sizing: border-box;
+}
+.system-app input:focus, .system-app textarea:focus, .system-app select:focus {
+	outline: none; border-color: var(--system-accent);
+	box-shadow: 0 0 0 3px rgba(0, 120, 212, 0.15);
+}
+.system-app table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.system-app th, .system-app td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--system-border); }
+.system-app th { background: var(--system-header-bg); font-weight: 600; }
+.system-app .card, .system-app .panel {
+	background: var(--system-window-bg); border-radius: var(--system-radius);
+	border: 1px solid var(--system-border); box-shadow: var(--system-shadow);
+	padding: 16px; margin: 0 0 16px;
+}
+.system-app .alert {
+	padding: 12px 16px; border-radius: var(--system-radius);
+	border-left: 4px solid var(--system-accent);
+	background: rgba(0, 120, 212, 0.1); margin: 0 0 12px;
+}
+.system-app .badge {
+	display: inline-block; padding: 2px 8px; border-radius: 12px;
+	font-size: 11px; font-weight: 500; background: var(--system-border);
+	color: var(--system-text);
+}
+.system-app .mt-1 { margin-top: 4px; } .system-app .mt-2 { margin-top: 8px; }
+.system-app .mt-3 { margin-top: 12px; } .system-app .mt-4 { margin-top: 16px; }
+.system-app .text-center { text-align: center; }
+
+/* === ACCESSIBILITY & FALLBACKS === */
+@media (prefers-reduced-motion: reduce) {
+	.system-btn, .system-card, .system-app * {
+		transition: none !important;
+		animation: none !important;
+	}
+}
+@supports not (backdrop-filter: blur(10px)) {
+	.system-card, .system-app .card {
+		background: var(--system-window-bg) !important;
+		backdrop-filter: none !important;
+	}
+}
+</style>
+
+<!-- === DESKTOP SHELL SYSTEM CLASSES (.system-desktop-*) - v2.7+ === -->
+<style id="system-desktop">
+/* Taskbar enhancements */
+.system-desktop-taskbar {
+	backdrop-filter: blur(var(--system-taskbar-blur));
+	-webkit-backdrop-filter: blur(var(--system-taskbar-blur));
+	box-shadow: var(--system-taskbar-glow);
+}
+
+.system-desktop-taskbar__item {
+	position: relative;
+}
+
+.system-desktop-taskbar__item--active::after {
+	background: var(--system-accent);
+}
+
+.system-desktop-taskbar__scroll-btn {
+	color: var(--system-text);
+	border: 1px solid var(--system-border);
+}
+
+.system-desktop-taskbar__scroll-btn:hover {
+	border-color: var(--system-border-hover);
+}
+
+/* Start Menu enhancements */
+.system-desktop-start-menu {
+	backdrop-filter: blur(var(--system-start-menu-blur));
+	-webkit-backdrop-filter: blur(var(--system-start-menu-blur));
+	animation: slideUp 0.2s ease-out;
+}
+
+.system-desktop-start-menu__item {
+	transition: background 0.2s ease;
+}
+
+.system-desktop-start-menu__item:hover {
+	background: rgba(255,255,255,0.1);
+}
+
+/* Window enhancements */
+.system-desktop-window {
+	box-shadow: var(--system-window-glow), var(--system-shadow);
+	border: 1px solid var(--system-border);
+}
+
+.system-desktop-window__header {
+	cursor: grab;
+	border-bottom: 1px solid var(--system-border);
+}
+
+.system-desktop-window__header:active {
+	cursor: grabbing;
+}
+
+.system-desktop-window__control--close:hover {
+	background: var(--system-danger);
+}
+
+.system-desktop-window__control--close:hover .material-icons {
+	color: var(--system-text-on-accent);
+}
+
+.system-desktop-window--minimized {
+	transform: scale(0.8) translateY(200px);
+	opacity: 0;
+	pointer-events: none;
+}
+
+.system-desktop-window--maximized {
+	border-radius: 0 !important;
+	box-shadow: none !important;
+}
+
+/* Desktop Icon enhancements */
+.system-desktop-icon {
+	background: var(--system-icon-bg);
+	border: var(--system-icon-border);
+	border-radius: var(--system-radius);
+	transition: all 0.2s ease;
+}
+
+.system-desktop-icon:hover {
+	background: var(--system-icon-bg-hover);
+	border: var(--system-icon-border-hover);
+	box-shadow: var(--system-icon-glow);
+	transform: translateY(-2px);
+}
+
+.system-desktop-icon__label {
+	color: var(--system-text);
+	font-size: 11px;
+	text-align: center;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* Browser enhancements */
+.system-desktop-browser__toolbar {
+	border-bottom: 1px solid var(--system-border);
+	background: var(--system-header-bg);
+}
+
+.system-desktop-browser__btn {
+	border: 1px solid var(--system-border);
+	transition: all 0.2s ease;
+}
+
+.system-desktop-browser__btn:hover {
+	border-color: var(--system-accent);
+	background: rgba(0,0,0,0.1);
+}
+
+.system-desktop-browser__address {
+	border: 1px solid var(--system-border);
+	background: var(--system-window-bg);
+}
+
+.system-desktop-browser__address:focus {
+	border-color: var(--system-accent);
+	box-shadow: 0 0 10px rgba(0, 120, 212, 0.3);
+}
+
+/* Utility classes */
+.system-desktop__container {
+	padding: 10px;
+	gap: 8px;
+}
+
+.system-desktop__grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
+	gap: 8px;
+	align-content: start;
+}
+
+.system-desktop__divider {
+	border-top: 1px solid var(--system-border);
+	margin: 8px 0;
+}
+
+.system-desktop__spacer {
+	height: 16px;
+}
+
+.system-desktop__hidden {
+	display: none !important;
+}
+
+/* Reduced motion support for desktop classes */
+@media (prefers-reduced-motion: reduce) {
+	.system-desktop-icon,
+	.system-desktop-window,
+	.system-desktop-taskbar,
+	.system-desktop-start-menu,
+	.system-desktop-browser__btn {
+		transition: none !important;
+		animation: none !important;
+		transform: none !important;
+	}
+}
+
+/* Backdrop-filter fallback for desktop classes */
+@supports not (backdrop-filter: blur(10px)) {
+	.system-desktop-taskbar,
+	.system-desktop-start-menu {
+		background: rgba(30, 30, 30, 0.98) !important;
+		backdrop-filter: none !important;
+	}
+}
+</style>
+
+<!-- === DYNAMIC THEME STYLES (injected at runtime) === -->
+<link id="theme-stylesheet" rel="stylesheet" href="">
+<style id="theme-inline"></style>
+</head>
+<body data-theme="default">
+
+<!-- Theme Animation Canvas - z-index 0 to stay behind taskbar -->
+<canvas id="themeCanvas" style="z-index: 0 !important;"></canvas>
+
+<!-- Desktop Icons -->
+<div class="desktop-area system-desktop__container system-desktop__grid">
+	<div class="icon system-desktop-icon" onclick="appManager.open('This PC', 'desktop_windows', 'pc')">
+		<span class="material-icons system-desktop-icon__icon">desktop_windows</span>
+		<span class="system-desktop-icon__label">This PC</span>
+	</div>
+	<div class="icon system-desktop-icon" onclick="appManager.open('Browser', 'public', 'browser')">
+		<span class="material-icons system-desktop-icon__icon">public</span>
+		<span class="system-desktop-icon__label">Browser</span>
+	</div>
+	<div class="icon system-desktop-icon" onclick="appManager.open('Settings', 'settings', 'settings')">
+		<span class="material-icons system-desktop-icon__icon">settings</span>
+		<span class="system-desktop-icon__label">Settings</span>
+	</div>
+	<div class="icon system-desktop-icon" onclick="appManager.open('Terminal', 'terminal', 'terminal')">
+		<span class="material-icons system-desktop-icon__icon">terminal</span>
+		<span class="system-desktop-icon__label">Terminal</span>
+	</div>
+	<div class="icon system-desktop-icon" onclick="appManager.open('Photos', 'photo_library', 'photos')">
+		<span class="material-icons system-desktop-icon__icon">photo_library</span>
+		<span class="system-desktop-icon__label">Photos</span>
+	</div>
+</div>
+
+<!-- Start Menu -->
+<div class="start-menu system-desktop-start-menu" id="startMenu">
+	<div class="menu-header system-desktop-start-menu__header">
+		<div class="menu-avatar system-desktop-start-menu__avatar">U</div>
+		<div style="color:var(--system-text); font-weight:600;">User</div>
+	</div>
+	<div class="menu-list system-desktop-start-menu__list">
+		<div class="menu-item system-desktop-start-menu__item" onclick="appManager.open('Settings', 'settings', 'settings')">
+			<span class="material-icons">settings</span> <span>Settings</span>
+		</div>
+		<div class="menu-item system-desktop-start-menu__item" onclick="appManager.open('Browser', 'public', 'browser')">
+			<span class="material-icons">public</span> <span>Web Browser</span>
+		</div>
+		<div class="menu-item system-desktop-start-menu__item" onclick="appManager.open('Calculator', 'calculate', 'calculator')">
+			<span class="material-icons">calculate</span> <span>Calculator</span>
+		</div>
+		<div class="menu-item system-desktop-start-menu__item" onclick="appManager.open('Terminal', 'terminal', 'terminal')">
+			<span class="material-icons">terminal</span> <span>Terminal</span>
+		</div>
+		<div class="menu-item system-desktop-start-menu__item" onclick="alert('Shutting down...'); toggleStartMenu()">
+			<span class="material-icons">power_off</span> <span>Shut Down</span>
+		</div>
+	</div>
+</div>
+
+<!-- Windows Container -->
+<div id="windowsContainer" class="system-desktop__windows-container"></div>
+
+<!-- Taskbar - z-index 3000 to be above canvas -->
+<div class="taskbar system-desktop-taskbar" style="z-index: 3000 !important;">
+	<span class="start-btn system-desktop-taskbar__start-btn material-icons" id="startBtn" onclick="toggleStartMenu()">apps</span>
+
+	<div class="taskbar-apps-wrapper system-desktop-taskbar__apps-wrapper">
+		<span class="taskbar-scroll-btn system-desktop-taskbar__scroll-btn material-icons" id="scrollLeftBtn" onclick="appManager.scrollTaskbar(-200)">chevron_left</span>
+		<div class="taskbar-apps system-desktop-taskbar__apps" id="taskbarApps"></div>
+		<span class="taskbar-scroll-btn system-desktop-taskbar__scroll-btn material-icons" id="scrollRightBtn" onclick="appManager.scrollTaskbar(200)">chevron_right</span>
+	</div>
+
+	<div class="system-tray system-desktop-tray">
+		<div class="clock system-desktop-clock">
+			<span id="time">12:00</span>
+			<span id="date">Oct 24</span>
+		</div>
+	</div>
+</div>
+
+<!-- === THEME BRIDGE FOR IFRAME APPS === -->
+<script>
+(function() {
+		if (window.frameElement && window.frameElement.hasAttribute('data-os-app')) {
+			window.parent.postMessage({ type: 'themeRequest', appId: window.frameElement.dataset.appId }, '*');
+			window.addEventListener('message', function(e) {
+					if (e.data?.type === 'themeUpdate') {
+						const root = document.documentElement;
+						for (const [key, value] of Object.entries(e.data.variables)) {
+							root.style.setProperty(key, value);
+						}
+						window.dispatchEvent(new CustomEvent('osThemeChanged', {
+									detail: { themeId: e.data.themeId, variables: e.data.variables }
+								}));
+					}
+				});
+			window.addEventListener('load', function() {
+					window.parent.postMessage({ type: 'appReady', appId: window.frameElement.dataset.appId }, '*');
+				});
+		}
+	})();
+</script>
+
+<!-- === THEME MANAGER v3.0 (FIXED) === -->
+<script>
+const ThemeManager = {
+	configUrl: 'themes.json', baseUrl: '', currentTheme: null, themeConfig: null,
+	activeCleanup: null, themeScriptEl: null,
+	themeLinkEl: document.getElementById('theme-stylesheet'),
+	canvas: document.getElementById('themeCanvas'),
+	themeIntervals: [], themeTimeouts: [], themeAnimationFrames: [],
+
+	getSystemVariables() {
+		const root = document.documentElement; const style = getComputedStyle(root);
+		const varNames = ['--system-bg','--system-window-bg','--system-header-bg','--system-accent','--system-accent-dim','--system-highlight','--system-text','--system-text-dim','--system-text-on-accent','--system-border','--system-border-hover','--system-menu-bg','--system-radius','--system-radius-lg','--system-shadow','--system-font','--system-font-mono','--system-taskbar-height','--system-safe-bottom','--system-success','--system-warning','--system-danger','--system-info','--system-icon-border','--system-icon-border-hover','--system-icon-bg','--system-icon-bg-hover','--system-taskbar-glow','--system-window-glow','--system-icon-glow','--system-start-menu-blur','--system-taskbar-blur'];
+		const vars = {};
+		for (const name of varNames) vars[name] = style.getPropertyValue(name).trim();
+		return vars;
+	},
+
+	broadcastThemeToApps(themeId = this.currentTheme) {
+		if (!themeId) return;
+		const systemVars = this.getSystemVariables();
+		document.querySelectorAll('iframe[data-os-app]').forEach(iframe => {
+				try {
+					const targetOrigin = iframe.src?.startsWith('http') ? new URL(iframe.src).origin : window.location.origin;
+					iframe.contentWindow.postMessage({ type: 'themeUpdate', themeId, variables: systemVars, timestamp: Date.now() }, targetOrigin);
+				} catch (e) { console.warn('⚠ Could not sync theme to iframe:', e); }
+			});
+	},
+
+	registerIframeApp(iframe) {
+		if (!iframe.hasAttribute('data-os-app')) iframe.setAttribute('data-os-app', 'true');
+		setTimeout(() => this.broadcastThemeToApps(this.currentTheme), 100);
+	},
+
+	initAppMessageListener() {
+		window.addEventListener('message', (e) => {
+				if (e.data?.type === 'themeRequest') this.broadcastThemeToApps(this.currentTheme);
+				if (e.data?.type === 'appReady' && e.data.appId) {
+					const iframe = document.querySelector(`iframe[data-app-id="${e.data.appId}"]`);
+					if (iframe) this.registerIframeApp(iframe);
+				}
+			});
+	},
+
+	async init() {
+		console.log('🔧 ThemeManager.init() starting');
+		console.log('🔧 configUrl:', this.configUrl);
+		console.log('🔧 canvas element:', this.canvas);
+		console.log('🔧 themeLinkEl:', this.themeLinkEl);
+
+		try {
+			console.log('🔧 Fetching themes.json...');
+			const response = await fetch(this.configUrl, { cache: 'no-store' });
+			console.log('🔧 Response status:', response.status);
+			if (!response.ok) throw new Error(`HTTP ${response.status}`);
+			this.themeConfig = await response.json();
+			console.log('✓ Theme config loaded:', Object.keys(this.themeConfig));
+
+			const savedTheme = this.getSavedThemePreference();
+			const urlParams = new URLSearchParams(window.location.search);
+			const requestedTheme = urlParams.get('theme');
+			const themeToApply = requestedTheme || (savedTheme && this.themeConfig[savedTheme] ? savedTheme : 'default');
+
+			await this.apply(themeToApply);
+			this.initAppMessageListener();
+
+		} catch (error) {
+			console.error('✗ Failed to load theme config:', error);
+			console.error('✗ Error stack:', error.stack);
+			this.applyFallback();
+		}
+	},
+
+	async apply(themeId) {
+		if (!this.themeConfig?.[themeId]) {
+			console.warn(`✗ Theme "${themeId}" not found`);
+			return false;
+		}
+
+		const theme = this.themeConfig[themeId];
+		console.log(`→ Applying theme: ${theme.name} (${themeId})`);
+
+		await this.cleanup();
+
+		document.documentElement.setAttribute('data-theme', themeId);
+		document.body.setAttribute('data-theme', themeId);
+
+		await this.loadCSS(theme.css);
+
+		setTimeout(() => {
+				document.body.style.background = '';
+				document.body.style.backgroundColor = 'var(--system-bg)';
+				console.log('  ✓ Background reset for theme');
+			}, 100);
+
+		this.canvas.style.display = theme.canvas ? 'block' : 'none';
+
+		const ctx = this.canvas.getContext('2d');
+		if (ctx) {
+			ctx.setTransform(1, 0, 0, 1, 0, 0);
+			ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+		}
+
+		if (theme.script) {
+			this.activeCleanup = await this.loadScript(theme.script);
+		} else {
+			this.activeCleanup = null;
+		}
+
+		this.currentTheme = themeId;
+		this.saveThemePreference(themeId);
+		this.broadcastThemeToApps(themeId);
+
+		window.dispatchEvent(new CustomEvent('themeChanged', {
+					detail: { theme: themeId, config: theme }
+				}));
+
+		console.log(`✓ Theme applied: ${theme.name}`);
+		return true;
+	},
+
+	async loadCSS(cssPath) {
+		return new Promise((resolve, reject) => {
+				if (this.themeLinkEl.parentNode) {
+					this.themeLinkEl.parentNode.removeChild(this.themeLinkEl);
+				}
+
+				if (!cssPath) { resolve(); return; }
+
+				const newLink = document.createElement('link');
+				newLink.id = 'theme-stylesheet';
+				newLink.rel = 'stylesheet';
+				const url = this.baseUrl + cssPath + '?t=' + Date.now();
+				console.log('  → Loading CSS:', url);
+				newLink.href = url;
+
+				newLink.onload = () => {
+					console.log('  ✓ CSS loaded');
+					this.themeLinkEl = newLink;
+					resolve();
+				};
+				newLink.onerror = (err) => {
+					console.error('  ✗ CSS failed:', err);
+					reject(err);
+				};
+
+				document.head.appendChild(newLink);
+			});
+	},
+
+	async loadScript(scriptPath) {
+		return new Promise((resolve) => {
+				if (!scriptPath) { resolve(null); return; }
+				if (this.themeScriptEl) { this.themeScriptEl.remove(); this.themeScriptEl = null; }
+				const url = this.baseUrl + scriptPath + '?t=' + Date.now();
+				console.log('  → Loading script:', url);
+				this.themeScriptEl = document.createElement('script');
+				this.themeScriptEl.src = url; this.themeScriptEl.async = true;
+				this.themeScriptEl.onload = () => {
+					console.log('  ✓ Script loaded');
+					let cleanupFn = null;
+					if (window.ThemeCleanup && typeof window.ThemeCleanup === 'function') {
+						cleanupFn = window.ThemeCleanup;
+						delete window.ThemeCleanup;
+					}
+					if (window.ThemeCleanupRegistry && Array.isArray(window.ThemeCleanupRegistry)) {
+						const registryCleanup = () => {
+							window.ThemeCleanupRegistry.forEach(fn => {
+									try { if (typeof fn === 'function') fn(); }
+									catch (e) { console.warn('⚠ Registry cleanup error:', e); }
+								});
+						};
+						cleanupFn = cleanupFn ? (() => { cleanupFn(); registryCleanup(); }) : registryCleanup;
+						window.ThemeCleanupRegistry = [];
+					}
+					resolve(cleanupFn);
+				};
+				this.themeScriptEl.onerror = (err) => {
+					console.error('  ✗ Script failed:', err);
+					resolve(null);
+				};
+				document.head.appendChild(this.themeScriptEl);
+			});
+	},
+
+	async cleanup() {
+		console.log('→ Cleaning up current theme...');
+
+		this.themeAnimationFrames.forEach(id => { try { cancelAnimationFrame(id); } catch(e) {} });
+		this.themeAnimationFrames = [];
+
+		this.themeIntervals.forEach(id => { try { clearInterval(id); } catch(e) {} });
+		this.themeIntervals = [];
+
+		this.themeTimeouts.forEach(id => { try { clearTimeout(id); } catch(e) {} });
+		this.themeTimeouts = [];
+
+		if (typeof this.activeCleanup === 'function') {
+			try { this.activeCleanup(); } catch (e) { console.warn('⚠ Cleanup error:', e); }
+			this.activeCleanup = null;
+		}
+
+		if (this.themeScriptEl) { this.themeScriptEl.remove(); this.themeScriptEl = null; }
+
+		const ctx = this.canvas.getContext('2d');
+		if (ctx) {
+			ctx.setTransform(1, 0, 0, 1, 0, 0);
+			ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+		}
+
+		this.canvas.style.display = 'none';
+
+		const inlineStyle = document.getElementById('theme-inline');
+		if (inlineStyle) inlineStyle.textContent = '';
+
+		console.log('  ✓ Cleanup complete');
+	},
+
+	registerCleanup(cleanupFn) {
+		if (typeof cleanupFn === 'function') {
+			if (!window.ThemeCleanupRegistry) window.ThemeCleanupRegistry = [];
+			window.ThemeCleanupRegistry.push(cleanupFn);
+		}
+	},
+	trackAnimation(id) { this.themeAnimationFrames.push(id); },
+	trackInterval(id) { this.themeIntervals.push(id); },
+	trackTimeout(id) { this.themeTimeouts.push(id); },
+
+	applyFallback() {
+		console.warn('⚠ Using fallback default theme');
+		document.documentElement.setAttribute('data-theme', 'default');
+		document.body.setAttribute('data-theme', 'default');
+		this.canvas.style.display = 'none';
+		this.currentTheme = 'default';
+	},
+
+	getAvailableThemes() {
+		if (!this.themeConfig) return [];
+		return Object.entries(this.themeConfig).map(([id, config]) => ({
+					id,
+					name: config.name || id,
+					description: config.description || '',
+					canvas: config.canvas || false
+				}));
+	},
+
+	async populateThemeSelector(selectElementId) {
+		const select = document.getElementById(selectElementId);
+		if (!select) return;
+		if (!this.themeConfig) {
+			select.innerHTML = '<option value="">Loading...</option>';
+			setTimeout(() => this.populateThemeSelector(selectElementId), 500);
+			return;
+		}
+		select.innerHTML = '';
+		for (const [id, config] of Object.entries(this.themeConfig)) {
+			const opt = document.createElement('option');
+			opt.value = id;
+			opt.textContent = config.name || id;
+			if (id === this.currentTheme) opt.selected = true;
+			select.appendChild(opt);
+		}
+	},
+
+	saveThemePreference(themeId) {
+		try { localStorage.setItem('os-preferred-theme', themeId); }
+		catch (e) { console.warn('⚠ Could not save theme:', e); }
+	},
+
+	getSavedThemePreference() {
+		try { return localStorage.getItem('os-preferred-theme'); }
+		catch (e) { console.warn('⚠ Could not read theme:', e); return null; }
+	},
+
+	async refreshThemeConfig() {
+		console.log('→ Refreshing themes.json...');
+		try {
+			const response = await fetch(this.configUrl + '?t=' + Date.now(), { cache: 'no-store' });
+			if (!response.ok) throw new Error(`HTTP ${response.status}`);
+			this.themeConfig = await response.json();
+			console.log('✓ themes.json reloaded:', Object.keys(this.themeConfig).length, 'themes');
+			this.populateThemeSelector('themeSelector');
+			return true;
+		} catch (error) {
+			console.error('✗ Failed to refresh themes.json:', error);
+			alert('Could not reload themes. Check console for details.');
+			return false;
+		}
+	}
+};
+
+if (document.readyState === 'loading') {
+	document.addEventListener('DOMContentLoaded', () => ThemeManager.init());
+} else {
+	ThemeManager.init();
+}
+</script>
+
+<!-- === MAIN OS LOGIC === -->
+<script>
+function updateClock() { const now = new Date(); document.getElementById('time').textContent = now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); document.getElementById('date').textContent = now.toLocaleDateString([], { month: 'short', day: 'numeric' }); }
+setInterval(updateClock, 1000); updateClock();
+
+const startMenu = document.getElementById('startMenu'), startBtn = document.getElementById('startBtn');
+function toggleStartMenu() { const isVisible = startMenu.style.display === 'block'; startMenu.style.display = isVisible ? 'none' : 'block'; startBtn.classList.toggle('active', !isVisible); }
+document.addEventListener('click', (e) => { if (!startMenu.contains(e.target) && !startBtn.contains(e.target)) { startMenu.style.display = 'none'; startBtn.classList.remove('active'); } });
+
+const appTemplates = {
+	'pc': `<div class="system-app">
+	<div class="system-card">
+	<div class="system-card-header">
+	<h3 class="system-subtitle">This PC</h3>
+	</div>
+	<div class="system-card-body">
+	<p class="system-text"><strong>Storage:</strong> 64 GB</p>
+	<p class="system-text"><strong>Memory:</strong> 4 GB</p>
+	<p class="system-text"><strong>OS:</strong> WebOS v3.0</p>
+	</div>
+	</div>
+	</div>`,
+
+	'browser': `<div class="system-app" style="padding:0;display:flex;flex-direction:column;height:100%;">
+	<div class="browser-toolbar system-desktop-browser__toolbar">
+	<span class="system-btn-icon material-icons" onclick="event.stopPropagation(); alert('Back')">arrow_back</span>
+	<span class="system-btn-icon material-icons" onclick="event.stopPropagation(); alert('Forward')">arrow_forward</span>
+	<span class="system-btn-icon material-icons" onclick="event.stopPropagation(); this.closest('.window-content').querySelector('iframe').src = this.closest('.window-content').querySelector('iframe').src">refresh</span>
+	<input type="text" class="system-input address-bar system-desktop-browser__address" style="flex:1;min-width:0;" placeholder="https://example.com" value="https://example.com" onkeydown="if(event.key==='Enter'){this.closest('.window-content').querySelector('iframe').src = this.value}">
+	</div>
+	<div class="iframe-container system-desktop-browser__iframe-container">
+	<iframe class="web-iframe" src="https://example.com"></iframe>
+	<div class="click-blocker" onclick="event.stopPropagation();"></div>
+	</div>
+	</div>`,
+
+	'settings': `<div class="system-app">
+	<h3 class="system-subtitle">Settings</h3>
+	<div class="system-card system-mb-3">
+	<div class="system-card-body">
+	<div class="system-form-group">
+	<label class="system-label">Theme:</label>
+	<div class="system-flex">
+	<select id="themeSelector" class="system-select" style="flex:1;min-width:150px;">
+	<option value="">Loading themes...</option>
+	</select>
+	<button id="applyThemeBtn" class="system-btn">Apply</button>
+	<span id="refreshThemesBtn" class="system-btn-icon material-icons" title="Reload themes.json" style="cursor:pointer;" onclick="event.stopPropagation();">refresh</span>
+	</div>
+	<small class="system-form-help">Select a theme and click Apply.</small>
+	</div>
+	</div>
+	</div>
+	</div>`,
+
+	'calculator': `<div class="system-app system-text-center">
+	<h3 class="system-subtitle">Calculator</h3>
+	<div class="system-card">
+	<div class="system-card-body">
+	<div class="system-stat">
+	<span class="system-stat-value" id="calc-display">0</span>
+	<span class="system-stat-label">Result</span>
+	</div>
+	</div>
+	</div>
+	</div>`,
+
+	'terminal': `<div class="system-app" style="background:#1a1a1a;color:#0f0;">
+	<div class="system-card" style="background:#0d0d0d;border-color:#333;">
+	<div class="system-card-body system-font-mono">
+	<p class="system-text">user@webos:~$ <span class="terminal-cursor">_</span></p>
+	</div>
+	</div>
+	</div>`,
+
+	'photos': `<div class="system-app">
+	<h3 class="system-subtitle">Photos</h3>
+	<div class="system-grid">
+	<div class="system-thumbnail" style="background:var(--system-border);"></div>
+	<div class="system-thumbnail" style="background:var(--system-border);"></div>
+	<div class="system-thumbnail" style="background:var(--system-border);"></div>
+	<div class="system-thumbnail" style="background:var(--system-border);"></div>
+	<div class="system-thumbnail" style="background:var(--system-border);"></div>
+	<div class="system-thumbnail" style="background:var(--system-border);"></div>
+	</div>
+	</div>`
+};
+
+const appManager = {
+	windows: [], zIndexCounter: 100, activeWindowId: null,
+	ensureWindowInBounds: function(id) {
+		const win = this.windows.find(w => w.id === id); if (!win) return;
+		const el = win.el;
+		const taskbarHeight = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--system-taskbar-height')) || 50;
+		const safeBottom = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--system-safe-bottom')) || 20;
+		const maxWidth = window.innerWidth, maxHeight = window.innerHeight - taskbarHeight - safeBottom - 10;
+		const rect = el.getBoundingClientRect(); const minWidth = 100, minHeight = 40; let corrected = false;
+		if (rect.right < minWidth || rect.left > maxWidth - minWidth) { el.style.left = Math.max(0, Math.min((maxWidth - rect.width) / 2, maxWidth - minWidth)) + 'px'; corrected = true; }
+		if (rect.bottom < minHeight || rect.top > maxHeight - minHeight) { el.style.top = Math.max(0, Math.min((maxHeight - rect.height) / 2, maxHeight - minHeight)) + 'px'; corrected = true; }
+		return corrected;
+	},
+	open: function(title, iconCode, appType) {
+		const id = 'win-' + Date.now(); const content = appTemplates[appType] || appTemplates['pc'];
+		const winEl = document.createElement('div'); winEl.className = 'window system-desktop-window'; winEl.id = id; winEl.style.zIndex = ++this.zIndexCounter;
+		winEl.onmousedown = (e) => this.handleWindowClick(e, id); winEl.ontouchstart = (e) => this.handleWindowClick(e, id);
+		winEl.innerHTML = `<div class="window-header system-desktop-window__header"><div class="window-title-area"><span class="material-icons" style="font-size:16px;color:var(--system-text-dim);">${iconCode}</span><div class="window-title system-desktop-window__title">${title}</div></div><div class="window-controls system-desktop-window__controls"><span class="icon-btn material-icons" onclick="event.stopPropagation(); appManager.minimize('${id}')">remove</span><span class="icon-btn material-icons" onclick="event.stopPropagation(); appManager.maximize('${id}')">crop_square</span><span class="icon-btn close-btn material-icons" onclick="event.stopPropagation(); appManager.close('${id}')">close</span></div></div><div class="window-content system-desktop-window__content">${content}</div><div class="resize-handle" id="resize-${id}"></div>`;
+		document.getElementById('windowsContainer').appendChild(winEl); this.initDrag(winEl); this.initResize(winEl);
+		const taskItem = document.createElement('div'); taskItem.className = 'taskbar-item system-desktop-taskbar__item active'; taskItem.id = 'task-' + id; taskItem.onclick = () => this.toggle(id); taskItem.innerHTML = `<span class="material-icons">${iconCode}</span>`;
+		const taskbarApps = document.getElementById('taskbarApps'); taskbarApps.appendChild(taskItem);
+		setTimeout(() => { this.updateTaskbarScrollButtons(); this.scrollToTaskItem(taskItem); }, 50);
+		this.windows.push({ id, title, iconCode, el: winEl, taskItem, appType }); this.focus(id);
+		if (appType === 'settings') this.initSettingsWindow(id);
+		startMenu.style.display = 'none'; startBtn.classList.remove('active');
+	},
+	openIframeApp: function(title, iconCode, appUrl) {
+		const id = 'win-' + Date.now(); const appId = 'app-' + Date.now();
+		const winEl = document.createElement('div'); winEl.className = 'window system-desktop-window'; winEl.id = id; winEl.style.zIndex = ++this.zIndexCounter;
+		winEl.onmousedown = (e) => this.handleWindowClick(e, id); winEl.ontouchstart = (e) => this.handleWindowClick(e, id);
+		winEl.innerHTML = `<div class="window-header system-desktop-window__header"><div class="window-title-area"><span class="material-icons" style="font-size:16px;color:var(--system-text-dim);">${iconCode}</span><div class="window-title system-desktop-window__title">${title}</div></div><div class="window-controls system-desktop-window__controls"><span class="icon-btn material-icons" onclick="event.stopPropagation(); appManager.minimize('${id}')">remove</span><span class="icon-btn material-icons" onclick="event.stopPropagation(); appManager.maximize('${id}')">crop_square</span><span class="icon-btn close-btn material-icons" onclick="event.stopPropagation(); appManager.close('${id}')">close</span></div></div><div class="window-content system-desktop-window__content" style="padding:0;background:transparent;"><iframe src="${appUrl}" data-os-app="true" data-app-id="${appId}" sandbox="allow-scripts allow-same-origin allow-forms allow-pointer-lock" style="width:100%;height:100%;border:none;background:transparent;"></iframe></div><div class="resize-handle" id="resize-${id}"></div>`;
+		document.getElementById('windowsContainer').appendChild(winEl); this.initDrag(winEl); this.initResize(winEl);
+		const taskItem = document.createElement('div'); taskItem.className = 'taskbar-item system-desktop-taskbar__item active'; taskItem.id = 'task-' + id; taskItem.onclick = () => this.toggle(id); taskItem.innerHTML = `<span class="material-icons">${iconCode}</span>`;
+		const taskbarApps = document.getElementById('taskbarApps'); taskbarApps.appendChild(taskItem);
+		setTimeout(() => { this.updateTaskbarScrollButtons(); this.scrollToTaskItem(taskItem); const iframe = winEl.querySelector('iframe'); if (iframe) { iframe.onload = () => ThemeManager.registerIframeApp(iframe); setTimeout(() => ThemeManager.registerIframeApp(iframe), 500); } }, 50);
+		this.windows.push({ id, title, iconCode, el: winEl, taskItem, appType: 'iframe', appUrl }); this.focus(id);
+		startMenu.style.display = 'none'; startBtn.classList.remove('active');
+	},
+	scrollTaskbar: function(direction) { document.getElementById('taskbarApps')?.scrollBy({ left: direction, behavior: 'smooth' }); },
+	scrollToTaskItem: function(taskItem) { const container = document.getElementById('taskbarApps'); if (!container || !taskItem) return; const itemRect = taskItem.getBoundingClientRect(); const containerRect = container.getBoundingClientRect(); if (itemRect.right > containerRect.right || itemRect.left < containerRect.left) { taskItem.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' }); } },
+	updateTaskbarScrollButtons: function() {
+		const taskbarApps = document.getElementById('taskbarApps'), scrollLeftBtn = document.getElementById('scrollLeftBtn'), scrollRightBtn = document.getElementById('scrollRightBtn');
+		if (!taskbarApps || !scrollLeftBtn || !scrollRightBtn) return;
+		const hasOverflow = taskbarApps.scrollWidth > taskbarApps.clientWidth;
+		if (!hasOverflow) { scrollLeftBtn.classList.remove('visible'); scrollRightBtn.classList.remove('visible'); return; }
+		scrollLeftBtn.classList.toggle('visible', taskbarApps.scrollLeft > 5);
+		scrollRightBtn.classList.toggle('visible', taskbarApps.scrollLeft < (taskbarApps.scrollWidth - taskbarApps.clientWidth - 5));
+	},
+	initSettingsWindow: function(windowId) {
+		const win = this.windows.find(w => w.id === windowId); if (!win) return;
+		setTimeout(() => {
+				const selector = document.getElementById('themeSelector'), applyBtn = document.getElementById('applyThemeBtn'), refreshBtn = document.getElementById('refreshThemesBtn');
+				if (selector) ThemeManager.populateThemeSelector('themeSelector');
+				if (applyBtn) { applyBtn.onclick = async () => { const selected = selector?.value; if (selected) { applyBtn.disabled = true; applyBtn.textContent = 'Applying...'; const success = await ThemeManager.apply(selected); applyBtn.disabled = false; applyBtn.textContent = 'Apply'; if (success) { applyBtn.textContent = '✓ Applied!'; setTimeout(() => applyBtn.textContent = 'Apply', 1500); } } else { alert('Please select a theme first'); } }; }
+				if (refreshBtn) { refreshBtn.onclick = async () => { refreshBtn.disabled = true; refreshBtn.innerHTML = '<span class="material-icons" style="font-size:18px;animation:spin 1s linear infinite">refresh</span>'; await ThemeManager.refreshThemeConfig(); refreshBtn.disabled = false; refreshBtn.innerHTML = '<span class="material-icons" style="font-size:18px;">refresh</span>'; }; }
+			}, 100);
+	},
+	handleWindowClick: function(e, id) { if (e.target.closest('.window-controls') || e.target.closest('.resize-handle')) return; if (e.target.classList.contains('address-bar')) return; if (this.activeWindowId !== id) { e.preventDefault(); e.stopPropagation(); this.focus(id); return false; } },
+	close: function(id) { const win = this.windows.find(w => w.id === id); if (win) { win.el.remove(); win.taskItem.remove(); this.windows = this.windows.filter(w => w.id !== id); if (this.activeWindowId === id) this.activeWindowId = null; setTimeout(() => this.updateTaskbarScrollButtons(), 50); } },
+	minimize: function(id) { const win = this.windows.find(w => w.id === id); if (win) { win.el.classList.add('minimized'); win.el.classList.add('system-desktop-window--minimized'); win.taskItem.classList.remove('active'); win.taskItem.classList.remove('system-desktop-taskbar__item--active'); } },
+	maximize: function(id) { const win = this.windows.find(w => w.id === id); if (!win) return; if (win.el.style.width === '100%') { win.el.style.width = '90%'; win.el.style.height = '70%'; win.el.style.top = '10%'; win.el.style.left = '5%'; win.el.classList.remove('system-desktop-window--maximized'); } else { win.el.style.width = '100%'; win.el.style.height = 'calc(100dvh - var(--system-taskbar-height) - var(--system-safe-bottom))'; win.el.style.top = '0'; win.el.style.left = '0'; win.el.classList.add('system-desktop-window--maximized'); } this.focus(id); },
+	toggle: function(id) { const win = this.windows.find(w => w.id === id); if (!win) return; if (win.el.classList.contains('minimized')) { win.el.classList.remove('minimized'); win.el.classList.remove('system-desktop-window--minimized'); this.focus(id); } else { if (this.activeWindowId === id) this.minimize(id); else this.focus(id); } },
+	focus: function(id) { const win = this.windows.find(w => w.id === id); if (!win) return; this.ensureWindowInBounds(id); win.el.style.zIndex = ++this.zIndexCounter; this.windows.forEach(w => { w.taskItem.classList.remove('active'); w.taskItem.classList.remove('system-desktop-taskbar__item--active'); if (w.id !== id && w.appType === 'iframe') { const blocker = w.el.querySelector('.click-blocker'); if (blocker) blocker.classList.remove('hidden'); } }); win.taskItem.classList.add('active'); win.taskItem.classList.add('system-desktop-taskbar__item--active'); win.el.classList.remove('minimized'); win.el.classList.remove('system-desktop-window--minimized'); this.activeWindowId = id; this.scrollToTaskItem(win.taskItem); },
+	initDrag: function(el) {
+		const header = el.querySelector('.window-header'); let isDragging = false, startX, startY, initialLeft, initialTop;
+		const getBounds = () => { const taskbarHeight = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--system-taskbar-height')) || 50; const safeBottom = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--system-safe-bottom')) || 20; return { maxWidth: window.innerWidth, maxHeight: window.innerHeight - taskbarHeight - safeBottom - 10 }; };
+		const start = (e) => { if(e.target.closest('.window-controls') || e.target.classList.contains('address-bar')) return; if(e.type === 'touchstart') e.preventDefault(); isDragging = true; const clientX = e.type.includes('mouse') ? e.clientX : e.touches?.[0]?.clientX; const clientY = e.type.includes('mouse') ? e.clientY : e.touches?.[0]?.clientY; startX = clientX; startY = clientY; initialLeft = el.offsetLeft; initialTop = el.offsetTop; this.focus(el.id); };
+		const move = (e) => { if (!isDragging) return; if(e.type === 'touchmove') e.preventDefault(); const clientX = e.type.includes('mouse') ? e.clientX : e.touches?.[0]?.clientX; const clientY = e.type.includes('mouse') ? e.clientY : e.touches?.[0]?.clientY; let newLeft = initialLeft + (clientX - startX), newTop = initialTop + (clientY - startY); const { maxWidth, maxHeight } = getBounds(); const winRect = el.getBoundingClientRect(); const minWidth = Math.min(100, winRect.width), minHeight = 40; newLeft = Math.max(-winRect.width + minWidth, Math.min(newLeft, maxWidth - minWidth)); newTop = Math.max(0, Math.min(newTop, maxHeight - minHeight)); el.style.left = newLeft + "px"; el.style.top = newTop + "px"; };
+		const end = () => { isDragging = false; };
+		header.addEventListener("mousedown", start); header.addEventListener("touchstart", start, { passive: false });
+		document.addEventListener("mousemove", move); document.addEventListener("touchmove", move, { passive: false });
+		document.addEventListener("mouseup", end); document.addEventListener("touchend", end);
+	},
+	initResize: function(el) {
+		const handle = el.querySelector('.resize-handle'); let isResizing = false, startW, startH, startMX, startMY;
+		const start = (e) => { if(e.type === 'touchstart') e.preventDefault(); isResizing = true; startW = parseInt(window.getComputedStyle(el).width, 10); startH = parseInt(window.getComputedStyle(el).height, 10); startMX = e.type.includes('mouse') ? e.clientX : e.touches?.[0]?.clientX; startMY = e.type.includes('mouse') ? e.clientY : e.touches?.[0]?.clientY; this.focus(el.id); };
+		const move = (e) => { if (!isResizing) return; if(e.type === 'touchmove') e.preventDefault(); const clientX = e.type.includes('mouse') ? e.clientX : e.touches?.[0]?.clientX; const clientY = e.type.includes('mouse') ? e.clientY : e.touches?.[0]?.clientY; const newW = startW + (clientX - startMX), newH = startH + (clientY - startMY); if (newW > 200) el.style.width = newW + "px"; if (newH > 150) el.style.height = newH + "px"; };
+		const end = () => { isResizing = false; };
+		handle.addEventListener("mousedown", start); handle.addEventListener("touchstart", start, { passive: false });
+		document.addEventListener("mousemove", move); document.addEventListener("touchmove", move, { passive: false });
+		document.addEventListener("mouseup", end); document.addEventListener("touchend", end);
+	}
+};
+
+document.getElementById('taskbarApps')?.addEventListener('scroll', () => appManager.updateTaskbarScrollButtons());
+window.addEventListener('resize', () => setTimeout(() => appManager.updateTaskbarScrollButtons(), 100));
+setTimeout(() => appManager.updateTaskbarScrollButtons(), 100);
+window.addEventListener('themeChanged', (e) => { console.log(`🎨 Theme changed: ${e.detail.theme}`); });
+
+/* === FONT LOAD VERIFICATION (optional but recommended) === */
+if ('fonts' in document) {
+  document.fonts.load('12px "Material Icons"').catch(() => {
+    console.warn('⚠ Material Icons font failed to load. Check /system/fonts/MaterialIcons-Regular.ttf');
+  });
+}
+</script>
+</body>
+</html>

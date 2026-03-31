@@ -1,0 +1,813 @@
+{
+  "csgCode": [
+    {
+      "title": "Main",
+      "content": "\n// CSG code goes here\nvar f1 = await font(\"/fonts/ClassicRomanCaps.ttf\");\nvar ts= text({\nfont:f1,\ntext:\"wELCOME!\",\nfn:30,\nfontSize:9\n});\n\nvar v1= await importSvg(\"./try1.svg\");\n\nPrintLog(v1);\nalignPath({cx:0,cy:0},ts)\nrotatePath(90,ts)\nvar p1= new Path3d().path([\n\"s\", 1,1,\n\"m\", 0,0, 0,\n\"s\",1.1,1.1,\n\"l\", 0,0, 3\n]).fn(30)\nreturn extrude3d(v1, p1);\n"
+    }
+  ],
+  "editorCode": [
+    {
+      "title": "Code",
+      "content": "// Include helper functions here"
+    }
+  ],
+  "meshCache": {
+    "Main": {
+      "mesh": [
+        {
+          "$jsonMesh": {
+            "mesh": {
+              "positions": "AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/bRAzwkWUIkQAAEBAbRAzwodhEkQAAEBAAADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/HckiwpzME0QAAAAAHckiwtcSBUQAAAAAAADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/HckiwpzME0QAAAAAHckiwtcSBUQAAAAAAADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/bRAzwkWUIkQAAEBAbRAzwodhEkQAAEBAAADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/",
+              "normals": "AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/",
+              "indices": "AQAAAA4ADgANAAwADAALAAoACgAJAAgACAAHAAYABgAFAAQABAADAAIAAgABAA4ADgAMAAoACgAIAAYABgAEAAIAAgAOAAoACgAGAAIAEAAdAA8AHQAbABwAGwAZABoAGQAXABgAFwAVABYAFQATABQAEwARABIAEQAdABAAHQAZABsAGQAVABcAFQARABMAEQAZAB0AGQARABUAHgAfAC4AHgAuAC0AHwAgAC8AHwAvAC4AIAAhADAAIAAwAC8AIQAiADEAIQAxADAAIgAjADIAIgAyADEAIwAkADMAIwAzADIAJAAlADQAJAA0ADMAJQAmADUAJQA1ADQAJgAnADYAJgA2ADUAJwAoADcAJwA3ADYAKAApADgAKAA4ADcAKQAqADkAKQA5ADgAKgArADoAKgA6ADkAKwAsADsAKwA7ADoALAAeAC0ALAAtADsA",
+              "materials": [
+                {
+                  "color": "#ffcc00",
+                  "roughness": 0.6,
+                  "metalness": 0.2,
+                  "side": 0,
+                  "flatShading": true,
+                  "type": "MeshStandardMaterial"
+                }
+              ],
+              "groups": [],
+              "position": [
+                0,
+                0,
+                0
+              ],
+              "rotation": [
+                0,
+                0,
+                0
+              ],
+              "scale": [
+                1,
+                1,
+                1
+              ]
+            },
+            "userData": {}
+          }
+        },
+        {
+          "$jsonMesh": {
+            "mesh": {
+              "positions": "m+wRw7CPLkQAAEBA6uwRw7aPLkQAAEBAjewRwyuQLkQAAEBAjagEwyyxHkQAAAAA1agEwzGxHkQAAAAAgKgEw5uxHkQAAAAAjagEwyyxHkQAAAAA1agEwzGxHkQAAAAAgKgEw5uxHkQAAAAAm+wRw7CPLkQAAEBA6uwRw7aPLkQAAEBAjewRwyuQLkQAAEBA",
+              "normals": "AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIC/AAAAAAAAAAAAAIC/AAAAAAAAAAAAAIC/NdebPSOU/7z+IX8/Jj4TvvLoiDyzTX2/NGviPicxTT3IP2U/XD4TPiTpiLyxTX0/nWnivrYvTb0tQGW/79abvbKT/zz/IX+/",
+              "indices": "AQAAAAIABAAFAAMABgAJAAoABgAKAAcABwAKAAsABwALAAgACAALAAkACAAJAAYA",
+              "materials": [
+                {
+                  "color": "#ffcc00",
+                  "roughness": 0.6,
+                  "metalness": 0.2,
+                  "side": 0,
+                  "flatShading": true,
+                  "type": "MeshStandardMaterial"
+                }
+              ],
+              "groups": [],
+              "position": [
+                0,
+                0,
+                0
+              ],
+              "rotation": [
+                0,
+                0,
+                0
+              ],
+              "scale": [
+                1,
+                1,
+                1
+              ]
+            },
+            "userData": {}
+          }
+        },
+        {
+          "$jsonMesh": {
+            "mesh": {
+              "positions": "AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/",
+              "normals": "AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/",
+              "indices": "AQAAAAMAAwACAAEABQAHAAQABwAFAAYACAAJAA0ACAANAAwACQAKAA4ACQAOAA0ACgALAA8ACgAPAA4ACwAIAAwACwAMAA8A",
+              "materials": [
+                {
+                  "color": "#ffcc00",
+                  "roughness": 0.6,
+                  "metalness": 0.2,
+                  "side": 0,
+                  "flatShading": true,
+                  "type": "MeshStandardMaterial"
+                }
+              ],
+              "groups": [],
+              "position": [
+                0,
+                0,
+                0
+              ],
+              "rotation": [
+                0,
+                0,
+                0
+              ],
+              "scale": [
+                1,
+                1,
+                1
+              ]
+            },
+            "userData": {}
+          }
+        },
+        {
+          "$jsonMesh": {
+            "mesh": {
+              "positions": "AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/",
+              "normals": "AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/",
+              "indices": "AQAAAAQABAADAAIAAgABAAQABgAJAAUACQAHAAgABwAJAAYACgALABAACgAQAA8ACwAMABEACwARABAADAANABIADAASABEADQAOABMADQATABIADgAKAA8ADgAPABMA",
+              "materials": [
+                {
+                  "color": "#ffcc00",
+                  "roughness": 0.6,
+                  "metalness": 0.2,
+                  "side": 0,
+                  "flatShading": true,
+                  "type": "MeshStandardMaterial"
+                }
+              ],
+              "groups": [],
+              "position": [
+                0,
+                0,
+                0
+              ],
+              "rotation": [
+                0,
+                0,
+                0
+              ],
+              "scale": [
+                1,
+                1,
+                1
+              ]
+            },
+            "userData": {}
+          }
+        },
+        {
+          "$jsonMesh": {
+            "mesh": {
+              "positions": "AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/",
+              "normals": "AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/",
+              "indices": "AQAAAAQABAADAAIAAgABAAQABgAJAAUACQAHAAgABwAJAAYACgALABAACgAQAA8ACwAMABEACwARABAADAANABIADAASABEADQAOABMADQATABIADgAKAA8ADgAPABMA",
+              "materials": [
+                {
+                  "color": "#ffcc00",
+                  "roughness": 0.6,
+                  "metalness": 0.2,
+                  "side": 0,
+                  "flatShading": true,
+                  "type": "MeshStandardMaterial"
+                }
+              ],
+              "groups": [],
+              "position": [
+                0,
+                0,
+                0
+              ],
+              "rotation": [
+                0,
+                0,
+                0
+              ],
+              "scale": [
+                1,
+                1,
+                1
+              ]
+            },
+            "userData": {}
+          }
+        },
+        {
+          "$jsonMesh": {
+            "mesh": {
+              "positions": "AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/",
+              "normals": "AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/",
+              "indices": "AQAAAAQABAADAAIAAgABAAQABgAJAAUACQAHAAgABwAJAAYACgALABAACgAQAA8ACwAMABEACwARABAADAANABIADAASABEADQAOABMADQATABIADgAKAA8ADgAPABMA",
+              "materials": [
+                {
+                  "color": "#ffcc00",
+                  "roughness": 0.6,
+                  "metalness": 0.2,
+                  "side": 0,
+                  "flatShading": true,
+                  "type": "MeshStandardMaterial"
+                }
+              ],
+              "groups": [],
+              "position": [
+                0,
+                0,
+                0
+              ],
+              "rotation": [
+                0,
+                0,
+                0
+              ],
+              "scale": [
+                1,
+                1,
+                1
+              ]
+            },
+            "userData": {}
+          }
+        },
+        {
+          "$jsonMesh": {
+            "mesh": {
+              "positions": "AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/",
+              "normals": "AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/",
+              "indices": "AQAAAAIABAAFAAMABgAHAAoABgAKAAkABwAIAAsABwALAAoACAAGAAkACAAJAAsA",
+              "materials": [
+                {
+                  "color": "#ffcc00",
+                  "roughness": 0.6,
+                  "metalness": 0.2,
+                  "side": 0,
+                  "flatShading": true,
+                  "type": "MeshStandardMaterial"
+                }
+              ],
+              "groups": [],
+              "position": [
+                0,
+                0,
+                0
+              ],
+              "rotation": [
+                0,
+                0,
+                0
+              ],
+              "scale": [
+                1,
+                1,
+                1
+              ]
+            },
+            "userData": {}
+          }
+        },
+        {
+          "$jsonMesh": {
+            "mesh": {
+              "positions": "AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/",
+              "normals": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/",
+              "indices": "BAAFAAcABAAHAAYABQAEAAYABQAGAAcA",
+              "materials": [
+                {
+                  "color": "#ffcc00",
+                  "roughness": 0.6,
+                  "metalness": 0.2,
+                  "side": 0,
+                  "flatShading": true,
+                  "type": "MeshStandardMaterial"
+                }
+              ],
+              "groups": [],
+              "position": [
+                0,
+                0,
+                0
+              ],
+              "rotation": [
+                0,
+                0,
+                0
+              ],
+              "scale": [
+                1,
+                1,
+                1
+              ]
+            },
+            "userData": {}
+          }
+        },
+        {
+          "$jsonMesh": {
+            "mesh": {
+              "positions": "AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/",
+              "normals": "AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/",
+              "indices": "AQAAAAIABAAFAAMABgAHAAoABgAKAAkABwAIAAsABwALAAoACAAGAAkACAAJAAsA",
+              "materials": [
+                {
+                  "color": "#ffcc00",
+                  "roughness": 0.6,
+                  "metalness": 0.2,
+                  "side": 0,
+                  "flatShading": true,
+                  "type": "MeshStandardMaterial"
+                }
+              ],
+              "groups": [],
+              "position": [
+                0,
+                0,
+                0
+              ],
+              "rotation": [
+                0,
+                0,
+                0
+              ],
+              "scale": [
+                1,
+                1,
+                1
+              ]
+            },
+            "userData": {}
+          }
+        },
+        {
+          "$jsonMesh": {
+            "mesh": {
+              "positions": "AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/",
+              "normals": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/",
+              "indices": "BAAFAAcABAAHAAYABQAEAAYABQAGAAcA",
+              "materials": [
+                {
+                  "color": "#ffcc00",
+                  "roughness": 0.6,
+                  "metalness": 0.2,
+                  "side": 0,
+                  "flatShading": true,
+                  "type": "MeshStandardMaterial"
+                }
+              ],
+              "groups": [],
+              "position": [
+                0,
+                0,
+                0
+              ],
+              "rotation": [
+                0,
+                0,
+                0
+              ],
+              "scale": [
+                1,
+                1,
+                1
+              ]
+            },
+            "userData": {}
+          }
+        },
+        {
+          "$jsonMesh": {
+            "mesh": {
+              "positions": "AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/",
+              "normals": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/",
+              "indices": "BAAFAAcABAAHAAYABQAEAAYABQAGAAcA",
+              "materials": [
+                {
+                  "color": "#ffcc00",
+                  "roughness": 0.6,
+                  "metalness": 0.2,
+                  "side": 0,
+                  "flatShading": true,
+                  "type": "MeshStandardMaterial"
+                }
+              ],
+              "groups": [],
+              "position": [
+                0,
+                0,
+                0
+              ],
+              "rotation": [
+                0,
+                0,
+                0
+              ],
+              "scale": [
+                1,
+                1,
+                1
+              ]
+            },
+            "userData": {}
+          }
+        },
+        {
+          "$jsonMesh": {
+            "mesh": {
+              "positions": "AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/",
+              "normals": "AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/",
+              "indices": "AQAAAAIABAAFAAMABgAHAAoABgAKAAkABwAIAAsABwALAAoACAAGAAkACAAJAAsA",
+              "materials": [
+                {
+                  "color": "#ffcc00",
+                  "roughness": 0.6,
+                  "metalness": 0.2,
+                  "side": 0,
+                  "flatShading": true,
+                  "type": "MeshStandardMaterial"
+                }
+              ],
+              "groups": [],
+              "position": [
+                0,
+                0,
+                0
+              ],
+              "rotation": [
+                0,
+                0,
+                0
+              ],
+              "scale": [
+                1,
+                1,
+                1
+              ]
+            },
+            "userData": {}
+          }
+        },
+        {
+          "$jsonMesh": {
+            "mesh": {
+              "positions": "AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/",
+              "normals": "AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/",
+              "indices": "AQAAAAMAAwACAAEABQAHAAQABwAFAAYACAAJAA0ACAANAAwACQAKAA4ACQAOAA0ACgALAA8ACgAPAA4ACwAIAAwACwAMAA8A",
+              "materials": [
+                {
+                  "color": "#ffcc00",
+                  "roughness": 0.6,
+                  "metalness": 0.2,
+                  "side": 0,
+                  "flatShading": true,
+                  "type": "MeshStandardMaterial"
+                }
+              ],
+              "groups": [],
+              "position": [
+                0,
+                0,
+                0
+              ],
+              "rotation": [
+                0,
+                0,
+                0
+              ],
+              "scale": [
+                1,
+                1,
+                1
+              ]
+            },
+            "userData": {}
+          }
+        },
+        {
+          "$jsonMesh": {
+            "mesh": {
+              "positions": "AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/",
+              "normals": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADAfwAAwH8AAMB/AADAfwAAwH8AAMB/",
+              "indices": "AgACAAMAAgADAAMA",
+              "materials": [
+                {
+                  "color": "#ffcc00",
+                  "roughness": 0.6,
+                  "metalness": 0.2,
+                  "side": 0,
+                  "flatShading": true,
+                  "type": "MeshStandardMaterial"
+                }
+              ],
+              "groups": [],
+              "position": [
+                0,
+                0,
+                0
+              ],
+              "rotation": [
+                0,
+                0,
+                0
+              ],
+              "scale": [
+                1,
+                1,
+                1
+              ]
+            },
+            "userData": {}
+          }
+        },
+        {
+          "$jsonMesh": {
+            "mesh": {
+              "positions": "AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/",
+              "normals": "AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/",
+              "indices": "AQAAAAUABQAEAAMAAwACAAEAAQAFAAMABwALAAYACwAJAAoACQAHAAgABwAJAAsADAANABMADAATABIADQAOABQADQAUABMADgAPABUADgAVABQADwAQABYADwAWABUAEAARABcAEAAXABYAEQAMABIAEQASABcA",
+              "materials": [
+                {
+                  "color": "#ffcc00",
+                  "roughness": 0.6,
+                  "metalness": 0.2,
+                  "side": 0,
+                  "flatShading": true,
+                  "type": "MeshStandardMaterial"
+                }
+              ],
+              "groups": [],
+              "position": [
+                0,
+                0,
+                0
+              ],
+              "rotation": [
+                0,
+                0,
+                0
+              ],
+              "scale": [
+                1,
+                1,
+                1
+              ]
+            },
+            "userData": {}
+          }
+        },
+        {
+          "$jsonMesh": {
+            "mesh": {
+              "positions": "AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/",
+              "normals": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/",
+              "indices": "BAAFAAcABAAHAAYABQAEAAYABQAGAAcA",
+              "materials": [
+                {
+                  "color": "#ffcc00",
+                  "roughness": 0.6,
+                  "metalness": 0.2,
+                  "side": 0,
+                  "flatShading": true,
+                  "type": "MeshStandardMaterial"
+                }
+              ],
+              "groups": [],
+              "position": [
+                0,
+                0,
+                0
+              ],
+              "rotation": [
+                0,
+                0,
+                0
+              ],
+              "scale": [
+                1,
+                1,
+                1
+              ]
+            },
+            "userData": {}
+          }
+        },
+        {
+          "$jsonMesh": {
+            "mesh": {
+              "positions": "AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/",
+              "normals": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/",
+              "indices": "BAAFAAcABAAHAAYABQAEAAYABQAGAAcA",
+              "materials": [
+                {
+                  "color": "#ffcc00",
+                  "roughness": 0.6,
+                  "metalness": 0.2,
+                  "side": 0,
+                  "flatShading": true,
+                  "type": "MeshStandardMaterial"
+                }
+              ],
+              "groups": [],
+              "position": [
+                0,
+                0,
+                0
+              ],
+              "rotation": [
+                0,
+                0,
+                0
+              ],
+              "scale": [
+                1,
+                1,
+                1
+              ]
+            },
+            "userData": {}
+          }
+        },
+        {
+          "$jsonMesh": {
+            "mesh": {
+              "positions": "AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/",
+              "normals": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/",
+              "indices": "BAAFAAcABAAHAAYABQAEAAYABQAGAAcA",
+              "materials": [
+                {
+                  "color": "#ffcc00",
+                  "roughness": 0.6,
+                  "metalness": 0.2,
+                  "side": 0,
+                  "flatShading": true,
+                  "type": "MeshStandardMaterial"
+                }
+              ],
+              "groups": [],
+              "position": [
+                0,
+                0,
+                0
+              ],
+              "rotation": [
+                0,
+                0,
+                0
+              ],
+              "scale": [
+                1,
+                1,
+                1
+              ]
+            },
+            "userData": {}
+          }
+        },
+        {
+          "$jsonMesh": {
+            "mesh": {
+              "positions": "AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/",
+              "normals": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/",
+              "indices": "BAAFAAcABAAHAAYABQAEAAYABQAGAAcA",
+              "materials": [
+                {
+                  "color": "#ffcc00",
+                  "roughness": 0.6,
+                  "metalness": 0.2,
+                  "side": 0,
+                  "flatShading": true,
+                  "type": "MeshStandardMaterial"
+                }
+              ],
+              "groups": [],
+              "position": [
+                0,
+                0,
+                0
+              ],
+              "rotation": [
+                0,
+                0,
+                0
+              ],
+              "scale": [
+                1,
+                1,
+                1
+              ]
+            },
+            "userData": {}
+          }
+        },
+        {
+          "$jsonMesh": {
+            "mesh": {
+              "positions": "AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/",
+              "normals": "AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/",
+              "indices": "AQAAAAQABAADAAIAAgABAAQABgAJAAUACQAHAAgABwAJAAYACgALABAACgAQAA8ACwAMABEACwARABAADAANABIADAASABEADQAOABMADQATABIADgAKAA8ADgAPABMA",
+              "materials": [
+                {
+                  "color": "#ffcc00",
+                  "roughness": 0.6,
+                  "metalness": 0.2,
+                  "side": 0,
+                  "flatShading": true,
+                  "type": "MeshStandardMaterial"
+                }
+              ],
+              "groups": [],
+              "position": [
+                0,
+                0,
+                0
+              ],
+              "rotation": [
+                0,
+                0,
+                0
+              ],
+              "scale": [
+                1,
+                1,
+                1
+              ]
+            },
+            "userData": {}
+          }
+        },
+        {
+          "$jsonMesh": {
+            "mesh": {
+              "positions": "AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/",
+              "normals": "AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/",
+              "indices": "AQAAAAUABQAEAAMAAwACAAEAAQAFAAMABwALAAYACwAJAAoACQAHAAgABwAJAAsADAANABMADAATABIADQAOABQADQAUABMADgAPABUADgAVABQADwAQABYADwAWABUAEAARABcAEAAXABYAEQAMABIAEQASABcA",
+              "materials": [
+                {
+                  "color": "#ffcc00",
+                  "roughness": 0.6,
+                  "metalness": 0.2,
+                  "side": 0,
+                  "flatShading": true,
+                  "type": "MeshStandardMaterial"
+                }
+              ],
+              "groups": [],
+              "position": [
+                0,
+                0,
+                0
+              ],
+              "rotation": [
+                0,
+                0,
+                0
+              ],
+              "scale": [
+                1,
+                1,
+                1
+              ]
+            },
+            "userData": {}
+          }
+        },
+        {
+          "$jsonMesh": {
+            "mesh": {
+              "positions": "AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/",
+              "normals": "AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/AADAfwAAwH8AAMB/",
+              "indices": "AQAAAAUABQAEAAMAAwACAAEAAQAFAAMABwALAAYACwAJAAoACQAHAAgABwAJAAsADAANABMADAATABIADQAOABQADQAUABMADgAPABUADgAVABQADwAQABYADwAWABUAEAARABcAEAAXABYAEQAMABIAEQASABcA",
+              "materials": [
+                {
+                  "color": "#ffcc00",
+                  "roughness": 0.6,
+                  "metalness": 0.2,
+                  "side": 0,
+                  "flatShading": true,
+                  "type": "MeshStandardMaterial"
+                }
+              ],
+              "groups": [],
+              "position": [
+                0,
+                0,
+                0
+              ],
+              "rotation": [
+                0,
+                0,
+                0
+              ],
+              "scale": [
+                1,
+                1,
+                1
+              ]
+            },
+            "userData": {}
+          }
+        }
+      ],
+      "updated": false
+    }
+  }
+}

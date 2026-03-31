@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>eSpeak Phonemes</title>
+<style>
+:root {
+	--primary: #007AFF; /* iOS Blue */
+	--bg: #F2F2F7;
+	--card: #FFFFFF;
+	--text: #000000;
+	--error: #FF3B30;
+	--success: #34C759;
+}
+
+body {
+	font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+	background-color: var(--bg);
+	color: var(--text);
+	margin: 0;
+	padding: 20px;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	min-height: 100vh;
+	box-sizing: border-box;
+}
+
+.container {
+	background: var(--card);
+	padding: 20px;
+	border-radius: 12px;
+	width: 100%;
+	max-width: 500px;
+	box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+h1 {
+	font-size: 22px;
+	text-align: center;
+	margin-top: 0;
+	margin-bottom: 20px;
+}
+
+textarea {
+	width: 100%;
+	height: 120px;
+	padding: 12px;
+	border: 1px solid #C6C6C8;
+	border-radius: 8px;
+	font-size: 17px;
+	box-sizing: border-box;
+	background: #F2F2F7;
+	resize: none;
+	margin-bottom: 15px;
+}
+
+textarea:focus {
+	outline: 2px solid var(--primary);
+	background: #FFF;
+}
+
+.controls {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	margin-bottom: 15px;
+}
+
+select {
+	padding: 12px;
+	border-radius: 8px;
+	border: 1px solid #C6C6C8;
+	font-size: 17px;
+	background: white;
+	width: 100%;
+}
+
+button {
+	background-color: var(--primary);
+	color: white;
+	border: none;
+	padding: 14px;
+	border-radius: 10px;
+	font-size: 17px;
+	font-weight: 600;
+	width: 100%;
+	cursor: pointer;
+	-webkit-tap-highlight-color: transparent;
+}
+
+button:active {
+	opacity: 0.8;
+}
+
+button:disabled {
+	background-color: #C6C6C8;
+	color: #8E8E93;
+}
+
+button.copy-btn {
+	background-color: #E5E5EA;
+	color: #000;
+	margin-top: 10px;
+	padding: 10px;
+	font-size: 15px;
+}
+
+.output-box {
+	background: #F2F2F7;
+	padding: 15px;
+	border-radius: 8px;
+	min-height: 60px;
+	font-family: monospace;
+	font-size: 18px;
+	color: #333;
+	word-break: break-word;
+	border: 1px solid #C6C6C8;
+	position: relative;
+}
+
+.status {
+	font-size: 14px;
+	color: #8E8E93;
+	text-align: center;
+	margin-top: 10px;
+	min-height: 20px;
+}
+
+.error {
+	color: var(--error);
+	background: #FFF0F0;
+	padding: 10px;
+	border-radius: 6px;
+	border: 1px solid var(--error);
+	display: none;
+	margin-top: 10px;
+	font-size: 14px;
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+<h1>🔊 Text to Phonemes</h1>
+
+<textarea id="textInput" placeholder="Type text here...">Hello world</textarea>
+
+<div class="controls">
+<select id="phonemeType">
+<option value="1">IPA (Readable: həlˈoʊ)</option>
+<option value="2">SAMPA (Computer: h@l"oU)</option>
+	</select>
+
+	<button id="convertBtn" disabled>Loading Engine...</button>
+	</div>
+
+	<label style="font-size:14px; color:#666; margin-bottom:5px; display:block;">Result:</label>
+	<div id="output" class="output-box">Waiting...</div>
+	<button id="copyBtn" class="copy-btn" style="display:none;">Copy Result</button>
+
+	<div id="status" class="status">Initializing...</div>
+	<div id="errorBox" class="error"></div>
+	</div>
+
+	<script type="module">
+	import initEspeak from 'https://unpkg.com/espeak-ng-wasm@1.0.0/dist/espeak-ng-wasm.js';
+
+	const els = {
+	btn: document.getElementById('convertBtn'),
+	input: document.getElementById('textInput'),
+	output: document.getElementById('output'),
+	status: document.getElementById('status'),
+	error: document.getElementById('errorBox'),
+	copy: document.getElementById('copyBtn'),
+	select: document.getElementById('phonemeType')
+	};
+
+	let espeak = null;
+
+	function showError(msg) {
+	els.error.style.display = 'block';
+	els.error.textContent = msg;
+	els.status.textContent = "Failed";
+	els.btn.disabled = true;
+	els.btn.textContent = "Error";
+	}
+
+	async function loadEngine() {
+	try {
+	els.status.textContent = "Downloading Engine (30MB)...";
+
+	// Attempt to load
+	espeak = await initEspeak({
+	locateFile: (path) => {
+	return `https://unpkg.com/espeak-ng-wasm@1.0.0/dist/${path}`;
+	}
+	});
+
+	els.status.textContent = "Ready";
+	els.status.style.color = "var(--success)";
+	els.btn.disabled = false;
+	els.btn.textContent = "Convert to Phonemes";
+	convert(); // Run once on load
+
+	} catch (err) {
+	console.error(err);
+	let msg = "Failed to load engine. ";
+
+	// Detect common iOS file:// protocol error
+	if (window.location.protocol === 'file:') {
+	msg += "iOS blocks WASM from local files. Please host this on a website (like GitHub Pages) or use CodePen.io";
+	} else {
+	msg += "Check your internet connection.";
+	}
+	showError(msg);
+	}
+	}
+
+	function convert() {
+	if (!espeak) return;
+	const text = els.input.value;
+	const type = parseInt(els.select.value);
+
+	if (!text.trim()) {
+	els.output.textContent = "";
+	els.copy.style.display = 'none';
+	return;
+	}
+
+	try {
+	const result = espeak.TextToPhonemes(text, type);
+	els.output.textContent = result;
+	els.copy.style.display = 'block';
+	} catch (e) {
+	els.output.textContent = "Conversion error";
+	}
+	}
+
+	// Copy Functionality
+	els.copy.addEventListener('click', () => {
+	const text = els.output.textContent;
+	navigator.clipboard.writeText(text).then(() => {
+	const original = els.copy.textContent;
+	els.copy.textContent = "Copied!";
+	setTimeout(() => els.copy.textContent = original, 2000);
+	});
+	});
+
+	els.btn.addEventListener('click', convert);
+	els.input.addEventListener('input', () => {
+	// Optional: Auto convert on typing (debounced)
+	// convert();
+	});
+
+	// Start
+	loadEngine();
+	</script>
+
+	</body>
+	</html>

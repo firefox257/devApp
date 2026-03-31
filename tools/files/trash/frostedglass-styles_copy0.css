@@ -1,0 +1,243 @@
+/* ========================================
+   Frosted Glass Theme - CORRECTED
+   Works WITH base styles, not against them
+   ======================================== */
+
+/* 1. Extend CSS Variables (don't replace) */
+:root {
+  /* Keep base variables, add frosted extensions */
+  --glass-bg: rgba(255, 255, 255, 0.1);
+  --glass-bg-hover: rgba(255, 255, 255, 0.15);
+  --glass-border: rgba(255, 255, 255, 0.2);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  --blur-strength: 12px;
+  
+  /* Override base theme colors for frosted look */
+  --bg-color: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%) !important;
+  --window-bg: rgba(30, 30, 46, 0.6);
+  --header-bg: rgba(255, 255, 255, 0.08);
+  --accent: #7ec8e3;
+  --accent-dim: #4a9eb8;
+  --text-primary: #f8f9fa;
+  --text-secondary: #adb5bd;
+  --border-color: var(--glass-border);
+  --menu-bg: rgba(30, 30, 46, 0.85);
+}
+
+/* 2. Background - HIGH SPECIFICITY (required per guide) */
+html body[data-theme="frosted-glass"],
+body[data-theme="frosted-glass"] {
+  background: var(--bg-color) !important;
+  background-size: 400% 400% !important;
+  animation: gradientShift 15s ease infinite !important;
+}
+
+/* 3. Desktop Icons - enhance, don't override completely */
+body[data-theme="frosted-glass"] .icon {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  backdrop-filter: blur(var(--blur-strength));
+  -webkit-backdrop-filter: blur(var(--blur-strength));
+  box-shadow: var(--glass-shadow);
+  color: var(--text-primary);
+  transition: all 0.2s ease;
+}
+
+body[data-theme="frosted-glass"] .icon:hover {
+  background: var(--glass-bg-hover);
+  border-color: var(--accent);
+  box-shadow: 0 8px 40px rgba(126, 200, 227, 0.4);
+  transform: translateY(-2px);
+}
+
+body[data-theme="frosted-glass"] .icon .mat-icon {
+  color: var(--text-primary);
+  text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+}
+
+body[data-theme="frosted-glass"] .icon span {
+  color: var(--text-primary);
+  text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+}
+
+/* 4. Windows - Target BOTH .window AND .window-content */
+body[data-theme="frosted-glass"] .window {
+  background: var(--window-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  backdrop-filter: blur(var(--blur-strength));
+  -webkit-backdrop-filter: blur(var(--blur-strength));
+  box-shadow: var(--glass-shadow);
+}
+
+body[data-theme="frosted-glass"] .window-content {
+  background: transparent; /* Let parent .window show the glass */
+  color: var(--text-primary);
+}
+
+/* Window header */
+body[data-theme="frosted-glass"] .window-header {
+  background: var(--header-bg);
+  border-bottom: 1px solid var(--glass-border);
+  backdrop-filter: blur(calc(var(--blur-strength) - 4px));
+  -webkit-backdrop-filter: blur(calc(var(--blur-strength) - 4px));
+}
+
+body[data-theme="frosted-glass"] .window-title {
+  color: var(--text-primary);
+}
+
+body[data-theme="frosted-glass"] .window-controls .mat-icon {
+  color: var(--text-primary);
+}
+
+body[data-theme="frosted-glass"] .control-btn:hover {
+  background: rgba(255,255,255,0.15);
+}
+
+body[data-theme="frosted-glass"] .control-btn.close-btn:hover {
+  background: #e81123;
+}
+
+body[data-theme="frosted-glass"] .control-btn.close-btn:hover .mat-icon {
+  color: white;
+}
+
+/* 5. Taskbar - enhance existing backdrop-filter */
+body[data-theme="frosted-glass"] .taskbar {
+  background: rgba(20, 20, 35, 0.8) !important; /* Slightly more opaque */
+  border-top: 1px solid var(--glass-border);
+  backdrop-filter: blur(var(--blur-strength)) !important;
+  -webkit-backdrop-filter: blur(var(--blur-strength)) !important;
+}
+
+body[data-theme="frosted-glass"] .taskbar-item {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+}
+
+body[data-theme="frosted-glass"] .taskbar-item:hover,
+body[data-theme="frosted-glass"] .taskbar-item.active {
+  background: var(--glass-bg-hover);
+  border-color: var(--accent);
+}
+
+body[data-theme="frosted-glass"] .taskbar-item::after {
+  background: var(--accent);
+}
+
+/* 6. Start Menu */
+body[data-theme="frosted-glass"] .start-menu {
+  background: var(--menu-bg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(var(--blur-strength));
+  -webkit-backdrop-filter: blur(var(--blur-strength));
+  box-shadow: var(--glass-shadow);
+}
+
+body[data-theme="frosted-glass"] .menu-item {
+  color: var(--text-primary);
+}
+
+body[data-theme="frosted-glass"] .menu-item:hover {
+  background: var(--glass-bg-hover);
+}
+
+body[data-theme="frosted-glass"] .menu-item .mat-icon {
+  color: var(--accent);
+}
+
+/* 7. Buttons & Inputs */
+body[data-theme="frosted-glass"] button,
+body[data-theme="frosted-glass"] .btn {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  color: var(--text-primary);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+body[data-theme="frosted-glass"] button:hover,
+body[data-theme="frosted-glass"] .btn:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #0f0f1a;
+}
+
+body[data-theme="frosted-glass"] input,
+body[data-theme="frosted-glass"] textarea,
+body[data-theme="frosted-glass"] select {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--glass-border);
+  color: var(--text-primary);
+}
+
+body[data-theme="frosted-glass"] input:focus,
+body[data-theme="frosted-glass"] textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(126, 200, 227, 0.3);
+  outline: none;
+}
+
+/* 8. Browser Toolbar (if using browser app) */
+body[data-theme="frosted-glass"] .browser-toolbar {
+  background: rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid var(--glass-border);
+}
+
+body[data-theme="frosted-glass"] .address-bar {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--glass-border);
+  color: var(--text-primary);
+}
+
+body[data-theme="frosted-glass"] .browser-btn .mat-icon {
+  color: var(--text-primary);
+}
+
+/* 9. Scrollbars - enhance base styles */
+body[data-theme="frosted-glass"] ::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+body[data-theme="frosted-glass"] ::-webkit-scrollbar-thumb {
+  background: var(--glass-border);
+}
+
+body[data-theme="frosted-glass"] ::-webkit-scrollbar-thumb:hover {
+  background: var(--accent);
+}
+
+/* 10. Canvas - must stay transparent */
+body[data-theme="frosted-glass"] #themeCanvas {
+  background: transparent !important;
+}
+
+/* 11. Animations */
+@keyframes gradientShift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes glassPulse {
+  0%, 100% { box-shadow: var(--glass-shadow); }
+  50% { box-shadow: 0 12px 48px rgba(126, 200, 227, 0.3); }
+}
+
+body[data-theme="frosted-glass"] .window.active {
+  animation: glassPulse 4s ease-in-out infinite;
+}
+
+/* 12. Fallback for no backdrop-filter support */
+@supports not (backdrop-filter: blur(10px)) {
+  body[data-theme="frosted-glass"] .window,
+  body[data-theme="frosted-glass"] .taskbar,
+  body[data-theme="frosted-glass"] .start-menu,
+  body[data-theme="frosted-glass"] .icon {
+    background: rgba(30, 30, 46, 0.95) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+}

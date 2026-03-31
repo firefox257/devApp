@@ -1,0 +1,978 @@
+//theme-doc.txt
+
+
+
+================================================================================
+MATERIAL ICONS OS - THEME DEVELOPMENT GUIDE v2.1
+Complete Theme Development Guide (Verified with Desktop.html v2.0)
+================================================================================
+
+TABLE OF CONTENTS
+--------------------------------------------------------------------------------
+1.  Overview
+2.  Critical Rules (Read First!)
+3.  File Structure
+4.  Theme Configuration (themes.json)
+5.  CSS: Scoping & Variables
+6.  JavaScript & Canvas Animations
+7.  Cleanup System
+8.  Theme System API (ThemeManager)
+9.  Best Practices
+10. Common Pitfalls
+11. Pre-Deployment Testing Checklist
+12. Examples (Including Frosted Glass)
+13. Troubleshooting
+14. Quick Start Template
+
+================================================================================
+1. OVERVIEW
+================================================================================
+
+The Material Icons OS uses a client-side theme system that loads themes 
+dynamically via the ThemeManager JavaScript object. Each theme consists of:
+
+- CSS file: Scoped overrides using body[data-theme="theme-id"] selectors
+- JavaScript file (optional): Canvas animations with mandatory cleanup function
+- Assets: Images, fonts, and other resources (optional)
+
+KEY FEATURES:
+- Dynamic Loading: Themes apply without page reload
+- Canvas Support: Animated backgrounds with automatic cleanup
+- CSS Variables: Easy color theming with custom properties
+- Scoped Selectors: Prevent style bleeding between themes
+- Theme Persistence: Selected theme saved to localStorage
+- URL Parameters: Apply themes via ?theme=theme-id
+- Resource Cleanup: Automatic cleanup of animations, timers, listeners
+
+================================================================================
+2. CRITICAL RULES (READ FIRST!)
+================================================================================
+
+*** THESE RULES ARE NON-NEGOTIABLE ***
+
+1. CSS MUST be scoped with body[data-theme="your-theme"] to prevent style bleeding
+2. Scripts MUST set window.ThemeCleanup = function cleanup() {...} at global scope
+3. Canvas MUST stay transparent - use clearRect(), never fillRect() with solid color
+4. Event listeners MUST be removed in cleanup using stored references
+5. Animation frames MUST be cancelled with cancelAnimationFrame()
+
+PRO TIP: Test cleanup early
+Apply your theme, then immediately switch to another theme. If animations 
+continue or styles persist, your cleanup is broken. Fix it before adding features.
+
+================================================================================
+3. FILE STRUCTURE
+================================================================================
+
+RECOMMENDED ORGANIZATION:
+
+/webos/
+  |-- desktop.html          [Main OS file with ThemeManager]
+  |-- themes.json           [Theme registry - REQUIRED]
+  +-- themes/
+      +-- your-theme/
+          |-- styles.css          [scoped selectors]
+          |-- script.js           [with window.ThemeCleanup]
+          |-- preview.jpg         [optional thumbnail for Settings UI]
+          +-- assets/
+              |-- background.png
+              +-- fonts/
+
+REQUIRED FILES:
+
+File                              | Required | Purpose                     | Key Requirement
+----------------------------------|----------|-----------------------------|------------------------
+themes.json                       | Yes      | Theme registry/metadata     | Valid JSON, correct paths
+themes/your-theme/styles.css      | Yes      | Visual styling              | Scoped with [data-theme]
+themes/your-theme/script.js       | Optional | Canvas animations           | Must set window.ThemeCleanup
+themes/your-theme/preview.jpg     | Optional | Theme thumbnail in Settings | Recommended: 300x200px
+
+NOTE: File names can be customized (e.g., frostedglass-styles.css) but must
+      match the paths specified in themes.json exactly.
+
+================================================================================
+4. THEME CONFIGURATION (themes.json)
+================================================================================
+
+themes.json STRUCTURE:
+
+{
+  "your-theme-id": {
+    "name": "Display Name",
+    "description": "Brief description",
+    "css": "themes/your-theme/styles.css",
+    "script": "themes/your-theme/script.js",
+    "canvas": true,
+    "preview": "themes/your-theme/preview.jpg",
+    "author": "Your Name",
+    "version": "1.0.0",
+    "settings": {
+      "particles": false,
+      "particleCount": 20
+    }
+  }
+}
+
+CONFIGURATION PROPERTIES:
+
+Property     | Type    | Required | Description
+-------------|---------|----------|------------------------------------------
+name         | String  | Yes      | Human-readable theme name (shown in Settings)
+description  | String  | Optional | Optional description for theme selector
+css          | String  | Yes      | Path to CSS file (relative to desktop.html)
+script       | String  | Optional | Path to JS file that sets window.ThemeCleanup
+canvas       | Boolean | Yes      | true to show canvas, false to hide it
+preview      | String  | Optional | Optional thumbnail image for theme selector
+author       | String  | Optional | Theme author name
+version      | String  | Optional | Theme version (semver recommended)
+settings     | Object  | Optional | Optional config passed to theme scripts
+
+PRO TIP: Access settings in your script
+
+// In script.js - access via window.ThemeConfig
+const themeId = 'your-theme-id';  // Match your themes.json key
+const config = window.ThemeConfig?.[themeId]?.settings || {};
+const particleCount = config.particleCount ?? 20;
+
+NOTE: ThemeManager.themeConfig contains the full themes.json data after loading.
+      Theme scripts can access it via window.ThemeConfig (set by ThemeManager).
+
+================================================================================
+5. CSS: SCOPING & VARIABLES
+================================================================================
+
+*** CSS SCOPING IS MANDATORY ***
+Always wrap theme-specific rules in body[data-theme="your-theme"]. 
+Unscoped rules will leak to other themes.
+
+CORRECT - Scoped with data attribute:
+
+body[data-theme="your-theme"] {
+  --bg-color: linear-gradient(135deg, #1a1a2e, #0f3460);
+}
+
+body[data-theme="your-theme"] .icon {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+}
+
+WRONG - Global selector will leak:
+
+.icon {
+  background: red; /* Affects ALL themes! */
+}
+
+HIGH SPECIFICITY FOR BACKGROUND OVERRIDES:
+
+For background overrides that must beat base styles, use:
+
+html body[data-theme="your-theme"],
+body[data-theme="your-theme"] {
+  background: var(--bg-color) !important;
+  background-size: cover !important;
+}
+
+CORE CSS VARIABLES REFERENCE (from desktop.html base styles):
+
+Variable          | Default                | Controls               | Override Example
+------------------|------------------------|------------------------|------------------------
+--bg-color        | #004e92                | Desktop background     | linear-gradient(...)
+--window-bg       | #ffffff                | Window content bg      | rgba(30,30,46,0.6)
+--header-bg       | #e8e8e8                | Window title bar       | rgba(255,255,255,0.08)
+--accent          | #0078d4                | Primary accent color   | #7ec8e3
+--text-primary    | #333                   | Main text color        | #f8f9fa
+--text-secondary  | #666                   | Secondary text         | #adb5bd
+--border-color    | #ccc                   | Generic borders        | rgba(255,255,255,0.2)
+--menu-bg         | rgba(30,30,30,0.95)    | Start menu bg          | rgba(30,30,46,0.85)
+
+ADDING CUSTOM VARIABLES:
+
+:root {
+  --glass-bg: rgba(255, 255, 255, 0.1);
+  --glass-bg-hover: rgba(255, 255, 255, 0.15);
+  --glass-border: rgba(255, 255, 255, 0.2);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  --blur-strength: 12px;
+}
+
+body[data-theme="your-theme"] .icon {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--blur-strength));
+  -webkit-backdrop-filter: blur(var(--blur-strength));
+  box-shadow: var(--glass-shadow);
+}
+
+ACCESSIBILITY: REDUCED MOTION
+
+@media (prefers-reduced-motion: reduce) {
+  body[data-theme="your-theme"] {
+    animation: none !important;
+  }
+  body[data-theme="your-theme"] .icon,
+  body[data-theme="your-theme"] .window {
+    transition: none !important;
+    animation: none !important;
+    transform: none !important;
+  }
+}
+
+FALLBACK FOR NO BACKDROP-FILTER SUPPORT:
+
+@supports not (backdrop-filter: blur(10px)) {
+  body[data-theme="your-theme"] .window,
+  body[data-theme="your-theme"] .taskbar {
+    background: rgba(30, 30, 46, 0.95) !important;
+    backdrop-filter: none !important;
+  }
+}
+
+================================================================================
+6. JAVASCRIPT & CANVAS ANIMATIONS
+================================================================================
+
+*** SCRIPT REQUIREMENTS (NON-NEGOTIABLE) ***
+
+1. Wrap entire script in IIFE: (function() { ... })();
+2. Set window.ThemeCleanup = function cleanup() {...} at global scope
+3. Keep canvas transparent: use clearRect(), never fill with solid color
+4. Store event handler references for proper removal in cleanup
+5. Cancel all requestAnimationFrame, setInterval, setTimeout
+
+COMPLETE TEMPLATE WITH BEST PRACTICES:
+
+(function() {
+  'use strict';
+  
+  // 1. Get canvas with defensive checks
+  const canvas = document.getElementById('themeCanvas');
+  if (!canvas) {
+    console.warn('Canvas not found - theme running in no-canvas mode');
+    window.ThemeCleanup = function cleanup() {};
+    return;
+  }
+
+  const ctx = canvas.getContext('2d');
+  if (!ctx) {
+    console.error('Could not get canvas context');
+    window.ThemeCleanup = function() {};
+    return;
+  }
+
+  // 2. Track ALL resources for cleanup
+  const themeResources = {
+    animationFrame: null,
+    resizeHandlers: [],
+    intervals: [],
+    timeouts: []
+  };
+
+  // 3. Enforce canvas layering (defensive)
+  canvas.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none;display:block;background:transparent;';
+
+  // 4. HiDPI-aware resize handling
+  function resizeCanvas() {
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = window.innerWidth * dpr;
+    canvas.height = window.innerHeight * dpr;
+    canvas.style.width = window.innerWidth + 'px';
+    canvas.style.height = window.innerHeight + 'px';
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.scale(dpr, dpr);
+  }
+  resizeCanvas();
+  
+  const resizeHandler = resizeCanvas;
+  window.addEventListener('resize', resizeHandler);
+  themeResources.resizeHandlers.push(resizeHandler);
+
+  // 5. Respect reduced motion preference
+  const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (prefersReducedMotion) {
+    console.log('Reduced motion preferred - skipping animation');
+    window.ThemeCleanup = function() {};
+    return;
+  }
+
+  // 6. Optional: Access theme settings from themes.json
+  const themeId = 'your-theme-id';  // Match your themes.json key
+  const config = window.ThemeConfig?.[themeId]?.settings || {};
+  const particleCount = config.particleCount ?? 20;
+
+  // 7. Your animation code
+  function animate() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // Draw your animation here
+    
+    themeResources.animationFrame = requestAnimationFrame(animate);
+    
+    // Track with ThemeManager for auto-cleanup
+    if (typeof ThemeManager !== 'undefined' && ThemeManager.trackAnimation) {
+      ThemeManager.trackAnimation(themeResources.animationFrame);
+    }
+  }
+  
+  animate();
+
+  // 8. REQUIRED: Set global cleanup function
+  window.ThemeCleanup = function cleanup() {
+    console.log('Theme cleanup started');
+    
+    if (themeResources.animationFrame) {
+      cancelAnimationFrame(themeResources.animationFrame);
+      themeResources.animationFrame = null;
+    }
+    
+    themeResources.resizeHandlers.forEach(handler => {
+      try { window.removeEventListener('resize', handler); } catch(e) {}
+    });
+    themeResources.resizeHandlers = [];
+    
+    themeResources.intervals.forEach(id => { try { clearInterval(id); } catch(e) {} });
+    themeResources.intervals = [];
+    themeResources.timeouts.forEach(id => { try { clearTimeout(id); } catch(e) {} });
+    themeResources.timeouts = [];
+    
+    try {
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    } catch (e) { console.warn('Canvas clear error:', e); }
+    
+    console.log('Theme cleanup complete');
+  };
+  
+  // Optional: Register additional cleanup via ThemeManager
+  if (typeof ThemeManager !== 'undefined' && ThemeManager.registerCleanup) {
+    ThemeManager.registerCleanup(() => {
+      console.log('Registry cleanup executed');
+    });
+  }
+  
+  console.log('Theme script loaded successfully');
+})();
+
+================================================================================
+7. CLEANUP SYSTEM
+================================================================================
+
+The ThemeManager provides a robust cleanup system to prevent memory leaks 
+and visual artifacts when switching themes.
+
+HOW CLEANUP WORKS:
+1. User switches theme -> ThemeManager.cleanup() is called
+2. ThemeManager cancels all tracked animation frames, intervals, timeouts
+3. ThemeManager executes window.ThemeCleanup function (if set by theme script)
+4. ThemeManager clears canvas and removes script element
+5. New theme loads -> Clean slate, no artifacts from previous theme
+
+THEMEMANAGER CLEANUP HELPERS:
+
+Method                          | Purpose                         | Example
+--------------------------------|---------------------------------|----------------------------------
+ThemeManager.trackAnimation(id) | Track requestAnimationFrame     | ThemeManager.trackAnimation(rafId)
+ThemeManager.trackInterval(id)  | Track setInterval for auto-clear| ThemeManager.trackInterval(intervalId)
+ThemeManager.trackTimeout(id)   | Track setTimeout for auto-clear | ThemeManager.trackTimeout(timeoutId)
+ThemeManager.registerCleanup(fn)| Register additional cleanup fn  | ThemeManager.registerCleanup(() => {...})
+
+*** CLEANUP CHECKLIST (MUST COMPLETE ALL) ***
+
+[ ] Set window.ThemeCleanup function at global scope (not just return it)
+[ ] Cancel all requestAnimationFrame calls
+[ ] Clear all setInterval and setTimeout timers
+[ ] Remove all addEventListener listeners using stored references
+[ ] Clear canvas with clearRect() and resetTransform()
+[ ] Remove any DOM elements created by the theme
+[ ] Free large arrays/objects to help garbage collection
+[ ] Log cleanup start/end for debugging
+
+================================================================================
+8. THEME SYSTEM API (THEMEMANAGER)
+================================================================================
+
+THEMEMANAGER OBJECT (Available in desktop.html):
+
+// Get current theme
+ThemeManager.currentTheme  // returns: "frosted-glass"
+
+// Get theme configuration (full themes.json data)
+ThemeManager.themeConfig   // returns: { "default": {...}, "matrix": {...}, ... }
+
+// Apply a theme (returns Promise)
+await ThemeManager.apply('frosted-glass');
+
+// Get available themes
+ThemeManager.getAvailableThemes();  // returns: [{id, name, description, canvas}, ...]
+
+// Populate a select element (for Settings UI)
+await ThemeManager.populateThemeSelector('themeSelector');
+
+// Refresh themes.json (for development)
+await ThemeManager.refreshThemeConfig();
+
+// Cleanup helpers for theme scripts
+ThemeManager.trackAnimation(rafId);
+ThemeManager.trackInterval(intervalId);
+ThemeManager.trackTimeout(timeoutId);
+ThemeManager.registerCleanup(cleanupFn);
+
+EVENTS:
+
+// Listen for theme changes
+window.addEventListener('themeChanged', (e) => {
+  console.log('New theme:', e.detail.theme);
+  console.log('Theme config:', e.detail.config);
+  // Update your UI here
+});
+
+URL PARAMETERS:
+
+// Apply theme via URL
+desktop.html?theme=frosted-glass
+
+// Force reload theme config
+desktop.html?theme=frosted-glass&reload=1
+
+THEME PERSISTENCE:
+
+// Theme preference is automatically saved to localStorage
+// Key: 'os-preferred-theme'
+// Loaded on init with priority: URL param > saved preference > default
+
+================================================================================
+9. BEST PRACTICES
+================================================================================
+
+1. USE CSS VARIABLES FOR MAINTAINABILITY
+
+/* GOOD: Uses variables */
+body[data-theme="your-theme"] .window {
+  background: var(--window-bg);
+  color: var(--text-primary);
+}
+
+/* BAD: Hardcoded colors */
+.window {
+  background: #ffffff; /* Won't adapt to theme */
+}
+
+2. MAINTAIN CANVAS TRANSPARENCY
+
+// GOOD: Clear canvas (preserves background)
+ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+// BAD: Fill with color (blocks CSS background)
+ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+3. HANDLE HIDPI DISPLAYS
+
+function resizeCanvas() {
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = window.innerWidth * dpr;
+  canvas.height = window.innerHeight * dpr;
+  canvas.style.width = window.innerWidth + 'px';
+  canvas.style.height = window.innerHeight + 'px';
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.scale(dpr, dpr);
+}
+
+4. DEBOUNCE RESIZE HANDLERS
+
+let resizeTimeout;
+function onResize() {
+  clearTimeout(resizeTimeout);
+  resizeTimeout = setTimeout(() => {
+    resizeCanvas();
+  }, 150);
+}
+window.addEventListener('resize', onResize);
+// In cleanup: clearTimeout(resizeTimeout);
+
+5. OPTIMIZE ANIMATION PERFORMANCE
+
+// Limit particle count
+const MAX_PARTICLES = 100;
+
+// Use object pooling for reusable particles
+const particlePool = [];
+function getParticle() {
+  return particlePool.pop() || new Particle();
+}
+
+// Pause animation when tab hidden
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && animationFrame) {
+    cancelAnimationFrame(animationFrame);
+  } else {
+    animate();
+  }
+});
+
+6. USE VENDOR PREFIXES FOR BACKDROP-FILTER
+
+body[data-theme="your-theme"] .window {
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);  /* Safari support */
+}
+
+================================================================================
+10. COMMON PITFALLS
+================================================================================
+
+*** STYLE BLEEDING (MOST COMMON) ***
+
+Problem: Theme CSS affects other themes after switching
+
+Solution:
+/* Always scope with data attribute */
+body[data-theme="your-theme"] .icon { ... }
+
+/* For background overrides, use high specificity */
+html body[data-theme="your-theme"],
+body[data-theme="your-theme"] {
+  background: ... !important;
+}
+
+*** CANVAS BLOCKING BACKGROUND ***
+
+Problem: Can't see CSS background through canvas
+
+Solution:
+- Use clearRect() not fillRect()
+- Set canvas CSS: background: transparent !important
+- Ensure canvas z-index is 0 (behind UI)
+- Check ThemeManager sets canvas display based on theme.canvas property
+
+*** MEMORY LEAKS FROM UNCLEANED RESOURCES ***
+
+Problem: Animations continue after theme switch
+
+Solution:
+- Set window.ThemeCleanup at global scope
+- Store handler references for removeEventListener
+- Cancel all animation frames/intervals/timeouts
+- Use ThemeManager.track*() helpers
+
+*** LOW CSS SPECIFICITY ***
+
+Problem: Theme styles overridden by base CSS
+
+Solution:
+/* Use high-specificity selectors */
+html body[data-theme="your-theme"],
+body[data-theme="your-theme"] {
+  background: ... !important;
+}
+
+/* Add !important to critical overrides */
+body[data-theme="your-theme"] .taskbar {
+  background: ... !important;
+}
+
+*** NOT TESTING CLEANUP ***
+
+Problem: Theme works initially but breaks on switch
+
+Solution:
+Test cleanup immediately: Apply theme -> Switch to another -> 
+Check console for errors or visual artifacts.
+
+*** FILE PATH TYPOS ***
+
+Problem: Theme fails to load with 404 errors
+
+Solution:
+- Double-check all paths in themes.json
+- Verify filenames match exactly (case-sensitive on some servers)
+- Common typo: "default-tyles.css" should be "default-styles.css"
+
+================================================================================
+11. PRE-DEPLOYMENT TESTING CHECKLIST
+================================================================================
+
+*** RUN THESE TESTS BEFORE SUBMITTING YOUR THEME ***
+
+Test                  | How to Test                              | Expected Result
+----------------------|------------------------------------------|---------------------------
+CSS Scoping           | Apply theme -> Switch to default         | No styles from old theme remain
+                      | -> Inspect elements                      |
+Canvas Transparency   | Apply theme with canvas -> Check bg      | CSS gradient visible through canvas
+Cleanup Execution     | Switch themes rapidly 10x -> Check       | No memory growth, no lingering animations
+                      | DevTools Performance                     |
+HiDPI Rendering       | Test on Retina display or zoom to 200%   | Canvas animation remains sharp
+Resize Handling       | Resize browser window during animation   | Canvas resizes smoothly, no stutter
+Reduced Motion        | Enable OS "Reduce Motion" -> Apply theme | Animations disabled, theme functional
+Error Handling        | Simulate missing canvas -> Load theme    | Graceful fallback, no console errors
+Theme Selector        | Open Settings -> Check theme appears     | Theme listed correctly, preview loads
+File Paths            | Check Network tab for 404s               | All CSS/JS files load (200 OK)
+Theme Persistence     | Apply theme -> Refresh page              | Same theme re-applies automatically
+URL Parameters        | Open ?theme=your-theme                   | Theme applies on load
+
+================================================================================
+12. EXAMPLES
+================================================================================
+
+EXAMPLE 1: FROSTED GLASS THEME (COMPLETE)
+
+themes.json entry:
+{
+  "frosted-glass": {
+    "name": "Frosted Glass",
+    "description": "Elegant translucent theme with backdrop blur effects",
+    "css": "themes/frosted-glass/frostedglass-styles.css",
+    "script": "themes/frosted-glass/frostedglass-script.js",
+    "canvas": true,
+    "preview": "themes/frosted-glass/preview.jpg",
+    "author": "Your Name",
+    "version": "1.0.0",
+    "settings": {
+      "particles": false,
+      "particleCount": 20
+    }
+  }
+}
+
+styles.css (key excerpts):
+-------------------------------------------------------------------------------
+:root {
+  --glass-bg: rgba(255, 255, 255, 0.1);
+  --glass-border: rgba(255, 255, 255, 0.2);
+  --blur-strength: 12px;
+  --bg-color: linear-gradient(135deg, #1a1a2e, #16213e, #0f3460);
+  --window-bg: rgba(30, 30, 46, 0.6);
+  --accent: #7ec8e3;
+  --text-primary: #f8f9fa;
+}
+
+html body[data-theme="frosted-glass"],
+body[data-theme="frosted-glass"] {
+  background: var(--bg-color) !important;
+  background-size: cover !important;
+}
+
+body[data-theme="frosted-glass"] .icon {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(var(--blur-strength));
+  -webkit-backdrop-filter: blur(var(--blur-strength));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body[data-theme="frosted-glass"] {
+    animation: none !important;
+  }
+}
+
+@supports not (backdrop-filter: blur(10px)) {
+  body[data-theme="frosted-glass"] .window {
+    background: rgba(30, 30, 46, 0.95) !important;
+  }
+}
+-------------------------------------------------------------------------------
+
+script.js (key excerpts):
+-------------------------------------------------------------------------------
+(function() {
+  'use strict';
+  
+  const canvas = document.getElementById('themeCanvas');
+  if (!canvas) { window.ThemeCleanup = function() {}; return; }
+  
+  const ctx = canvas.getContext('2d');
+  let animationFrame = null;
+  let resizeHandler = null;
+  
+  // HiDPI resize
+  function resizeCanvas() {
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = window.innerWidth * dpr;
+    canvas.height = window.innerHeight * dpr;
+    canvas.style.width = window.innerWidth + 'px';
+    canvas.style.height = window.innerHeight + 'px';
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.scale(dpr, dpr);
+  }
+  resizeCanvas();
+  resizeHandler = resizeCanvas;
+  window.addEventListener('resize', resizeHandler);
+  
+  // Animation loop
+  function animate() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // Draw particles/effects here
+    animationFrame = requestAnimationFrame(animate);
+    if (ThemeManager?.trackAnimation) ThemeManager.trackAnimation(animationFrame);
+  }
+  animate();
+  
+  // REQUIRED cleanup
+  window.ThemeCleanup = function cleanup() {
+    if (animationFrame) cancelAnimationFrame(animationFrame);
+    if (resizeHandler) window.removeEventListener('resize', resizeHandler);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  };
+  
+  if (ThemeManager?.registerCleanup) ThemeManager.registerCleanup(() => {});
+})();
+-------------------------------------------------------------------------------
+
+EXAMPLE 2: SIMPLE GRADIENT THEME (CSS ONLY)
+
+themes.json:
+{
+  "sunset": {
+    "name": "Sunset Gradient",
+    "css": "themes/sunset/styles.css",
+    "script": null,
+    "canvas": false,
+    "preview": "themes/sunset/preview.jpg"
+  }
+}
+
+styles.css:
+-------------------------------------------------------------------------------
+:root {
+  --bg-color: linear-gradient(135deg, #ff6b6b, #feca57, #48dbfb);
+  --accent: #feca57;
+  --text-primary: #2d3436;
+}
+
+html body[data-theme="sunset"],
+body[data-theme="sunset"] {
+  background: var(--bg-color) !important;
+  background-size: cover !important;
+}
+
+body[data-theme="sunset"] .icon {
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(10px);
+}
+-------------------------------------------------------------------------------
+
+================================================================================
+13. TROUBLESHOOTING
+================================================================================
+
+*** BACKGROUND NOT SHOWING ***
+
+Problem: Background image/color not visible
+
+Solutions:
+1. Check CSS specificity - use body[data-theme="..."] + !important
+2. Verify image path is correct (check Network tab for 404)
+3. Ensure canvas is transparent: background: transparent !important
+4. Check if base styles override - inspect computed styles
+5. Verify themes.json "canvas" property matches theme capability
+
+*** ANIMATIONS NOT STOPPING (MEMORY LEAK) ***
+
+Problem: Previous theme animation continues after switching
+
+Solutions:
+1. Verify window.ThemeCleanup is set at global scope
+2. Cancel animation frames with cancelAnimationFrame()
+3. Remove event listeners with stored references
+4. Use ThemeManager.trackAnimation() for auto-cancel
+5. Clear canvas with clearRect() and resetTransform()
+6. Check ThemeManager.cleanup() is being called (console logs)
+
+*** THEME NOT LOADING ***
+
+Problem: Theme doesn't appear in Settings or apply
+
+Solutions:
+1. Validate themes.json syntax (use JSONLint)
+2. Verify file paths are relative to desktop.html
+3. Check browser console for CORS or 404 errors
+4. Clear browser cache or add ?reload=1 to URL
+5. Check for typos in filenames (e.g., "tyles" vs "styles")
+6. Verify theme ID in themes.json matches URL parameter
+
+*** CSS NOT APPLYING ***
+
+Problem: Theme styles not showing
+
+Solutions:
+1. Increase specificity with body[data-theme="..."]
+2. Add !important to critical overrides temporarily for testing
+3. Check if CSS file is loading (Network tab -> Status 200)
+4. Verify data-theme attribute is set on <body>
+5. Check ThemeManager.currentTheme after apply
+
+*** CANVAS NOT SHOWING ***
+
+Problem: Canvas animations not visible
+
+Solutions:
+1. Verify themes.json has "canvas": true
+2. Check canvas display style (should be 'block' when active)
+3. Ensure animation loop is running (console.log in animate())
+4. Verify canvas z-index is 0 (behind UI, in front of background)
+5. Check canvas isn't being cleared immediately after draw
+
+================================================================================
+14. QUICK START TEMPLATE
+================================================================================
+
+Copy these files to create a new theme with proper cleanup:
+
+FILE: themes/your-theme/styles.css
+-------------------------------------------------------------------------------
+:root {
+  --bg-color: #your-color;
+  --accent: #your-color;
+  --text-primary: #your-color;
+  --glass-bg: rgba(255, 255, 255, 0.1);
+  --glass-border: rgba(255, 255, 255, 0.2);
+  --blur-strength: 12px;
+}
+
+html body[data-theme="your-theme"],
+body[data-theme="your-theme"] {
+  background: var(--bg-color) !important;
+  background-size: cover !important;
+}
+
+body[data-theme="your-theme"] .icon {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(var(--blur-strength));
+  -webkit-backdrop-filter: blur(var(--blur-strength));
+}
+
+body[data-theme="your-theme"] #themeCanvas {
+  display: block !important;
+  background: transparent !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body[data-theme="your-theme"] {
+    animation: none !important;
+  }
+  body[data-theme="your-theme"] .icon,
+  body[data-theme="your-theme"] .window {
+    transition: none !important;
+    transform: none !important;
+  }
+}
+
+@supports not (backdrop-filter: blur(10px)) {
+  body[data-theme="your-theme"] .window {
+    background: rgba(30, 30, 46, 0.95) !important;
+  }
+}
+-------------------------------------------------------------------------------
+
+FILE: themes/your-theme/script.js
+-------------------------------------------------------------------------------
+(function() {
+  'use strict';
+  
+  const canvas = document.getElementById('themeCanvas');
+  if (!canvas) { window.ThemeCleanup = function() {}; return; }
+  
+  const ctx = canvas.getContext('2d');
+  let animationFrame = null;
+  let resizeHandler = null;
+  
+  // HiDPI resize
+  function resizeCanvas() {
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = window.innerWidth * dpr;
+    canvas.height = window.innerHeight * dpr;
+    canvas.style.width = window.innerWidth + 'px';
+    canvas.style.height = window.innerHeight + 'px';
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.scale(dpr, dpr);
+  }
+  resizeCanvas();
+  resizeHandler = resizeCanvas;
+  window.addEventListener('resize', resizeHandler);
+  
+  // Enforce canvas layering
+  canvas.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none;background:transparent;';
+  
+  // Respect reduced motion
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    window.ThemeCleanup = function() {};
+    return;
+  }
+  
+  // Animation loop
+  function animate() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // Draw your animation here
+    animationFrame = requestAnimationFrame(animate);
+    if (ThemeManager?.trackAnimation) ThemeManager.trackAnimation(animationFrame);
+  }
+  animate();
+  
+  // REQUIRED cleanup
+  window.ThemeCleanup = function cleanup() {
+    if (animationFrame) cancelAnimationFrame(animationFrame);
+    if (resizeHandler) window.removeEventListener('resize', resizeHandler);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  };
+  
+  if (ThemeManager?.registerCleanup) ThemeManager.registerCleanup(() => {});
+})();
+-------------------------------------------------------------------------------
+
+FILE: Update themes.json
+-------------------------------------------------------------------------------
+{
+  "your-theme": {
+    "name": "Your Theme Name",
+    "description": "Description of your theme",
+    "css": "themes/your-theme/styles.css",
+    "script": "themes/your-theme/script.js",
+    "canvas": false,
+    "preview": "themes/your-theme/preview.jpg",
+    "author": "Your Name",
+    "version": "1.0.0"
+  }
+}
+-------------------------------------------------------------------------------
+
+================================================================================
+APPENDIX: DESKTOP.HTML INTEGRATION NOTES
+================================================================================
+
+CANVAS ELEMENT (in desktop.html):
+-------------------------------------------------------------------------------
+<canvas id="themeCanvas"></canvas>
+-------------------------------------------------------------------------------
+- Hidden by default (display: none)
+- Shown when theme.canvas = true AND script loads successfully
+- z-index: 0 (behind all UI elements)
+- pointer-events: none (clicks pass through)
+
+THEME STYLESHEET INJECTION:
+-------------------------------------------------------------------------------
+<link id="theme-stylesheet" rel="stylesheet" href="">
+<style id="theme-inline"></style>
+-------------------------------------------------------------------------------
+- theme-stylesheet: External CSS file loaded dynamically
+- theme-inline: Reserved for future inline style injection
+
+DATA-THEME ATTRIBUTE:
+-------------------------------------------------------------------------------
+<html lang="en" data-theme="default">
+<body data-theme="default">
+-------------------------------------------------------------------------------
+- Both html and body get data-theme attribute
+- Updated by ThemeManager.apply() before loading CSS/script
+
+THEME PERSISTENCE:
+- localStorage key: 'os-preferred-theme'
+- Loaded on ThemeManager.init()
+- Priority: URL param > saved preference > default
+
+================================================================================
+END OF DOCUMENTATION
+================================================================================
+Material Icons OS - Theme Development Guide v2.1
+Verified against desktop.html v2.0 and Frosted Glass theme example
+For support, check browser console logs or ThemeManager API
+================================================================================

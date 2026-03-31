@@ -1,0 +1,320 @@
+/* Rainy Forest Theme - Nature-inspired dark theme with rain animation */
+
+:root {
+  /* Forest color palette */
+  --bg-color: #1a2f23;
+  --window-bg: #0d1f17;
+  --header-bg: #143327;
+  --accent: #7ec850;
+  --accent-dim: #4a7c32;
+  --menu-bg: rgba(13, 31, 23, 0.95);
+  --text-primary: #e8f5e9;
+  --text-secondary: #81c784;
+  --border-color: #2d5a3f;
+  --highlight: #a5d6a7;
+}
+
+/* ✅ FIXED: Use higher specificity + !important to override base styles */
+html body[data-theme="rainy-forest"],
+body[data-theme="rainy-forest"] {
+  /* 
+   * ⚠️ STUB: Replace with your generated background.png
+   * Make sure the file exists at: themes/rainy-forest/background.png
+   */
+  background: url('background.png') no-repeat center center fixed !important;
+  background-size: cover !important;
+  /* Fallback color if image fails to load */
+  background-color: #0a1612 !important;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+/* ✅ FIXED: Canvas is fully transparent - only raindrops are drawn */
+#themeCanvas {
+  display: block !important;
+  pointer-events: none;
+  z-index: 0;
+  background: transparent !important;
+}
+
+/* Soft glow on icons */
+.mat-icon {
+  color: var(--text-primary);
+  text-shadow: 0 0 8px rgba(126, 200, 80, 0.4);
+  transition: all 0.3s ease;
+}
+
+/* Desktop Icons - Glass-morphism style */
+.icon {
+  color: var(--text-primary);
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+  border: 1px solid rgba(126, 200, 80, 0.3);
+  background: rgba(13, 31, 23, 0.6);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: 12px;
+  transition: all 0.3s ease;
+}
+
+.icon:hover {
+  background: rgba(126, 200, 80, 0.25);
+  border-color: var(--accent);
+  box-shadow: 0 0 20px rgba(126, 200, 80, 0.4), inset 0 0 10px rgba(126, 200, 80, 0.1);
+  transform: translateY(-2px);
+}
+
+.icon:active {
+  background: rgba(126, 200, 80, 0.35);
+  box-shadow: 0 0 25px rgba(126, 200, 80, 0.6);
+  transform: translateY(0);
+}
+
+/* Start Menu - Frosted glass effect */
+.start-menu {
+  background: var(--menu-bg);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 20px rgba(126, 200, 80, 0.2);
+  border: 1px solid rgba(126, 200, 80, 0.3);
+  border-radius: 16px;
+}
+
+.menu-header {
+  border-bottom: 1px solid var(--border-color);
+}
+
+.menu-avatar {
+  background: linear-gradient(135deg, var(--accent-dim), var(--accent));
+  border: 2px solid var(--accent);
+  box-shadow: 0 0 15px rgba(126, 200, 80, 0.5);
+  color: var(--text-primary);
+}
+
+.menu-item {
+  color: var(--text-primary);
+  border: 1px solid transparent;
+  border-radius: 10px;
+  transition: all 0.2s ease;
+}
+
+.menu-item:hover {
+  background: rgba(126, 200, 80, 0.15);
+  border-color: rgba(126, 200, 80, 0.4);
+}
+
+.menu-item:active {
+  background: rgba(126, 200, 80, 0.25);
+}
+
+.menu-item .mat-icon {
+  color: var(--text-secondary);
+}
+
+/* Windows - Dark forest glass */
+.window {
+  background: var(--window-bg);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6), 0 0 30px rgba(126, 200, 80, 0.15);
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.window-header {
+  background: var(--header-bg);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.window-title {
+  color: var(--text-primary);
+}
+
+.control-btn .mat-icon {
+  color: var(--text-primary);
+}
+
+.control-btn:hover {
+  background: rgba(126, 200, 80, 0.15);
+}
+
+.control-btn:hover .mat-icon {
+  color: var(--highlight);
+  text-shadow: 0 0 8px rgba(126, 200, 80, 0.6);
+}
+
+.control-btn.close-btn:hover {
+  background: #c62828;
+  box-shadow: 0 0 15px rgba(198, 40, 40, 0.5);
+}
+
+.control-btn.close-btn:hover .mat-icon {
+  color: white;
+  text-shadow: none;
+}
+
+.window-content {
+  background: var(--window-bg);
+  color: var(--text-primary);
+}
+
+/* Browser Toolbar */
+.browser-toolbar {
+  background: var(--header-bg);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.browser-btn {
+  border: 1px solid var(--border-color);
+  transition: all 0.2s ease;
+}
+
+.browser-btn .mat-icon {
+  color: var(--text-primary);
+}
+
+.browser-btn:hover {
+  background: rgba(126, 200, 80, 0.15);
+  border-color: var(--accent);
+}
+
+.address-bar {
+  border: 1px solid var(--border-color);
+  background: rgba(13, 31, 23, 0.8);
+  color: var(--text-primary);
+}
+
+.address-bar::placeholder {
+  color: var(--text-secondary);
+}
+
+.address-bar:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 10px rgba(126, 200, 80, 0.3);
+}
+
+/* Resize Handle */
+.resize-handle {
+  background: linear-gradient(135deg, transparent 50%, var(--accent) 50%);
+  opacity: 0.6;
+}
+
+.resize-handle:active {
+  opacity: 1;
+  box-shadow: 0 0 15px rgba(126, 200, 80, 0.6);
+}
+
+/* Taskbar - Frosted forest bar */
+.taskbar {
+  background: rgba(13, 31, 23, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-top: 1px solid rgba(126, 200, 80, 0.3);
+  box-shadow: 0 -5px 25px rgba(0, 0, 0, 0.4);
+}
+
+.start-btn {
+  color: var(--text-primary);
+  transition: all 0.2s ease;
+}
+
+.start-btn:hover {
+  background: rgba(126, 200, 80, 0.2);
+  box-shadow: 0 0 20px rgba(126, 200, 80, 0.4);
+}
+
+.start-btn:active, .start-btn.active {
+  background: rgba(126, 200, 80, 0.3);
+  box-shadow: 0 0 25px rgba(126, 200, 80, 0.6);
+}
+
+.taskbar-item {
+  color: var(--text-primary);
+  background: rgba(126, 200, 80, 0.08);
+  border: 1px solid rgba(126, 200, 80, 0.2);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-radius: 10px;
+  transition: all 0.2s ease;
+}
+
+.taskbar-item:hover {
+  border-color: var(--accent-dim);
+  background: rgba(126, 200, 80, 0.2);
+  box-shadow: 0 0 15px rgba(126, 200, 80, 0.3);
+}
+
+.taskbar-item.active {
+  background: rgba(126, 200, 80, 0.3);
+  border-color: var(--accent);
+  box-shadow: 0 0 20px rgba(126, 200, 80, 0.5);
+}
+
+.taskbar-item::after {
+  background: var(--accent);
+  box-shadow: 0 0 8px rgba(126, 200, 80, 0.8);
+}
+
+.system-tray {
+  color: var(--text-primary);
+}
+
+#time {
+  text-shadow: 0 0 10px rgba(126, 200, 80, 0.5);
+}
+
+/* Scrollbars - Forest themed */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--window-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, var(--accent-dim), var(--accent));
+  border-radius: 5px;
+  border: 1px solid rgba(126, 200, 80, 0.3);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, var(--accent), var(--highlight));
+  box-shadow: 0 0 10px rgba(126, 200, 80, 0.5);
+}
+
+/* Content area styling */
+.content-padding {
+  color: var(--text-primary);
+}
+
+.content-padding h3 {
+  color: var(--highlight);
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 8px;
+}
+
+/* Soft fade animation for theme transitions */
+.window, .icon, .taskbar-item, .start-menu, .menu-item {
+  transition: background 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease;
+}
+
+/* Gentle pulse for active elements */
+@keyframes forestPulse {
+  0%, 100% { box-shadow: 0 0 15px rgba(126, 200, 80, 0.3); }
+  50% { box-shadow: 0 0 25px rgba(126, 200, 80, 0.5); }
+}
+
+.taskbar-item.active {
+  animation: forestPulse 2s ease-in-out infinite;
+}
+
+/* Fog/mist overlay effect - sits BEHIND canvas */
+.fog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(ellipse at bottom, rgba(20, 50, 40, 0.3) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}

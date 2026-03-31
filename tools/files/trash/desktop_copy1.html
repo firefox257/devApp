@@ -1,0 +1,1204 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="default">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Material Icons OS</title>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    
+    <!-- === BASE STYLES (Core OS - themes override via data-theme) === -->
+    <style id="base-styles">
+        :root {
+            --taskbar-height: 50px;
+            --safe-bottom: env(safe-area-inset-bottom, 20px);
+            /* Base variables - themes override these */
+            --bg-color: #004e92;
+            --window-bg: #ffffff;
+            --header-bg: #e8e8e8;
+            --accent: #0078d4;
+            --menu-bg: rgba(30, 30, 30, 0.95);
+            --text-primary: #333;
+            --text-secondary: #666;
+            --border-color: #ccc;
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            overflow: hidden;
+            height: 100dvh;
+            width: 100vw;
+            background: var(--bg-color);
+            transition: background 0.3s ease;
+            position: relative;
+        }
+
+        /* Theme Animation Canvas - HIDDEN BY DEFAULT */
+        #themeCanvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            pointer-events: none;
+            display: none;
+            background: transparent !important;
+        }
+
+        .mat-icon {
+            font-family: 'Material Icons';
+            font-weight: normal;
+            font-style: normal;
+            font-size: 24px;
+            line-height: 1;
+            display: inline-block;
+            white-space: nowrap;
+            direction: ltr;
+            -webkit-font-feature-settings: 'liga';
+            -webkit-font-smoothing: antialiased;
+            color: white;
+            vertical-align: middle;
+            transition: color 0.2s, text-shadow 0.2s;
+        }
+
+        /* Desktop */
+        .desktop-area {
+            height: calc(100dvh - var(--taskbar-height) - var(--safe-bottom));
+            width: 100%;
+            padding: 10px;
+            display: flex;
+            flex-wrap: wrap;
+            align-content: flex-start;
+            gap: 8px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .icon {
+            width: 70px;
+            height: 80px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            color: white;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+            cursor: pointer;
+        }
+        .icon:active { background: rgba(255, 255, 255, 0.15); }
+        .icon .mat-icon { font-size: 32px; margin-bottom: 4px; }
+        .icon span { font-size: 11px; text-align: center; width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+        /* Start Menu */
+        .start-menu {
+            position: absolute;
+            bottom: calc(var(--taskbar-height) + var(--safe-bottom) + 10px);
+            left: 10px;
+            width: 280px;
+            background: var(--menu-bg);
+            backdrop-filter: blur(15px);
+            border-radius: 12px;
+            padding: 10px;
+            z-index: 2000;
+            display: none;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            border: 1px solid rgba(255,255,255,0.1);
+            animation: slideUp 0.2s ease-out;
+        }
+        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .menu-header { padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.1); margin-bottom: 5px; display: flex; align-items: center; gap: 10px; }
+        .menu-avatar { width: 36px; height: 36px; background: var(--accent); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; color: white; }
+        .menu-list { display: flex; flex-direction: column; gap: 2px; }
+        .menu-item { display: flex; align-items: center; padding: 12px; border-radius: 8px; color: white; cursor: pointer; }
+        .menu-item:active { background: rgba(255,255,255,0.1); }
+        .menu-item .mat-icon { margin-right: 15px; font-size: 20px; color: #ccc; }
+
+        /* Windows */
+        .window {
+            position: absolute;
+            top: 10%;
+            left: 5%;
+            width: 90%;
+            height: 70%;
+            background: var(--window-bg);
+            border-radius: 10px;
+            box-shadow: 0 15px 40px rgba(0,0,0,0.6);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            border: 1px solid rgba(255,255,255,0.1);
+            min-width: 200px;
+            min-height: 150px;
+            transition: transform 0.2s, opacity 0.2s;
+        }
+        .window.minimized { transform: scale(0.8) translateY(200px); opacity: 0; pointer-events: none; }
+        .window-header {
+            height: 40px;
+            background: var(--header-bg);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 10px;
+            border-bottom: 1px solid var(--border-color);
+            cursor: grab;
+        }
+        .window-header:active { cursor: grabbing; }
+        .window-title-area { display: flex; align-items: center; gap: 8px; flex: 1; overflow: hidden; }
+        .window-title { font-size: 13px; color: var(--text-primary); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .window-controls { display: flex; gap: 4px; }
+        .control-btn {
+            width: 32px; height: 32px; border: none; background: transparent;
+            border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+        }
+        .control-btn .mat-icon { color: var(--text-primary); font-size: 18px; }
+        .control-btn:hover { background: rgba(0,0,0,0.1); }
+        .control-btn.close-btn:hover { background: #e81123; }
+        .control-btn.close-btn:hover .mat-icon { color: white; }
+        .window-content { flex: 1; background: white; color: var(--text-primary); overflow: hidden; display: flex; flex-direction: column; position: relative; }
+
+        /* Click Blocker */
+        .click-blocker { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: transparent; z-index: 100; cursor: pointer; }
+        .click-blocker.hidden { display: none; }
+
+        /* Browser */
+        .browser-toolbar { display: flex; align-items: center; gap: 8px; padding: 8px; background: #f5f5f5; border-bottom: 1px solid var(--border-color); }
+        .browser-btn { width: 32px; height: 32px; border: none; background: transparent; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        .browser-btn .mat-icon { color: #555; font-size: 18px; }
+        .browser-btn:active { background: #e0e0e0; }
+        .address-bar { flex: 1; height: 32px; border: 1px solid var(--border-color); border-radius: 16px; padding: 0 12px; font-size: 13px; background: white; outline: none; user-select: text; -webkit-user-select: text; }
+        .iframe-container { flex: 1; position: relative; background: white; }
+        .web-iframe { width: 100%; height: 100%; border: none; background: white; }
+        .content-padding { padding: 15px; overflow-y: auto; -webkit-overflow-scrolling: touch; font-size: 14px; line-height: 1.5; flex: 1; color: var(--text-primary); }
+
+        /* Resize */
+        .resize-handle { position: absolute; bottom: 0; right: 0; width: 20px; height: 20px; cursor: nwse-resize; z-index: 10; background: linear-gradient(135deg, transparent 50%, #666 50%); opacity: 0.5; }
+        .resize-handle:active { background: linear-gradient(135deg, transparent 50%, var(--accent) 50%); opacity: 1; }
+
+        /* Taskbar */
+        .taskbar {
+            position: absolute; bottom: 0; width: 100%;
+            height: calc(var(--taskbar-height) + var(--safe-bottom));
+            background: rgba(20, 20, 20, 0.9);
+            backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px);
+            display: flex; align-items: flex-end; justify-content: space-between;
+            padding: 0 10px; padding-bottom: var(--safe-bottom);
+            z-index: 3000; border-top: 1px solid rgba(255,255,255,0.1);
+        }
+        .start-btn { width: 40px; height: 40px; background: transparent; border: none; display: inner-block; align-items: center; justify-content: center; border-radius: 6px; color: white; flex-shrink: 0; }
+        .start-btn:active, .start-btn.active { background: rgba(255,255,255,0.15); }
+        
+        /* ✅ FIXED: Taskbar apps container with scroll buttons */
+        .taskbar-apps-wrapper {
+            flex: 1;
+            display: flex;
+            align-items: flex-end;
+            padding-left: 10px;
+            padding-right: 10px;
+            gap: 6px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .taskbar-apps {
+            display: flex;
+            gap: 6px;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            scroll-behavior: smooth;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+            padding: 3px 0;
+        }
+        .taskbar-apps::-webkit-scrollbar { display: none; }
+        
+        /* Scroll buttons */
+        .taskbar-scroll-btn {
+            width: 32px;
+            height: 40px;
+            background: rgba(255,255,255,0.1);
+            border: none;
+            border-radius: 6px;
+            color: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s, background 0.2s;
+        }
+        .taskbar-scroll-btn.visible {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .taskbar-scroll-btn:hover {
+            background: rgba(255,255,255,0.2);
+        }
+        .taskbar-scroll-btn:active {
+            background: rgba(255,255,255,0.3);
+        }
+        .taskbar-scroll-btn .mat-icon {
+            font-size: 20px;
+        }
+        
+        .taskbar-item {
+            min-width: 44px;
+            height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 6px;
+            position: relative;
+            color: white;
+            cursor: pointer;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            flex-shrink: 0;
+            transition: background 0.2s, transform 0.1s;
+        }
+        .taskbar-item:active { 
+            background: rgba(255,255,255,0.2);
+            transform: scale(0.95);
+        }
+        .taskbar-item.active { 
+            background: rgba(255,255,255,0.25); 
+            border-color: rgba(255,255,255,0.3); 
+        }
+        .taskbar-item::after {
+            content: ''; position: absolute; bottom: 4px; width: 4px; height: 4px;
+            background: var(--accent); border-radius: 50%; transition: width 0.2s;
+        }
+        .taskbar-item.active::after { width: 16px; border-radius: 2px; }
+        
+        .system-tray { display: flex; align-items: center; gap: 8px; color: white; font-size: 12px; padding-right: 5px; padding-bottom: 5px; text-align: right; flex-shrink: 0; }
+        .clock { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.1; font-weight: 500; }
+        #date { font-size: 10px; opacity: 0.7; }
+
+        /* Scrollbars */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb { background: #888; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #555; }
+
+        /* Spin Animation for Refresh Button */
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+    </style>
+
+    <!-- === DYNAMIC THEME STYLES (injected at runtime) === -->
+    <link id="theme-stylesheet" rel="stylesheet" href="">
+    <style id="theme-inline"></style>
+</head>
+<body data-theme="default">
+
+    <!-- Theme Animation Canvas (hidden by default) -->
+    <canvas id="themeCanvas"></canvas>
+
+    <!-- Desktop Icons -->
+    <div class="desktop-area">
+        <div class="icon" onclick="appManager.open('This PC', 'desktop_windows', 'pc')">
+            <span class="mat-icon">desktop_windows</span><span>This PC</span>
+        </div>
+        <div class="icon" onclick="appManager.open('Browser', 'public', 'browser')">
+            <span class="mat-icon">public</span><span>Browser</span>
+        </div>
+        <div class="icon" onclick="appManager.open('Settings', 'settings', 'settings')">
+            <span class="mat-icon">settings</span><span>Settings</span>
+        </div>
+        <div class="icon" onclick="appManager.open('Terminal', 'terminal', 'terminal')">
+            <span class="mat-icon">terminal</span><span>Terminal</span>
+        </div>
+        <div class="icon" onclick="appManager.open('Photos', 'photo_library', 'photos')">
+            <span class="mat-icon">photo_library</span><span>Photos</span>
+        </div>
+    </div>
+
+    <!-- Start Menu -->
+    <div class="start-menu" id="startMenu">
+        <div class="menu-header">
+            <div class="menu-avatar">U</div>
+            <div style="color:white; font-weight:600;">User</div>
+        </div>
+        <div class="menu-list">
+            <div class="menu-item" onclick="appManager.open('Settings', 'settings', 'settings')">
+                <span class="mat-icon">settings</span> <span>Settings</span>
+            </div>
+            <div class="menu-item" onclick="appManager.open('Browser', 'public', 'browser')">
+                <span class="mat-icon">public</span> <span>Web Browser</span>
+            </div>
+            <div class="menu-item" onclick="appManager.open('Calculator', 'calculate', 'calculator')">
+                <span class="mat-icon">calculate</span> <span>Calculator</span>
+            </div>
+            <div class="menu-item" onclick="appManager.open('Terminal', 'terminal', 'terminal')">
+                <span class="mat-icon">terminal</span> <span>Terminal</span>
+            </div>
+            <div class="menu-item" onclick="alert('Shutting down...'); toggleStartMenu()">
+                <span class="mat-icon">power_off</span> <span>Shut Down</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Windows Container -->
+    <div id="windowsContainer"></div>
+
+    <!-- Taskbar -->
+    <div class="taskbar">
+        <button class="start-btn" id="startBtn" onclick="toggleStartMenu()">
+            <span class="mat-icon">windows</span>
+        </button>
+        
+        <!-- ✅ FIXED: Taskbar apps with scroll buttons -->
+        <div class="taskbar-apps-wrapper">
+            <button class="taskbar-scroll-btn" id="scrollLeftBtn" onclick="appManager.scrollTaskbar(-200)">
+                <span class="mat-icon">chevron_left</span>
+            </button>
+            <div class="taskbar-apps" id="taskbarApps"></div>
+            <button class="taskbar-scroll-btn" id="scrollRightBtn" onclick="appManager.scrollTaskbar(200)">
+                <span class="mat-icon">chevron_right</span>
+            </button>
+        </div>
+        
+        <div class="system-tray">
+            <div class="clock">
+                <span id="time">12:00</span>
+                <span id="date">Oct 24</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- === THEME MANAGER === -->
+    <script>
+        const ThemeManager = {
+            configUrl: 'themes.json',
+            baseUrl: '',
+            
+            currentTheme: null,
+            themeConfig: null,
+            activeCleanup: null,
+            themeScriptEl: null,
+            themeLinkEl: document.getElementById('theme-stylesheet'),
+            canvas: document.getElementById('themeCanvas'),
+            
+            // ✅ Track all theme-related timers and animations
+            themeIntervals: [],
+            themeTimeouts: [],
+            themeAnimationFrames: [],
+
+            async init() {
+                try {
+                    const response = await fetch(this.configUrl, { cache: 'no-store' });
+                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                    
+                    this.themeConfig = await response.json();
+                    console.log('✓ Theme config loaded:', Object.keys(this.themeConfig));
+
+                    // ✅ Check for saved theme preference FIRST
+                    const savedTheme = this.getSavedThemePreference();
+                    
+                    const urlParams = new URLSearchParams(window.location.search);
+                    const requestedTheme = urlParams.get('theme');
+                    
+                    // Priority: URL param > saved preference > default
+                    const themeToApply = requestedTheme 
+                        ? requestedTheme 
+                        : (savedTheme && this.themeConfig[savedTheme] ? savedTheme : 'default');
+
+                    await this.apply(themeToApply);
+
+                } catch (error) {
+                    console.error('✗ Failed to load theme config:', error);
+                    this.applyFallback();
+                }
+            },
+
+            async apply(themeId) {
+                if (!this.themeConfig?.[themeId]) {
+                    console.warn(`✗ Theme "${themeId}" not found in config`);
+                    return false;
+                }
+
+                const theme = this.themeConfig[themeId];
+                console.log(`→ Applying theme: ${theme.name} (${themeId})`);
+
+                // ✅ CRITICAL: Cleanup MUST happen before loading new theme
+                await this.cleanup();
+
+                document.documentElement.setAttribute('data-theme', themeId);
+                document.body.setAttribute('data-theme', themeId);
+
+                await this.loadCSS(theme.css);
+
+                // ✅ Reset canvas state before new theme
+                this.canvas.style.display = 'none';
+                const ctx = this.canvas.getContext('2d');
+                if (ctx) {
+                    ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                    ctx.resetTransform();
+                }
+
+                if (theme.script) {
+                    this.activeCleanup = await this.loadScript(theme.script);
+                }
+
+                // ✅ Only show canvas if theme uses it AND has script loaded
+                this.canvas.style.display = theme.canvas && this.activeCleanup ? 'block' : 'none';
+
+                this.currentTheme = themeId;
+                
+                // ✅ SAVE TO LOCALSTORAGE
+                this.saveThemePreference(themeId);
+
+                window.dispatchEvent(new CustomEvent('themeChanged', { 
+                    detail: { theme: themeId, config: theme } 
+                }));
+
+                console.log(`✓ Theme applied: ${theme.name}`);
+                return true;
+            },
+
+            async loadCSS(cssPath) {
+                return new Promise((resolve, reject) => {
+                    if (this.themeLinkEl.href) {
+                        this.themeLinkEl.href = '';
+                    }
+
+                    if (!cssPath) {
+                        console.log('  → No CSS override for this theme');
+                        resolve();
+                        return;
+                    }
+
+                    const url = this.baseUrl + cssPath;
+                    console.log('  → Loading CSS:', url);
+
+                    this.themeLinkEl.href = url;
+                    this.themeLinkEl.onload = () => {
+                        console.log('  ✓ CSS loaded');
+                        resolve();
+                    };
+                    this.themeLinkEl.onerror = (err) => {
+                        console.error('  ✗ CSS failed to load:', err);
+                        reject(err);
+                    };
+                });
+            },
+
+            async loadScript(scriptPath) {
+                return new Promise((resolve) => {
+                    if (!scriptPath) {
+                        console.log('  → No script for this theme');
+                        resolve(null);
+                        return;
+                    }
+
+                    // ✅ Remove old script first
+                    if (this.themeScriptEl) {
+                        this.themeScriptEl.remove();
+                        this.themeScriptEl = null;
+                    }
+
+                    const url = this.baseUrl + scriptPath;
+                    console.log('  → Loading script:', url);
+
+                    this.themeScriptEl = document.createElement('script');
+                    this.themeScriptEl.src = url;
+                    this.themeScriptEl.async = true;
+                    
+                    this.themeScriptEl.onload = () => {
+                        console.log('  ✓ Script loaded');
+                        
+                        // ✅ Check for cleanup function (theme MUST expose this)
+                        let cleanupFn = null;
+                        
+                        if (window.ThemeCleanup && typeof window.ThemeCleanup === 'function') {
+                            cleanupFn = window.ThemeCleanup;
+                            delete window.ThemeCleanup;
+                            console.log('  ✓ Cleanup function registered');
+                        }
+                        
+                        // ✅ Also check for ThemeCleanupRegistry (multiple cleanup functions)
+                        if (window.ThemeCleanupRegistry && Array.isArray(window.ThemeCleanupRegistry)) {
+                            const registryCleanup = () => {
+                                window.ThemeCleanupRegistry.forEach(fn => {
+                                    try {
+                                        if (typeof fn === 'function') fn();
+                                    } catch (e) {
+                                        console.warn('⚠ Registry cleanup error:', e);
+                                    }
+                                });
+                            };
+                            
+                            if (cleanupFn) {
+                                const originalCleanup = cleanupFn;
+                                cleanupFn = () => {
+                                    originalCleanup();
+                                    registryCleanup();
+                                };
+                            } else {
+                                cleanupFn = registryCleanup;
+                            }
+                            
+                            window.ThemeCleanupRegistry = [];
+                            console.log('  ✓ Cleanup registry registered');
+                        }
+                        
+                        resolve(cleanupFn);
+                    };
+                    
+                    this.themeScriptEl.onerror = (err) => {
+                        console.error('  ✗ Script failed to load:', err);
+                        resolve(null);
+                    };
+
+                    document.head.appendChild(this.themeScriptEl);
+                });
+            },
+
+            async cleanup() {
+                console.log('→ Cleaning up current theme...');
+                
+                // ✅ 1. Stop all animation frames
+                this.themeAnimationFrames.forEach(id => {
+                    try {
+                        cancelAnimationFrame(id);
+                    } catch (e) {
+                        console.warn('⚠ Cancel animation frame error:', e);
+                    }
+                });
+                this.themeAnimationFrames = [];
+                console.log('  ✓ Stopped', this.themeAnimationFrames.length, 'animation frames');
+                
+                // ✅ 2. Clear all intervals
+                this.themeIntervals.forEach(id => {
+                    try {
+                        clearInterval(id);
+                    } catch (e) {
+                        console.warn('⚠ Clear interval error:', e);
+                    }
+                });
+                this.themeIntervals = [];
+                console.log('  ✓ Cleared', this.themeIntervals.length, 'intervals');
+                
+                // ✅ 3. Clear all timeouts
+                this.themeTimeouts.forEach(id => {
+                    try {
+                        clearTimeout(id);
+                    } catch (e) {
+                        console.warn('⚠ Clear timeout error:', e);
+                    }
+                });
+                this.themeTimeouts = [];
+                console.log('  ✓ Cleared', this.themeTimeouts.length, 'timeouts');
+                
+                // ✅ 4. Run theme cleanup function
+                if (typeof this.activeCleanup === 'function') {
+                    console.log('  → Running theme cleanup function');
+                    try {
+                        this.activeCleanup();
+                    } catch (e) {
+                        console.warn('  ⚠ Cleanup function error:', e);
+                    }
+                    this.activeCleanup = null;
+                }
+
+                // ✅ 5. Remove script element
+                if (this.themeScriptEl) {
+                    this.themeScriptEl.remove();
+                    this.themeScriptEl = null;
+                    console.log('  ✓ Script element removed');
+                }
+
+                // ✅ 6. Clear canvas thoroughly
+                const ctx = this.canvas.getContext('2d');
+                if (ctx) {
+                    ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                    ctx.resetTransform();
+                }
+                this.canvas.style.display = 'none';
+                console.log('  ✓ Canvas cleared and hidden');
+
+                // ✅ 7. Clear inline theme styles
+                document.getElementById('theme-inline').textContent = '';
+                console.log('  ✓ Inline styles cleared');
+
+                console.log('  ✓ Cleanup complete');
+            },
+            
+            // ✅ Helper for theme scripts to register cleanup
+            registerCleanup(cleanupFn) {
+                if (typeof cleanupFn === 'function') {
+                    if (!window.ThemeCleanupRegistry) {
+                        window.ThemeCleanupRegistry = [];
+                    }
+                    window.ThemeCleanupRegistry.push(cleanupFn);
+                    console.log('  ✓ Cleanup function registered');
+                }
+            },
+            
+            // ✅ Helper for theme scripts to track animation frames
+            trackAnimation(id) {
+                this.themeAnimationFrames.push(id);
+            },
+            
+            // ✅ Helper for theme scripts to track intervals
+            trackInterval(id) {
+                this.themeIntervals.push(id);
+            },
+            
+            // ✅ Helper for theme scripts to track timeouts
+            trackTimeout(id) {
+                this.themeTimeouts.push(id);
+            },
+
+            applyFallback() {
+                console.warn('⚠ Using fallback default theme');
+                document.documentElement.setAttribute('data-theme', 'default');
+                document.body.setAttribute('data-theme', 'default');
+                this.canvas.style.display = 'none';
+                this.currentTheme = 'default';
+            },
+
+            getAvailableThemes() {
+                if (!this.themeConfig) return [];
+                return Object.entries(this.themeConfig).map(([id, config]) => ({
+                    id,
+                    name: config.name || id,
+                    description: config.description || '',
+                    canvas: config.canvas || false
+                }));
+            },
+
+            async populateThemeSelector(selectElementId) {
+                const select = document.getElementById(selectElementId);
+                if (!select) {
+                    console.warn('Theme selector element not found:', selectElementId);
+                    return;
+                }
+
+                if (!this.themeConfig) {
+                    select.innerHTML = '<option value="">Loading...</option>';
+                    setTimeout(() => this.populateThemeSelector(selectElementId), 500);
+                    return;
+                }
+
+                select.innerHTML = '';
+                for (const [id, config] of Object.entries(this.themeConfig)) {
+                    const opt = document.createElement('option');
+                    opt.value = id;
+                    opt.textContent = config.name || id;
+                    if (id === this.currentTheme) {
+                        opt.selected = true;
+                    }
+                    select.appendChild(opt);
+                }
+                console.log('✓ Theme selector populated:', Object.keys(this.themeConfig).length, 'themes');
+            },
+
+            // ✅ Save current theme to localStorage
+            saveThemePreference(themeId) {
+                try {
+                    localStorage.setItem('os-preferred-theme', themeId);
+                    console.log(`✓ Theme preference saved: ${themeId}`);
+                } catch (e) {
+                    console.warn('⚠ Could not save theme to localStorage:', e);
+                }
+            },
+
+            // ✅ Load saved theme from localStorage
+            getSavedThemePreference() {
+                try {
+                    return localStorage.getItem('os-preferred-theme');
+                } catch (e) {
+                    console.warn('⚠ Could not read theme from localStorage:', e);
+                    return null;
+                }
+            },
+
+            // ✅ Refresh themes.json config
+            async refreshThemeConfig() {
+                console.log('→ Refreshing themes.json...');
+                try {
+                    const response = await fetch(this.configUrl + '?t=' + Date.now(), { 
+                        cache: 'no-store' 
+                    });
+                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                    
+                    this.themeConfig = await response.json();
+                    console.log('✓ themes.json reloaded:', Object.keys(this.themeConfig).length, 'themes');
+                    
+                    // Re-populate any theme selectors that exist
+                    this.populateThemeSelector('themeSelector');
+                    
+                    return true;
+                } catch (error) {
+                    console.error('✗ Failed to refresh themes.json:', error);
+                    alert('Could not reload themes. Check console for details.');
+                    return false;
+                }
+            }
+        };
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => ThemeManager.init());
+        } else {
+            ThemeManager.init();
+        }
+    </script>
+
+    <!-- === MAIN OS LOGIC === -->
+    <script>
+        function updateClock() {
+            const now = new Date();
+            document.getElementById('time').textContent = now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+            document.getElementById('date').textContent = now.toLocaleDateString([], { month: 'short', day: 'numeric' });
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        const startMenu = document.getElementById('startMenu');
+        const startBtn = document.getElementById('startBtn');
+
+        function toggleStartMenu() {
+            const isVisible = startMenu.style.display === 'block';
+            startMenu.style.display = isVisible ? 'none' : 'block';
+            startBtn.classList.toggle('active', !isVisible);
+        }
+
+        document.addEventListener('click', (e) => {
+            if (!startMenu.contains(e.target) && !startBtn.contains(e.target)) {
+                startMenu.style.display = 'none';
+                startBtn.classList.remove('active');
+            }
+        });
+
+        const iframeApps = ['browser'];
+
+        // App templates
+        const appTemplates = {
+            'pc': `<div class="content-padding"><h3>This PC</h3><p>Storage: 64 GB<br>Memory: 4 GB<br>OS: WebOS v2.0</p></div>`,
+            'browser': `
+                <div class="browser-toolbar">
+                    <button class="browser-btn" onclick="alert('Back')"><span class="mat-icon">arrow_back</span></button>
+                    <button class="browser-btn" onclick="alert('Forward')"><span class="mat-icon">arrow_forward</span></button>
+                    <button class="browser-btn" onclick="this.parentElement.nextElementSibling.querySelector('iframe').src = this.parentElement.nextElementSibling.querySelector('iframe').src"><span class="mat-icon">refresh</span></button>
+                    <input type="text" class="address-bar" placeholder="https://example.com" value="https://example.com" onkeydown="if(event.key==='Enter'){this.parentElement.nextElementSibling.querySelector('iframe').src = this.value}">
+                </div>
+                <div class="iframe-container">
+                    <iframe class="web-iframe" src="https://example.com"></iframe>
+                    <div class="click-blocker" onclick="event.stopPropagation();"></div>
+                </div>
+            `,
+            // ✅ Settings template - CLEANED UP (no stubbed settings)
+            'settings': `
+                <div class="content-padding">
+                    <h3>Settings</h3>
+                    
+                    <!-- Theme Section -->
+                    <div style="margin: 15px 0; padding: 10px; background: rgba(0,0,0,0.03); border-radius: 8px;">
+                        <label style="display:block; margin: 10px 0; font-weight: 600;">
+                            Theme:
+                        </label>
+                        <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                            <select id="themeSelector" style="flex: 1; min-width: 150px; padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border-color, #ccc); background: var(--window-bg, #fff); color: var(--text-primary, #333); font-family: inherit;">
+                                <option value="">Loading themes...</option>
+                            </select>
+                            <button id="applyThemeBtn" style="padding: 6px 16px; border-radius: 6px; border: none; background: var(--accent, #0078d4); color: white; cursor: pointer; font-weight: 500;">Apply</button>
+                            <button id="refreshThemesBtn" title="Reload themes.json" style="width: 36px; height: 36px; border-radius: 6px; border: 1px solid var(--border-color, #ccc); background: var(--window-bg, #fff); color: var(--text-primary, #333); cursor: pointer; display: flex; align-items: center; justify-content: center;">
+                                <span class="material-icons" style="font-size: 18px;">refresh</span>
+                            </button>
+                        </div>
+                        <small style="color: var(--text-secondary, #666); display: block; margin-top: 8px;">
+                            Select a theme and click Apply. Use 🔄 to reload theme list.
+                        </small>
+                    </div>
+                </div>
+            `,
+            'calculator': `<div class="content-padding" style="text-align:center;"><h3>Calculator</h3><div style="font-size:32px; padding:20px; background:#f0f0f0; border-radius:8px; margin:10px 0;">0</div></div>`,
+            'terminal': `<div class="content-padding" style="background:#1a1a1a; color:#0f0; font-family:monospace;"><p>user@webos:~$ <span class="terminal-cursor">_</span></p></div>`,
+            'photos': `<div class="content-padding"><h3>Photos</h3><div style="display:grid; grid-template-columns:repeat(3,1fr); gap:5px;"><div style="background:#ddd; height:60px; border-radius:4px;"></div><div style="background:#ccc; height:60px; border-radius:4px;"></div><div style="background:#bbb; height:60px; border-radius:4px;"></div></div></div>`
+        };
+
+        const appManager = {
+            windows: [],
+            zIndexCounter: 100,
+            activeWindowId: null,
+
+            open: function(title, iconCode, appType) {
+                const id = 'win-' + Date.now();
+                const content = appTemplates[appType] || appTemplates['pc'];
+                
+                const winEl = document.createElement('div');
+                winEl.className = 'window';
+                winEl.id = id;
+                winEl.style.zIndex = ++this.zIndexCounter;
+                
+                winEl.onmousedown = (e) => this.handleWindowClick(e, id);
+                winEl.ontouchstart = (e) => this.handleWindowClick(e, id);
+                
+                winEl.innerHTML = `
+                    <div class="window-header">
+                        <div class="window-title-area">
+                            <span class="mat-icon" style="font-size: 16px; color:var(--text-secondary, #666);">${iconCode}</span>
+                            <div class="window-title">${title}</div>
+                        </div>
+                        <div class="window-controls">
+                            <button class="control-btn min-btn" onclick="appManager.minimize('${id}')" title="Minimize">
+                                <span class="mat-icon">remove</span>
+                            </button>
+                            <button class="control-btn max-btn" onclick="appManager.maximize('${id}')" title="Maximize">
+                                <span class="mat-icon">crop_square</span>
+                            </button>
+                            <button class="control-btn close-btn" onclick="appManager.close('${id}')" title="Close">
+                                <span class="mat-icon">close</span>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="window-content">${content}</div>
+                    <div class="resize-handle" id="resize-${id}"></div>
+                `;
+                
+                document.getElementById('windowsContainer').appendChild(winEl);
+                this.initDrag(winEl);
+                this.initResize(winEl);
+
+                const taskItem = document.createElement('div');
+                taskItem.className = 'taskbar-item active';
+                taskItem.id = 'task-' + id;
+                taskItem.onclick = () => this.toggle(id);
+                taskItem.innerHTML = `<span class="mat-icon">${iconCode}</span>`;
+                
+                const taskbarApps = document.getElementById('taskbarApps');
+                taskbarApps.appendChild(taskItem);
+                
+                // ✅ Auto-scroll to show new window
+                setTimeout(() => {
+                    this.updateTaskbarScrollButtons();
+                    this.scrollToTaskItem(taskItem);
+                }, 50);
+
+                this.windows.push({ id, title, iconCode, el: winEl, taskItem: taskItem, appType: appType });
+                this.focus(id);
+                
+                // ✅ Initialize theme selector for Settings window
+                if (appType === 'settings') {
+                    this.initSettingsWindow(id);
+                }
+                
+                startMenu.style.display = 'none';
+                startBtn.classList.remove('active');
+            },
+
+            // ✅ Scroll taskbar left/right
+            scrollTaskbar: function(direction) {
+                const taskbarApps = document.getElementById('taskbarApps');
+                taskbarApps.scrollBy({
+                    left: direction,
+                    behavior: 'smooth'
+                });
+            },
+
+            // ✅ Scroll to specific task item
+            scrollToTaskItem: function(taskItem) {
+                const taskbarApps = document.getElementById('taskbarApps');
+                const itemRect = taskItem.getBoundingClientRect();
+                const containerRect = taskbarApps.getBoundingClientRect();
+                
+                // Only scroll if item is not fully visible
+                if (itemRect.right > containerRect.right || itemRect.left < containerRect.left) {
+                    taskItem.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'nearest',
+                        inline: 'nearest'
+                    });
+                }
+            },
+
+            // ✅ Update scroll button visibility - FIXED!
+            updateTaskbarScrollButtons: function() {
+                const taskbarApps = document.getElementById('taskbarApps');
+                const scrollLeftBtn = document.getElementById('scrollLeftBtn');
+                const scrollRightBtn = document.getElementById('scrollRightBtn');
+                
+                if (!taskbarApps || !scrollLeftBtn || !scrollRightBtn) return;
+                
+                // ✅ Check if there's actually overflow content
+                const hasOverflow = taskbarApps.scrollWidth > taskbarApps.clientWidth;
+                
+                if (!hasOverflow) {
+                    // No overflow - hide both buttons
+                    scrollLeftBtn.classList.remove('visible');
+                    scrollRightBtn.classList.remove('visible');
+                    return;
+                }
+                
+                // Has overflow - show buttons based on scroll position
+                const canScrollLeft = taskbarApps.scrollLeft > 5;
+                const canScrollRight = taskbarApps.scrollLeft < (taskbarApps.scrollWidth - taskbarApps.clientWidth - 5);
+                
+                scrollLeftBtn.classList.toggle('visible', canScrollLeft);
+                scrollRightBtn.classList.toggle('visible', canScrollRight);
+            },
+
+            // ✅ Initialize Settings window event handlers - FIXED!
+            initSettingsWindow: function(windowId) {
+                const win = this.windows.find(w => w.id === windowId);
+                if (!win) return;
+
+                setTimeout(() => {
+                    const selector = document.getElementById('themeSelector');
+                    const applyBtn = document.getElementById('applyThemeBtn');
+                    const refreshBtn = document.getElementById('refreshThemesBtn');
+
+                    if (selector) {
+                        ThemeManager.populateThemeSelector('themeSelector');
+                    }
+
+                    if (applyBtn) {
+                        // ✅ FIXED: Apply theme WITHOUT reloading page
+                        applyBtn.onclick = async () => {
+                            const selected = selector?.value;
+                            if (selected) {
+                                // Show loading state
+                                applyBtn.disabled = true;
+                                applyBtn.textContent = 'Applying...';
+                                
+                                // Apply theme dynamically
+                                const success = await ThemeManager.apply(selected);
+                                
+                                // Reset button state
+                                applyBtn.disabled = false;
+                                applyBtn.textContent = 'Apply';
+                                
+                                if (success) {
+                                    // Optional: Show brief success feedback
+                                    applyBtn.textContent = '✓ Applied!';
+                                    setTimeout(() => applyBtn.textContent = 'Apply', 1500);
+                                }
+                            } else {
+                                alert('Please select a theme first');
+                            }
+                        };
+                    }
+                    
+                    // ✅ Refresh button handler
+                    if (refreshBtn) {
+                        refreshBtn.onclick = async () => {
+                            refreshBtn.disabled = true;
+                            refreshBtn.innerHTML = '<span class="material-icons" style="font-size:18px;animation:spin 1s linear infinite">refresh</span>';
+                            
+                            const success = await ThemeManager.refreshThemeConfig();
+                            
+                            refreshBtn.disabled = false;
+                            refreshBtn.innerHTML = '<span class="material-icons" style="font-size:18px;">refresh</span>';
+                            
+                            if (success) {
+                                const originalTitle = refreshBtn.title;
+                                refreshBtn.title = '✓ Reloaded!';
+                                setTimeout(() => refreshBtn.title = originalTitle, 1500);
+                            }
+                        };
+                    }
+                }, 100);
+            },
+
+            handleWindowClick: function(e, id) {
+                if (e.target.closest('.window-controls') || e.target.closest('.resize-handle')) return;
+                if (e.target.classList.contains('address-bar')) return;
+                if (this.activeWindowId !== id) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.focus(id);
+                    return false;
+                }
+            },
+
+            close: function(id) {
+                const win = this.windows.find(w => w.id === id);
+                if (win) {
+                    win.el.remove();
+                    win.taskItem.remove();
+                    this.windows = this.windows.filter(w => w.id !== id);
+                    if (this.activeWindowId === id) this.activeWindowId = null;
+                    
+                    // ✅ Update scroll buttons after closing
+                    setTimeout(() => {
+                        this.updateTaskbarScrollButtons();
+                    }, 50);
+                }
+            },
+
+            minimize: function(id) {
+                const win = this.windows.find(w => w.id === id);
+                if (win) {
+                    win.el.classList.add('minimized');
+                    win.taskItem.classList.remove('active');
+                }
+            },
+
+            maximize: function(id) {
+                const win = this.windows.find(w => w.id === id);
+                if (win) {
+                    if (win.el.style.width === '100%') {
+                        win.el.style.width = '90%';
+                        win.el.style.height = '70%';
+                        win.el.style.top = '10%';
+                        win.el.style.left = '5%';
+                    } else {
+                        win.el.style.width = '100%';
+                        win.el.style.height = 'calc(100dvh - var(--taskbar-height) - var(--safe-bottom))';
+                        win.el.style.top = '0';
+                        win.el.style.left = '0';
+                    }
+                    this.focus(id);
+                }
+            },
+
+            toggle: function(id) {
+                const win = this.windows.find(w => w.id === id);
+                if (!win) return;
+                if (win.el.classList.contains('minimized')) {
+                    win.el.classList.remove('minimized');
+                    this.focus(id);
+                } else {
+                    if (this.activeWindowId === id) {
+                        this.minimize(id);
+                    } else {
+                        this.focus(id);
+                    }
+                }
+            },
+
+            focus: function(id) {
+                const win = this.windows.find(w => w.id === id);
+                if (!win) return;
+                win.el.style.zIndex = ++this.zIndexCounter;
+                
+                this.windows.forEach(w => {
+                    w.taskItem.classList.remove('active');
+                    if (w.id !== id && iframeApps.includes(w.appType)) {
+                        const blocker = w.el.querySelector('.click-blocker');
+                        if (blocker) blocker.classList.remove('hidden');
+                    }
+                });
+                
+                if (iframeApps.includes(win.appType)) {
+                    const blocker = win.el.querySelector('.click-blocker');
+                    if (blocker) blocker.classList.add('hidden');
+                }
+                
+                win.taskItem.classList.add('active');
+                win.el.classList.remove('minimized');
+                this.activeWindowId = id;
+                
+                // ✅ Scroll to focused window's taskbar item
+                this.scrollToTaskItem(win.taskItem);
+            },
+
+            initDrag: function(el) {
+                const header = el.querySelector('.window-header');
+                let isDragging = false, startX, startY, initialLeft, initialTop;
+
+                const start = (e) => {
+                    if(e.target.closest('.window-controls')) return;
+                    if(e.target.classList.contains('address-bar')) return;
+                    if(e.type === 'touchstart') e.preventDefault();
+                    isDragging = true;
+                    const clientX = e.type.includes('mouse') ? e.clientX : e.touches[0].clientX;
+                    const clientY = e.type.includes('mouse') ? e.clientY : e.touches[0].clientY;
+                    startX = clientX; startY = clientY;
+                    initialLeft = el.offsetLeft; initialTop = el.offsetTop;
+                    this.focus(el.id);
+                };
+
+                const move = (e) => {
+                    if (!isDragging) return;
+                    if(e.type === 'touchmove') e.preventDefault();
+                    const clientX = e.type.includes('mouse') ? e.clientX : e.touches[0].clientX;
+                    const clientY = e.type.includes('mouse') ? e.clientY : e.touches[0].clientY;
+                    el.style.left = (initialLeft + clientX - startX) + "px";
+                    el.style.top = (initialTop + clientY - startY) + "px";
+                };
+
+                const end = () => { isDragging = false; };
+
+                header.addEventListener("mousedown", start);
+                header.addEventListener("touchstart", start, { passive: false });
+                document.addEventListener("mousemove", move);
+                document.addEventListener("touchmove", move, { passive: false });
+                document.addEventListener("mouseup", end);
+                document.addEventListener("touchend", end);
+            },
+
+            initResize: function(el) {
+                const handle = el.querySelector('.resize-handle');
+                let isResizing = false, startW, startH, startMX, startMY;
+
+                const start = (e) => {
+                    if(e.type === 'touchstart') e.preventDefault();
+                    isResizing = true;
+                    startW = parseInt(window.getComputedStyle(el).width, 10);
+                    startH = parseInt(window.getComputedStyle(el).height, 10);
+                    startMX = e.type.includes('mouse') ? e.clientX : e.touches[0].clientX;
+                    startMY = e.type.includes('mouse') ? e.clientY : e.touches[0].clientY;
+                    this.focus(el.id);
+                };
+
+                const move = (e) => {
+                    if (!isResizing) return;
+                    if(e.type === 'touchmove') e.preventDefault();
+                    const clientX = e.type.includes('mouse') ? e.clientX : e.touches[0].clientX;
+                    const clientY = e.type.includes('mouse') ? e.clientY : e.touches[0].clientY;
+                    const newW = startW + (clientX - startMX);
+                    const newH = startH + (clientY - startMY);
+                    if (newW > 200) el.style.width = newW + "px";
+                    if (newH > 150) el.style.height = newH + "px";
+                };
+
+                const end = () => { isResizing = false; };
+
+                handle.addEventListener("mousedown", start);
+                handle.addEventListener("touchstart", start, { passive: false });
+                document.addEventListener("mousemove", move);
+                document.addEventListener("touchmove", move, { passive: false });
+                document.addEventListener("mouseup", end);
+                document.addEventListener("touchend", end);
+            }
+        };
+
+        // ✅ Update scroll buttons on taskbar scroll
+        document.getElementById('taskbarApps')?.addEventListener('scroll', () => {
+            appManager.updateTaskbarScrollButtons();
+        });
+
+        // ✅ Update scroll buttons on window resize
+        window.addEventListener('resize', () => {
+            setTimeout(() => {
+                appManager.updateTaskbarScrollButtons();
+            }, 100);
+        });
+
+        // ✅ Update scroll buttons on page load
+        setTimeout(() => {
+            appManager.updateTaskbarScrollButtons();
+        }, 100);
+
+        window.addEventListener('themeChanged', (e) => {
+            console.log(`🎨 Theme changed: ${e.detail.theme}`);
+        });
+    </script>
+</body>
+</html>

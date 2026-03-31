@@ -1,0 +1,74 @@
+{
+	"default": {
+		"name": "Default Blue",
+		"description": "Clean modern blue gradient interface",
+		"css": "themes/default/default-styles.css",
+		"script": "themes/default/default-script.js",
+		"canvas": false,
+		"author": "WebOS Team",
+		"version": "1.0"
+	},
+	"matrix": {
+		"name": "Matrix Green",
+		"description": "Cyberpunk terminal with falling code rain",
+		"css": "themes/matrix/matrix-styles.css",
+		"script": "themes/matrix/matrix-script.js",
+		"canvas": true,
+		"author": "WebOS Team",
+		"version": "1.0"
+	},
+	"rainy-forest": {
+		"name": "Rainy Forest",
+		"description": "Serene forest scene with animated rain drops",
+		"css": "themes/rainy-forest/rainyforest-styles.css",
+		"script": "themes/rainy-forest/rainyforest-script.js",
+		"canvas": true,
+		"author": "WebOS Team",
+		"version": "1.0"
+	},
+	"frosted-glass": {
+		"name": "Frosted Glass",
+		"description": "Elegant translucent theme with backdrop blur effects",
+		"css": "themes/frosted-glass/frostedglass-styles.css",
+		"script": "themes/frosted-glass/frostedglass-script.js",
+		"canvas": true,
+		"author": "Your Name",
+		"version": "1.0.0"
+	},
+	"heaven": {
+		"name": "Transparent Blur Heaven",
+		"description": "Ethereal glassmorphism with soft pastel gradients, celestial blur effects, and floating light particles",
+		"css": "themes/heaven/heaven-styles.css",
+		"script": "themes/heaven/heaven-script.js",
+		"canvas": true,
+		"preview": "themes/heaven/preview.jpg",
+		"author": "Your Name",
+		"version": "1.0.0",
+		"settings": {
+			"particleCount": 30,
+			"floatSpeed": 0.8,
+			"glowIntensity": 0.6
+		}
+	},
+
+
+	"try": {
+		"name": "try",
+		"description": "Elegant translucent theme with backdrop blur effects",
+		"css": "themes/try/try-styles.css",
+		"script": "themes/try/try-script.js",
+		"canvas": true,
+		"author": "Your Name",
+		"version": "1.0.0"
+	}
+
+
+
+
+
+
+
+
+
+
+}

@@ -28,6 +28,7 @@ const _mimetype = {
     '.svg': 'image/svg+xml',
     '.gltf': 'model/gltf+json',
     '.bin': 'application/octet-stream',
+	'.onnx': 'application/octet-stream',
     '.css': 'text/css',
     '.hdr': 'application/octet-stream',
     '.json': 'application/json',

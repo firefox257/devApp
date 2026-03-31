@@ -1,0 +1,1213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>CSG Editor - Help Documentation (Updated)</title>
+<style>
+/* BASE STYLES - Matching the CSG Editor Dark Theme */
+html,
+body {
+	height: 100%;
+	margin: 0;
+	padding: 0;
+}
+body {
+	font-family: 'Segoe UI', sans-serif;
+	background: #282c34;
+	color: #f8f8f8;
+	padding: 20px;
+	line-height: 1.6;
+}
+/* HEADINGS */
+h1,
+h2,
+h3,
+h4 {
+	color: #61afef;
+	padding-bottom: 8px;
+	margin-top: 1.5em;
+}
+h1 {
+	text-align: center;
+	font-size: 2.2em;
+	margin-bottom: 1em;
+}
+h2 {
+	font-size: 1.8em;
+}
+h3 {
+	font-size: 1.4em;
+	color: #98c379;
+}
+h4 {
+	font-size: 1.2em;
+	color: #e06c75;
+}
+/* LISTS AND PARAGRAPHS */
+p,
+li {
+	margin: 10px 0;
+}
+ul,
+ol {
+	padding-left: 20px;
+}
+/* TABLE OF CONTENTS (TOC) */
+.toc {
+	background: #3e4451;
+	padding: 20px;
+	border-radius: 8px;
+	margin-bottom: 30px;
+}
+.toc ul {
+	list-style-type: none;
+	padding-left: 0;
+}
+.toc li {
+	margin: 8px 0;
+}
+.toc li ul {
+	padding-left: 20px;
+	list-style-type: disc;
+}
+.toc li ul li ul {
+	padding-left: 20px;
+	list-style-type: circle;
+}
+.toc a {
+	color: #61afef;
+	text-decoration: none;
+}
+.toc a:hover {
+	text-decoration: underline;
+}
+/* TOOLBAR BUTTON DESCRIPTIONS */
+.button-desc {
+	display: flex;
+	align-items: center;
+	gap: 15px;
+	background: #3e4451;
+	padding: 12px;
+	border-radius: 6px;
+	margin: 15px 0;
+}
+.button-icon {
+	font-size: 1.8em;
+	width: 35px;
+	height: 35px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: 4px;
+	font-weight: bold;
+	background: #4a515e;
+	color: #f8f8f8;
+}
+/* NAVIGATION BUTTONS */
+.nav-buttons {
+	display: flex;
+	justify-content: space-between;
+	margin: 30px 0;
+}
+.nav-button {
+	background: #3498db;
+	color: white;
+	border: none;
+	padding: 10px 20px;
+	border-radius: 5px;
+	cursor: pointer;
+	text-decoration: none;
+	display: inline-block;
+	transition: background 0.3s;
+}
+.nav-button:hover {
+	background: #2980b9;
+}
+/* CODE AND NOTES */
+pre {
+	background: #1e2127;
+	border-left: 4px solid #e06c75;
+	padding: 15px;
+	margin: 20px 0;
+	overflow-x: auto;
+	white-space: pre-wrap;
+	word-wrap: break-word;
+}
+.example-block {
+	background: #3e4451;
+	padding: 15px;
+	border-radius: 6px;
+	margin: 20px 0;
+}
+.example-title {
+	font-weight: bold;
+	color: #e06c75;
+	margin-bottom: 10px;
+}
+.note {
+	background: #3e4451;
+	padding: 15px;
+	border-radius: 6px;
+	margin: 20px 0;
+	border-left: 4px solid #61afef;
+}
+.warning {
+	background: #544a4a;
+	padding: 15px;
+	border-radius: 6px;
+	margin: 20px 0;
+	border-left: 4px solid #e06c75;
+}
+/* TABLES */
+table {
+	width: 100%;
+	border-collapse: collapse;
+	margin: 20px 0;
+	background: #3e4451;
+}
+th,
+td {
+	border: 1px solid #545862;
+	padding: 12px;
+	text-align: left;
+}
+th {
+	background: #2c3e50;
+	color: #61afef;
+}
+tr:nth-child(even) {
+	background: #34495e;
+}
+hr {
+	border: 0;
+	height: 1px;
+	background: #545862;
+	margin: 40px 0;
+}
+/* FIXED JUMP BACK BUTTON */
+#jump-back-btn {
+	position: fixed;
+	bottom: 20px;
+	right: 20px;
+	background: #61afef;
+	color: #282c34;
+	border: none;
+	padding: 10px 15px;
+	border-radius: 5px;
+	cursor: pointer;
+	font-weight: bold;
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+	z-index: 1000;
+	display: none;
+}
+#jump-back-btn:hover {
+	background: #569cd6;
+	transform: translateY(-1px);
+}
+</style>
+</head>
+<body>
+<h1 id="top">CSG Editor - Help Documentation (Updated)</h1>
+<div class="toc">
+<h2>Table of Contents</h2>
+<ul>
+<li><a href="#about">1. About</a></li>
+<li><a href="#toolbar">2. How to Use the Toolbar</a></li>
+<li>
+<a href="#settings">3. Settings</a>
+<ul>
+<li>
+<a href="#grid-settings">Grid Width/Length/Spacing</a>
+</li>
+<li><a href="#library-path">Library Path</a></li>
+<li>
+<a href="#settings-buttons">Buttons in Settings Panel</a>
+</li>
+</ul>
+</li>
+<li>
+<a href="#textcode">4. How to Use the TextCode Editor</a>
+<ul>
+<li>
+<a href="#editor-interface">Editor Interface & Core Features</a>
+</li>
+<li>
+<a href="#toolbar-buttons">4.1 Toolbar Buttons: Icons and Functions</a>
+</li>
+<li>
+<a href="#bracket-selector">4.2 Bracket Selector</a>
+</li>
+<li>
+<a href="#csg-vs-editor">4.3 Difference Between CSG Scripts and Editor Scripts</a>
+</li>
+<li>
+<a href="#get-include">How to Use get() and include()</a>
+</li>
+<li><a href="#external">External get() and include()</a></li>
+<li>
+<a href="#file-paths">How Paths Work (File Access)</a>
+</li>
+</ul>
+</li>
+<li>
+<a href="#path-creation">5. Paths: How to Create Them</a>
+<ul>
+<li><a href="#path-format">Path Format</a></li>
+<li>
+<a href="#path-commands">Path Commands Reference</a>
+</li>
+<li>
+<a href="#auto-hole">Advanced: Automatic Hole Detection</a>
+</li>
+<li>
+<a href="#arcpath3d-helper"><code>arcPath3d()</code> Helper</a>
+</li>
+<li><a href="#path-examples">Examples</a></li>
+</ul>
+</li>
+<li>
+<a href="#commands">6. scadCSG Commands and How to Use Them</a>
+<ul>
+<li><a href="#primitives">Primitive Shapes</a></li>
+<li><a href="#transformations">Transformations</a></li>
+<li><a href="#csg-operations">CSG Operations</a></li>
+<li><a href="#path-classes">Path Classes (Path2d/Path3d)</a></li>
+<li><a href="#extrusions">2D to 3D Extrusion</a></li>
+<li>
+<a href="#2d-path-manipulation">2D Path Manipulation</a>
+</li>
+<li>
+<a href="#3d-imports">3D Imports (Requires <code>await</code>)</a>
+</li>
+<li>
+<a href="#text-functions">Text Functions (Requires <code>await</code>)</a>
+</li>
+<li><a href="#utilities">Utility Functions</a></li>
+<li><a href="#three-access">Three.js Access</a></li>
+</ul>
+</li>
+<li><a href="#examples">7. Complete Examples</a></li>
+</ul>
+</div>
+
+<section id="about">
+<h2>1. About</h2>
+<p>
+Welcome to the <strong>CSG Editor</strong>! This is a powerful,
+mobile-friendly, browser-based CAD (Computer-Aided Design) tool
+that lets you create complex 3D models using Constructive Solid
+Geometry (CSG) operations.
+</p>
+<p>
+You write scripts in a JavaScript-like syntax to define shapes
+(like cubes, spheres, cylinders), transform them (translate,
+	rotate, scale), and combine them using boolean operations
+(union, difference, intersection). The result is rendered in
+real-time in the 3D view.
+</p>
+<p>
+This editor is designed for rapid prototyping, 3D printing
+preparation, and educational purposes. It combines the power of
+OpenSCAD-style scripting with the immediacy of a live 3D
+preview.
+</p>
+</section>
+
+<hr />
+<div class="nav-buttons">
+<a href="#toolbar" class="nav-button">Next: Toolbar &rarr;</a>
+<a href="#top" class="nav-button">↑ Top</a>
+</div>
+
+<section id="toolbar">
+<h2>2. How to Use the Toolbar</h2>
+<p>
+The toolbar at the top of the screen contains buttons to switch
+between different views and perform common actions. Here's what
+each button does:
+</p>
+<div class="button-desc">
+<div class="button-icon" style="background: #98c379">&#x1F5BC;</div>
+<div>
+<strong>3D View Button</strong> (<code>&#x1F5BC;</code>)<br />
+Switches to the <strong>3D Rendering View</strong> where you can see and
+interact with your model.
+</div>
+</div>
+<div class="button-desc">
+<div class="button-icon" style="background: #e06c75">&#x1F4BB;</div>
+<div>
+<strong>CSG Code Editor</strong> (<code>&#x1F4BB;</code>)<br />
+Switches to the <strong>CSG Script</strong> editor. This is where you
+write the main code that defines your 3D model.
+</div>
+</div>
+<div class="button-desc">
+<div class="button-icon" style="background: #61afef">&#x2B9D;</div>
+<div>
+<strong>Editor Code</strong> (<code>&#x2B9D;</code>)<br />
+Switches to the <strong>Editor Script</strong> editor. This is where you
+define reusable functions and constants.
+</div>
+</div>
+<div class="button-desc">
+<div class="button-icon" style="background: #98c379">&#x1F4CB;</div>
+<div>
+<strong>Toggle Wireframe</strong> (<code>&#x1F4CB;</code>)<br />
+Toggles display between solid and <strong>wireframe mode</strong>.
+</div>
+</div>
+<div class="button-desc">
+<div class="button-icon" style="background: #dc3545">&#x2716;</div>
+<div>
+<strong>Clear Cache</strong> (<code>&#x2716;</code>)<br />
+Clears the cached result for the currently active script tab.
+</div>
+</div>
+<div class="button-desc">
+<div class="button-icon" style="background: #61afef">&#x2699;</div>
+<div>
+<strong>Settings</strong> (<code>&#x2699;</code>)<br />
+Opens the Settings panel for grid size and library path configuration.
+</div>
+</div>
+<div class="button-desc">
+<div class="button-icon" style="background: #98c379">&#x1F4E5;</div>
+<div>
+<strong>Load Project</strong> (<code>&#x1F4E5;</code>)<br />
+Opens a file picker to load a saved project (.json file).
+</div>
+</div>
+<div class="button-desc">
+<div class="button-icon" style="background: #98c379">&#x1F4BE;</div>
+<div>
+<strong>Save Project</strong> (<code>&#x1F4BE;</code>)<br />
+Saves the current project, including all scripts and cached geometry.
+</div>
+</div>
+<div class="button-desc">
+<div class="button-icon" style="background: #61afef">&#x2753;</div>
+<div>
+<strong>Help</strong> (<code>&#x2753;</code>)<br />
+Opens this help documentation.
+</div>
+</div>
+<div class="button-desc">
+<div class="button-icon" style="background: #dc3545">&#x1F5D1;</div>
+<div>
+<strong>Clear Console</strong> (<code>&#x1F5D1;</code>)<br />
+Clears all messages from the console panel.
+</div>
+</div>
+<p><strong>Keyboard Shortcuts:</strong></p>
+<ul>
+<li><code>Ctrl+S</code> / <code>Cmd+S</code>: Open Save dialog</li>
+<li><code>Ctrl+F</code> / <code>Cmd+F</code>: Open Find dialog</li>
+<li><code>F3</code>: Find next occurrence</li>
+<li><code>Shift+F3</code>: Find previous occurrence</li>
+</ul>
+</section>
+
+<hr />
+<div class="nav-buttons">
+<a href="#settings" class="nav-button">Next: Settings &rarr;</a>
+<a href="#top" class="nav-button">↑ Top</a>
+</div>
+
+<section id="settings">
+<h2>3. Settings</h2>
+<p>The Settings panel allows you to configure the modeling environment.</p>
+
+<h3 id="grid-settings">Grid Width / Length / Spacing</h3>
+<p>Sets the dimensions (X, Y) and line separation of the build plate grid in millimeters.</p>
+
+<h3 id="library-path">Library Path</h3>
+<p>Base path used with the <code>$lib/</code> prefix in <code>get()</code> or <code>include()</code> functions.</p>
+<div class="note">
+<p><strong>Note:</strong> Settings are saved in browser local storage and persist between sessions.</p>
+</div>
+
+<h3 id="settings-buttons">Buttons in Settings Panel</h3>
+<div class="button-desc">
+<div class="button-icon" style="background: #28a745">&#x1F4BE;</div>
+<div><strong>Save Settings</strong><br />Saves current settings to local storage.</div>
+</div>
+<div class="button-desc">
+<div class="button-icon" style="background: #dc3545">&#x1F9F9;</div>
+<div><strong>Clear All Cache</strong><br />Clears all caches and removes objects from the 3D scene.</div>
+</div>
+</section>
+
+<hr />
+<div class="nav-buttons">
+<a href="#textcode" class="nav-button">Next: TextCode Editor &rarr;</a>
+<a href="#top" class="nav-button">↑ Top</a>
+</div>
+
+<section id="textcode">
+<h2>4. How to Use the TextCode Editor</h2>
+<p>A powerful, multi-tab code editor with syntax-aware features.</p>
+
+<h3 id="editor-interface">Editor Interface & Core Features</h3>
+<ul>
+<li><strong>Smart Indentation</strong>: Auto-indentation for brackets</li>
+<li><strong>Multi-Page Support</strong>: Multiple script tabs</li>
+<li><strong>Find & Replace</strong>: Press <code>Ctrl+F</code></li>
+<li><strong>Beautify</strong>: Auto-format code</li>
+</ul>
+
+<h3 id="toolbar-buttons">4.1 Toolbar Buttons</h3>
+<div class="button-desc">
+<div class="button-icon">&#x21A9;</div><div><strong>Undo</strong></div>
+</div>
+<div class="button-desc">
+<div class="button-icon">&#x21AA;</div><div><strong>Redo</strong></div>
+</div>
+<div class="button-desc">
+<div class="button-icon">&#x1F524;</div><div><strong>Select All</strong></div>
+</div>
+<div class="button-desc">
+<div class="button-icon">&#x1F517;</div><div><strong>Select Bracket Content</strong></div>
+</div>
+<div class="button-desc">
+<div class="button-icon">&#x23;</div><div><strong>Go To Line</strong></div>
+</div>
+<div class="button-desc">
+<div class="button-icon">&#x1F50D;</div><div><strong>Find</strong></div>
+</div>
+<div class="button-desc">
+<div class="button-icon">&#x1F5C3;</div><div><strong>Pages Menu</strong></div>
+</div>
+<div class="button-desc">
+<div class="button-icon">&#x25B6;</div><div><strong>Run</strong></div>
+</div>
+<div class="button-desc">
+<div class="button-icon">&#x1F4BE;</div><div><strong>Save</strong></div>
+</div>
+<div class="button-desc">
+<div class="button-icon">&#x2728;</div><div><strong>Beautify</strong></div>
+</div>
+
+<h3 id="bracket-selector">4.2 Bracket Selector</h3>
+<p>Selects entire code blocks when cursor is inside brackets <code>{}</code>, <code>[]</code>, <code>()</code>, <code>&lt;&gt;</code>.</p>
+
+<h3 id="csg-vs-editor">4.3 CSG Scripts vs Editor Scripts</h3>
+<ul>
+<li><strong>CSG Scripts</strong> (Red Monitor): Must return 3D objects for rendering</li>
+<li><strong>Editor Scripts</strong> (Blue Editor): Return reusable functions/constants</li>
+</ul>
+
+<h3 id="get-include">How to Use get() and include()</h3>
+<ul>
+<li><code>include(name)</code>: Load exports from an Editor Script tab</li>
+<li><code>get(name)</code>: Load 3D model result from a CSG Script tab</li>
+</ul>
+
+<h3 id="external">External get() and include()</h3>
+<ul>
+<li><code>include(name, filepath)</code>: Load Editor script from file</li>
+<li><code>get(name, filepath)</code>: Load CSG script from file</li>
+</ul>
+
+<h3 id="file-paths">How Paths Work</h3>
+<ol>
+<li><strong>Absolute</strong>: Start with <code>/</code></li>
+<li><strong>Library</strong>: Start with <code>$lib/</code> (uses Library Path setting)</li>
+<li><strong>Relative</strong>: Relative to current project file directory</li>
+</ol>
+</section>
+
+<hr />
+<div class="nav-buttons">
+<a href="#path-creation" class="nav-button">Next: Paths &rarr;</a>
+<a href="#top" class="nav-button">↑ Top</a>
+</div>
+
+<section id="path-creation">
+<h2>5. Paths: How to Create Them</h2>
+<p>2D paths are the foundation for complex extruded shapes.</p>
+
+<h3 id="path-format">Path Format</h3>
+<pre><code>{
+path: [
+'m', x, y,           // Move to (Absolute)
+'lr', dx, dy,        // Line to (Relative)
+'q', cx, cy, x, y,   // Quadratic Bezier
+'x', cx, cy, x, y,   // Arc via control point
+],
+fn: 40 // Resolution for curves
+}</code></pre>
+<div class="note">
+<p><strong>2D Coordinates:</strong> Y-up system (positive X=right, positive Y=up)</p>
+</div>
+
+<h3 id="path-commands">Path Commands Reference</h3>
+<table>
+<thead>
+<tr><th>Command</th><th>Type</th><th>Syntax</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td><code>m</code></td><td>Absolute</td><td><code>'m', x, y</code></td><td>Move To</td></tr>
+<tr><td><code>mr</code></td><td>Relative</td><td><code>'mr', dx, dy</code></td><td>Move To (relative)</td></tr>
+<tr><td><code>l</code></td><td>Absolute</td><td><code>'l', x, y</code></td><td>Line To</td></tr>
+<tr><td><code>lr</code></td><td>Relative</td><td><code>'lr', dx, dy</code></td><td>Line To (relative)</td></tr>
+<tr><td><code>q</code></td><td>Absolute</td><td><code>'q', cx, cy, x, y</code></td><td>Quadratic Bezier</td></tr>
+<tr><td><code>qr</code></td><td>Relative</td><td><code>'qr', dcx, dcy, dx, dy</code></td><td>Quadratic Bezier (relative)</td></tr>
+<tr><td><code>c</code></td><td>Absolute</td><td><code>'c', cx1, cy1, cx2, cy2, x, y</code></td><td>Cubic Bezier</td></tr>
+<tr><td><code>cr</code></td><td>Relative</td><td><code>'cr', dcx1, dcy1, dcx2, dcy2, dx, dy</code></td><td>Cubic Bezier (relative)</td></tr>
+<tr><td><code>x</code></td><td>Absolute</td><td><code>'x', cx, cy, x, y</code></td><td>Arc via control point</td></tr>
+<tr><td><code>xr</code></td><td>Relative</td><td><code>'xr', dcx, dcy, dx, dy</code></td><td>Arc (relative)</td></tr>
+<tr><td><code>n</code></td><td>Utility</td><td><code>'n', segments</code></td><td>Set segments for next command</td></tr>
+<tr><td><code>r</code></td><td>3D Modifier</td><td><code>'r', angle</code></td><td>Rotation for extrusion</td></tr>
+<tr><td><code>s</code></td><td>3D Modifier</td><td><code>'s', sx, sy</code></td><td>Scale for extrusion</td></tr>
+</tbody>
+</table>
+
+<h3 id="auto-hole">Automatic Hole Detection</h3>
+<p>The <code>shape()</code> function automatically detects holes based on path nesting.</p>
+
+<h3 id="arcpath3d-helper">arcPath3d() Helper</h3>
+<p>Generates smooth 3D paths for extrusion. Parameters: <code>startAng</code>, <code>endAng</code> (degrees), <code>r</code> (radius), <code>fn</code> (resolution).</p>
+
+<h3 id="path-examples">Path Examples</h3>
+<div class="example-block">
+<div class="example-title">Simple Triangle</div>
+<pre><code>const trianglePath = {
+path: ['m', 0, 0, 'l', 10, 0, 'l', 5, 10, 'l', 0, 0]
+};
+const triangleShape = shape(trianglePath);
+const straightPath = { path: ['m', 0, 0, 0, 'l', 0, 0, 2], fn: 1 };
+return linePaths3d(triangleShape, straightPath);</code></pre>
+</div>
+</section>
+
+<hr />
+<div class="nav-buttons">
+<a href="#commands" class="nav-button">Next: Commands &rarr;</a>
+<a href="#top" class="nav-button">↑ Top</a>
+</div>
+
+<section id="commands">
+<h2>6. scadCSG Commands and How to Use Them</h2>
+<div class="note">
+<p><strong>3D Coordinate System:</strong> Z-up system (X=width, Y=depth, Z=height)</p>
+</div>
+
+<h3 id="primitives">Primitive Shapes</h3>
+<table>
+<thead>
+<tr><th>Function</th><th>Parameters</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td><code>sphere()</code></td><td><code>{ r, d, fn }</code></td><td>Creates a sphere (r=radius, d=diameter, fn=segments)</td></tr>
+<tr><td><code>cube()</code></td><td><code>[x, y, z]</code></td><td>Creates a box with specified dimensions</td></tr>
+<tr><td><code>cylinder()</code></td><td><code>{ r, rt, rb, d, dt, db, h, fn }</code></td><td>Creates cylinder/cone (rt/rb=top/bottom radius)</td></tr>
+</tbody>
+</table>
+<div class="example-block">
+<div class="example-title">Primitive Examples</div>
+<pre><code>// Sphere with radius 5mm, 32 segments
+const ball = sphere({ r: 5, fn: 32 });
+
+// Cube 20x20x10mm
+const box = cube([20, 20, 10]);
+
+// Cone (different top/bottom radii)
+const cone = cylinder({ rt: 0, rb: 5, h: 15, fn: 32 });
+
+return union([ball, box, cone]);</code></pre>
+</div>
+
+<h3 id="transformations">Transformations</h3>
+<table>
+<thead>
+<tr><th>Function</th><th>Parameters</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td><code>translate()</code></td><td><code>[x, y, z], ...target</code></td><td>Moves geometry by offset</td></tr>
+<tr><td><code>rotate()</code></td><td><code>[x, y, z], ...target</code></td><td>Rotates in <strong>degrees</strong> (X, Y, Z order)</td></tr>
+<tr><td><code>scale()</code></td><td><code>[x, y, z], ...target</code></td><td>Scales by factors</td></tr>
+<tr><td><code>scaleTo()</code></td><td><code>{ x, y, z }, ...target</code></td><td>Scales proportionally to target dimension</td></tr>
+<tr><td><code>scaleAdd()</code></td><td><code>{ x, y, z }, ...target</code></td><td>Adds value to dimensions</td></tr>
+<tr><td><code>floor()</code></td><td><code>...target</code></td><td>Moves lowest point to Z=0</td></tr>
+<tr><td><code>align()</code></td><td><code>{ lx, rx, cx, uy, dy, cy, bz, tz, cz }, ...target</code></td><td>Aligns by bounding box</td></tr>
+<tr><td><code>placement()</code></td><td><code>offsets, obj, ...target</code></td><td>Aligns targets relative to obj</td></tr>
+</tbody>
+</table>
+<div class="note">
+<p><strong>Placement Commands:</strong> [REF-ANCHOR][TARGET-ALIGN][AXIS]</p>
+<ul>
+<li><strong>X:</strong> l=left(min), r=right(max), c=center (llx, lrx, lcx, rlx, rrx, rcx, clx, crx, ccx)</li>
+<li><strong>Y:</strong> d=down(min), u=up(max), c=center (ldy, luy, lcy, rdy, ruy, rcy, cdy, cuy, ccy)</li>
+<li><strong>Z:</strong> b=bottom(min), t=top(max), c=center (lbz, ltz, lcz, rbz, rtz, rcz, cbz, ctz, ccz)</li>
+</ul>
+</div>
+<div class="example-block">
+<div class="example-title">Transformation Examples</div>
+<pre><code>// Translate 10mm up on Z
+const moved = translate([0, 0, 10], cube([5, 5, 5]));
+
+// Rotate 45° around Z
+const rotated = rotate([0, 0, 45], cube([5, 5, 5]));
+
+// Scale to exactly 20mm on X (proportional)
+const sized = scaleTo({ x: 20 }, cube([10, 10, 10]));
+
+// Add 5mm to all dimensions
+const expanded = scaleAdd({ x: 5, y: 5, z: 5 }, cube([10, 10, 10]));
+
+// Place sphere on top of cube with 2mm offset
+const base = cube([20, 20, 5]);
+const top = sphere({ r: 5 });
+placement({ 'ttz': 2 }, base, top);
+
+return union([base, top]);</code></pre>
+</div>
+
+<h3 id="csg-operations">CSG Operations</h3>
+<table>
+<thead>
+<tr><th>Function</th><th>Parameters</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td><code>union()</code></td><td><code>...target</code></td><td>Combines objects (addition)</td></tr>
+<tr><td><code>difference()</code></td><td><code>mainMesh, ...target</code></td><td>Subtracts targets from main</td></tr>
+<tr><td><code>intersect()</code></td><td><code>...target</code></td><td>Finds overlapping volume (2+ meshes)</td></tr>
+<tr><td><code>inverseIntersect()</code></td><td><code>...target</code></td><td>Symmetric difference (XOR)</td></tr>
+</tbody>
+</table>
+<div class="example-block">
+<div class="example-title">CSG Examples</div>
+<pre><code>// Union: Combine objects
+const combined = union(cube([10, 10, 10]), sphere({ r: 5 }));
+
+// Difference: Cut hole through cube
+const base = cube([20, 20, 20]);
+const cutter = cylinder({ r: 3, h: 25 });
+const withHole = difference(base, translate([10, 10, -2.5], cutter));
+
+// Intersect: Keep only overlap
+const overlap = intersect(cube([15, 15, 15]), sphere({ r: 10 }));
+
+// XOR: Keep non-overlapping parts
+const xor = inverseIntersect(cube([15, 15, 15]), sphere({ r: 10 }));
+
+return withHole;</code></pre>
+</div>
+
+<h3 id="path-classes">Path Classes (NEW)</h3>
+<div class="note">
+<p><strong>Path2d</strong> and <strong>Path3d</strong> are class-based path builders with method chaining.</p>
+</div>
+<table>
+<thead>
+<tr><th>Class</th><th>Methods</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Path2d</code></td>
+<td><code>m(), mr(), l(), lr(), q(), qr(), c(), cr(), x(), xr(), n(), fn(), path(), getPoints(), boundingBox()</code></td>
+<td>2D path builder</td>
+</tr>
+<tr>
+<td><code>Path3d</code></td>
+<td><code>All Path2d + m(x,y,z), r(rotation), s(sx,sy), close(v), xyInitAng(v)</code></td>
+<td>3D path builder</td>
+</tr>
+</tbody>
+</table>
+<div class="example-block">
+<div class="example-title">Path Class Examples</div>
+<pre><code>// Path2d: Rounded rectangle
+const path2d = new Path2d()
+.fn(32)
+.m(0, 0)
+.l(50, 0)
+.l(50, 30)
+.l(0, 30)
+.l(0, 0);
+
+// Path3d: Extrusion path with rotation
+const path3d = new Path3d()
+.fn(16)
+.m(0, 0, 0)
+.r(0)
+.l(0, 0, 10)
+.r(90)
+.l(10, 0, 10)
+.close(true);
+
+// Get processed points
+const points2d = path2d.getPoints();
+const points3d = path3d.getPoints();
+
+// Convert between 2D and 3D
+const path2dFrom3d = new Path2d().path(path3d);
+const path3dFrom2d = new Path3d().path(path2d);
+
+return path2d;</code></pre>
+</div>
+
+<h3 id="extrusions">2D to 3D Extrusion</h3>
+<table>
+<thead>
+<tr><th>Function</th><th>Parameters</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td><code>shape()</code></td><td><code>shapeDataPath</code></td><td>Generates THREE.Shape array with hole detection</td></tr>
+<tr><td><code>linePaths3d()</code></td><td><code>target, commandPath</code></td><td>Extrudes Shape along 3D path (scale/rotation support)</td></tr>
+<tr><td><code>extrude3d()</code></td><td><code>target, commandPath</code></td><td>Extrudes Path2d along 3D path (advanced)</td></tr>
+<tr><td><code>sweep3d()</code></td><td><code>circularPath, wallPath, holeWallPath</code></td><td>Sweeps geometry along circular path</td></tr>
+<tr><td><code>arcPath3d()</code></td><td><code>{ startAng, endAng, r, d, fn }</code></td><td>Helper for curved 3D paths</td></tr>
+</tbody>
+</table>
+<div class="example-block">
+<div class="example-title">Extrusion Examples</div>
+<pre><code>// Simple straight extrusion
+const profile = new Path2d()
+.fn(32)
+.m(0, 0)
+.l(10, 0)
+.l(10, 10)
+.l(0, 10)
+.l(0, 0);
+
+const extrusionPath = new Path3d()
+.fn(1)
+.m(0, 0, 0)
+.l(0, 0, 5);
+
+const shapes = shape(profile);
+const extruded = linePaths3d(shapes, extrusionPath);
+
+// Curved extrusion
+const curvedPath = arcPath3d({
+startAng: 0,
+endAng: 90,
+r: 20,
+fn: 32
+});
+const curvedExtrusion = linePaths3d(shapes, curvedPath);
+
+// Sweep for tubes/rings
+const circularPath = new Path2d().fn(64).m(20, 0).l(20, 0);
+const wallProfile = new Path2d().fn(16).m(0, 0).l(0, 3).l(2, 3).l(2, 0).l(0, 0);
+const swept = sweep3d(circularPath, wallProfile, null);
+
+return extruded;</code></pre>
+</div>
+
+<h3 id="2d-path-manipulation">2D Path Manipulation</h3>
+<table>
+<thead>
+<tr><th>Function</th><th>Parameters</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td><code>translatePath()</code></td><td><code>[x, y], pathObject</code></td><td>Moves 2D path by offset</td></tr>
+<tr><td><code>rotatePath()</code></td><td><code>angle, pathObject</code></td><td>Rotates 2D path around origin</td></tr>
+<tr><td><code>scalePath()</code></td><td><code>[sx, sy], pathObject</code></td><td>Scales 2D path from origin</td></tr>
+<tr><td><code>scaleToPath()</code></td><td><code>{ x, y }, pathObject</code></td><td>Scales to target dimension</td></tr>
+<tr><td><code>scaleAddPath()</code></td><td><code>{ x, y }, pathObject</code></td><td>Adds to dimensions</td></tr>
+<tr><td><code>alignPath()</code></td><td><code>{ bx, tx, cx, by, ty, cy }, pathObject</code></td><td>Aligns by bounding box</td></tr>
+<tr><td><code>convertTo2d()</code></td><td><code>pathObject3d</code></td><td>Converts 3D path to 2D</td></tr>
+<tr><td><code>convertTo3d()</code></td><td><code>pathObject2d, z</code></td><td>Converts 2D path to 3D</td></tr>
+<tr><td><code>boundingBoxPath()</code></td><td><code>pathObject</code></td><td>Calculates 2D bounding box</td></tr>
+</tbody>
+</table>
+<div class="example-block">
+<div class="example-title">Path Manipulation Examples</div>
+<pre><code>const base = new Path2d().fn(32).m(0, 0).l(10, 0).l(10, 10).l(0, 10).l(0, 0);
+
+// Translate 5mm right, 3mm up
+const moved = translatePath([5, 3], new Path2d().path(base));
+
+// Rotate 45 degrees
+const rotated = rotatePath(45, new Path2d().path(base));
+
+// Scale to 50mm width
+const sized = scaleToPath({ x: 50 }, new Path2d().path(base));
+
+// Add 5mm to all sides
+const expanded = scaleAddPath({ x: 5, y: 5 }, new Path2d().path(base));
+
+// Get bounding box
+const bbox = boundingBoxPath(base);
+
+// Convert between 2D and 3D
+const path3d = convertTo3d(base, 0);
+const path2d = convertTo2d(path3d);
+
+return base;</code></pre>
+</div>
+
+<h3 id="3d-imports">3D Imports (Requires <code>await</code>)</h3>
+<div class="warning">
+<p><strong>All import functions are asynchronous!</strong> Must use <code>await</code>.</p>
+</div>
+<table>
+<thead>
+<tr><th>Function</th><th>Parameters</th><th>Returns</th></tr>
+</thead>
+<tbody>
+<tr><td><code>importStl()</code></td><td><code>filepath</code></td><td><code>THREE.Mesh</code></td></tr>
+<tr><td><code>importObj()</code></td><td><code>filepath</code></td><td><code>Brush[]</code></td></tr>
+<tr><td><code>importGlb()</code></td><td><code>filepath</code></td><td><code>Brush[]</code></td></tr>
+<tr><td><code>importFbx()</code></td><td><code>filepath</code></td><td><code>Brush[]</code></td></tr>
+<tr><td><code>importSvg()</code></td><td><code>filepath</code></td><td><code>Path2d[]</code></td></tr>
+</tbody>
+</table>
+<div class="example-block">
+<div class="example-title">Import Examples</div>
+<pre><code>// Import STL and combine
+async function model() {
+const imported = await importStl("$lib/part.stl");
+const base = cube([30, 30, 5]);
+return union([imported, floor(base)]);
+}
+
+// Import SVG and extrude
+async function logo() {
+const svgPaths = await importSvg("$lib/logo.svg");
+const shapes = svgPaths.map(p => shape(p));
+const extrusionPath = new Path3d().m(0, 0, 0).l(0, 0, 2);
+const extruded = shapes.flatMap(s => linePaths3d(s, extrusionPath));
+return union(extruded);
+}
+
+// Import GLB with multiple meshes
+async function assembly() {
+const parts = await importGlb("$lib/assembly.glb");
+return union(parts);
+}</code></pre>
+</div>
+
+<h3 id="text-functions">Text Functions (Requires <code>await</code>)</h3>
+<div class="warning">
+<p><strong>Text functions are asynchronous!</strong> Font loading requires <code>await</code>.</p>
+</div>
+<table>
+<thead>
+<tr><th>Function</th><th>Parameters</th><th>Returns</th></tr>
+</thead>
+<tbody>
+<tr><td><code>font()</code></td><td><code>fontPath</code></td><td><code>Promise&lt;opentype.Font&gt;</code></td></tr>
+<tr><td><code>text()</code></td><td><code>{ font, text, fontSize, fn }</code></td><td><code>Path2d</code></td></tr>
+</tbody>
+</table>
+<div class="example-block">
+<div class="example-title">Text Examples</div>
+<pre><code>async function textModel() {
+const myFont = await font("$lib/arial.ttf");
+
+const textPath = text({
+font: myFont,
+text: "CSG",
+fontSize: 10,
+fn: 32
+});
+
+const textShape = shape(textPath);
+const extrusionPath = new Path3d().m(0, 0, 0).l(0, 0, 2);
+const extruded = linePaths3d(textShape, extrusionPath);
+
+return union(extruded);
+}</code></pre>
+</div>
+
+<h3 id="utilities">Utility Functions</h3>
+<table>
+<thead>
+<tr><th>Function</th><th>Parameters</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td><code>color()</code></td><td><code>c, ...target</code></td><td>Applies color (hex, rgb, or name)</td></tr>
+<tr><td><code>convexHull()</code></td><td><code>...target</code></td><td>Creates convex hull around objects</td></tr>
+<tr><td><code>boundingBox()</code></td><td><code>...target</code></td><td>Calculates 3D world-space bounding box</td></tr>
+<tr><td><code>subdivide()</code></td><td><code>{ resolution }, ...target</code></td><td>Refines geometry for smoother surfaces</td></tr>
+<tr><td><code>show()</code></td><td><code>...target</code></td><td>Sets visibility to true</td></tr>
+<tr><td><code>hide()</code></td><td><code>...target</code></td><td>Sets visibility to false</td></tr>
+<tr><td><code>expand()</code></td><td><code>...target</code></td><td>Extracts meshes into array</td></tr>
+<tr><td><code>clone()</code></td><td><code>source</code></td><td>Deep clones THREE.js objects</td></tr>
+</tbody>
+</table>
+<div class="example-block">
+<div class="example-title">Utility Examples</div>
+<pre><code>// Apply color
+const redCube = color(0xff0000, cube([10, 10, 10]));
+const blueSphere = color("#0000ff", sphere({ r: 5 }));
+
+// Convex hull
+const hull = convexHull(cube([10, 10, 10]), translate([15, 0, 0], sphere({ r: 5 })));
+
+// Bounding box
+const bbox = boundingBox(cube([10, 10, 10]), sphere({ r: 5 }));
+
+// Subdivide for smoother booleans
+const smooth = subdivide({ resolution: 0.5 }, sphere({ r: 10, fn: 16 }));
+
+// Show/hide for debugging
+const debug = hide(cube([10, 10, 10]));
+const visible = show(sphere({ r: 5 }));
+
+// Deep clone
+const original = cube([10, 10, 10]);
+const copy1 = clone(original);
+const copy2 = clone(original);
+translate([15, 0, 0], copy1);
+translate([-15, 0, 0], copy2);
+const cloned = union([original, copy1, copy2]);
+
+// Expand nested structures
+const meshes = expand(union(cube([10, 10, 10]), sphere({ r: 5 })));
+
+return cloned;</code></pre>
+</div>
+
+<h3 id="three-access">Three.js Access</h3>
+<div class="note">
+<p>Direct access to Three.js namespace for advanced operations.</p>
+</div>
+<div class="example-block">
+<div class="example-title">Three.js Access Example</div>
+<pre><code>// Create custom geometry
+const customGeom = new THREE.TorusGeometry(10, 3, 16, 100);
+const customMesh = new THREE.Mesh(customGeom, defaultMaterial.clone());
+
+// Use any THREE function
+const vector = new THREE.Vector3(1, 2, 3);
+const quaternion = new THREE.Quaternion();
+
+return customMesh;</code></pre>
+</div>
+</section>
+
+<hr />
+<div class="nav-buttons">
+<a href="#examples" class="nav-button">Next: Examples &rarr;</a>
+<a href="#top" class="nav-button">↑ Top</a>
+</div>
+
+<section id="examples">
+<h2>7. Complete Examples</h2>
+
+<div class="example-block" id="example-basic-assembly">
+<div class="example-title">Basic Assembly with Placement</div>
+<pre><code>// Base plate with mounted components
+const basePlate = cube([50, 50, 3]);
+const mount1 = cylinder({ r: 5, h: 10 });
+const mount2 = cylinder({ r: 5, h: 10 });
+
+// Place mounts on corners
+placement({ 'lbl': 0, 'lbd': 0, 'bbz': 0 }, basePlate, mount1);
+placement({ 'rbr': 0, 'rbu': 0, 'bbz': 0 }, basePlate, mount2);
+
+// Add holes through mounts
+const holeCutter = cylinder({ r: 2, h: 15 });
+const mountWithHole1 = difference(mount1, translate([0, 0, -2.5], holeCutter));
+const mountWithHole2 = difference(mount2, translate([0, 0, -2.5], clone(holeCutter)));
+
+return union([basePlate, mountWithHole1, mountWithHole2]);</code></pre>
+</div>
+
+<div class="example-block" id="example-parametric-box">
+<div class="example-title">Parametric Box with Wall Thickness</div>
+<pre><code>// Parameters
+const outerW = 40, outerD = 30, outerH = 20, wallThickness = 2;
+
+// Outer box
+const outer = cube([outerW, outerD, outerH]);
+
+// Inner box (subtracted to create hollow)
+const inner = cube([
+outerW - wallThickness * 2,
+outerD - wallThickness * 2,
+outerH - wallThickness
+]);
+
+// Position inner box
+const positionedInner = translate([wallThickness, wallThickness, wallThickness], inner);
+
+// Create hollow box
+const hollowBox = difference(outer, positionedInner);
+
+// Add lid
+const lid = cube([outerW + 1, outerD + 1, 2]);
+const positionedLid = translate([0, 0, outerH], lid);
+
+return union([hollowBox, positionedLid]);</code></pre>
+</div>
+
+<div class="example-block" id="example-custom-profile">
+<div class="example-title">Custom Profile Extrusion</div>
+<pre><code>// I-beam profile
+const profile = new Path2d()
+.fn(4)
+.m(-10, 5).l(10, 5).l(10, 3).l(3, 3).l(3, -3)
+.l(10, -3).l(10, -5).l(-10, -5).l(-10, -3)
+.l(-3, -3).l(-3, 3).l(-10, 3).l(-10, 5);
+
+// Extrude along straight path
+const extrusionPath = new Path3d().fn(1).m(0, 0, 0).l(0, 0, 100);
+
+const shapes = shape(profile);
+const beam = linePaths3d(shapes, extrusionPath);
+
+return union(beam);</code></pre>
+</div>
+
+<div class="example-block" id="example-curved-tube">
+<div class="example-title">Curved Tube with Varying Diameter</div>
+<pre><code>// Circular profile
+const tubeProfile = new Path2d().fn(32).m(5, 0).l(5, 0);
+
+// Curved path with scale variation
+const curvedPath = new Path3d()
+.fn(32)
+.m(0, 0, 0)
+.s(1, 1)
+.x(20, 0, 20)
+.s(1.5, 1.5)
+.x(40, 0, 0)
+.s(1, 1);
+
+const shapes = shape(tubeProfile);
+const tube = linePaths3d(shapes, curvedPath);
+
+return union(tube);</code></pre>
+</div>
+
+<div class="example-block" id="example-modular-design">
+<div class="example-title">Modular Design with Clone</div>
+<pre><code>// Create base module
+function createModule() {
+const base = cube([20, 20, 5]);
+const post = cylinder({ r: 3, h: 10 });
+const positionedPost = translate([10, 10, 5], post);
+return union([base, positionedPost]);
+}
+
+// Create multiple instances
+const module1 = createModule();
+const module2 = clone(module1);
+const module3 = clone(module1);
+
+// Arrange in row
+translate([0, 0, 0], module1);
+translate([25, 0, 0], module2);
+translate([50, 0, 0], module3);
+
+// Add connecting plate
+const plate = cube([75, 20, 2]);
+const positionedPlate = translate([0, 0, 15], plate);
+
+return union([module1, module2, module3, positionedPlate]);</code></pre>
+</div>
+
+<div class="example-block" id="example-lattice-structure">
+<div class="example-title">Lattice Structure with Subdivide</div>
+<pre><code>// Lattice unit
+function latticeUnit(size) {
+const strut = cylinder({ r: 1, h: size, fn: 8 });
+const xStrut = rotate([0, 90, 0], strut);
+const yStrut = rotate([90, 0, 0], strut);
+const zStrut = strut;
+return union([xStrut, translate([0, size/2, 0], yStrut), translate([0, 0, size/2], zStrut)]);
+}
+
+// Create lattice array
+const units = [];
+const unitSize = 10, count = 3;
+for (let x = 0; x < count; x++) {
+for (let y = 0; y < count; y++) {
+for (let z = 0; z < count; z++) {
+const unit = latticeUnit(unitSize);
+units.push(translate([x * unitSize, y * unitSize, z * unitSize], unit));
+}
+}
+}
+
+// Subdivide for smoother struts
+const lattice = subdivide({ resolution: 0.5 }, union(units));
+
+// Add outer frame
+const frame = cube([count * unitSize, count * unitSize, count * unitSize]);
+const innerFrame = cube([count * unitSize - 2, count * unitSize - 2, count * unitSize - 2]);
+const hollowFrame = difference(frame, translate([1, 1, 1], innerFrame));
+
+return union([lattice, hollowFrame]);</code></pre>
+</div>
+
+<div class="example-block" id="example-svg-text">
+<div class="example-title">SVG Import with Text</div>
+<pre><code>async function svgTextModel() {
+// Load font
+const myFont = await font("$lib/arial.ttf");
+
+// Create text path
+const textPath = text({ font: myFont, text: "CSG", fontSize: 10, fn: 32 });
+
+// Load SVG logo
+const svgPaths = await importSvg("$lib/logo.svg");
+
+// Combine text and SVG
+const textShape = shape(textPath);
+const svgShapes = svgPaths.map(p => shape(p));
+
+// Extrude all
+const extrusionPath = new Path3d().m(0, 0, 0).l(0, 0, 2);
+const textExtruded = linePaths3d(textShape, extrusionPath);
+const svgExtruded = svgShapes.flatMap(s => linePaths3d(s, extrusionPath));
+
+// Position and combine
+translate([0, 0, 0], textExtruded);
+translate([0, 15, 0], svgExtruded);
+
+return union([...textExtruded, ...svgExtruded]);
+}</code></pre>
+</div>
+</section>
+
+<hr />
+<div class="nav-buttons">
+<a href="#top" class="nav-button">↑ Top</a>
+</div>
+
+<button id="jump-back-btn">&#x21A9; Jump Back</button>
+
+<script>
+const scrollHistory = []
+const jumpBackBtn = document.getElementById('jump-back-btn')
+
+document.querySelectorAll('a[href^="#"]').forEach((anchor) => {
+anchor.addEventListener('click', function (e) {
+e.preventDefault()
+const targetId = this.getAttribute('href')
+const targetElement = document.querySelector(targetId)
+if (targetElement) {
+scrollHistory.push(window.scrollY)
+updateJumpBackButton()
+window.scrollTo({
+top: targetElement.offsetTop - 20,
+behavior: 'smooth'
+})
+}
+})
+})
+
+jumpBackBtn.addEventListener('click', () => {
+if (scrollHistory.length > 0) {
+const prevPos = scrollHistory.pop()
+window.scrollTo({ top: prevPos, behavior: 'smooth' })
+updateJumpBackButton()
+}
+})
+
+function updateJumpBackButton() {
+jumpBackBtn.style.display = scrollHistory.length > 0 ? 'block' : 'none'
+}
+
+updateJumpBackButton()
+</script>
+</body>
+</html>

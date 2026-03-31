@@ -1,0 +1,1191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Material Icons OS - Theme Development Guide</title>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #0078d4;
+            --primary-dark: #005a9e;
+            --accent: #7ec850;
+            --bg: #f5f5f5;
+            --surface: #ffffff;
+            --text: #333333;
+            --text-secondary: #666666;
+            --border: #e0e0e0;
+            --code-bg: #1e1e1e;
+            --code-text: #d4d4d4;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            line-height: 1.6;
+            color: var(--text);
+            background: var(--bg);
+        }
+
+        /* Header */
+        header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: white;
+            padding: 40px 20px;
+            text-align: center;
+        }
+
+        header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+
+        header p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+
+        /* Container */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            display: grid;
+            grid-template-columns: 280px 1fr;
+            gap: 30px;
+        }
+
+        /* Sidebar Navigation */
+        .sidebar {
+            position: sticky;
+            top: 20px;
+            align-self: start;
+            background: var(--surface);
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            height: calc(100vh - 40px);
+            overflow-y: auto;
+        }
+
+        .sidebar h3 {
+            color: var(--primary);
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .sidebar nav ul {
+            list-style: none;
+        }
+
+        .sidebar nav li {
+            margin-bottom: 8px;
+        }
+
+        .sidebar nav a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            display: block;
+            padding: 8px 12px;
+            border-radius: 6px;
+            transition: all 0.2s;
+        }
+
+        .sidebar nav a:hover {
+            background: rgba(0, 120, 212, 0.1);
+            color: var(--primary);
+        }
+
+        .sidebar nav a.active {
+            background: var(--primary);
+            color: white;
+        }
+
+        /* Main Content */
+        main {
+            background: var(--surface);
+            border-radius: 12px;
+            padding: 40px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        section {
+            margin-bottom: 50px;
+            scroll-margin-top: 20px;
+        }
+
+        h2 {
+            color: var(--primary);
+            font-size: 2rem;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid var(--accent);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        h3 {
+            color: var(--text);
+            font-size: 1.5rem;
+            margin: 30px 0 15px 0;
+        }
+
+        h4 {
+            color: var(--text-secondary);
+            font-size: 1.2rem;
+            margin: 20px 0 10px 0;
+        }
+
+        p {
+            margin-bottom: 15px;
+        }
+
+        ul, ol {
+            margin: 15px 0 15px 25px;
+        }
+
+        li {
+            margin-bottom: 8px;
+        }
+
+        /* Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            background: var(--surface);
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+
+        th {
+            background: var(--primary);
+            color: white;
+            font-weight: 600;
+        }
+
+        tr:hover {
+            background: rgba(0, 120, 212, 0.05);
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        /* Code Blocks */
+        pre {
+            background: var(--code-bg);
+            color: var(--code-text);
+            padding: 20px;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 20px 0;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 14px;
+            line-height: 1.5;
+            border-left: 4px solid var(--accent);
+        }
+
+        code {
+            font-family: 'Courier New', Courier, monospace;
+            background: rgba(0, 120, 212, 0.1);
+            padding: 2px 6px;
+            border-radius: 4px;
+            color: var(--primary-dark);
+        }
+
+        pre code {
+            background: transparent;
+            padding: 0;
+            color: inherit;
+        }
+
+        /* Syntax Highlighting */
+        .keyword { color: #569cd6; }
+        .string { color: #ce9178; }
+        .comment { color: #6a9955; }
+        .function { color: #dcdcaa; }
+        .number { color: #b5cea8; }
+        .property { color: #9cdcfe; }
+
+        /* Info Boxes */
+        .info-box {
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid;
+        }
+
+        .info-box.success {
+            background: rgba(126, 200, 80, 0.1);
+            border-color: var(--accent);
+        }
+
+        .info-box.warning {
+            background: rgba(255, 193, 7, 0.1);
+            border-color: #ffc107;
+        }
+
+        .info-box.error {
+            background: rgba(244, 67, 54, 0.1);
+            border-color: #f44336;
+        }
+
+        .info-box h4 {
+            margin-top: 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* File Tree */
+        .file-tree {
+            background: var(--code-bg);
+            color: var(--code-text);
+            padding: 20px;
+            border-radius: 8px;
+            font-family: 'Courier New', Courier, monospace;
+            margin: 20px 0;
+        }
+
+        .file-tree div {
+            padding: 3px 0;
+        }
+
+        .file-tree .folder {
+            color: #9cdcfe;
+        }
+
+        .file-tree .file {
+            color: #ce9178;
+        }
+
+        /* Buttons */
+        .btn {
+            display: inline-block;
+            padding: 10px 20px;
+            background: var(--primary);
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            transition: background 0.2s;
+            margin: 5px;
+        }
+
+        .btn:hover {
+            background: var(--primary-dark);
+        }
+
+        /* Back to Top */
+        .back-to-top {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            background: var(--primary);
+            color: white;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-decoration: none;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            transition: all 0.3s;
+            opacity: 0;
+            visibility: hidden;
+        }
+
+        .back-to-top.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .back-to-top:hover {
+            transform: translateY(-5px);
+            background: var(--primary-dark);
+        }
+
+        /* Responsive */
+        @media (max-width: 900px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+
+            .sidebar {
+                position: relative;
+                top: 0;
+                height: auto;
+                margin-bottom: 20px;
+            }
+
+            main {
+                padding: 20px;
+            }
+
+            header h1 {
+                font-size: 2rem;
+            }
+        }
+
+        /* Print */
+        @media print {
+            .sidebar, .back-to-top {
+                display: none;
+            }
+
+            .container {
+                display: block;
+            }
+
+            pre {
+                page-break-inside: avoid;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1><span class="material-icons" style="vertical-align: middle;">palette</span> Material Icons OS</h1>
+        <p>Complete Theme Development Guide</p>
+    </header>
+
+    <div class="container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <h3><span class="material-icons">menu_book</span> Contents</h3>
+            <nav>
+                <ul>
+                    <li><a href="#overview">📖 Overview</a></li>
+                    <li><a href="#file-structure">📁 File Structure</a></li>
+                    <li><a href="#theme-configuration">⚙️ Theme Configuration</a></li>
+                    <li><a href="#css-overrides">🎨 CSS Overrides</a></li>
+                    <li><a href="#javascript-animations">💻 JavaScript & Animations</a></li>
+                    <li><a href="#cleanup-system">🧹 Cleanup System</a></li>
+                    <li><a href="#theme-api">🔌 Theme System API</a></li>
+                    <li><a href="#best-practices">📋 Best Practices</a></li>
+                    <li><a href="#examples">📚 Examples</a></li>
+                    <li><a href="#troubleshooting">🐛 Troubleshooting</a></li>
+                    <li><a href="#quick-start">🎓 Quick Start Template</a></li>
+                </ul>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main>
+            <!-- Overview -->
+            <section id="overview">
+                <h2><span class="material-icons">info</span> Overview</h2>
+                <p>The Material Icons OS uses a <strong>server-based theme system</strong> that loads themes dynamically from configuration files. Each theme consists of:</p>
+                
+                <ul>
+                    <li><strong>CSS file</strong> - Overrides default styles and defines visual appearance</li>
+                    <li><strong>JavaScript file</strong> (optional) - Handles canvas animations and dynamic effects</li>
+                    <li><strong>Assets</strong> - Images, fonts, and other resources</li>
+                </ul>
+
+                <div class="info-box success">
+                    <h4><span class="material-icons">check_circle</span> Key Features</h4>
+                    <ul>
+                        <li><strong>Dynamic Loading</strong> - Themes load from server without localStorage</li>
+                        <li><strong>Canvas Support</strong> - Optional animated backgrounds with proper cleanup</li>
+                        <li><strong>CSS Variables</strong> - Easy color theming with CSS custom properties</li>
+                        <li><strong>Data Attributes</strong> - Theme switching via <code>data-theme</code> attributes</li>
+                        <li><strong>Hot Reload</strong> - Apply themes via URL parameters or Settings UI</li>
+                        <li><strong>Resource Cleanup</strong> - Automatic cleanup of animations, timers, and event listeners</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- File Structure -->
+            <section id="file-structure">
+                <h2><span class="material-icons">folder</span> File Structure</h2>
+                
+                <h3>Recommended Organization</h3>
+                <div class="file-tree">
+                    <div class="folder">/webos/</div>
+                    <div>&nbsp;&nbsp;├── desktop.html</div>
+                    <div>&nbsp;&nbsp;├── themes.json</div>
+                    <div>&nbsp;&nbsp;└── <span class="folder">themes/</span></div>
+                    <div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└── <span class="folder">your-theme/</span></div>
+                    <div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├── <span class="file">styles.css</span></div>
+                    <div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├── <span class="file">script.js</span> <span style="color:#6a9955;">// with cleanup</span></div>
+                    <div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└── <span class="folder">assets/</span></div>
+                    <div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├── background.png</div>
+                    <div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└── fonts/</div>
+                </div>
+
+                <h3>Required Files</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>File</th>
+                            <th>Required</th>
+                            <th>Purpose</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>themes.json</code></td>
+                            <td>✅ Yes</td>
+                            <td>Theme registry and metadata</td>
+                        </tr>
+                        <tr>
+                            <td><code>themes/your-theme/styles.css</code></td>
+                            <td>✅ Yes</td>
+                            <td>Visual styling</td>
+                        </tr>
+                        <tr>
+                            <td><code>themes/your-theme/script.js</code></td>
+                            <td>⚠️ Optional</td>
+                            <td>Canvas animations <strong>with cleanup function</strong></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </section>
+
+            <!-- Theme Configuration -->
+            <section id="theme-configuration">
+                <h2><span class="material-icons">settings</span> Theme Configuration</h2>
+                
+                <h3><code>themes.json</code> Structure</h3>
+                <pre><code><span class="keyword">{</span>
+  <span class="property">"your-theme-id"</span><span class="keyword">:</span> <span class="keyword">{</span>
+    <span class="property">"name"</span><span class="keyword">:</span> <span class="string">"Display Name"</span><span class="keyword">,</span>
+    <span class="property">"description"</span><span class="keyword">:</span> <span class="string">"Brief description of the theme"</span><span class="keyword">,</span>
+    <span class="property">"css"</span><span class="keyword">:</span> <span class="string">"themes/your-theme/styles.css"</span><span class="keyword">,</span>
+    <span class="property">"script"</span><span class="keyword">:</span> <span class="string">"themes/your-theme/script.js"</span><span class="keyword">,</span>
+    <span class="property">"canvas"</span><span class="keyword">:</span> <span class="number">true</span><span class="keyword">,</span>
+    <span class="property">"author"</span><span class="keyword">:</span> <span class="string">"Your Name"</span><span class="keyword">,</span>
+    <span class="property">"version"</span><span class="keyword">:</span> <span class="string">"1.0.0"</span>
+  <span class="keyword">}</span>
+<span class="keyword">}</span></code></pre>
+
+                <h3>Configuration Properties</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Property</th>
+                            <th>Type</th>
+                            <th>Required</th>
+                            <th>Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>name</code></td>
+                            <td>String</td>
+                            <td>✅</td>
+                            <td>Human-readable theme name (shown in Settings)</td>
+                        </tr>
+                        <tr>
+                            <td><code>description</code></td>
+                            <td>String</td>
+                            <td>⚠️</td>
+                            <td>Optional description</td>
+                        </tr>
+                        <tr>
+                            <td><code>css</code></td>
+                            <td>String</td>
+                            <td>✅</td>
+                            <td>Path to CSS file (relative to <code>desktop.html</code>)</td>
+                        </tr>
+                        <tr>
+                            <td><code>script</code></td>
+                            <td>String</td>
+                            <td>⚠️</td>
+                            <td>Path to JS file <strong>that exports cleanup via window.ThemeCleanup</strong></td>
+                        </tr>
+                        <tr>
+                            <td><code>canvas</code></td>
+                            <td>Boolean</td>
+                            <td>✅</td>
+                            <td><code>true</code> to enable canvas, <code>false</code> to hide</td>
+                        </tr>
+                        <tr>
+                            <td><code>author</code></td>
+                            <td>String</td>
+                            <td>⚠️</td>
+                            <td>Theme author name</td>
+                        </tr>
+                        <tr>
+                            <td><code>version</code></td>
+                            <td>String</td>
+                            <td>⚠️</td>
+                            <td>Theme version (semver recommended)</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </section>
+
+            <!-- CSS Overrides -->
+            <section id="css-overrides">
+                <h2><span class="material-icons">brush</span> CSS Overrides</h2>
+                
+                <div class="info-box warning">
+                    <h4><span class="material-icons">warning</span> CSS Specificity Strategy</h4>
+                    <p>Themes use <strong>data attributes</strong> for specificity. Always use this pattern:</p>
+                </div>
+
+                <pre><code><span class="comment">/* ✅ CORRECT: High specificity with data attribute */</span>
+<span class="keyword">html</span> <span class="property">body</span><span class="keyword">[</span><span class="property">data-theme</span>=<span class="string">"your-theme"</span><span class="keyword">]</span><span class="keyword">,</span>
+<span class="property">body</span><span class="keyword">[</span><span class="property">data-theme</span>=<span class="string">"your-theme"</span><span class="keyword">]</span> <span class="keyword">{</span>
+  <span class="property">background</span><span class="keyword">:</span> <span class="function">url</span>(<span class="string">'themes/your-theme/background.png'</span>) <span class="keyword">!important;</span>
+  <span class="property">background-size</span><span class="keyword">:</span> cover <span class="keyword">!important;</span>
+<span class="keyword">}</span>
+
+<span class="comment">/* ❌ WRONG: Low specificity (will be overridden) */</span>
+<span class="property">body</span> <span class="keyword">{</span>
+  <span class="property">background</span><span class="keyword">:</span> red<span class="keyword">;</span>
+<span class="keyword">}</span></code></pre>
+
+                <h3>Core CSS Variables</h3>
+                <p>These variables are available for all themes to override:</p>
+                <pre><code><span class="keyword">:</span><span class="property">root</span> <span class="keyword">{</span>
+  <span class="comment">/* Layout */</span>
+  <span class="property">--taskbar-height</span><span class="keyword">:</span> <span class="number">50px;</span>
+  <span class="property">--safe-bottom</span><span class="keyword">:</span> <span class="function">env</span>(safe-area-inset-bottom<span class="keyword">,</span> <span class="number">20px</span>)<span class="keyword">;</span>
+  
+  <span class="comment">/* Colors - Override these in your theme */</span>
+  <span class="property">--bg-color</span><span class="keyword">:</span> <span class="string">#004e92;</span>           <span class="comment">/* Desktop background */</span>
+  <span class="property">--window-bg</span><span class="keyword">:</span> <span class="string">#ffffff;</span>           <span class="comment">/* Window content background */</span>
+  <span class="property">--header-bg</span><span class="keyword">:</span> <span class="string">#e8e8e8;</span>           <span class="comment">/* Window title bar */</span>
+  <span class="property">--accent</span><span class="keyword">:</span> <span class="string">#0078d4;</span>              <span class="comment">/* Primary accent color */</span>
+  <span class="property">--accent-dim</span><span class="keyword">:</span> <span class="string">#005a9e;</span>          <span class="comment">/* Dimmed accent (borders, etc) */</span>
+  <span class="property">--menu-bg</span><span class="keyword">:</span> <span class="function">rgba</span>(<span class="number">30</span><span class="keyword">,</span> <span class="number">30</span><span class="keyword">,</span> <span class="number">30</span><span class="keyword">,</span> <span class="number">0.95</span>)<span class="keyword">;</span>  <span class="comment">/* Start menu background */</span>
+  
+  <span class="comment">/* Text Colors */</span>
+  <span class="property">--text-primary</span><span class="keyword">:</span> <span class="string">#333;</span>           <span class="comment">/* Main text color */</span>
+  <span class="property">--text-secondary</span><span class="keyword">:</span> <span class="string">#666;</span>         <span class="comment">/* Secondary/muted text */</span>
+  
+  <span class="comment">/* Borders */</span>
+  <span class="property">--border-color</span><span class="keyword">:</span> <span class="string">#ccc;</span>           <span class="comment">/* Generic border color */</span>
+<span class="keyword">}</span></code></pre>
+            </section>
+
+            <!-- JavaScript & Animations -->
+            <section id="javascript-animations">
+                <h2><span class="material-icons">code</span> JavaScript & Canvas Animations</h2>
+                
+                <div class="info-box success">
+                    <h4><span class="material-icons">lightbulb</span> Script Requirements</h4>
+                    <p>Theme scripts <strong>MUST</strong> follow this pattern for proper cleanup:</p>
+                </div>
+
+                <h3>Basic Template with Cleanup</h3>
+                <pre><code><span class="comment">/**
+ * Your Theme Name - Animation Script
+ * ✅ Compatible with ThemeManager cleanup system
+ */</span>
+(<span class="keyword">function</span>() <span class="keyword">{</span>
+  <span class="string">'use strict'</span><span class="keyword">;</span>
+  
+  <span class="comment">// 1. Get canvas with error handling</span>
+  <span class="keyword">const</span> canvas = document.<span class="function">getElementById</span>(<span class="string">'themeCanvas'</span>)<span class="keyword">;</span>
+  <span class="keyword">if</span> (!canvas) <span class="keyword">{</span>
+    console.<span class="function">warn</span>(<span class="string">'Your theme: #themeCanvas not found'</span>)<span class="keyword">;</span>
+    window.ThemeCleanup = <span class="keyword">function</span> <span class="function">cleanup</span>() <span class="keyword">{};</span>
+    <span class="keyword">return;</span>
+  <span class="keyword">}</span>
+
+  <span class="keyword">const</span> ctx = canvas.<span class="function">getContext</span>(<span class="string">'2d'</span>)<span class="keyword">;</span>
+  
+  <span class="comment">// 2. Track resources for cleanup</span>
+  <span class="keyword">const</span> themeResources = <span class="keyword">{</span>
+    animationFrame: <span class="keyword">null,</span>
+    resizeHandlers: <span class="keyword">[],</span>
+    intervals: <span class="keyword">[],</span>
+    timeouts: <span class="keyword">[]</span>
+  <span class="keyword">};</span>
+
+  <span class="comment">// 3. Helper: Register event listeners for cleanup</span>
+  <span class="keyword">function</span> <span class="function">addResizeHandler</span>(handler) <span class="keyword">{</span>
+    window.<span class="function">addEventListener</span>(<span class="string">'resize'</span><span class="keyword">,</span> handler)<span class="keyword">;</span>
+    themeResources.resizeHandlers.<span class="function">push</span>(handler)<span class="keyword">;</span>
+  <span class="keyword">}</span>
+
+  <span class="comment">// 4. Handle resizing</span>
+  <span class="keyword">function</span> <span class="function">resizeCanvas</span>() <span class="keyword">{</span>
+    canvas.width = window.innerWidth<span class="keyword">;</span>
+    canvas.height = window.innerHeight<span class="keyword">;</span>
+  <span class="keyword">}</span>
+  <span class="function">resizeCanvas</span>()<span class="keyword">;</span>
+  <span class="function">addResizeHandler</span>(resizeCanvas)<span class="keyword">;</span>
+
+  <span class="comment">// 5. Your animation code here</span>
+  <span class="keyword">function</span> <span class="function">animate</span>() <span class="keyword">{</span>
+    <span class="comment">// Clear canvas (IMPORTANT: Keep transparent!)</span>
+    ctx.<span class="function">clearRect</span>(<span class="number">0</span><span class="keyword">,</span> <span class="number">0</span><span class="keyword">,</span> canvas.width<span class="keyword">,</span> canvas.height)<span class="keyword">;</span>
+    
+    <span class="comment">// Draw your animation</span>
+    <span class="comment">// ...</span>
+    
+    <span class="comment">// Track animation frame with ThemeManager</span>
+    themeResources.animationFrame = <span class="function">requestAnimationFrame</span>(animate)<span class="keyword">;</span>
+    <span class="keyword">if</span> (<span class="keyword">typeof</span> ThemeManager !== <span class="string">'undefined'</span> && ThemeManager.trackAnimation) <span class="keyword">{</span>
+      ThemeManager.<span class="function">trackAnimation</span>(themeResources.animationFrame)<span class="keyword">;</span>
+    <span class="keyword">}</span>
+  <span class="keyword">}</span>
+  
+  <span class="comment">// Start animation</span>
+  console.<span class="function">log</span>(<span class="string">'✓ Your theme animation started'</span>)<span class="keyword">;</span>
+  <span class="function">animate</span>()<span class="keyword">;</span>
+
+  <span class="comment">// 6. EXPOSE CLEANUP VIA window.ThemeCleanup (REQUIRED)</span>
+  window.ThemeCleanup = <span class="keyword">function</span> <span class="function">cleanup</span>() <span class="keyword">{</span>
+    console.<span class="function">log</span>(<span class="string">'✓ Your theme cleanup started'</span>)<span class="keyword">;</span>
+    
+    <span class="comment">// Cancel animation frame</span>
+    <span class="keyword">if</span> (themeResources.animationFrame) <span class="keyword">{</span>
+      <span class="function">cancelAnimationFrame</span>(themeResources.animationFrame)<span class="keyword">;</span>
+      themeResources.animationFrame = <span class="keyword">null;</span>
+    <span class="keyword">}</span>
+    
+    <span class="comment">// Remove all resize listeners</span>
+    themeResources.resizeHandlers.<span class="function">forEach</span>(handler => <span class="keyword">{</span>
+      <span class="keyword">try</span> <span class="keyword">{</span> window.<span class="function">removeEventListener</span>(<span class="string">'resize'</span><span class="keyword">,</span> handler)<span class="keyword">;</span> <span class="keyword">}</span> <span class="keyword">catch</span>(e) <span class="keyword">{}</span>
+    <span class="keyword">}</span>)<span class="keyword">;</span>
+    themeResources.resizeHandlers = <span class="keyword">[];</span>
+    
+    <span class="comment">// Clear intervals/timeouts</span>
+    themeResources.intervals.<span class="function">forEach</span>(id => <span class="keyword">{</span> <span class="keyword">try</span> <span class="keyword">{</span> <span class="function">clearInterval</span>(id)<span class="keyword">;</span> <span class="keyword">}</span> <span class="keyword">catch</span>(e) <span class="keyword">{};</span> <span class="keyword">}</span>)<span class="keyword">;</span>
+    themeResources.intervals = <span class="keyword">[];</span>
+    themeResources.timeouts.<span class="function">forEach</span>(id => <span class="keyword">{</span> <span class="keyword">try</span> <span class="keyword">{</span> <span class="function">clearTimeout</span>(id)<span class="keyword">;</span> <span class="keyword">}</span> <span class="keyword">catch</span>(e) <span class="keyword">{};</span> <span class="keyword">}</span>)<span class="keyword">;</span>
+    themeResources.timeouts = <span class="keyword">[];</span>
+    
+    <span class="comment">// Clear canvas thoroughly</span>
+    <span class="keyword">try</span> <span class="keyword">{</span>
+      ctx.<span class="function">clearRect</span>(<span class="number">0</span><span class="keyword">,</span> <span class="number">0</span><span class="keyword">,</span> canvas.width<span class="keyword">,</span> canvas.height)<span class="keyword">;</span>
+      ctx.<span class="function">resetTransform</span>()<span class="keyword">;</span>
+    <span class="keyword">}</span> <span class="keyword">catch</span> (e) <span class="keyword">{</span> console.<span class="function">warn</span>(<span class="string">'⚠ Error clearing canvas:'</span><span class="keyword">,</span> e)<span class="keyword">;</span> <span class="keyword">}</span>
+    
+    console.<span class="function">log</span>(<span class="string">'✓ Your theme cleanup complete'</span>)<span class="keyword">;</span>
+  <span class="keyword">};</span>
+  
+  <span class="comment">// 7. Optional: Register via cleanup registry for multiple cleanup functions</span>
+  <span class="keyword">if</span> (<span class="keyword">typeof</span> ThemeManager !== <span class="string">'undefined'</span> && ThemeManager.registerCleanup) <span class="keyword">{</span>
+    ThemeManager.<span class="function">registerCleanup</span>(() => <span class="keyword">{</span>
+      console.<span class="function">log</span>(<span class="string">'✓ Your theme registry cleanup'</span>)<span class="keyword">;</span>
+    <span class="keyword">}</span>)<span class="keyword">;</span>
+  <span class="keyword">}</span>
+  
+<span class="keyword">}</span>)()<span class="keyword">;</span></code></pre>
+
+                <div class="info-box error">
+                    <h4><span class="material-icons">error</span> Critical Rules</h4>
+                    <ul>
+                        <li><strong>✅ DO:</strong> Use IIFE (Immediately Invoked Function Expression)</li>
+                        <li><strong>✅ DO:</strong> Set <code>window.ThemeCleanup = function cleanup() {...}</code> at top level</li>
+                        <li><strong>✅ DO:</strong> Clear canvas with <code>clearRect()</code> (don't fill with color)</li>
+                        <li><strong>✅ DO:</strong> Remove event listeners in cleanup</li>
+                        <li><strong>✅ DO:</strong> Use <code>ThemeManager.trackAnimation/Interval/Timeout()</code> for auto-cleanup</li>
+                        <li><strong>❌ DON'T:</strong> Fill canvas with solid color (blocks background)</li>
+                        <li><strong>❌ DON'T:</strong> Return cleanup instead of setting <code>window.ThemeCleanup</code></li>
+                        <li><strong>❌ DON'T:</strong> Leave animation frames running after cleanup</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- Cleanup System -->
+            <section id="cleanup-system">
+                <h2><span class="material-icons">cleaning_services</span> Cleanup System</h2>
+                
+                <p>The ThemeManager provides a robust cleanup system to prevent memory leaks and visual artifacts when switching themes.</p>
+
+                <h3>How Cleanup Works</h3>
+                <ol>
+                    <li><strong>Theme loads</strong> → Script sets <code>window.ThemeCleanup</code> function</li>
+                    <li><strong>User switches theme</strong> → ThemeManager calls cleanup function</li>
+                    <li><strong>Cleanup executes</strong> → Cancels animations, removes listeners, clears canvas</li>
+                    <li><strong>New theme loads</strong> → Clean slate, no artifacts from previous theme</li>
+                </ol>
+
+                <h3>ThemeManager Cleanup Helpers</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Method</th>
+                            <th>Purpose</th>
+                            <th>Example</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>ThemeManager.trackAnimation(id)</code></td>
+                            <td>Track <code>requestAnimationFrame</code> for auto-cancel</td>
+                            <td><code>ThemeManager.trackAnimation(rafId)</code></td>
+                        </tr>
+                        <tr>
+                            <td><code>ThemeManager.trackInterval(id)</code></td>
+                            <td>Track <code>setInterval</code> for auto-clear</td>
+                            <td><code>ThemeManager.trackInterval(intervalId)</code></td>
+                        </tr>
+                        <tr>
+                            <td><code>ThemeManager.trackTimeout(id)</code></td>
+                            <td>Track <code>setTimeout</code> for auto-clear</td>
+                            <td><code>ThemeManager.trackTimeout(timeoutId)</code></td>
+                        </tr>
+                        <tr>
+                            <td><code>ThemeManager.registerCleanup(fn)</code></td>
+                            <td>Register additional cleanup function</td>
+                            <td><code>ThemeManager.registerCleanup(() => {...})</code></td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <h3>Resource Tracking Pattern</h3>
+                <pre><code><span class="comment">// Track all resources in one object</span>
+<span class="keyword">const</span> themeResources = <span class="keyword">{</span>
+  animationFrame: <span class="keyword">null,</span>
+  resizeHandlers: <span class="keyword">[],</span>
+  intervals: <span class="keyword">[],</span>
+  timeouts: <span class="keyword">[]</span>
+<span class="keyword">};</span>
+
+<span class="comment">// When creating animation frame</span>
+themeResources.animationFrame = <span class="function">requestAnimationFrame</span>(animate)<span class="keyword">;</span>
+<span class="keyword">if</span> (ThemeManager?.trackAnimation) <span class="keyword">{</span>
+  ThemeManager.<span class="function">trackAnimation</span>(themeResources.animationFrame)<span class="keyword">;</span>
+<span class="keyword">}</span>
+
+<span class="comment">// In cleanup function</span>
+window.ThemeCleanup = <span class="keyword">function</span> <span class="function">cleanup</span>() <span class="keyword">{</span>
+  <span class="keyword">if</span> (themeResources.animationFrame) <span class="keyword">{</span>
+    <span class="function">cancelAnimationFrame</span>(themeResources.animationFrame)<span class="keyword">;</span>
+  <span class="keyword">}</span>
+  <span class="comment">// ... clear other resources</span>
+<span class="keyword">};</span></code></pre>
+
+                <h3>Complete Cleanup Checklist</h3>
+                <div class="info-box success">
+                    <h4><span class="material-icons">task_alt</span> Every theme script should:</h4>
+                    <ul>
+                        <li>✅ Set <code>window.ThemeCleanup</code> function (not just return it)</li>
+                        <li>✅ Cancel all <code>requestAnimationFrame</code> calls</li>
+                        <li>✅ Clear all <code>setInterval</code> and <code>setTimeout</code> timers</li>
+                        <li>✅ Remove all <code>addEventListener</code> listeners</li>
+                        <li>✅ Clear canvas with <code>clearRect()</code> and <code>resetTransform()</code></li>
+                        <li>✅ Remove any DOM elements created by the theme</li>
+                        <li>✅ Free large arrays/objects to help garbage collection</li>
+                        <li>✅ Log cleanup start/end for debugging</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- Theme API -->
+            <section id="theme-api">
+                <h2><span class="material-icons">api</span> Theme System API</h2>
+                
+                <h3>ThemeManager Object</h3>
+                <p>The global <code>ThemeManager</code> object provides theme control:</p>
+                <pre><code><span class="comment">// Get current theme</span>
+ThemeManager.currentTheme  <span class="comment">// → "rainy-forest"</span>
+
+<span class="comment">// Get theme configuration</span>
+ThemeManager.themeConfig   <span class="comment">// → { "default": {...}, "matrix": {...} }</span>
+
+<span class="comment">// Apply a theme</span>
+<span class="keyword">await</span> ThemeManager.<span class="function">apply</span>(<span class="string">'matrix'</span>)<span class="keyword">;</span>
+
+<span class="comment">// Get available themes</span>
+ThemeManager.<span class="function">getAvailableThemes</span>()<span class="keyword">;</span>
+<span class="comment">// → [{id: 'default', name: 'Default Blue'}, ...]</span>
+
+<span class="comment">// Populate a select element</span>
+<span class="keyword">await</span> ThemeManager.<span class="function">populateThemeSelector</span>(<span class="string">'themeSelector'</span>)<span class="keyword">;</span>
+
+<span class="comment">// Cleanup helpers for theme scripts</span>
+ThemeManager.<span class="function">trackAnimation</span>(rafId)<span class="keyword">;</span>
+ThemeManager.<span class="function">trackInterval</span>(intervalId)<span class="keyword">;</span>
+ThemeManager.<span class="function">trackTimeout</span>(timeoutId)<span class="keyword">;</span>
+ThemeManager.<span class="function">registerCleanup</span>(cleanupFn)<span class="keyword">;</span></code></pre>
+
+                <h3>Events</h3>
+                <p>Listen for theme changes:</p>
+                <pre><code>window.<span class="function">addEventListener</span>(<span class="string">'themeChanged'</span><span class="keyword">,</span> (e) <span class="keyword">=&gt;</span> <span class="keyword">{</span>
+  console.<span class="function">log</span>(<span class="string">'New theme:'</span><span class="keyword">,</span> e.detail.theme)<span class="keyword">;</span>
+  console.<span class="function">log</span>(<span class="string">'Theme config:'</span><span class="keyword">,</span> e.detail.config)<span class="keyword">;</span>
+  
+  <span class="comment">// Update your UI here</span>
+<span class="keyword">}</span>)<span class="keyword">;</span></code></pre>
+
+                <h3>URL Parameters</h3>
+                <p>Apply theme via URL:</p>
+                <pre><code>http:<span class="comment">//your-server/desktop.html?theme=matrix</span></code></pre>
+            </section>
+
+            <!-- Best Practices -->
+            <section id="best-practices">
+                <h2><span class="material-icons">verified</span> Best Practices</h2>
+                
+                <h3>1. Use CSS Variables</h3>
+                <pre><code><span class="comment">/* ✅ GOOD: Uses variables */</span>
+<span class="keyword">.</span><span class="property">window</span> <span class="keyword">{</span>
+  <span class="property">background</span><span class="keyword">:</span> <span class="function">var</span>(<span class="property">--window-bg</span>)<span class="keyword">;</span>
+  <span class="property">color</span><span class="keyword">:</span> <span class="function">var</span>(<span class="property">--text-primary</span>)<span class="keyword">;</span>
+  <span class="property">border</span><span class="keyword">:</span> <span class="number">1px</span> solid <span class="function">var</span>(<span class="property">--border-color</span>)<span class="keyword">;</span>
+<span class="keyword">}</span>
+
+<span class="comment">/* ❌ BAD: Hardcoded colors */</span>
+<span class="keyword">.</span><span class="property">window</span> <span class="keyword">{</span>
+  <span class="property">background</span><span class="keyword">:</span> <span class="string">#ffffff;</span>
+  <span class="property">color</span><span class="keyword">:</span> <span class="string">#333;</span>
+  <span class="property">border</span><span class="keyword">:</span> <span class="number">1px</span> solid <span class="string">#ccc;</span>
+<span class="keyword">}</span></code></pre>
+
+                <h3>2. Maintain Transparency</h3>
+                <pre><code><span class="comment">// ✅ GOOD: Clear canvas</span>
+ctx.<span class="function">clearRect</span>(<span class="number">0</span><span class="keyword">,</span> <span class="number">0</span><span class="keyword">,</span> canvas.width<span class="keyword">,</span> canvas.height)<span class="keyword">;</span>
+
+<span class="comment">// ❌ BAD: Fill with color (blocks background)</span>
+ctx.fillStyle = <span class="string">'rgba(0, 0, 0, 0.5)'</span><span class="keyword">;</span>
+ctx.<span class="function">fillRect</span>(<span class="number">0</span><span class="keyword">,</span> <span class="number">0</span><span class="keyword">,</span> canvas.width<span class="keyword">,</span> canvas.height)<span class="keyword">;</span></code></pre>
+
+                <h3>3. Always Set window.ThemeCleanup</h3>
+                <pre><code><span class="comment">// ✅ GOOD: Set global cleanup function</span>
+window.ThemeCleanup = <span class="keyword">function</span> <span class="function">cleanup</span>() <span class="keyword">{</span>
+  <span class="function">cancelAnimationFrame</span>(animationFrame)<span class="keyword">;</span>
+  window.<span class="function">removeEventListener</span>(<span class="string">'resize'</span><span class="keyword">,</span> handler)<span class="keyword">;</span>
+<span class="keyword">};</span>
+
+<span class="comment">// ❌ BAD: Just return (won't be captured by script src)</span>
+<span class="keyword">return function</span> <span class="function">cleanup</span>() <span class="keyword">{</span>
+  <span class="comment">// This return value is ignored when loading via &lt;script src&gt;
+<span class="keyword">}</span></code></pre>
+
+                <h3>4. Use High Specificity</h3>
+                <pre><code><span class="comment">/* ✅ GOOD */</span>
+<span class="keyword">html</span> <span class="property">body</span><span class="keyword">[</span><span class="property">data-theme</span>=<span class="string">"your-theme"</span><span class="keyword">]</span> <span class="keyword">{</span>
+  <span class="property">background</span><span class="keyword">:</span> <span class="function">url</span>(...) <span class="keyword">!important;</span>
+<span class="keyword">}</span>
+
+<span class="comment">/* ❌ BAD: Overridden by base styles */</span>
+<span class="property">body</span> <span class="keyword">{</span>
+  <span class="property">background</span><span class="keyword">:</span> <span class="function">url</span>(...)<span class="keyword">;</span>
+<span class="keyword">}</span></code></pre>
+
+                <h3>5. Optimize Performance</h3>
+                <pre><code><span class="comment">// ✅ GOOD: Limit particle count</span>
+<span class="keyword">const</span> particleCount = <span class="number">100;</span>
+
+<span class="comment">// ❌ BAD: Too many particles</span>
+<span class="keyword">const</span> particleCount = <span class="number">1000;</span>
+
+<span class="comment">// ✅ GOOD: Use requestAnimationFrame for smooth animation</span>
+<span class="keyword">function</span> <span class="function">animate</span>() <span class="keyword">{</span>
+  <span class="comment">// draw code</span>
+  animationFrame = <span class="function">requestAnimationFrame</span>(animate)<span class="keyword">;</span>
+  <span class="keyword">if</span> (ThemeManager?.trackAnimation) <span class="keyword">{</span>
+    ThemeManager.<span class="function">trackAnimation</span>(animationFrame)<span class="keyword">;</span>
+  <span class="keyword">}</span>
+<span class="keyword">}</span></code></pre>
+
+                <h3>6. Handle Errors Gracefully</h3>
+                <pre><code><span class="keyword">if</span> (!canvas) <span class="keyword">{</span>
+  console.<span class="function">warn</span>(<span class="string">'Canvas not found'</span>)<span class="keyword">;</span>
+  window.ThemeCleanup = <span class="keyword">function</span>() <span class="keyword">{};</span>
+  <span class="keyword">return;</span>
+<span class="keyword">}</span>
+
+<span class="comment">// In cleanup, wrap DOM operations in try/catch</span>
+<span class="keyword">try</span> <span class="keyword">{</span>
+  ctx.<span class="function">clearRect</span>(<span class="number">0</span><span class="keyword">,</span> <span class="number">0</span><span class="keyword">,</span> canvas.width<span class="keyword">,</span> canvas.height)<span class="keyword">;</span>
+<span class="keyword">}</span> <span class="keyword">catch</span> (e) <span class="keyword">{</span>
+  console.<span class="function">warn</span>(<span class="string">'Cleanup error:'</span><span class="keyword">,</span> e)<span class="keyword">;</span>
+<span class="keyword">}</span></code></pre>
+
+                <h3>7. Test Across Screen Sizes</h3>
+                <pre><code>window.<span class="function">addEventListener</span>(<span class="string">'resize'</span><span class="keyword">,</span> () <span class="keyword">=&gt;</span> <span class="keyword">{</span>
+  canvas.width = window.innerWidth<span class="keyword">;</span>
+  canvas.height = window.innerHeight<span class="keyword">;</span>
+<span class="keyword">}</span>)<span class="keyword">;</span>
+
+<span class="comment">// And remove in cleanup!</span>
+window.ThemeCleanup = <span class="keyword">function</span> <span class="function">cleanup</span>() <span class="keyword">{</span>
+  window.<span class="function">removeEventListener</span>(<span class="string">'resize'</span><span class="keyword">,</span> resizeHandler)<span class="keyword">;</span>
+<span class="keyword">};</span></code></pre>
+            </section>
+
+            <!-- Examples -->
+            <section id="examples">
+                <h2><span class="material-icons">library_books</span> Examples</h2>
+                
+                <h3>Example 1: Simple Gradient Theme (No JS)</h3>
+                <p><strong>themes.json:</strong></p>
+                <pre><code><span class="keyword">{</span>
+  <span class="property">"sunset"</span><span class="keyword">:</span> <span class="keyword">{</span>
+    <span class="property">"name"</span><span class="keyword">:</span> <span class="string">"Sunset Gradient"</span><span class="keyword">,</span>
+    <span class="property">"css"</span><span class="keyword">:</span> <span class="string">"themes/sunset/styles.css"</span><span class="keyword">,</span>
+    <span class="property">"script"</span><span class="keyword">:</span> <span class="keyword">null,</span>
+    <span class="property">"canvas"</span><span class="keyword">:</span> <span class="number">false</span>
+  <span class="keyword">}</span>
+<span class="keyword">}</span></code></pre>
+
+                <p><strong>styles.css:</strong></p>
+                <pre><code><span class="keyword">:</span><span class="property">root</span> <span class="keyword">{</span>
+  <span class="property">--bg-color</span><span class="keyword">:</span> <span class="string">#ff6b6b;</span>
+  <span class="property">--window-bg</span><span class="keyword">:</span> <span class="string">#ffffff;</span>
+  <span class="property">--accent</span><span class="keyword">:</span> <span class="string">#feca57;</span>
+  <span class="property">--text-primary</span><span class="keyword">:</span> <span class="string">#2d3436;</span>
+<span class="keyword">}</span>
+
+<span class="keyword">html</span> <span class="property">body</span><span class="keyword">[</span><span class="property">data-theme</span>=<span class="string">"sunset"</span><span class="keyword">]</span><span class="keyword">,</span>
+<span class="property">body</span><span class="keyword">[</span><span class="property">data-theme</span>=<span class="string">"sunset"</span><span class="keyword">]</span> <span class="keyword">{</span>
+  <span class="property">background</span><span class="keyword">:</span> <span class="function">linear-gradient</span>(<span class="number">135deg</span><span class="keyword">,</span> <span class="string">#ff6b6b</span> <span class="number">0%</span><span class="keyword">,</span> <span class="string">#feca57</span> <span class="number">50%</span><span class="keyword">,</span> <span class="string">#48dbfb</span> <span class="number">100%</span>) <span class="keyword">!important;</span>
+  <span class="property">background-size</span><span class="keyword">:</span> cover <span class="keyword">!important;</span>
+<span class="keyword">}</span>
+
+<span class="keyword">.</span><span class="property">icon</span> <span class="keyword">{</span>
+  <span class="property">background</span><span class="keyword">:</span> <span class="function">rgba</span>(<span class="number">255</span><span class="keyword">,</span> <span class="number">255</span><span class="keyword">,</span> <span class="number">255</span><span class="keyword">,</span> <span class="number">0.2</span>)<span class="keyword">;</span>
+  <span class="property">backdrop-filter</span><span class="keyword">:</span> <span class="function">blur</span>(<span class="number">10px</span>)<span class="keyword">;</span>
+<span class="keyword">}</span></code></pre>
+
+                <h3>Example 2: Matrix Rain (With Cleanup)</h3>
+                <p>See the complete Matrix example with proper cleanup in the <a href="#cleanup-system">Cleanup System</a> section above.</p>
+            </section>
+
+            <!-- Troubleshooting -->
+            <section id="troubleshooting">
+                <h2><span class="material-icons">bug_report</span> Troubleshooting</h2>
+                
+                <h3>Background Not Showing</h3>
+                <div class="info-box error">
+                    <h4>Problem</h4>
+                    <p>Background image/color not visible</p>
+                </div>
+                <div class="info-box success">
+                    <h4>Solutions</h4>
+                    <ol>
+                        <li>Check CSS specificity - use <code>!important</code> and data attributes</li>
+                        <li>Verify image path is correct</li>
+                        <li>Check browser console for 404 errors</li>
+                        <li>Ensure canvas is transparent: <code>background: transparent !important</code></li>
+                    </ol>
+                </div>
+
+                <h3>Canvas Blocking Background</h3>
+                <div class="info-box error">
+                    <h4>Problem</h4>
+                    <p>Can't see background through canvas</p>
+                </div>
+                <div class="info-box success">
+                    <h4>Solutions</h4>
+                    <ol>
+                        <li>Use <code>clearRect()</code> not <code>fillRect()</code></li>
+                        <li>Don't fill with semi-transparent color</li>
+                        <li>Set canvas CSS: <code>background: transparent !important</code></li>
+                    </ol>
+                </div>
+
+                <h3>Animations Not Stopping (Memory Leak)</h3>
+                <div class="info-box error">
+                    <h4>Problem</h4>
+                    <p>Previous theme animation continues after switching</p>
+                </div>
+                <div class="info-box success">
+                    <h4>Solutions</h4>
+                    <ol>
+                        <li>✅ Set <code>window.ThemeCleanup</code> (not just return)</li>
+                        <li>✅ Cancel animation frames with <code>cancelAnimationFrame()</code></li>
+                        <li>✅ Remove event listeners with <code>removeEventListener()</code></li>
+                        <li>✅ Use <code>ThemeManager.trackAnimation()</code> for auto-cancel</li>
+                        <li>✅ Clear canvas with <code>clearRect()</code> and <code>resetTransform()</code></li>
+                    </ol>
+                </div>
+
+                <h3>Theme Not Loading</h3>
+                <div class="info-box error">
+                    <h4>Problem</h4>
+                    <p>Theme doesn't appear in Settings</p>
+                </div>
+                <div class="info-box success">
+                    <h4>Solutions</h4>
+                    <ol>
+                        <li>Check <code>themes.json</code> syntax (valid JSON)</li>
+                        <li>Verify file paths are correct</li>
+                        <li>Check browser console for errors</li>
+                        <li>Ensure CORS headers if loading from different domain</li>
+                    </ol>
+                </div>
+
+                <h3>CSS Not Applying</h3>
+                <div class="info-box error">
+                    <h4>Problem</h4>
+                    <p>Theme styles not showing</p>
+                </div>
+                <div class="info-box success">
+                    <h4>Solutions</h4>
+                    <ol>
+                        <li>Increase specificity with data attributes</li>
+                        <li>Use <code>!important</code> for critical overrides</li>
+                        <li>Check if CSS file is loading (Network tab)</li>
+                        <li>Clear browser cache</li>
+                    </ol>
+                </div>
+            </section>
+
+            <!-- Quick Start Template -->
+            <section id="quick-start">
+                <h2><span class="material-icons">rocket_launch</span> Quick Start Template</h2>
+                <p>Copy this template to create a new theme with proper cleanup:</p>
+
+                <h3>themes/your-theme/styles.css</h3>
+                <pre><code><span class="keyword">:</span><span class="property">root</span> <span class="keyword">{</span>
+  <span class="property">--bg-color</span><span class="keyword">:</span> <span class="string">#your-color;</span>
+  <span class="property">--window-bg</span><span class="keyword">:</span> <span class="string">#your-color;</span>
+  <span class="property">--accent</span><span class="keyword">:</span> <span class="string">#your-color;</span>
+  <span class="property">--text-primary</span><span class="keyword">:</span> <span class="string">#your-color;</span>
+  <span class="property">--text-secondary</span><span class="keyword">:</span> <span class="string">#your-color;</span>
+  <span class="property">--border-color</span><span class="keyword">:</span> <span class="string">#your-color;</span>
+<span class="keyword">}</span>
+
+<span class="keyword">html</span> <span class="property">body</span><span class="keyword">[</span><span class="property">data-theme</span>=<span class="string">"your-theme"</span><span class="keyword">]</span><span class="keyword">,</span>
+<span class="property">body</span><span class="keyword">[</span><span class="property">data-theme</span>=<span class="string">"your-theme"</span><span class="keyword">]</span> <span class="keyword">{</span>
+  <span class="property">background</span><span class="keyword">:</span> <span class="string">#your-background</span> <span class="keyword">!important;</span>
+<span class="keyword">}</span>
+
+<span class="keyword">#</span><span class="property">themeCanvas</span> <span class="keyword">{</span>
+  <span class="property">display</span><span class="keyword">:</span> none <span class="keyword">!important;</span> <span class="comment">/* or 'block' if using canvas */</span>
+  <span class="property">background</span><span class="keyword">:</span> transparent <span class="keyword">!important;</span>
+<span class="keyword">}</span></code></pre>
+
+                <h3>themes/your-theme/script.js (with cleanup)</h3>
+                <pre><code>(<span class="keyword">function</span>() <span class="keyword">{</span>
+  <span class="string">'use strict'</span><span class="keyword">;</span>
+  
+  <span class="keyword">const</span> canvas = document.<span class="function">getElementById</span>(<span class="string">'themeCanvas'</span>)<span class="keyword">;</span>
+  <span class="keyword">if</span> (!canvas) <span class="keyword">{</span>
+    window.ThemeCleanup = <span class="keyword">function</span>() <span class="keyword">{};</span>
+    <span class="keyword">return;</span>
+  <span class="keyword">}</span>
+  
+  <span class="keyword">const</span> ctx = canvas.<span class="function">getContext</span>(<span class="string">'2d'</span>)<span class="keyword">;</span>
+  <span class="keyword">const</span> themeResources = <span class="keyword">{</span> animationFrame: <span class="keyword">null,</span> resizeHandlers: <span class="keyword">[]</span> <span class="keyword">};</span>
+  
+  <span class="keyword">function</span> <span class="function">resizeCanvas</span>() <span class="keyword">{</span>
+    canvas.width = window.innerWidth<span class="keyword">;</span>
+    canvas.height = window.innerHeight<span class="keyword">;</span>
+  <span class="keyword">}</span>
+  <span class="function">resizeCanvas</span>()<span class="keyword">;</span>
+  window.<span class="function">addEventListener</span>(<span class="string">'resize'</span><span class="keyword">,</span> resizeCanvas)<span class="keyword">;</span>
+  themeResources.resizeHandlers.<span class="function">push</span>(resizeCanvas)<span class="keyword">;</span>
+
+  <span class="keyword">function</span> <span class="function">animate</span>() <span class="keyword">{</span>
+    ctx.<span class="function">clearRect</span>(<span class="number">0</span><span class="keyword">,</span> <span class="number">0</span><span class="keyword">,</span> canvas.width<span class="keyword">,</span> canvas.height)<span class="keyword">;</span>
+    <span class="comment">// Your animation here</span>
+    themeResources.animationFrame = <span class="function">requestAnimationFrame</span>(animate)<span class="keyword">;</span>
+    <span class="keyword">if</span> (ThemeManager?.trackAnimation) <span class="keyword">{</span>
+      ThemeManager.<span class="function">trackAnimation</span>(themeResources.animationFrame)<span class="keyword">;</span>
+    <span class="keyword">}</span>
+  <span class="keyword">}</span>
+  
+  <span class="function">animate</span>()<span class="keyword">;</span>
+
+  <span class="comment">// ✅ REQUIRED: Set global cleanup function</span>
+  window.ThemeCleanup = <span class="keyword">function</span> <span class="function">cleanup</span>() <span class="keyword">{</span>
+    <span class="keyword">if</span> (themeResources.animationFrame) <span class="function">cancelAnimationFrame</span>(themeResources.animationFrame)<span class="keyword">;</span>
+    themeResources.resizeHandlers.<span class="function">forEach</span>(h => window.<span class="function">removeEventListener</span>(<span class="string">'resize'</span><span class="keyword">,</span> h))<span class="keyword">;</span>
+    ctx.<span class="function">clearRect</span>(<span class="number">0</span><span class="keyword">,</span> <span class="number">0</span><span class="keyword">,</span> canvas.width<span class="keyword">,</span> canvas.height)<span class="keyword">;</span>
+    ctx.<span class="function">resetTransform</span>()<span class="keyword">;</span>
+  <span class="keyword">};</span>
+  
+  <span class="comment">// Optional: Register additional cleanup</span>
+  <span class="keyword">if</span> (ThemeManager?.registerCleanup) <span class="keyword">{</span>
+    ThemeManager.<span class="function">registerCleanup</span>(() => console.<span class="function">log</span>(<span class="string">'✓ Cleanup complete'</span>))<span class="keyword">;</span>
+  <span class="keyword">}</span>
+<span class="keyword">}</span>)()<span class="keyword">;</span></code></pre>
+
+                <h3>Update themes.json</h3>
+                <pre><code><span class="keyword">{</span>
+  <span class="property">"your-theme"</span><span class="keyword">:</span> <span class="keyword">{</span>
+    <span class="property">"name"</span><span class="keyword">:</span> <span class="string">"Your Theme Name"</span><span class="keyword">,</span>
+    <span class="property">"description"</span><span class="keyword">:</span> <span class="string">"Description"</span><span class="keyword">,</span>
+    <span class="property">"css"</span><span class="keyword">:</span> <span class="string">"themes/your-theme/styles.css"</span><span class="keyword">,</span>
+    <span class="property">"script"</span><span class="keyword">:</span> <span class="string">"themes/your-theme/script.js"</span><span class="keyword">,</span>
+    <span class="property">"canvas"</span><span class="keyword">:</span> <span class="number">false,</span>
+    <span class="property">"author"</span><span class="keyword">:</span> <span class="string">"Your Name"</span><span class="keyword">,</span>
+    <span class="property">"version"</span><span class="keyword">:</span> <span class="string">"1.0.0"</span>
+  <span class="keyword">}</span>
+<span class="keyword">}</span></code></pre>
+            </section>
+        </main>
+    </div>
+
+    <!-- Back to Top Button -->
+    <a href="#" class="back-to-top" id="backToTop">
+        <span class="material-icons">arrow_upward</span>
+    </a>
+
+    <script>
+        // Smooth scrolling for navigation
+        document.querySelectorAll('.sidebar a').forEach(link => {
+            link.addEventListener('click', function(e) {
+                e.preventDefault();
+                const targetId = this.getAttribute('href').substring(1);
+                const target = document.getElementById(targetId);
+                
+                // Update active state
+                document.querySelectorAll('.sidebar a').forEach(l => l.classList.remove('active'));
+                this.classList.add('active');
+                
+                // Smooth scroll
+                target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            });
+        });
+
+        // Update active nav on scroll
+        window.addEventListener('scroll', () => {
+            const sections = document.querySelectorAll('section');
+            const navLinks = document.querySelectorAll('.sidebar a');
+            
+            let current = '';
+            sections.forEach(section => {
+                const sectionTop = section.offsetTop;
+                const sectionHeight = section.clientHeight;
+                if (scrollY >= sectionTop - 100) {
+                    current = section.getAttribute('id');
+                }
+            });
+            
+            navLinks.forEach(link => {
+                link.classList.remove('active');
+                if (link.getAttribute('href') === `#${current}`) {
+                    link.classList.add('active');
+                }
+            });
+
+            // Back to top button
+            const backToTop = document.getElementById('backToTop');
+            if (window.scrollY > 500) {
+                backToTop.classList.add('visible');
+            } else {
+                backToTop.classList.remove('visible');
+            }
+        });
+
+        // Back to top click
+        document.getElementById('backToTop').addEventListener('click', function(e) {
+            e.preventDefault();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+    </script>
+</body>
+</html>

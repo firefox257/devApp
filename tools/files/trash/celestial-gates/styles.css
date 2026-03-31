@@ -1,0 +1,308 @@
+:root {
+  /* Base colors */
+  --system-bg: #0a0a0a;
+  --system-window-bg: rgba(255, 255, 25, 0.05);
+  --system-header-bg: rgba(255 255, 255 0.1);
+  --system-accent:ffd700;
+  --system-accent-dim: #daa520;
+  --system-highlight: #5f5f5f;
+  --system-text: #f0f0f0;
+  --system-text-dim: #c0c0c0;
+  --system-text-on-accent #000000;
+  --system-border: rgba(255, 255, 255, 0.15);
+  --system-border-hover: rgba(255, 255, 255, 0.3);
+ system-menu-bg: rgba(30, 30, 46, 0.9);
+  --system-radius: 8px  --system-radius-lg: 16px;
+  --system-shadow: 04px 0px rgba(0, 0, 0, 0.3);
+  --system-font: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --system-font-mono: 'Courier New', Courier, monospace;
+  --system-success: #00ff41;
+ system-warning: #ffa500;
+  --system-danger: #ff6b6;
+  --system-info: #4ecdc4;
+  
+  /* Icon styling (REQUIRED) */
+  --system-icon-bg: rgba(255, 255, 255, 0.1  --system-icon-bg-hover: rgba(255, 215, 0, 0.2);
+  --system-icon-border: 1px solid rgba(255, 215, 0, 0.3);
+  --system-icon-border-hover: 1px solid rgba(255,215, , 06);
+  
+  /* Desktop enhancements (OPTIONAL v2.7+) */
+  --system-taskbar-glow: 0 0 15px rgba(255, 215, 0, 0.2);
+  --system-window-glow: 0 0 20px rgba(25, 215, 0, 0.1);
+  --system-icon-glow: 0 0 10px rgba(255, 25, 0, 0.4);
+}
+
+/* Background image support */
+html, html body, body {
+  background-color: #0a0a0a !important;
+  background-image: url('background.png') !important;
+  background-repeat: no-repeat !important;
+  background-position: center center !important;
+  background-attachment: fixed !important;
+  background-size: cover !important;
+  min-height: 100dvh !important;
+  min-width: 100vw !important;
+}
+
+/* Canvas display */
+#themeCanvas {
+  display: block !important;
+}
+
+/* Optional desktop class enhancements */
+.system-desktop-taskbar {
+  box-shadow: var(--systembar-glow);
+  backdrop-filter: blur(15px);
+  border-top: 1px solid rgba255, 215, 0, 0.2);
+}
+
+.system-desktop-window {
+  box-shadow: var(--system-window-glow), var(--system-shadow);
+  border:1px solid rgba(255, 215, 0, 0.1);
+}
+
+.system-desktop-icon {
+  backdrop-filter:(10px);
+  border-radius: 12px;
+}
+
+.system-desktop-icon:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--system-icon-glow);
+  background: var(--system-icon-bg-hover);
+  border: var(--system-icon-border-hover);
+}
+
+/* System component enhancements */
+.system-card {
+  background: var(--system-window-bg);
+  border: 1px solid var(--system-border);
+  box-shadow: var(--system-shadow);
+}
+
+.system-btn {
+  background: var(--system-accent);
+  color: var(--system-text-on-accent);
+  border: 1px solid var(--system-accent);
+}
+
+.system-btn:hover {
+  background: var(--system-accent-dim);
+  box-shadow: 0 0 10px rgba(255, 215, 0, 0.3);
+}
+
+.system-btn:active {
+  transform: scale(0.98);
+}
+
+.system-btn-secondary {
+  background: transparent;
+  border: 1px solid var(--system-accent);
+  color: var(--system-accent);
+}
+
+.system-btn-secondary:hover {
+  background: rgba(255, 215, 0, 0.1);
+}
+
+.system-input {
+  background: rgba(255, 255, 255, .05);
+  border: 1px solid var(--system-border);
+  color: var(--system-text);
+}
+
+.system-input:focus {
+  border-color: var(--system-accent);
+ box-shadow: 0 0 px rgba(255, 215, 0, 0.3);
+}
+
+.system-select {
+  background: rgba(255, 255, 255, 0.05  border: 1px solid varsystem-border);
+  color: var(--system-text);
+}
+
+.system-checkbox[type="checkbox"] {
+  accent-color: var(--system-accent);
+}
+
+.system-switch input[type="checkbox"]:checked + .system-switch-slider {
+  background: var(--system-accent);
+}
+
+.system-alert {
+  border-left: 3px solid var(---accent);
+}
+
+.system-alert-success {
+  border-left-color: var(--system-success);
+}
+
+.system-alert-warning {
+  border-left-color: var(--system-warning);
+}
+
+.system-alert-danger {
+  border-left-color: var(--system-danger);
+}
+
+.system-alert-info {
+  border-left: var(--system);
+}
+
+.system {
+  background: rgba(255, 215, 0, 0.1);
+  border: 1px solid rgba(255, 215, 0, 0.3);
+  color var(--system-accent);
+}
+
+.system-badge-success {
+  background: rgba(144, 238, 144, 0.1);
+  border-color: rgba(144, 238, 144, 0.3);
+  color var(--system-success);
+.system-badge-warning {
+ :(255, 165, 0, 0.1);
+  border-color: rgba(255 165, 0, 0.3);
+  color: var(--system-warning);
+}
+
+.system-badge-danger {
+  background: rgba(255, 107, 107, 0.1);
+  border-color: rgba(255, 107, 10, 0.3);
+  color var(--system-danger);
+}
+
+/* Typography */
+.system-text {
+  color: var(--system-text);
+}
+
+.system-title {
+  color: var(--system-highlight);
+}
+
+.system-subtitle {
+  color: var(--system-highlight);
+}
+
+.system-heading {
+  color: var(--system-highlight);
+}
+
+.system-label {
+  color: var(--system-text);
+}
+
+.system-text-dim {
+  color: var(--system-text-dim);
+}
+
+/* Utility classes */
+.system-border {
+  border: 1px solid var(--system-border);
+.system-shadow {
+  box-shadow: var(--system-shadow);
+}
+
+.system-rounded {
+  border-radius: var(--system-radius);
+}
+
+.system-rounded-lg {
+  border-radius: var(--system-radius-lg);
+}
+
+/* Navigation */
+.system-nav-item {
+  color: var(--system-text}
+
+.system-nav-item:hover {
+  background: rgba(255, 215, 0, 0.1);
+}
+
+.system-nav-item-active {
+  background: rgba(25, 215 0, 0.2);
+ color: var(--system-accent);
+}
+
+/* Tabs */
+.system-tab {
+  color: var(--system-text-dim);
+}
+
+.system-tab:hover {
+  color: var(--system-text);
+}
+
+.system-tab-active {
+  color: var(--system-accent);
+  border-bottom: 2px solid var(--system-accent);
+}
+
+/* Table */
+.system-table th {
+  background: rgba(255,215, 0, 0.1);
+  color: var(--system-accent);
+}
+
+.system-table tr:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* List */
+.system-list-item {
+  border-bottom: 1px solid var(--system-border);
+}
+
+.system-list-item:last-child {
+  border-bottom: none;
+}
+
+/* Avatar */
+.system-avatar {
+  background: var(--system-accent);
+  color: var(--system-text-on-accent);
+}
+
+/* Progress */
+.system {
+  background: rgba(55, 255, 255, 0.);
+}
+
+.system-progress-bar {
+  background: var(--system-ac);
+}
+
+ Skeleton */
+.system-skeleton {
+ background: linear-gradient(90deg, 
+    rgba(255, 255, 255, 0.1) 25%, 
+ rgba(255, 215, 0, 0.1) 50%, 
+    rgba(25, 255, 255, 0.1) 75%);
+  background-size: % 100%;
+}
+
+/* Empty state */
+.system-empty {
+  color: var(--system-text-dim);
+}
+
+/* Accessibility */
+@media (prefers-reduced-motion: reduce) {
+  .system-btn,
+  .system,
+  .system-app *,
+  .system-desktop-icon,
+  .system-desktop-window {
+    transition none !;
+    animation: none;
+    transform none !important  }
+}
+
+@supports not (backdrop-filter: blur(1px)) {
+ system-card,
+  .system-app .card  .system-desktop-taskbar,
+  .system-desktop-start-menu {
+    background: rgba(30, 30,46,0.5) !important;
+    backdrop-filter: none !important;
+  }
+}

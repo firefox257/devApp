@@ -1,0 +1,1529 @@
+================================================================================
+MATERIAL ICONS OS - THEME DEVELOPMENT GUIDE v2.7+
+Complete Theme Development Guide (Verified with Desktop.html)
+ARCHITECTURE UPDATE: OS Shell Separation + Icon Variables + Bug Fixes
+================================================================================
+
+TABLE OF CONTENTS
+--------------------------------------------------------------------------------
+1.  Overview
+2.  Critical Rules (Read First!)
+3.  File Structure
+4.  Theme Configuration (themes.json)
+5.  CSS: Complete Override System
+6.  CSS Variables & Design Tokens
+7.  System Component Classes (.system-*)
+8.  System Class Override Groups
+9.  System App Container (.system-app)
+10. JavaScript & Canvas Animations
+11. Cleanup System
+12. Theme System API (ThemeManager)
+13. Best Practices
+14. Common Pitfalls
+15. Pre-Deployment Testing Checklist
+16. Examples
+17. Troubleshooting
+18. Quick Start Template
+19. Appendix: Desktop.html Integration Notes
+20. Appendix: Updated System Classes (v2.7+)
+21. Appendix: Architecture Changes (v2.7+)
+
+================================================================================
+1. OVERVIEW
+================================================================================
+
+The Material Icons OS uses a client-side theme system that loads themes 
+dynamically via the ThemeManager JavaScript object. Each theme consists of:
+
+- CSS file: CSS variable overrides + .system-* classes + background + canvas
+- JavaScript file (optional): Canvas animations with mandatory cleanup function
+- Assets: Images, fonts, and other resources (optional)
+
+ARCHITECTURE CHANGE (v2.6+):
+- OS Shell (.icon, .window, .taskbar, .start-menu) = desktop.html system CSS
+- Theme CSS = CSS Variables + .system-* classes + Canvas + Background only
+- Themes NO LONGER style OS shell elements directly
+
+ARCHITECTURE CHANGE (v2.7+):
+- Icon styling now uses CSS variables (--system-icon-bg, --system-icon-border)
+- ThemeManager bugs fixed (canvas reference, CSS loading, background apply)
+- Background image handling improved for initial load
+
+KEY FEATURES:
+- Dynamic Loading: Themes apply without page reload
+- Canvas Support: Animated backgrounds with automatic cleanup
+- CSS Variables: Easy color theming with custom properties
+- Complete Override: Theme CSS variables override all base styles
+- Theme Persistence: Selected theme saved to localStorage
+- URL Parameters: Apply themes via ?theme=theme-id
+- Resource Cleanup: Automatic cleanup of animations, timers, listeners
+- Component Library: 90+ .system-* classes for consistent UI theming
+- App Container: .system-app for zero-config HTML element styling
+- Iframe Sync: Apps in iframes automatically sync with OS theme changes
+- Separation of Concerns: OS shell styled in desktop.html, themes override variables
+- Icon Theming: Desktop icons fully themeable via CSS variables
+
+================================================================================
+2. CRITICAL RULES (READ FIRST!)
+================================================================================
+
+*** THESE RULES ARE NON-NEGOTIABLE ***
+
+1. Theme CSS uses CSS variables to override base styles (NO direct shell styling)
+2. Scripts MUST set window.ThemeCleanup = function cleanup() {...} at global scope
+3. Canvas MUST stay transparent - use clearRect(), never fillRect() with solid color
+4. Event listeners MUST be removed in cleanup using stored references
+5. Animation frames MUST be cancelled with cancelAnimationFrame()
+6. Use .system-* classes or .system-app container for UI components in apps
+7. Iframe apps MUST include os-theme-bridge.js for theme sync
+8. DO NOT style OS shell elements (.icon, .window, .taskbar, etc.) in theme CSS
+9. Theme CSS should ONLY override :root variables and .system-* classes
+
+*** NEW CRITICAL RULES (v2.7+) ***
+
+10. Theme CSS MUST include icon background/border variables
+    - --system-icon-bg, --system-icon-border, --system-icon-bg-hover, --system-icon-border-hover
+    - Icons will have no background/border without these overrides
+
+11. Theme CSS body background MUST use full shorthand with !important
+    - Use: background: url('bg.png') no-repeat center center fixed !important;
+    - NOT: background-color: url('bg.png'); (won't work)
+    - Include: min-height: 100dvh !important; min-width: 100vw !important;
+
+12. Theme script canvas references MUST be properly scoped
+    - Use local `const canvas` variable in script.js
+    - In desktop.html ThemeManager.cleanup(), use `this.canvas` not `canvas`
+    - Never reference undefined `canvas` in cleanup functions
+
+PRO TIP: Test cleanup early
+Apply your theme, then immediately switch to another theme. If animations 
+continue or styles persist, your cleanup is broken. Fix it before adding features.
+
+ARCHITECTURE REMINDER:
+┌─────────────────────────────────────────────────────────────────┐
+│                    desktop.html (OS Shell)                      │
+│  - .icon, .window, .taskbar, .start-menu, .mat-icon            │
+│  - .browser-*, .control-btn, .resize-handle, .content-padding  │
+│  - All OS-level UI elements                                    │
+│  - Uses CSS variables (--system-*) for theming                 │
+└─────────────────────────────────────────────────────────────────┘
+                              ↓
+                    CSS Variables (--system-*)
+                              ↓
+┌─────────────────────────────────────────────────────────────────┐
+│                  themes/*/styles.css (Theme)                    │
+│  - :root { --system-bg: #color; ... }                          │
+│  - .system-* classes for iframe apps                           │
+│  - Background image                                            │
+│  - #themeCanvas display settings                               │
+│  - Icon variables (--system-icon-*)                            │
+└─────────────────────────────────────────────────────────────────┘
+
+================================================================================
+3. FILE STRUCTURE
+================================================================================
+
+RECOMMENDED ORGANIZATION:
+
+/webos/
+  |-- desktop.html          [Main OS file with ThemeManager + OS Shell CSS]
+  |-- themes.json           [Theme registry - REQUIRED]
+  |-- theme-doc.txt         [This documentation file]
+  |-- os-theme-bridge.js    [SDK for iframe apps - REQUIRED for apps]
+  +-- themes/
+      +-- your-theme/
+          |-- styles.css          [CSS variables + .system-* classes only]
+          |-- script.js           [with window.ThemeCleanup]
+          |-- preview.jpg         [optional thumbnail for Settings UI]
+          |-- background.png      [optional background image]
+          +-- assets/
+              +-- fonts/
+
+REQUIRED FILES:
+
+File                              | Required | Purpose                     | Key Requirement
+----------------------------------|----------|-----------------------------|------------------------
+themes.json                       | Yes      | Theme registry/metadata     | Valid JSON, correct paths
+themes/your-theme/styles.css      | Yes      | Visual styling              | CSS variables + .system-* only
+themes/your-theme/script.js       | Optional | Canvas animations           | Must set window.ThemeCleanup
+themes/your-theme/preview.jpg     | Optional | Theme thumbnail in Settings | Recommended: 300x200px
+os-theme-bridge.js                | Yes*     | Iframe app theme sync       | *Required if using iframe apps
+desktop.html                      | Yes      | OS Shell + System CSS       | Contains all shell styling
+
+NOTE: File names can be customized but must match the paths specified in 
+      themes.json exactly. Paths are relative to desktop.html.
+
+THEME CSS SHOULD NOT CONTAIN:
+✗ .icon { ... }
+✗ .window { ... }
+✗ .taskbar { ... }
+✗ .start-menu { ... }
+✗ .mat-icon { ... }
+✗ .browser-* { ... }
+✗ .control-btn { ... }
+✗ .resize-handle { ... }
+
+THEME CSS SHOULD CONTAIN:
+✓ :root { --system-*: ... }
+✓ :root { --system-icon-bg: ... }
+✓ :root { --system-icon-border: ... }
+✓ .system-btn { ... }
+✓ .system-card { ... }
+✓ .system-app { ... }
+✓ body { background: ... }
+✓ #themeCanvas { display: ... }
+
+================================================================================
+4. THEME CONFIGURATION (themes.json)
+================================================================================
+
+themes.json STRUCTURE:
+
+{
+  "your-theme-id": {
+    "name": "Display Name",
+    "description": "Brief description",
+    "css": "themes/your-theme/styles.css",
+    "script": "themes/your-theme/script.js",
+    "canvas": true,
+    "preview": "themes/your-theme/preview.jpg",
+    "author": "Your Name",
+    "version": "1.0.0",
+    "settings": {
+      "particles": false,
+      "particleCount": 20
+    }
+  }
+}
+
+CONFIGURATION PROPERTIES:
+
+Property     | Type    | Required | Description
+-------------|---------|----------|------------------------------------------
+name         | String  | Yes      | Human-readable theme name (shown in Settings)
+description  | String  | Optional | Optional description for theme selector
+css          | String  | Yes      | Path to CSS file (relative to desktop.html)
+script       | String  | Optional | Path to JS file that sets window.ThemeCleanup
+canvas       | Boolean | Yes      | true to show canvas, false to hide it
+preview      | String  | Optional | Optional thumbnail image for theme selector
+author       | String  | Optional | Theme author name
+version      | String  | Optional | Theme version (semver recommended)
+settings     | Object  | Optional | Optional config passed to theme scripts
+
+PRO TIP: Access settings in your script
+
+// In script.js - access via window.ThemeConfig
+const themeId = 'your-theme-id';  // Match your themes.json key
+const config = window.ThemeConfig?.[themeId]?.settings || {};
+const particleCount = config.particleCount ?? 20;
+
+NOTE: ThemeManager.themeConfig contains the full themes.json data after loading.
+      Theme scripts can access it via window.ThemeConfig (set by ThemeManager).
+
+================================================================================
+5. CSS: COMPLETE OVERRIDE SYSTEM
+================================================================================
+
+*** CSS VARIABLES OVERRIDE BASE STYLES ***
+
+Theme CSS overrides base styles through CSS custom properties. OS shell elements
+in desktop.html reference these variables, so themes only need to override :root.
+
+CORRECT - Variable Overrides:
+
+:root {
+  --system-bg: linear-gradient(135deg, #1a1a2e, #0f3460);
+  --system-window-bg: rgba(30, 30, 46, 0.6);
+  --system-accent: #7ec8e3;
+  --system-icon-bg: rgba(30, 30, 46, 0.8);
+  --system-icon-border: 1px solid rgba(126, 200, 80, 0.3);
+}
+
+INCORRECT - Direct Shell Styling (DO NOT DO THIS):
+
+.icon { ... }           /* Styled in desktop.html */
+.window { ... }         /* Styled in desktop.html */
+.taskbar { ... }        /* Styled in desktop.html */
+.start-menu { ... }     /* Styled in desktop.html */
+
+BACKGROUND IMAGE SUPPORT:
+
+/* Use relative path from CSS file location */
+html, html body, body {
+  background-color: #fallback-color !important;
+  background-image: url('background.png') !important;
+  background-repeat: no-repeat !important;
+  background-position: center center !important;
+  background-attachment: fixed !important;
+  background-size: cover !important;
+  min-height: 100dvh !important;
+  min-width: 100vw !important;
+}
+
+/* Or use absolute path from web root */
+html, html body, body {
+  background: #fallback-color url('/themes/your-theme/background.png') no-repeat center center fixed !important;
+  background-size: cover !important;
+}
+
+ACCESSIBILITY: REDUCED MOTION
+
+@media (prefers-reduced-motion: reduce) {
+  body {
+    animation: none !important;
+  }
+  .system-btn,
+  .system-card,
+  .system-app * {
+    transition: none !important;
+    animation: none !important;
+    transform: none !important;
+  }
+}
+
+FALLBACK FOR NO BACKDROP-FILTER SUPPORT:
+
+@supports not (backdrop-filter: blur(10px)) {
+  .system-card,
+  .system-app .card {
+    background: rgba(30, 30, 46, 0.95) !important;
+    backdrop-filter: none !important;
+  }
+}
+
+================================================================================
+6. CSS VARIABLES & DESIGN TOKENS
+================================================================================
+
+CORE SYSTEM VARIABLES (Define in :root, override in theme):
+
+Variable                    | Default Value          | Purpose                  | Example Override
+----------------------------|------------------------|--------------------------|------------------------
+--system-bg                 | #004e92                | Body, cards background   | #000 (Matrix)
+--system-window-bg          | #ffffff                | Window content area      | rgba(10,10,10,0.9)
+--system-header-bg          | #e8e8e8                | Title bar, headers       | rgba(26,26,26,0.95)
+--system-accent             | #0078d4                | Primary buttons, links   | #00ff41 (Matrix)
+--system-accent-dim         | #005a9e                | Dimmed accent variant    | #008f11
+--system-highlight          | #4da3ff                | Highlight/accent light   | #00ff66
+--system-text               | #333333                | Primary text color       | #00ff41
+--system-text-dim           | #666666                | Secondary/dimmed text    | #008f11
+--system-text-on-accent     | #ffffff                | Text on accent bg        | #000 (for bright accents)
+--system-border             | #cccccc                | Borders, dividers        | #003300
+--system-border-hover       | #999999                | Hover state borders      | #006600
+--system-menu-bg            | rgba(30,30,30,0.95)    | Dropdown menus, popovers | rgba(10,10,10,0.98)
+--system-radius             | 8px                    | Rounded corners          | 4px (sharp themes)
+--system-radius-lg          | 16px                   | Large rounded elements   | 0px (no rounding)
+--system-shadow             | 0 4px 12px rgba(...)   | Card/window shadows      | 0 0 20px rgba(0,255,65,0.3)
+--system-font               | -apple-system, ...     | Base font stack          | 'Courier New', monospace
+--system-font-mono          | monospace fallback     | Code, terminal text      | 'Fira Code', monospace
+--system-taskbar-height     | 50px                   | Taskbar height           | 60px (taller taskbar)
+--system-safe-bottom        | env(safe-area...)      | Mobile safe area         | 20px (custom)
+--system-success            | #4caf50                | Success state color      | #00ff41
+--system-warning            | #ffc107                | Warning state color      | #ffaa00
+--system-danger             | #f44336                | Error/danger color       | #ff3333
+--system-info               | #2196f3                | Info state color         | #0099ff
+--system-icon-bg            | transparent            | Desktop icon background  | rgba(13, 31, 23, 0.6)
+--system-icon-bg-hover      | rgba(255,255,255,0.15) | Icon hover background    | rgba(126, 200, 80, 0.2)
+--system-icon-border        | none                   | Icon border              | 1px solid rgba(126, 200, 80, 0.3)
+--system-icon-border-hover  | 1px solid rgba(...)    | Icon hover border        | 1px solid rgba(126, 200, 80, 0.6)
+
+THEME OVERRIDE EXAMPLE (themes/matrix/styles.css):
+
+:root {
+  --system-bg: #000;
+  --system-window-bg: #0a0a0a;
+  --system-header-bg: #1a1a1a;
+  --system-accent: #00ff41;
+  --system-accent-dim: #008f11;
+  --system-highlight: #00ff66;
+  --system-text: #00ff41;
+  --system-text-dim: #008f11;
+  --system-text-on-accent: #000;
+  --system-border: #003300;
+  --system-border-hover: #006600;
+  --system-font: 'Courier New', Courier, monospace;
+  --system-font-mono: 'Fira Code', monospace;
+  --system-shadow: 0 0 40px rgba(0, 255, 65, 0.2);
+  --system-success: #00ff41;
+  --system-warning: #ffaa00;
+  --system-danger: #ff3333;
+  --system-info: #0099ff;
+  
+  /* Icon styling */
+  --system-icon-bg: rgba(0, 20, 0, 0.6);
+  --system-icon-bg-hover: rgba(0, 255, 65, 0.2);
+  --system-icon-border: 1px solid rgba(0, 255, 65, 0.3);
+  --system-icon-border-hover: 1px solid rgba(0, 255, 65, 0.6);
+}
+
+/* Background image support */
+html, html body, body {
+  background-color: #000 !important;
+  background-image: url('background.png') !important;
+  background-repeat: no-repeat !important;
+  background-position: center center !important;
+  background-attachment: fixed !important;
+  background-size: cover !important;
+  min-height: 100dvh !important;
+  min-width: 100vw !important;
+}
+
+/* Canvas display for rain/particle effects */
+#themeCanvas {
+  display: block !important;
+}
+
+ACCESSING VARIABLES IN JAVASCRIPT:
+
+// Get computed value
+const accentColor = getComputedStyle(document.documentElement)
+  .getPropertyValue('--system-accent').trim();
+
+// Set custom variable dynamically
+document.documentElement.style.setProperty('--custom-glow', '0 0 20px #00ff41');
+
+================================================================================
+7. SYSTEM COMPONENT CLASSES (.system-*)
+================================================================================
+
+*** USE THESE CLASSES FOR CONSISTENT, THEMEABLE UI IN APPS ***
+
+The .system-* class library provides pre-styled components that automatically
+adapt to the active theme via CSS variables. Always prefer these over custom
+classes for app-level UI consistency.
+
+[... Full .system-* class documentation remains the same as v2.6+ ...]
+
+================================================================================
+8. SYSTEM CLASS OVERRIDE GROUPS
+================================================================================
+
+*** SEMANTIC GROUPS FOR BULK STYLING ***
+
+[... This section remains unchanged from v2.6+ ...]
+
+================================================================================
+9. SYSTEM APP CONTAINER (.system-app)
+================================================================================
+
+*** ZERO-CONFIG AUTO-STYLING FOR IFRAME APPS ***
+
+[... This section remains unchanged from v2.6+ ...]
+
+================================================================================
+10. JAVASCRIPT & CANVAS ANIMATIONS
+================================================================================
+
+*** SCRIPT REQUIREMENTS (NON-NEGOTIABLE) ***
+
+1. Wrap entire script in IIFE: (function() { ... })();
+2. Set window.ThemeCleanup = function cleanup() {...} at global scope
+3. Keep canvas transparent: use clearRect(), never fill with solid color
+4. Store event handler references for proper removal in cleanup
+5. Cancel all requestAnimationFrame, setInterval, setTimeout
+6. Use proper canvas variable scoping (local const or this.canvas)
+
+⚠️ CRITICAL BUG FIX (v2.7+):
+In desktop.html ThemeManager.cleanup(), ensure canvas references use 
+`this.canvas` NOT `canvas` to avoid ReferenceError:
+
+WRONG (causes crash):
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+CORRECT:
+  ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+COMPLETE TEMPLATE WITH BEST PRACTICES:
+
+(function() {
+  'use strict';
+  
+  // 1. Get canvas with defensive checks
+  const canvas = document.getElementById('themeCanvas');
+  if (!canvas) {
+    console.warn('Canvas not found - theme running in no-canvas mode');
+    window.ThemeCleanup = function cleanup() {};
+    return;
+  }
+
+  const ctx = canvas.getContext('2d');
+  if (!ctx) {
+    console.error('Could not get canvas context');
+    window.ThemeCleanup = function() {};
+    return;
+  }
+
+  // 2. Track ALL resources for cleanup
+  const themeResources = {
+    animationFrame: null,
+    resizeHandlers: [],
+    intervals: [],
+    timeouts: []
+  };
+
+  // 3. Enforce canvas layering (defensive)
+  canvas.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none;display:block;background:transparent;';
+
+  // 4. HiDPI-aware resize handling
+  function resizeCanvas() {
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = window.innerWidth * dpr;
+    canvas.height = window.innerHeight * dpr;
+    canvas.style.width = window.innerWidth + 'px';
+    canvas.style.height = window.innerHeight + 'px';
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.scale(dpr, dpr);
+  }
+  resizeCanvas();
+  
+  const resizeHandler = resizeCanvas;
+  window.addEventListener('resize', resizeHandler);
+  themeResources.resizeHandlers.push(resizeHandler);
+
+  // 5. Respect reduced motion preference
+  const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (prefersReducedMotion) {
+    console.log('Reduced motion preferred - skipping animation');
+    window.ThemeCleanup = function() {};
+    return;
+  }
+
+  // 6. Optional: Access theme settings from themes.json
+  const themeId = 'your-theme-id';  // Match your themes.json key
+  const config = window.ThemeConfig?.[themeId]?.settings || {};
+  const particleCount = config.particleCount ?? 20;
+
+  // 7. Your animation code
+  function animate() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // Draw your animation here
+    
+    themeResources.animationFrame = requestAnimationFrame(animate);
+    
+    // Track with ThemeManager for auto-cleanup
+    if (typeof ThemeManager !== 'undefined' && ThemeManager.trackAnimation) {
+      ThemeManager.trackAnimation(themeResources.animationFrame);
+    }
+  }
+  
+  animate();
+
+  // 8. REQUIRED: Set global cleanup function
+  window.ThemeCleanup = function cleanup() {
+    console.log('Theme cleanup started');
+    
+    if (themeResources.animationFrame) {
+      cancelAnimationFrame(themeResources.animationFrame);
+      themeResources.animationFrame = null;
+    }
+    
+    themeResources.resizeHandlers.forEach(handler => {
+      try { window.removeEventListener('resize', handler); } catch(e) {}
+    });
+    themeResources.resizeHandlers = [];
+    
+    themeResources.intervals.forEach(id => { try { clearInterval(id); } catch(e) {} });
+    themeResources.intervals = [];
+    themeResources.timeouts.forEach(id => { try { clearTimeout(id); } catch(e) {} });
+    themeResources.timeouts = [];
+    
+    try {
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    } catch (e) { console.warn('Canvas clear error:', e); }
+    
+    console.log('Theme cleanup complete');
+  };
+  
+  // Optional: Register additional cleanup via ThemeManager
+  if (typeof ThemeManager !== 'undefined' && ThemeManager.registerCleanup) {
+    ThemeManager.registerCleanup(() => {
+      console.log('Registry cleanup executed');
+    });
+  }
+  
+  console.log('Theme script loaded successfully');
+})();
+
+================================================================================
+11. CLEANUP SYSTEM
+================================================================================
+
+The ThemeManager provides a robust cleanup system to prevent memory leaks 
+and visual artifacts when switching themes.
+
+HOW CLEANUP WORKS:
+1. User switches theme -> ThemeManager.cleanup() is called
+2. ThemeManager cancels all tracked animation frames, intervals, timeouts
+3. ThemeManager executes window.ThemeCleanup function (if set by theme script)
+4. ThemeManager clears canvas and removes script element
+5. New theme loads -> Clean slate, no artifacts from previous theme
+
+⚠️ CRITICAL BUG FIX (v2.7+):
+In desktop.html ThemeManager.cleanup() method (~line 370), the canvas 
+reference MUST use `this.canvas` not `canvas`:
+
+WRONG (causes ReferenceError):
+  const ctx = this.canvas.getContext('2d');
+  if (ctx) { 
+    ctx.clearRect(0, 0, this.canvas.width, canvas.height);  // ❌ canvas undefined
+  }
+
+CORRECT:
+  const ctx = this.canvas.getContext('2d');
+  if (ctx) { 
+    ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);  // ✅
+  }
+
+THEMEMANAGER CLEANUP HELPERS:
+
+Method                          | Purpose                         | Example
+--------------------------------|---------------------------------|----------------------------------
+ThemeManager.trackAnimation(id) | Track requestAnimationFrame     | ThemeManager.trackAnimation(rafId)
+ThemeManager.trackInterval(id)  | Track setInterval for auto-clear| ThemeManager.trackInterval(intervalId)
+ThemeManager.trackTimeout(id)   | Track setTimeout for auto-clear | ThemeManager.trackTimeout(timeoutId)
+ThemeManager.registerCleanup(fn)| Register additional cleanup fn  | ThemeManager.registerCleanup(() => {...})
+
+*** CLEANUP CHECKLIST (MUST COMPLETE ALL) ***
+
+[ ] Set window.ThemeCleanup function at global scope (not just return it)
+[ ] Cancel all requestAnimationFrame calls
+[ ] Clear all setInterval and setTimeout timers
+[ ] Remove all addEventListener listeners using stored references
+[ ] Clear canvas with clearRect() and resetTransform()
+[ ] Remove any DOM elements created by the theme
+[ ] Free large arrays/objects to help garbage collection
+[ ] Log cleanup start/end for debugging
+[ ] Verify canvas variable is properly scoped (local const or this.canvas)
+
+================================================================================
+12. THEME SYSTEM API (THEMEMANAGER)
+================================================================================
+
+THEMEMANAGER OBJECT (Available in desktop.html):
+
+// Get current theme
+ThemeManager.currentTheme  // returns: "frosted-glass"
+
+// Get theme configuration (full themes.json data)
+ThemeManager.themeConfig   // returns: { "default": {...}, "matrix": {...}, ... }
+
+// Apply a theme (returns Promise)
+await ThemeManager.apply('frosted-glass');
+
+// Get available themes
+ThemeManager.getAvailableThemes();  // returns: [{id, name, description, canvas}, ...]
+
+// Populate a select element (for Settings UI)
+await ThemeManager.populateThemeSelector('themeSelector');
+
+// Refresh themes.json (for development)
+await ThemeManager.refreshThemeConfig();
+
+// Cleanup helpers for theme scripts
+ThemeManager.trackAnimation(rafId);
+ThemeManager.trackInterval(intervalId);
+ThemeManager.trackTimeout(timeoutId);
+ThemeManager.registerCleanup(cleanupFn);
+
+EVENTS:
+
+// Listen for theme changes
+window.addEventListener('themeChanged', (e) => {
+  console.log('New theme:', e.detail.theme);
+  console.log('Theme config:', e.detail.config);
+  // Update your UI here
+});
+
+URL PARAMETERS:
+
+// Apply theme via URL
+desktop.html?theme=frosted-glass
+
+// Force reload theme config
+desktop.html?theme=frosted-glass&reload=1
+
+THEME PERSISTENCE:
+
+// Theme preference is automatically saved to localStorage
+// Key: 'os-preferred-theme'
+// Loaded on init with priority: URL param > saved preference > default
+
+⚠️ BUG FIX (v2.7+): loadCSS() Implementation
+
+The loadCSS() method now creates a NEW <link> element instead of reusing 
+the existing one. This ensures reliable onload firing across browsers.
+
+- Old link element is removed before new one is created
+- Cache-busting parameter added: ?t=Date.now()
+- ThemeManager.themeLinkEl reference is updated to new element
+
+This fixes issues where CSS wouldn't apply on initial page load.
+
+================================================================================
+13. BEST PRACTICES
+================================================================================
+
+1. USE CSS VARIABLES FOR MAINTAINABILITY
+
+/* GOOD: Uses variables */
+.system-card {
+  background: var(--system-window-bg);
+  color: var(--system-text);
+}
+
+/* BAD: Hardcoded colors */
+.system-card {
+  background: #ffffff; /* Won't adapt to theme */
+}
+
+2. LEVERAGE .system-* CLASSES FOR CONSISTENCY
+
+/* GOOD: Uses system classes */
+<button class="system-btn">Save</button>
+<input class="system-input" placeholder="Type here">
+
+/* BAD: Custom classes that won't theme */
+<button class="my-custom-btn">Save</button>
+<!-- Requires manual theme overrides -->
+
+3. USE .system-app FOR RAPID APP DEVELOPMENT
+
+/* GOOD: Zero-config styling */
+<div class="system-app">
+  <h1>Title</h1>
+  <button>Click</button>
+</div>
+
+4. DO NOT STYLE OS SHELL ELEMENTS IN THEME CSS
+
+/* BAD: OS shell styling in theme (DO NOT DO) */
+.icon { background: red; }
+.window { border-color: blue; }
+.taskbar { height: 60px; }
+
+/* GOOD: Variable overrides only */
+:root {
+  --system-bg: #color;
+  --system-accent: #color;
+  --system-icon-bg: rgba(0,0,0,0.5);
+  --system-icon-border: 1px solid rgba(255,255,255,0.2);
+}
+
+5. MAINTAIN CANVAS TRANSPARENCY
+
+// GOOD: Clear canvas (preserves background)
+ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+// BAD: Fill with color (blocks CSS background)
+ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+6. HANDLE HIDPI DISPLAYS
+
+function resizeCanvas() {
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = window.innerWidth * dpr;
+  canvas.height = window.innerHeight * dpr;
+  canvas.style.width = window.innerWidth + 'px';
+  canvas.style.height = window.innerHeight + 'px';
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.scale(dpr, dpr);
+}
+
+7. DEBOUNCE RESIZE HANDLERS
+
+let resizeTimeout;
+function onResize() {
+  clearTimeout(resizeTimeout);
+  resizeTimeout = setTimeout(() => {
+    resizeCanvas();
+  }, 150);
+}
+window.addEventListener('resize', onResize);
+// In cleanup: clearTimeout(resizeTimeout);
+
+8. OPTIMIZE ANIMATION PERFORMANCE
+
+// Limit particle count
+const MAX_PARTICLES = 100;
+
+// Use object pooling for reusable particles
+const particlePool = [];
+function getParticle() {
+  return particlePool.pop() || new Particle();
+}
+
+// Pause animation when tab hidden
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && animationFrame) {
+    cancelAnimationFrame(animationFrame);
+  } else {
+    animate();
+  }
+});
+
+9. USE VENDOR PREFIXES FOR BACKDROP-FILTER
+
+.system-card {
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);  /* Safari support */
+}
+
+10. INCLUDE ALL ICON VARIABLES IN THEME
+
+/* Required for proper icon styling */
+:root {
+  --system-icon-bg: rgba(0, 0, 0, 0.3);
+  --system-icon-bg-hover: rgba(255, 255, 255, 0.15);
+  --system-icon-border: 1px solid rgba(255, 255, 255, 0.2);
+  --system-icon-border-hover: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+================================================================================
+14. COMMON PITFALLS
+================================================================================
+
+*** THEME CSS STYLING OS SHELL ELEMENTS ***
+
+Problem: Theme CSS contains .icon, .window, .taskbar styles
+
+Solution:
+- Remove all OS shell selectors from theme CSS
+- Use CSS variable overrides in :root instead
+- OS shell is styled in desktop.html #system-variables
+- This ensures consistent OS experience across all themes
+
+*** ICONS MISSING BACKGROUND/BORDER ***
+
+Problem: Desktop icons have no background or border in theme
+
+Solution:
+- Theme must override --system-icon-bg and --system-icon-border in :root
+- Default values are transparent/none for clean base
+- Example:
+  :root {
+    --system-icon-bg: rgba(13, 31, 23, 0.6);
+    --system-icon-bg-hover: rgba(126, 200, 80, 0.2);
+    --system-icon-border: 1px solid rgba(126, 200, 80, 0.3);
+    --system-icon-border-hover: 1px solid rgba(126, 200, 80, 0.6);
+  }
+
+*** BACKGROUND IMAGE NOT SHOWING ***
+
+Problem: Background image doesn't appear
+
+Solution:
+- Use correct path relative to CSS file: url('background.png')
+- Or use absolute path from web root: url('/themes/your-theme/background.png')
+- Check Network tab for 404 errors
+- Clear browser cache (Ctrl+F5)
+- Use full background shorthand with !important
+- Include min-height: 100dvh !important on body
+
+*** CANVAS BLOCKING BACKGROUND ***
+
+Problem: Can't see CSS background through canvas
+
+Solution:
+- Use clearRect() not fillRect()
+- Set canvas CSS: background: transparent !important
+- Ensure canvas z-index is 0 (behind UI)
+- Check ThemeManager sets canvas display based on theme.canvas property
+
+*** MEMORY LEAKS FROM UNCLEANED RESOURCES ***
+
+Problem: Animations continue after theme switch
+
+Solution:
+- Set window.ThemeCleanup at global scope
+- Store handler references for removeEventListener
+- Cancel all animation frames/intervals/timeouts
+- Use ThemeManager.track*() helpers
+
+*** CANVAS REFERENCE ERROR IN CLEANUP ***
+
+Problem: ReferenceError: canvas is not defined when switching themes
+
+Solution:
+- In desktop.html ThemeManager.cleanup(), use `this.canvas` not `canvas`
+- Line ~370: ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+- The `canvas` variable doesn't exist in that scope
+- In theme script.js, use local `const canvas` variable
+
+*** BACKGROUND IMAGE NOT SHOWING ON INITIAL LOAD ***
+
+Problem: Background shows after Settings apply, but not on page load
+
+Solution:
+- desktop.html body uses `background-color` not `background` shorthand
+- Theme CSS must use full `background` property with `!important`
+- Ensure theme CSS loads before DOM renders (ThemeManager handles this)
+- Add `min-height: 100dvh !important` to body in theme CSS
+- Use multiple selectors: html, html body, body { ... }
+
+*** FILE PATH TYPOS ***
+
+Problem: Theme fails to load with 404 errors
+
+Solution:
+- Double-check all paths in themes.json
+- Verify filenames match exactly (case-sensitive on some servers)
+- Common typo: "default-tyles.css" should be "default-styles.css"
+
+*** .system-* CLASSES NOT THEMING ***
+
+Problem: System classes show default colors, not theme colors
+
+Solution:
+- Verify theme CSS overrides --system-* variables in :root
+- Check CSS variable names match exactly (case-sensitive)
+- Ensure theme CSS loads after base styles (ThemeManager handles this)
+- Use browser DevTools to inspect computed styles for variables
+
+================================================================================
+15. PRE-DEPLOYMENT TESTING CHECKLIST
+================================================================================
+
+*** RUN THESE TESTS BEFORE SUBMITTING YOUR THEME ***
+
+Test                      | How to Test                              | Expected Result
+--------------------------|------------------------------------------|---------------------------
+CSS Variables Only        | Check theme CSS for OS shell selectors   | No .icon, .window, .taskbar, etc.
+Icon Variables            | Check :root for --system-icon-*          | All 4 icon variables present
+Background Image          | Apply theme -> Check if image loads      | Image visible, no 404 errors
+                          | (DevTools -> Network tab)                |
+Background Initial Load   | Hard refresh (Ctrl+F5)                   | Image visible from start
+Canvas Transparency       | Apply theme with canvas -> Check bg      | CSS background visible through canvas
+Cleanup Execution         | Switch themes rapidly 10x -> Check       | No memory growth, no lingering animations
+                          | DevTools Performance                     |
+Canvas Reference Error    | Switch themes 10x -> Check console       | No ReferenceError for canvas
+HiDPI Rendering           | Test on Retina display or zoom to 200%   | Canvas animation remains sharp
+Resize Handling           | Resize browser window during animation   | Canvas resizes smoothly, no stutter
+Reduced Motion            | Enable OS "Reduce Motion" -> Apply theme | Animations disabled, theme functional
+Error Handling            | Simulate missing canvas -> Load theme    | Graceful fallback, no console errors
+Theme Selector            | Open Settings -> Check theme appears     | Theme listed correctly, preview loads
+File Paths                | Check Network tab for 404s               | All CSS/JS files load (200 OK)
+Theme Persistence         | Apply theme -> Refresh page              | Same theme re-applies automatically
+URL Parameters            | Open ?theme=your-theme                   | Theme applies on load
+.system-* Class Theming   | Use .system-btn in app -> Switch themes  | Button colors update with theme
+.system-app Container     | Wrap app in .system-app -> Switch themes | All elements update correctly
+Variable Overrides        | Inspect :root in DevTools                | --system-* values match theme CSS
+Icon Background           | Load theme -> Check desktop icons        | Icons have theme background
+Icon Border               | Load theme -> Check icon borders         | Borders visible, match theme
+Icon Hover                | Hover over icons                         | Background + border brighten
+
+================================================================================
+16. EXAMPLES
+================================================================================
+
+[... Examples section remains largely the same, with updated icon variables ...]
+
+EXAMPLE 1: FROSTED GLASS THEME (COMPLETE) - UPDATED
+
+themes.json entry:
+{
+  "frosted-glass": {
+    "name": "Frosted Glass",
+    "description": "Elegant translucent theme with backdrop blur effects",
+    "css": "themes/frosted-glass/styles.css",
+    "script": "themes/frosted-glass/script.js",
+    "canvas": true,
+    "preview": "themes/frosted-glass/preview.jpg",
+    "author": "Your Name",
+    "version": "1.0.0",
+    "settings": {
+      "particles": false,
+      "particleCount": 20
+    }
+  }
+}
+
+styles.css (CORRECT - v2.7+ Architecture):
+-------------------------------------------------------------------------------
+:root {
+  --system-bg: linear-gradient(135deg, #1a1a2e, #16213e, #0f3460);
+  --system-window-bg: rgba(30, 30, 46, 0.6);
+  --system-header-bg: rgba(255, 255, 255, 0.08);
+  --system-accent: #7ec8e3;
+  --system-text: #f8f9fa;
+  --system-text-dim: #adb5bd;
+  --system-border: rgba(255, 255, 255, 0.2);
+  --system-radius: 12px;
+  --system-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  
+  /* Icon variables */
+  --system-icon-bg: rgba(30, 30, 46, 0.8);
+  --system-icon-bg-hover: rgba(126, 200, 227, 0.2);
+  --system-icon-border: 1px solid rgba(126, 200, 227, 0.3);
+  --system-icon-border-hover: 1px solid rgba(126, 200, 227, 0.6);
+}
+
+/* Background image support */
+html, html body, body {
+  background-color: #0f3460 !important;
+  background-image: url('background.png') !important;
+  background-repeat: no-repeat !important;
+  background-position: center center !important;
+  background-attachment: fixed !important;
+  background-size: cover !important;
+  min-height: 100dvh !important;
+  min-width: 100vw !important;
+}
+
+/* Canvas display */
+#themeCanvas {
+  display: block !important;
+}
+
+/* System class enhancements ONLY (no OS shell) */
+.system-card {
+  background: var(--system-window-bg);
+  border: 1px solid var(--system-border);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.system-btn {
+  background: var(--system-accent);
+  color: var(--system-text-on-accent, #000);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .system-btn,
+  .system-card {
+    transition: none !important;
+  }
+}
+
+@supports not (backdrop-filter: blur(10px)) {
+  .system-card {
+    background: rgba(30, 30, 46, 0.95) !important;
+  }
+}
+-------------------------------------------------------------------------------
+
+[... Rest of examples remain similar with icon variable additions ...]
+
+================================================================================
+17. TROUBLESHOOTING
+================================================================================
+
+[... Existing troubleshooting content ...]
+
+*** ICONS MISSING BACKGROUND/BORDER ***
+
+Problem: Desktop icons have no background or border
+
+Solutions:
+1. Verify theme CSS includes --system-icon-bg and --system-icon-border in :root
+2. Check variable names match exactly (case-sensitive)
+3. Hard refresh browser (Ctrl+F5)
+4. Inspect .icon element in DevTools to see computed variables
+
+*** THEME CSS CONTAINS OS SHELL SELECTORS ***
+
+Problem: Theme CSS has .icon, .window, .taskbar, etc.
+
+Solutions:
+1. Remove all OS shell selectors from theme CSS
+2. Use :root variable overrides instead
+3. OS shell is styled in desktop.html #system-variables
+4. This ensures consistent experience across all themes
+
+*** BACKGROUND NOT SHOWING ***
+
+Problem: Background image/color not visible
+
+Solutions:
+1. Check image path is correct (check Network tab for 404)
+2. Ensure canvas is transparent: background: transparent !important
+3. Check if base styles override - inspect computed styles
+4. Verify themes.json "canvas" property matches theme capability
+5. Clear browser cache (Ctrl+F5)
+6. Use full background shorthand with !important
+7. Add min-height: 100dvh !important to body
+
+*** ANIMATIONS NOT STOPPING (MEMORY LEAK) ***
+
+Problem: Previous theme animation continues after switching
+
+Solutions:
+1. Verify window.ThemeCleanup is set at global scope
+2. Cancel animation frames with cancelAnimationFrame()
+3. Remove event listeners with stored references
+4. Use ThemeManager.trackAnimation() for auto-cancel
+5. Clear canvas with clearRect() and resetTransform()
+6. Check ThemeManager.cleanup() is being called (console logs)
+7. Verify canvas variable is properly scoped in cleanup
+
+*** CANVAS REFERENCE ERROR ***
+
+Problem: ReferenceError: canvas is not defined in console
+
+Solutions:
+1. In desktop.html, check ThemeManager.cleanup() method
+2. Ensure all canvas references use `this.canvas` not `canvas`
+3. In theme script.js, use local `const canvas` variable
+4. Check line ~370 in desktop.html for the bug
+
+*** THEME NOT LOADING ***
+
+Problem: Theme doesn't appear in Settings or apply
+
+Solutions:
+1. Validate themes.json syntax (use JSONLint)
+2. Verify file paths are relative to desktop.html
+3. Check browser console for CORS or 404 errors
+4. Clear browser cache or add ?reload=1 to URL
+5. Check for typos in filenames (e.g., "tyles" vs "styles")
+6. Verify theme ID in themes.json matches URL parameter
+
+*** CSS NOT APPLYING ***
+
+Problem: Theme styles not showing
+
+Solutions:
+1. Check if CSS file is loading (Network tab -> Status 200)
+2. Verify :root variables are being overridden
+3. Check for typos in CSS variable names
+4. Hard refresh browser (Ctrl+F5)
+5. Check loadCSS() creates new link element (v2.7+ fix)
+
+*** CANVAS NOT SHOWING ***
+
+Problem: Canvas animations not visible
+
+Solutions:
+1. Verify themes.json has "canvas": true
+2. Check canvas display style (should be 'block' when active)
+3. Ensure animation loop is running (console.log in animate())
+4. Verify canvas z-index is 0 (behind UI, in front of background)
+5. Check canvas isn't being cleared immediately after draw
+
+*** .system-app NOT STYLING ***
+
+Problem: Elements inside .system-app look unstyled
+
+Solutions:
+1. Verify .system-app class is on the container wrapping elements
+2. Check CSS file loads .system-app rules (Network tab)
+3. Ensure theme overrides .system-app variables correctly
+4. Check specificity: .system-app input
+
+================================================================================
+18. QUICK START TEMPLATE
+================================================================================
+
+Copy these files to create a new theme with proper cleanup:
+
+FILE: themes/your-theme/styles.css
+-------------------------------------------------------------------------------
+:root {
+  --system-bg: #your-bg-color;
+  --system-window-bg: #your-window-bg;
+  --system-header-bg: #your-header-bg;
+  --system-accent: #your-accent-color;
+  --system-accent-dim: #your-accent-dim;
+  --system-highlight: #your-highlight;
+  --system-text: #your-text-color;
+  --system-text-dim: #your-dim-text;
+  --system-text-on-accent: #your-text-on-accent;
+  --system-border: #your-border-color;
+  --system-border-hover: #your-border-hover;
+  --system-radius: 8px;
+  --system-radius-lg: 16px;
+  --system-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  --system-font: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --system-font-mono: 'Courier New', Courier, monospace;
+  --system-success: #4caf50;
+  --system-warning: #ffc107;
+  --system-danger: #f44336;
+  --system-info: #2196f3;
+  
+  /* ✅ Icon variables (REQUIRED) */
+  --system-icon-bg: rgba(0, 0, 0, 0.3);
+  --system-icon-bg-hover: rgba(255, 255, 255, 0.15);
+  --system-icon-border: 1px solid rgba(255, 255, 255, 0.2);
+  --system-icon-border-hover: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+/* Background image support */
+html, html body, body {
+  background-color: #fallback-color !important;
+  background-image: url('background.png') !important;
+  background-repeat: no-repeat !important;
+  background-position: center center !important;
+  background-attachment: fixed !important;
+  background-size: cover !important;
+  min-height: 100dvh !important;
+  min-width: 100vw !important;
+}
+
+/* Canvas display */
+#themeCanvas {
+  display: block !important;  /* or 'none' if no animation */
+}
+
+/* System component enhancements ONLY */
+.system-card {
+  background: var(--system-window-bg);
+  border: 1px solid var(--system-border);
+  box-shadow: var(--system-shadow);
+}
+
+.system-btn {
+  background: var(--system-accent);
+  color: var(--system-text-on-accent, #fff);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .system-btn,
+  .system-card,
+  .system-app * {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+@supports not (backdrop-filter: blur(10px)) {
+  .system-card,
+  .system-app .card {
+    background: var(--system-window-bg) !important;
+    backdrop-filter: none !important;
+  }
+}
+
+/* DO NOT INCLUDE: .icon, .window, .taskbar, .start-menu, etc. */
+/* These are styled in desktop.html */
+-------------------------------------------------------------------------------
+
+FILE: themes/your-theme/script.js
+-------------------------------------------------------------------------------
+(function() {
+  'use strict';
+  
+  const canvas = document.getElementById('themeCanvas');
+  if (!canvas) { window.ThemeCleanup = function() {}; return; }
+  
+  const ctx = canvas.getContext('2d');
+  let animationFrame = null;
+  let resizeHandler = null;
+  
+  // HiDPI resize
+  function resizeCanvas() {
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = window.innerWidth * dpr;
+    canvas.height = window.innerHeight * dpr;
+    canvas.style.width = window.innerWidth + 'px';
+    canvas.style.height = window.innerHeight + 'px';
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.scale(dpr, dpr);
+  }
+  resizeCanvas();
+  resizeHandler = resizeCanvas;
+  window.addEventListener('resize', resizeHandler);
+  
+  // Enforce canvas layering
+  canvas.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none;background:transparent;';
+  
+  // Respect reduced motion
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    window.ThemeCleanup = function() {};
+    return;
+  }
+  
+  // Animation loop
+  function animate() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // Draw your animation here
+    animationFrame = requestAnimationFrame(animate);
+    if (ThemeManager?.trackAnimation) ThemeManager.trackAnimation(animationFrame);
+  }
+  animate();
+  
+  // REQUIRED cleanup
+  window.ThemeCleanup = function cleanup() {
+    if (animationFrame) cancelAnimationFrame(animationFrame);
+    if (resizeHandler) window.removeEventListener('resize', resizeHandler);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  };
+  
+  if (ThemeManager?.registerCleanup) ThemeManager.registerCleanup(() => {});
+})();
+-------------------------------------------------------------------------------
+
+FILE: Update themes.json
+-------------------------------------------------------------------------------
+{
+  "your-theme": {
+    "name": "Your Theme Name",
+    "description": "Description of your theme",
+    "css": "themes/your-theme/styles.css",
+    "script": "themes/your-theme/script.js",
+    "canvas": false,
+    "preview": "themes/your-theme/preview.jpg",
+    "author": "Your Name",
+    "version": "1.0.0"
+  }
+}
+-------------------------------------------------------------------------------
+
+================================================================================
+19. APPENDIX: DESKTOP.HTML INTEGRATION NOTES
+================================================================================
+
+CANVAS ELEMENT (in desktop.html):
+-------------------------------------------------------------------------------
+<canvas id="themeCanvas"></canvas>
+-------------------------------------------------------------------------------
+- Hidden by default (display: none)
+- Shown when theme.canvas = true AND script loads successfully
+- z-index: 0 (behind all UI elements)
+- pointer-events: none (clicks pass through)
+- Base styles in #system-variables (position, z-index, etc.)
+
+THEME STYLESHEET INJECTION:
+-------------------------------------------------------------------------------
+<link id="theme-stylesheet" rel="stylesheet" href="">
+<style id="theme-inline"></style>
+-------------------------------------------------------------------------------
+- theme-stylesheet: External CSS file loaded dynamically
+- theme-inline: Reserved for future inline style injection
+- v2.7+: Creates NEW link element for reliable onload
+
+THEME PERSISTENCE:
+- localStorage key: 'os-preferred-theme'
+- Loaded on ThemeManager.init()
+- Priority: URL param > saved preference > default
+
+IFRAME APP INTEGRATION:
+-------------------------------------------------------------------------------
+<!-- In desktop.html window content -->
+<iframe 
+  src="/apps/notes/index.html" 
+  data-os-app="true"
+  sandbox="allow-scripts allow-same-origin allow-forms"
+  style="width:100%;height:100%;border:none;background:transparent;"
+></iframe>
+-------------------------------------------------------------------------------
+- Apps must include <script src="/os-theme-bridge.js">
+- Apps should use .system-app or .system-* classes for automatic theming
+- Theme sync via postMessage: parent → iframe
+
+OS SHELL ELEMENTS (Styled in desktop.html #system-variables):
+-------------------------------------------------------------------------------
+.mat-icon          - Material Icons styling
+.icon              - Desktop icons (uses --system-icon-* variables)
+.icon:hover        - Icon hover state (uses --system-icon-* variables)
+.start-menu        - Start menu panel
+.menu-header       - Start menu header
+.menu-avatar       - User avatar in start menu
+.menu-list         - Start menu item list
+.menu-item         - Start menu items
+.window            - Application windows
+.window-header     - Window title bar
+.window-title      - Window title text
+.window-controls   - Minimize/maximize/close buttons
+.window-content    - Window content area
+.control-btn       - Window control buttons
+.click-blocker     - iframe click interceptor
+.browser-toolbar   - Browser navigation bar
+.browser-btn       - Browser navigation buttons
+.address-bar       - Browser URL input
+.iframe-container  - Browser iframe wrapper
+.web-iframe        - Browser iframe element
+.content-padding   - Window content padding
+.resize-handle     - Window resize corner
+.taskbar           - Bottom taskbar
+.start-btn         - Start button
+.taskbar-apps      - Taskbar app list
+.taskbar-item      - Individual taskbar items
+.taskbar-scroll-btn - Taskbar scroll buttons
+.system-tray       - System tray area
+.clock             - Clock display
+#time, #date       - Time and date elements
+#themeCanvas       - Theme animation canvas (base styles in #system-variables)
+::-webkit-scrollbar - Custom scrollbars
+-------------------------------------------------------------------------------
+
+THEME CSS SHOULD NOT STYLE THESE ELEMENTS DIRECTLY.
+Use CSS variable overrides in :root instead.
+
+⚠️ IMPORTANT: desktop.html body background uses `background-color` not 
+`background` shorthand. This allows themes to override with `background-image` 
+without conflict.
+
+Theme CSS should use:
+  html, html body, body {
+    background: url('bg.png') no-repeat center center fixed !important;
+    background-size: cover !important;
+    min-height: 100dvh !important;
+  }
+
+================================================================================
+20. APPENDIX: UPDATED SYSTEM CLASSES (v2.7+)
+================================================================================
+
+[... Existing .system-* class documentation ...]
+
+=== CSS VARIABLE UPDATES (v2.7+) ===
+
+Added to :root in #system-variables for theme consistency:
+-------------------------------------------------------------------------------
+--system-icon-bg            - Desktop icon background (default: transparent)
+--system-icon-bg-hover      - Icon hover background (default: rgba(255,255,255,0.15))
+--system-icon-border        - Icon border (default: none)
+--system-icon-border-hover  - Icon hover border (default: 1px solid rgba(...))
+
+Themes should override these in their :root block for full compatibility.
+
+Example theme override:
+-------------------------------------------------------------------------------
+:root {
+  --system-icon-bg: rgba(13, 31, 23, 0.6);
+  --system-icon-bg-hover: rgba(126, 200, 80, 0.2);
+  --system-icon-border: 1px solid rgba(126, 200, 80, 0.3);
+  --system-icon-border-hover: 1px solid rgba(126, 200, 80, 0.6);
+}
+
+=== ICON STYLING ARCHITECTURE (v2.7+) ===
+
+Desktop icons now use CSS variables instead of hardcoded styles:
+
+BEFORE (v2.5 and earlier):
+-------------------------------------------------------------------------------
+.icon {
+  background: transparent;
+  border: none;
+}
+.icon:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+AFTER (v2.7+):
+-------------------------------------------------------------------------------
+.icon {
+  background: var(--system-icon-bg);
+  border: var(--system-icon-border);
+}
+.icon:hover {
+  background: var(--system-icon-bg-hover);
+  border: var(--system-icon-border-hover);
+}
+
+BENEFITS:
+✓ Themes can style icons via variables (no direct .icon styling)
+✓ Consistent icon behavior across all themes
+✓ Easier to create themed icon backgrounds (glass, solid, gradient)
+✓ Maintains v2.6+ architecture (themes only override variables)
+
+=== IFRAME APP THEME SYNC ===
+
+[... Existing iframe documentation ...]
+
+=== OS-THEME-BRIDGE.JS REFERENCE ===
+
+[... Existing bridge documentation ...]
+
+================================================================================
+21. APPENDIX: ARCHITECTURE CHANGES (v2.7+)
+================================================================================
+
+=== MAJOR ARCHITECTURE UPDATE (v2.6+) ===
+
+[... Existing v2.6+ architecture documentation ...]
+
+=== BUG FIXES (v2.7+) ===
+
+The following critical bugs were fixed in v2.7+:
+
+1. THEME MANAGER CLEANUP - CANVAS REFERENCE ERROR
+-------------------------------------------------------------------------------
+Problem: ReferenceError: canvas is not defined when switching themes
+Location: desktop.html ThemeManager.cleanup() method (~line 370)
+Fix: Changed `canvas.height` to `this.canvas.height`
+Impact: Themes now switch without crashing
+
+2. CSS LOADING - UNRELIABLE ONLOAD
+-------------------------------------------------------------------------------
+Problem: CSS onload doesn't fire reliably when reusing <link> element
+Location: desktop.html ThemeManager.loadCSS() method
+Fix: Create NEW <link> element instead of reusing existing one
+Impact: Theme CSS applies correctly on initial load
+
+3. BACKGROUND IMAGE - INITIAL LOAD FAILURE
+-------------------------------------------------------------------------------
+Problem: Background shows after Settings apply, but not on page load
+Location: desktop.html body styles + theme CSS
+Fix: 
+  - desktop.html uses background-color (not background shorthand)
+  - Theme CSS uses full background shorthand with !important
+  - Added min-height: 100dvh to theme body styles
+Impact: Background visible from initial page load
+
+4. ICON STYLING - NO THEME SUPPORT
+-------------------------------------------------------------------------------
+Problem: Desktop icons had no theme support (hardcoded styles)
+Location: desktop.html .icon class
+Fix: Added --system-icon-* CSS variables
+Impact: Icons fully themeable via CSS variables
+
+=== MIGRATION GUIDE (v2.6 to v2.7) ===
+
+If you have existing themes from v2.6:
+
+STEP 1: Add Icon Variables to :root
+-------------------------------------------------------------------------------
+ADD to your theme CSS :root block:
+  --system-icon-bg: rgba(0, 0, 0, 0.3);
+  --system-icon-bg-hover: rgba(255, 255, 255, 0.15);
+  --system-icon-border: 1px solid rgba(255, 255, 255, 0.2);
+  --system-icon-border-hover: 1px solid rgba(255, 255, 255, 0.4);
+
+STEP 2: Update Background Body Styles
+-------------------------------------------------------------------------------
+CHANGE your body background to:
+  html, html body, body {
+    background-color: #fallback !important;
+    background-image: url('background.png') !important;
+    background-repeat: no-repeat !important;
+    background-position: center center !important;
+    background-attachment: fixed !important;
+    background-size: cover !important;
+    min-height: 100dvh !important;
+    min-width: 100vw !important;
+  }
+
+STEP 3: Test Theme Switching
+-------------------------------------------------------------------------------
+- Switch themes 10x rapidly
+- Check console for ReferenceError
+- Verify no memory leaks
+- Confirm canvas clears properly
+
+=== TESTING CHECKLIST FOR V2.7 THEMES ===
+
+[ ] All --system-icon-* variables present in :root
+[ ] Background uses full shorthand with !important
+[ ] min-height: 100dvh on body
+[ ] Theme loads on initial page load (not just after Settings apply)
+[ ] Theme switching works without ReferenceError
+[ ] Canvas cleanup works (no lingering animations)
+[ ] Icons have background and border
+[ ] Icons brighten on hover
+[ ] All v2.6 checklist items pass
+
+================================================================================
+END OF DOCUMENTATION
+================================================================================
+Material Icons OS - Theme Development Guide v2.7+
+Verified against desktop.html and Rainy Forest theme example
+Includes 90+ .system-* classes, Override Groups, and .system-app Container
+Uses CSS Variable Override System (No direct OS shell styling in themes)
+OS Shell styled in desktop.html #system-variables
+Icon Styling via CSS Variables (--system-icon-*)
+ThemeManager Bugs Fixed (canvas reference, CSS loading, background apply)
+For support, check browser console logs or ThemeManager API
+================================================================================
