@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>KittenTTS — Fixed Style Dimensions</title>
+    <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+    <style>
+        body { font-family: -apple-system, sans-serif; background: #121212; color: #eee; padding: 15px; margin: 0; }
+        .card { max-width: 480px; margin: 20px auto; background: #1e1e1e; padding: 20px; border-radius: 12px; border: 1px solid #333; }
+        h2 { color: #ff69b4; margin: 0 0 15px 0; font-size: 1.4rem; text-align: center; }
+        label { display: block; font-size: 11px; color: #888; margin-bottom: 4px; text-transform: uppercase; }
+        select, input, textarea { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #333; background: #2c2c2c; color: white; font-size: 16px; box-sizing: border-box; margin-bottom: 12px; font-family: monospace; }
+        button { width: 100%; padding: 16px; background: #ff69b4; color: white; border: none; border-radius: 8px; font-weight: bold; font-size: 18px; margin-bottom: 8px; cursor: pointer; transition: background 0.2s; }
+        button:disabled { background: #444; color: #888; cursor: not-allowed; }
+        button.secondary { background: #4a9eff; }
+        #log { margin-top: 15px; background: #000; padding: 10px; border-radius: 8px; font-family: monospace; font-size: 10px; color: #00ff41; height: 160px; overflow-y: auto; border: 1px solid #333; white-space: pre-wrap; }
+        #tokenOutput { 
+            margin-top: 12px; background: #252525; padding: 12px; border-radius: 8px; 
+            font-family: monospace; font-size: 10px; color: #7ec8ff; border: 1px solid #444;
+            white-space: pre-wrap; min-height: 80px; max-height: 180px; overflow-y: auto; line-height: 1.4;
+        }
+        .status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; }
+        .status-loading { background: #ffcc00; animation: pulse 1s infinite; }
+        .status-ready { background: #34c759; }
+        .status-error { background: #ff3b30; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+        .btn-row { display: flex; gap: 8px; }
+        .btn-row button { flex: 1; }
+        .config-row { display: flex; gap: 10px; margin-bottom: 12px; }
+        .config-row > div { flex: 1; }
+        .hint { font-size: 10px; color: #666; margin-top: 4px; font-style: italic; }
+        .token-label { color: #aaa; font-size: 10px; text-transform: uppercase; margin-bottom: 6px; display: block; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h2>🐱 KittenTTS — Fixed Dimensions</h2>
+    
+    <label>Voice Artist</label>
+    <select id="voiceSelect">
+        <option value="Bella">Bella</option>
+        <option value="Jasper" selected>Jasper</option>
+        <option value="Luna">Luna</option>
+        <option value="Bruno">Bruno</option>
+        <option value="Rosie">Rosie</option>
+        <option value="Hugo">Hugo</option>
+        <option value="Kiki">Kiki</option>
+        <option value="Leo">Leo</option>
+    </select>
+
+    <div class="config-row">
+        <div>
+            <label>Speed: <span id="speedVal">1.0</span>x</label>
+            <input type="range" id="speedRange" min="0.4" max="2.0" step="0.1" value="1.0">
+        </div>
+        <div>
+            <label>Sample Rate</label>
+            <select id="sampleRate">
+                <option value="24000" selected>24000 Hz</option>
+                <option value="22050">22050 Hz</option>
+            </select>
+        </div>
+    </div>
+
+    <label>Text Input</label>
+    <textarea id="textInput" rows="3" placeholder="Type text...">hello world</textarea>
+
+    <span class="token-label">🔤 Exact Tokens Sent to Model</span>
+    <div id="tokenOutput">
+        <span class="status-dot status-loading"></span>Waiting for system ready...
+    </div>
+    <div class="hint">Style vectors clamped to 256-dim. Adjust ASCII_OFFSET if phonemes sound off.</div>
+    
+    <div class="btn-row">
+        <button id="testPhoneticsBtn" class="secondary">🔊 Test Phonetics</button>
+        <button id="runBtn">🔊 Generate Speech</button>
+    </div>
+    <div id="log">Status: Initializing...</div>
+</div>
+
+<script>
+    // ==========================================
+    // 🔑 TOKENIZER CONFIGURATION
+    // ==========================================
+    const TOKEN_CONFIG = {
+        BOS: 2,      // Beginning of Sequence
+        EOS: 3,      // End of Sequence
+        SPACE: 32,   // ASCII space
+        ASCII_OFFSET: 0 // Change to -97 if model uses 0-indexed chars (a=0)
+    };
+
+    const logDiv = document.getElementById('log');
+    const tokenOutput = document.getElementById('tokenOutput');
+    
+    const log = (msg, type = 'info') => { 
+        const prefix = type === 'error' ? '❌' : type === 'success' ? '✅' : 'ℹ️';
+        logDiv.innerText += `\n${prefix} ${msg}`; 
+        logDiv.scrollTop = logDiv.scrollHeight; 
+    };
+    
+    const speedRange = document.getElementById('speedRange');
+    const speedVal = document.getElementById('speedVal');
+    speedRange.oninput = () => speedVal.innerText = speedRange.value;
+
+    let session = null;
+    let voices = {};
+    let systemReady = false;
+
+    const voiceMap = {
+        "Bella": "expr-voice-2-f.npy", "Jasper": "expr-voice-2-m.npy",
+        "Luna": "expr-voice-3-f.npy", "Bruno": "expr-voice-3-m.npy",
+        "Rosie": "expr-voice-4-f.npy", "Hugo": "expr-voice-4-m.npy",
+        "Kiki": "expr-voice-5-f.npy", "Leo": "expr-voice-5-m.npy"
+    };
+
+    // ==========================================
+    // 🔤 ASCII TOKENIZER
+    // ==========================================
+    function textToTokenIds(text) {
+        const clean = text.toLowerCase().replace(/[^a-z\s.!?,'-]/g, ' ');
+        const ids = [TOKEN_CONFIG.BOS];
+        const chars = [];
+        
+        for (const char of clean) {
+            if (char === ' ') {
+                ids.push(TOKEN_CONFIG.SPACE);
+                chars.push('␣');
+            } else {
+                ids.push(char.charCodeAt(0) + TOKEN_CONFIG.ASCII_OFFSET);
+                chars.push(char);
+            }
+        }
+        ids.push(TOKEN_CONFIG.EOS);
+        chars.push('</s>');
+        return { ids, chars };
+    }
+
+    function displayTokens(ids, chars, title = "Tokens") {
+        let html = `<strong>${title}:</strong>\n`;
+        html += `📝 [${ids.join(', ')}]\n`;
+        html += `🔤 "${chars.join('')}"\n`;
+        html += `📊 Count: ${ids.length} tokens | BOS:${ids[0]} EOS:${ids[ids.length-1]}`;
+        tokenOutput.innerHTML = html;
+    }
+
+    // ==========================================
+    // 📦 NPY PARSER (FIXED DIMENSIONS)
+    // ==========================================
+    function parseNpy(buffer) {
+        const view = new DataView(buffer);
+        const headerLen = view.getUint16(8, true);
+        const start = 10 + headerLen;
+        
+        // 🔑 KittenTTS expects exactly 256-dim style vectors
+        const TARGET_DIM = 256;
+        const TARGET_BYTES = TARGET_DIM * 4; // float32 = 4 bytes
+        const availableBytes = buffer.byteLength - start;
+        
+        if (availableBytes < TARGET_BYTES) {
+            console.warn(`Voice file too small: ${availableBytes} bytes < ${TARGET_BYTES} needed. Padding with zeros.`);
+            // Pad with zeros if file is shorter than expected
+            const padded = new ArrayBuffer(TARGET_BYTES);
+            new Uint8Array(padded).set(new Uint8Array(buffer, start));
+            return new Float32Array(padded);
+        }
+        
+        // Slice exactly 256 floats
+        return new Float32Array(buffer.slice(start, start + TARGET_BYTES));
+    }
+
+    async function init() {
+        try {
+            log("Loading ONNX Model...");
+            session = await ort.InferenceSession.create('./kitten_tts_nano_v0_8.onnx', { 
+                executionProviders: ['wasm'] 
+            });
+            
+            log("Fetching voices.npz...");
+            const response = await fetch('./voices.npz');
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const arrayBuffer = await response.arrayBuffer();
+            const zip = await JSZip.loadAsync(arrayBuffer);
+
+            for (const [name, filename] of Object.entries(voiceMap)) {
+                const file = zip.file(filename);
+                if (file) {
+                    const styleVec = parseNpy(await file.async("arraybuffer"));
+                    if (styleVec.length !== 256) throw new Error(`Invalid voice dim for ${name}: got ${styleVec.length}`);
+                    voices[name] = styleVec;
+                    log(`✓ Loaded ${name} (256-dim)`);
+                }
+            }
+            
+            systemReady = true;
+            log("✅ System Ready", 'success');
+            tokenOutput.innerHTML = `<span class="status-dot status-ready"></span>Ready • Click Test Phonetics`;
+            
+            // Initial preview
+            const { ids, chars } = textToTokenIds("hello world");
+            displayTokens(ids, chars, "Default Test Tokens");
+            
+        } catch (e) {
+            log("❌ INIT ERROR: " + e.message, 'error');
+            console.error(e);
+            tokenOutput.innerHTML = `<span class="status-dot status-error"></span>Error: ${e.message}`;
+        }
+    }
+
+    // ==========================================
+    // 🎛️ INFERENCE & AUDIO
+    // ==========================================
+    async function runInference(ids, styleData) {
+        const idsBigInt = new BigInt64Array(ids.map(n => BigInt(n)));
+        const speed = parseFloat(speedRange.value);
+        
+        const feeds = {
+            "input_ids": new ort.Tensor('int64', idsBigInt, [1, idsBigInt.length]),
+            "style": new ort.Tensor('float32', styleData, [1, 256]), // 🔑 Explicit 256 shape
+            "speed": new ort.Tensor('float32', new Float32Array([speed]), [1])
+        };
+
+        log("🔄 Running ONNX Inference...");
+        const results = await session.run(feeds);
+        const outputKey = Object.keys(results)[0];
+        if (!results[outputKey]?.data) throw new Error("No audio output");
+
+        log("✅ Success! Playing audio...");
+        await playAudio(results[outputKey].data);
+    }
+
+    async function playAudio(data) {
+        const sampleRate = parseInt(document.getElementById('sampleRate').value);
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        const ctx = new AudioCtx({ sampleRate: sampleRate });
+        if (ctx.state === 'suspended') await ctx.resume();
+        
+        const buffer = ctx.createBuffer(1, data.length, sampleRate);
+        const channel = buffer.getChannelData(0);
+        for (let i = 0; i < data.length; i++) channel[i] = data[i];
+        
+        const source = ctx.createBufferSource();
+        source.buffer = buffer;
+        source.connect(ctx.destination);
+        source.start();
+        log(`🔊 Playing at ${sampleRate}Hz`);
+        source.onended = () => { ctx.close(); log("✓ Audio complete"); };
+    }
+
+    // ==========================================
+    // 🖱️ EVENT HANDLERS
+    // ==========================================
+    
+    document.getElementById('testPhoneticsBtn').onclick = async () => {
+        if (!systemReady) return log('⚠️ System not ready', 'error');
+        const voice = document.getElementById('voiceSelect').value;
+        if (!voices[voice]) return log('⚠️ Voice not loaded', 'error');
+        
+        const btn = document.getElementById('testPhoneticsBtn');
+        btn.disabled = true; btn.innerText = "Testing...";
+        
+        const testText = "hello world";
+        const { ids, chars } = textToTokenIds(testText);
+        displayTokens(ids, chars, `🔊 Testing: ${testText}`);
+        log(`🔢 Tokens: [${ids.join(', ')}] | Style: 256-dim`, 'info');
+        
+        try {
+            await runInference(ids, voices[voice]);
+        } catch (e) {
+            log("❌ Test Failed: " + e.message, 'error');
+            console.error(e);
+        } finally {
+            btn.disabled = false; btn.innerText = "🔊 Test Phonetics";
+        }
+    };
+
+    document.getElementById('runBtn').onclick = async () => {
+        if (!systemReady) return;
+        const text = document.getElementById('textInput').value.trim();
+        if (!text) return log('⚠️ Enter text first', 'error');
+        
+        const btn = document.getElementById('runBtn');
+        btn.disabled = true; btn.innerText = "Generating...";
+        
+        const { ids, chars } = textToTokenIds(text);
+        displayTokens(ids, chars, `🔊 Generating: ${text}`);
+        log(`🔢 Tokens: [${ids.join(', ')}] | Style: 256-dim`, 'info');
+        
+        try {
+            await runInference(ids, voices[document.getElementById('voiceSelect').value]);
+        } catch (e) {
+            log("❌ Generation Failed: " + e.message, 'error');
+            console.error(e);
+        } finally {
+            btn.disabled = false; btn.innerText = "🔊 Generate Speech";
+        }
+    };
+
+    // Live token preview
+    let previewTimeout;
+    document.getElementById('textInput').addEventListener('input', (e) => {
+        clearTimeout(previewTimeout);
+        previewTimeout = setTimeout(() => {
+            const text = e.target.value.trim();
+            if (text) {
+                const { ids, chars } = textToTokenIds(text);
+                displayTokens(ids, chars, "Live Preview");
+            }
+        }, 200);
+    });
+
+    window.onload = init;
+</script>
+</body>
+</html>

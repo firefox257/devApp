@@ -1,7 +1,9 @@
 ================================================================================
 MATERIAL ICONS OS - THEME DEVELOPMENT GUIDE v2.7+
 Complete Theme Development Guide (Verified with Desktop.html)
-ARCHITECTURE UPDATE: OS Shell Separation + Icon Variables + Bug Fixes
+ARCHITECTURE UPDATE: OS Shell Separation + Icon Variables + Desktop System Classes
+LONG-PRESS INTERACTION MODEL + CONTEXT MENU SYSTEM [NEW v2.7+]
+APP REGISTRY INTEGRATION: apps.json v2.0 [NEW]
 ================================================================================
 
 TABLE OF CONTENTS
@@ -13,20 +15,23 @@ TABLE OF CONTENTS
 5.  CSS: Complete Override System
 6.  CSS Variables & Design Tokens
 7.  System Component Classes (.system-*) [FULL REFERENCE]
-8.  System Class Override Groups
-9.  System App Container (.system-app)
-10. JavaScript & Canvas Animations
-11. Cleanup System
-12. Theme System API (ThemeManager)
-13. Best Practices
-14. Common Pitfalls
-15. Pre-Deployment Testing Checklist
-16. Examples
-17. Troubleshooting
-18. Quick Start Template
-19. Appendix: Desktop.html Integration Notes
-20. Appendix: Updated System Classes (v2.7+)
-21. Appendix: Architecture Changes (v2.7+)
+8.  Desktop Shell System Classes (.system-desktop-*) [NEW v2.7+]
+9.  System Class Override Groups
+10. System App Container (.system-app)
+11. Long-Press Interaction Model [NEW v2.7+]
+12. JavaScript & Canvas Animations
+13. Cleanup System
+14. Theme System API (ThemeManager)
+15. Best Practices
+16. Common Pitfalls
+17. Pre-Deployment Testing Checklist
+18. Examples
+19. Troubleshooting
+20. Quick Start Template
+21. Appendix: Desktop.html Integration Notes
+22. Appendix: Updated System Classes (v2.7+)
+23. Appendix: Architecture Changes (v2.7+)
+24. APP REGISTRY: apps.json STRUCTURE (v2.0) [NEW]
 
 ================================================================================
 1. OVERVIEW
@@ -48,6 +53,9 @@ ARCHITECTURE CHANGE (v2.7+):
 - Icon styling now uses CSS variables (--system-icon-bg, --system-icon-border)
 - ThemeManager bugs fixed (canvas reference, CSS loading, background apply)
 - Background image handling improved for initial load
+- NEW: Desktop Shell System Classes (.system-desktop-*) for enhanced theming
+- NEW: Long-press interaction model with ContextMenu API for desktop icons
+- NEW: apps.json registry for centralized app management (v2.0)
 
 KEY FEATURES:
 - Dynamic Loading: Themes apply without page reload
@@ -58,10 +66,14 @@ KEY FEATURES:
 - URL Parameters: Apply themes via ?theme=theme-id
 - Resource Cleanup: Automatic cleanup of animations, timers, listeners
 - Component Library: 90+ .system-* classes for consistent UI theming
+- Desktop Classes: 40+ .system-desktop-* classes for OS shell theming [NEW]
 - App Container: .system-app for zero-config HTML element styling
 - Iframe Sync: Apps in iframes automatically sync with OS theme changes
 - Separation of Concerns: OS shell styled in desktop.html, themes override variables
 - Icon Theming: Desktop icons fully themeable via CSS variables
+- Long-Press System: Touch-first context menus with setupLongPress() utility [NEW]
+- Context Menu API: Unified menu system with keyboard/touch support [NEW]
+- App Registry: Centralized apps.json for categories, permissions, sandboxing [NEW]
 
 ================================================================================
 2. CRITICAL RULES (READ FIRST!)
@@ -95,6 +107,22 @@ KEY FEATURES:
     - In desktop.html ThemeManager.cleanup(), use `this.canvas` not `canvas`
     - Never reference undefined `canvas` in cleanup functions
 
+13. Desktop Shell Classes (.system-desktop-*) are OPTIONAL enhancement hooks
+    - Original class names (.taskbar, .window, .icon) remain unchanged
+    - .system-desktop-* classes provide semantic theming hooks
+    - Themes can override .system-desktop-* for advanced effects
+    - Backward compatible - existing themes work without changes
+
+14. Long-Press Interactions MUST include keyboard fallback
+    - Desktop icons must have tabindex="0" and role="button"
+    - onkeydown handler for Enter/Space must trigger same action as onShortPress
+    - Context menus should be dismissible via Escape key
+
+15. App Integration MUST respect apps.json structure
+    - Iframe apps must declare sandbox/permissions matching apps.json
+    - Apps should use os-theme-bridge.js for theme sync
+    - App windows respect allowMultipleInstances setting
+
 PRO TIP: Test cleanup early
 Apply your theme, then immediately switch to another theme. If animations 
 continue or styles persist, your cleanup is broken. Fix it before adding features.
@@ -103,9 +131,11 @@ ARCHITECTURE REMINDER:
 +-----------------------------------------------------------------------------+
 |                    desktop.html (OS Shell)                                  |
 |  - .icon, .window, .taskbar, .start-menu, .mat-icon                        |
+|  - .system-desktop-* classes (NEW v2.7+)                                   |
 |  - .browser-*, .control-btn, .resize-handle, .content-padding              |
 |  - All OS-level UI elements                                                |
 |  - Uses CSS variables (--system-*) for theming                             |
+|  - setupLongPress() utility + ContextMenu API (NEW v2.7+)                  |
 +-----------------------------------------------------------------------------+
                               |
                     CSS Variables (--system-*)
@@ -113,10 +143,11 @@ ARCHITECTURE REMINDER:
 +-----------------------------------------------------------------------------+
 |                  themes/*/styles.css (Theme)                                |
 |  - :root { --system-bg: #color; ... }                                      |
+|  - :root { --system-icon-bg: ... } (REQUIRED)                              |
 |  - .system-* classes for iframe apps                                       |
+|  - .system-desktop-* classes for OS shell enhancement (OPTIONAL)           |
 |  - Background image                                                        |
 |  - #themeCanvas display settings                                           |
-|  - Icon variables (--system-icon-*)                                        |
 +-----------------------------------------------------------------------------+
 
 ================================================================================
@@ -128,27 +159,47 @@ RECOMMENDED ORGANIZATION:
 /webos/
   |-- desktop.html          [Main OS file with ThemeManager + OS Shell CSS]
   |-- themes.json           [Theme registry - REQUIRED]
+  |-- apps.json             [App registry - REQUIRED v2.0]
   |-- theme-doc.txt         [This documentation file]
   |-- os-theme-bridge.js    [SDK for iframe apps - REQUIRED for apps]
   +-- themes/
       +-- your-theme/
-          |-- styles.css          [CSS variables + .system-* classes only]
+          |-- styles.css          [CSS variables + .system-* + .system-desktop-*]
           |-- script.js           [with window.ThemeCleanup]
           |-- preview.jpg         [optional thumbnail for Settings UI]
           |-- background.png      [optional background image]
           +-- assets/
               +-- fonts/
+  +-- apps/
+      +-- notes/
+          |-- index.html          [App entry point]
+          |-- styles.css          [App-specific styles]
+          |-- script.js           [App logic]
+      +-- terminal/
+      +-- browser/
+      +-- aichat/
 
 REQUIRED FILES:
 
 File                              | Required | Purpose                     | Key Requirement
 ----------------------------------|----------|-----------------------------|------------------------
 themes.json                       | Yes      | Theme registry/metadata     | Valid JSON, correct paths
+apps.json                         | Yes      | App registry/metadata       | Valid JSON v2.0 structure
 themes/your-theme/styles.css      | Yes      | Visual styling              | CSS variables + .system-* only
 themes/your-theme/script.js       | Optional | Canvas animations           | Must set window.ThemeCleanup
 themes/your-theme/preview.jpg     | Optional | Theme thumbnail in Settings | Recommended: 300x200px
 os-theme-bridge.js                | Yes*     | Iframe app theme sync       | *Required if using iframe apps
 desktop.html                      | Yes      | OS Shell + System CSS       | Contains all shell styling
+
+Font Assets (Optional but Recommended):
+-------------------------------------------------------------------------------
+/system/fonts/MaterialIcons-Regular.ttf   | Recommended | Local icon font    | Must match @font-face src
+/system/fonts/MaterialIcons-Regular.woff2 | Optional    | Compressed variant | Smaller size, same quality
+-------------------------------------------------------------------------------
+
+NOTE: The @font-face declaration in desktop.html MUST reference the exact 
+      path and filename of your font file. Mismatched paths will cause icons 
+      to render as plain text instead of glyphs.
 
 NOTE: File names can be customized but must match the paths specified in 
       themes.json exactly. Paths are relative to desktop.html.
@@ -164,14 +215,17 @@ X .control-btn { ... }
 X .resize-handle { ... }
 
 THEME CSS SHOULD CONTAIN:
-✓ :root { --system-*: ... }
-✓ :root { --system-icon-bg: ... }
-✓ :root { --system-icon-border: ... }
-✓ .system-btn { ... }
-✓ .system-card { ... }
-✓ .system-app { ... }
-✓ body { background: ... }
-✓ #themeCanvas { display: ... }
++ :root { --system-*: ... }
++ :root { --system-icon-bg: ... }
++ :root { --system-icon-border: ... }
++ .system-btn { ... }
++ .system-card { ... }
++ .system-app { ... }
++ .system-desktop-taskbar { ... } (OPTIONAL - for enhanced theming)
++ .system-desktop-window { ... } (OPTIONAL - for enhanced theming)
++ .system-desktop-icon { ... } (OPTIONAL - for enhanced theming)
++ body { background: ... }
++ #themeCanvas { display: ... }
 
 ================================================================================
 4. THEME CONFIGURATION (themes.json)
@@ -246,6 +300,23 @@ INCORRECT - Direct Shell Styling (DO NOT DO THIS):
 .taskbar { ... }        /* Styled in desktop.html */
 .start-menu { ... }     /* Styled in desktop.html */
 
+OPTIONAL - Desktop System Class Enhancements (v2.7+):
+
+/* These are safe because they use the .system-desktop-* namespace */
+.system-desktop-taskbar {
+  backdrop-filter: blur(20px);
+  box-shadow: 0 0 20px rgba(0, 120, 212, 0.3);
+}
+
+.system-desktop-icon {
+  backdrop-filter: blur(10px);
+  transition: transform 0.2s ease;
+}
+
+.system-desktop-icon:hover {
+  transform: translateY(-2px);
+}
+
 BACKGROUND IMAGE SUPPORT:
 
 /* Use relative path from CSS file location */
@@ -274,7 +345,9 @@ ACCESSIBILITY: REDUCED MOTION
   }
   .system-btn,
   .system-card,
-  .system-app * {
+  .system-app *,
+  .system-desktop-icon,
+  .system-desktop-window {
     transition: none !important;
     animation: none !important;
     transform: none !important;
@@ -285,7 +358,9 @@ FALLBACK FOR NO BACKDROP-FILTER SUPPORT:
 
 @supports not (backdrop-filter: blur(10px)) {
   .system-card,
-  .system-app .card {
+  .system-app .card,
+  .system-desktop-taskbar,
+  .system-desktop-start-menu {
     background: rgba(30, 30, 46, 0.95) !important;
     backdrop-filter: none !important;
   }
@@ -327,6 +402,16 @@ Variable                    | Default Value          | Purpose                  
 --system-icon-border        | none                   | Icon border              | 1px solid rgba(126, 200, 80, 0.3)
 --system-icon-border-hover  | 1px solid rgba(...)    | Icon hover border        | 1px solid rgba(126, 200, 80, 0.6)
 
+OPTIONAL DESKTOP VARIABLES (v2.7+ - Add to desktop.html for advanced theming):
+
+Variable                    | Default Value          | Purpose                  | Example Override
+----------------------------|------------------------|--------------------------|------------------------
+--system-taskbar-glow       | none                   | Taskbar glow effect      | 0 0 20px rgba(0,120,212,0.3)
+--system-window-glow        | none                   | Window glow effect       | 0 0 30px rgba(0,120,212,0.15)
+--system-icon-glow          | none                   | Icon hover glow          | 0 0 15px rgba(0,120,212,0.4)
+--system-start-menu-blur    | 15px                   | Start menu blur amount   | 25px
+--system-taskbar-blur       | 15px                   | Taskbar blur amount      | 25px
+
 THEME OVERRIDE EXAMPLE (themes/matrix/styles.css):
 
 :root {
@@ -349,11 +434,15 @@ THEME OVERRIDE EXAMPLE (themes/matrix/styles.css):
   --system-danger: #ff3333;
   --system-info: #0099ff;
   
-  /* Icon styling */
+  /* Icon styling (REQUIRED) */
   --system-icon-bg: rgba(0, 20, 0, 0.6);
   --system-icon-bg-hover: rgba(0, 255, 65, 0.2);
   --system-icon-border: 1px solid rgba(0, 255, 65, 0.3);
   --system-icon-border-hover: 1px solid rgba(0, 255, 65, 0.6);
+  
+  /* Desktop enhancements (OPTIONAL v2.7+) */
+  --system-taskbar-glow: 0 0 20px rgba(0, 255, 65, 0.3);
+  --system-window-glow: 0 0 30px rgba(0, 255, 65, 0.15);
 }
 
 /* Background image support */
@@ -371,6 +460,21 @@ html, html body, body {
 /* Canvas display for rain/particle effects */
 #themeCanvas {
   display: block !important;
+}
+
+/* Optional desktop class enhancements */
+.system-desktop-taskbar {
+  box-shadow: var(--system-taskbar-glow);
+  backdrop-filter: blur(20px);
+}
+
+.system-desktop-window {
+  box-shadow: var(--system-window-glow), var(--system-shadow);
+}
+
+.system-desktop-icon:hover {
+  box-shadow: var(--system-icon-glow);
+  transform: translateY(-2px);
 }
 
 ACCESSING VARIABLES IN JAVASCRIPT:
@@ -395,7 +499,7 @@ classes for app-level UI consistency.
 --- TYPOGRAPHY CLASSES ---
 
 Class                  | Description                                          | Example Usage
------------------------|------------------------------------------------------|------------------------------------------
+-----------------------|------------------------------------------------------|------------------
 .system-text           | Base body text: 14px, 1.4 line-height, theme color  | <p class="system-text">Content</p>
 .system-text-large     | Emphasized text: 16px, medium weight                | <p class="system-text-large">Note</p>
 .system-text-small     | Secondary text: 12px, dimmed color                  | <span class="system-text-small">Hint</span>
@@ -409,7 +513,7 @@ Class                  | Description                                          | 
 --- BUTTON CLASSES ---
 
 Class                      | Description                                      | Example Usage
----------------------------|--------------------------------------------------|------------------------------------------
+---------------------------|--------------------------------------------------|------------------
 .system-btn                | Primary button: accent bg, white text, hover    | <button class="system-btn">Save</button>
 .system-btn:hover          | Hover: opacity 0.9 + accent glow shadow         | (automatic)
 .system-btn:active         | Active: subtle scale-down press effect          | (automatic on click)
@@ -430,7 +534,7 @@ Class                      | Description                                      | 
 --- FORM & INPUT CLASSES ---
 
 Class                      | Description                                      | Example Usage
----------------------------|--------------------------------------------------|------------------------------------------
+---------------------------|--------------------------------------------------|------------------
 .system-input              | Standard text input: themed borders, focus ring | <input type="text" class="system-input">
 .system-select             | Styled dropdown with custom arrow indicator     | <select class="system-select"><option>
 .system-textarea           | Multi-line textarea: resizable, themed          | <textarea class="system-textarea" rows="4">
@@ -453,7 +557,7 @@ Class                      | Description                                      | 
 --- CONTAINER & LAYOUT CLASSES ---
 
 Class                      | Description                                      | Example Usage
----------------------------|--------------------------------------------------|------------------------------------------
+---------------------------|--------------------------------------------------|------------------
 .system-card               | Elevated container: border, shadow, rounded     | <div class="system-card">Content</div>
 .system-card-header        | Card header: bottom border, accent bg           | <div class="system-card-header">Title</div>
 .system-card-body          | Card content area: standard padding             | <div class="system-card-body">Details</div>
@@ -471,7 +575,7 @@ Class                      | Description                                      | 
 --- NAVIGATION & MENU CLASSES ---
 
 Class                      | Description                                      | Example Usage
----------------------------|--------------------------------------------------|------------------------------------------
+---------------------------|--------------------------------------------------|------------------
 .system-nav                | Horizontal nav list: no bullets, flex layout    | <ul class="system-nav"><li class="system-nav-item">
 .system-nav-item           | Nav item: hover bg, rounded                     | <li class="system-nav-item">Dashboard</li>
 .system-nav-item:hover     | Hover: subtle background tint                   | (automatic)
@@ -489,7 +593,7 @@ Class                      | Description                                      | 
 --- DATA DISPLAY CLASSES ---
 
 Class                      | Description                                      | Example Usage
----------------------------|--------------------------------------------------|------------------------------------------
+---------------------------|--------------------------------------------------|------------------
 .system-table              | Full-width table: collapsed borders, themed     | <table class="system-table">...</table>
 .system-table th, td       | Cells: padding, left-align, bottom border       | <th class="system-table">Name</th>
 .system-table th           | Header cells: accent bg, bold text              | <th class="system-table">ID</th>
@@ -515,7 +619,7 @@ Class                      | Description                                      | 
 --- FEEDBACK & STATUS CLASSES ---
 
 Class                      | Description                                      | Example Usage
----------------------------|--------------------------------------------------|------------------------------------------
+---------------------------|--------------------------------------------------|------------------
 .system-alert              | Info alert: left accent border, icon support    | <div class="system-alert"><span class="mat-icon">info</span> Note</div>
 .system-alert-success      | Success variant: green border + light green bg  | <div class="system-alert system-alert-success">Saved</div>
 .system-alert-warning      | Warning variant: amber border + light amber bg  | <div class="system-alert system-alert-warning">Check input</div>
@@ -530,16 +634,28 @@ Class                      | Description                                      | 
 --- MEDIA & ICON CLASSES ---
 
 Class                      | Description                                      | Example Usage
----------------------------|--------------------------------------------------|------------------------------------------
+---------------------------|--------------------------------------------------|------------------
 .system-icon               | Flex container for Material Icons, theme color  | <span class="system-icon"><span class="mat-icon">home</span></span>
 .system-icon-sm            | Small icon: 16px font size                      | <span class="system-icon system-icon-sm"><span class="mat-icon">close</span></span>
 .system-icon-lg            | Large icon: 32px font size                      | <span class="system-icon system-icon-lg"><span class="mat-icon">account_circle</span></span>
 .system-image              | Responsive image: max-width:100%, auto height   | <img class="system-image" src="photo.jpg" alt="Desc">
 
+--- CONTEXT MENU & LONG-PRESS CLASSES [NEW v2.7+] ---
+
+Class                      | Description                                      | Example Usage
+---------------------------|--------------------------------------------------|------------------
+.system-menu               | Base context menu container: blur, border, shadow| <div class="system-menu">...</div>
+.system-menu-item          | Menu option: padding, hover bg, icon + label    | <div class="system-menu-item"><span class="material-icons">delete</span> Remove</div>
+.system-menu-item:hover    | Hover: subtle background for selection          | (automatic via CSS)
+.system-menu-item:active   | Active press: brighter background               | (automatic via CSS)
+.system-menu-divider       | Horizontal separator: subtle border             | <div class="system-menu-divider"></div>
+.desktop-context-menu      | Desktop-specific menu: enhanced shadow, animation| (added automatically by ContextMenu.show())
+.desktop-context-menu .system-menu-item:active | Desktop menu active state | (enhanced press feedback)
+
 --- UTILITY CLASSES ---
 
 Class                      | Description                                      | Example Usage
----------------------------|--------------------------------------------------|------------------------------------------
+---------------------------|--------------------------------------------------|------------------
 .system-hidden             | Force-hide: display:none !important             | <div class="system-hidden">Secret</div>
 .system-text-center        | Center-align text with !important               | <p class="system-text-center">Centered</p>
 .system-text-left          | Left-align text (explicit override)             | <p class="system-text-left">Left</p>
@@ -555,13 +671,282 @@ Class                      | Description                                      | 
 .system-truncate           | Ellipsis truncation: max-width:100%             | <span class="system-truncate">Long text...</span>
 
 ================================================================================
-8. SYSTEM CLASS OVERRIDE GROUPS
+8. DESKTOP SHELL SYSTEM CLASSES (.system-desktop-*) [NEW v2.7+]
+================================================================================
+
+*** USE THESE CLASSES FOR ENHANCED OS SHELL THEMING ***
+
+The .system-desktop-* class library provides semantic, theme-safe hooks for
+styling OS shell elements (taskbar, windows, icons, start menu). These classes
+are ADDED alongside existing class names for backward compatibility.
+
+KEY PRINCIPLES:
+- Non-Breaking: Original classes (.taskbar, .window, .icon) remain unchanged
+- Additive Only: .system-desktop-* classes complement, not replace
+- Variable-Driven: All classes use var(--system-*) for theming
+- Theme-Override Friendly: Themes can enhance via CSS variables or targeted rules
+
+NAMING CONVENTION:
+  .system-desktop-{element}-{state?}-{variant?}
+  .system-desktop-{element}__{subpart}
+
+--- TASKBAR & SYSTEM TRAY ---
+
+Class                              | Description                           | Variables Used
+-----------------------------------|---------------------------------------|------------------
+.system-desktop-taskbar            | Base taskbar container                | --system-bg, --system-border, --system-taskbar-height
+.system-desktop-taskbar__item      | Individual taskbar app button         | --system-border, --system-accent
+.system-desktop-taskbar__item--active | Active/focused app indicator        | --system-accent (via ::after)
+.system-desktop-taskbar__scroll-btn | Left/right scroll buttons            | --system-border, --system-text
+.system-desktop-tray               | System tray container                 | --system-text, --system-text-dim
+.system-desktop-clock              | Clock display wrapper                 | --system-text, --system-text-dim
+.system-desktop-start-btn          | Start button                          | --system-text, --system-accent
+
+--- WINDOWS & WINDOW CONTROLS ---
+
+Class                              | Description                           | Variables Used
+-----------------------------------|---------------------------------------|------------------
+.system-desktop-window             | Base window container                 | --system-window-bg, --system-radius-lg, --system-shadow
+.system-desktop-window__header     | Window title bar                      | --system-header-bg, --system-border
+.system-desktop-window__title      | Window title text                     | --system-text, --system-font
+.system-desktop-window__controls   | Min/max/close button group            | --system-border, --system-danger
+.system-desktop-window__control    | Individual control button             | --system-text, --system-border
+.system-desktop-window__control--close | Close button (red variant)        | --system-danger, --system-text-on-accent
+.system-desktop-window__content    | Window content area                   | --system-window-bg, --system-text
+.system-desktop-window--minimized  | Minimized state modifier              | --system-shadow, --system-bg
+.system-desktop-window--maximized  | Maximized state modifier              | --system-radius: 0, --system-shadow: none
+
+--- DESKTOP ICONS ---
+
+Class                              | Description                           | Variables Used
+-----------------------------------|---------------------------------------|------------------
+.system-desktop-icon               | Base desktop icon container           | --system-icon-bg, --system-icon-border, --system-radius
+.system-desktop-icon__icon         | Material icon inside desktop icon     | --system-text, --system-icon-size
+.system-desktop-icon__label        | Icon text label                       | --system-text, --system-text-dim, --system-font
+.system-desktop-icon--hover        | Hover state (via CSS :hover)          | --system-icon-bg-hover, --system-icon-border-hover
+.system-desktop-icon--selected     | Selected/focused state                | --system-accent, --system-highlight
+
+--- START MENU ---
+
+Class                              | Description                           | Variables Used
+-----------------------------------|---------------------------------------|------------------
+.system-desktop-start-menu         | Start menu panel                      | --system-menu-bg, --system-radius-lg, --system-shadow
+.system-desktop-start-menu__header | User/avatar header                    | --system-border, --system-text
+.system-desktop-start-menu__avatar | User avatar circle                    | --system-accent, --system-text-on-accent
+.system-desktop-start-menu__list   | Menu items container                  | --system-menu-bg
+.system-desktop-start-menu__item   | Individual menu item                  | --system-text, --system-border
+.system-desktop-start-menu__item--hover | Hover state (via CSS)            | --system-border-hover
+
+--- BROWSER WINDOW COMPONENTS ---
+
+Class                              | Description                           | Variables Used
+-----------------------------------|---------------------------------------|------------------
+.system-desktop-browser__toolbar   | Browser navigation bar                | --system-header-bg, --system-border
+.system-desktop-browser__btn       | Browser nav button (back/forward)     | --system-border, --system-text
+.system-desktop-browser__address   | URL address bar input                 | --system-window-bg, --system-border, --system-accent
+.system-desktop-browser__iframe-container | Wrapper for web iframe         | --system-window-bg
+
+--- UTILITY & LAYOUT CLASSES (DESKTOP SCOPE) ---
+
+Class                              | Description                           | Variables Used
+-----------------------------------|---------------------------------------|------------------
+.system-desktop__container         | Centered desktop content wrapper      | --system-safe-bottom, --system-taskbar-height
+.system-desktop__grid              | Icon grid layout helper               | gap, grid-template-columns
+.system-desktop__divider           | Horizontal separator                  | --system-border
+.system-desktop__spacer            | Vertical spacing helper               | height: 16px
+.system-desktop__hidden            | Force-hide element                    | display: none !important
+
+--- CSS IMPLEMENTATION EXAMPLE ---
+
+/* Add to desktop.html <style id="system-components"> or new <style id="system-desktop"> */
+
+/* Taskbar */
+.system-desktop-taskbar {
+  background: var(--system-bg);
+  border-top: 1px solid var(--system-border);
+  height: var(--system-taskbar-height);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 10px;
+  z-index: 3000;
+}
+
+.system-desktop-taskbar__item {
+  min-width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--system-radius);
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--system-border);
+  color: var(--system-text);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.system-desktop-taskbar__item:hover {
+  background: rgba(255,255,255,0.15);
+  border-color: var(--system-border-hover);
+}
+
+.system-desktop-taskbar__item--active {
+  background: rgba(255,255,255,0.25);
+  border-color: var(--system-accent);
+}
+
+.system-desktop-taskbar__item--active::after {
+  content: '';
+  position: absolute;
+  bottom: 4px;
+  width: 16px;
+  height: 4px;
+  background: var(--system-accent);
+  border-radius: 2px;
+}
+
+/* Desktop Icons */
+.system-desktop-icon {
+  background: var(--system-icon-bg);
+  border: var(--system-icon-border);
+  border-radius: var(--system-radius);
+  transition: all 0.2s ease;
+}
+
+.system-desktop-icon:hover {
+  background: var(--system-icon-bg-hover);
+  border: var(--system-icon-border-hover);
+}
+
+.system-desktop-icon__label {
+  color: var(--system-text);
+  font-size: 11px;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Windows */
+.system-desktop-window {
+  background: var(--system-window-bg);
+  border: 1px solid var(--system-border);
+  border-radius: var(--system-radius-lg);
+  box-shadow: var(--system-shadow);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.system-desktop-window__header {
+  background: var(--system-header-bg);
+  border-bottom: 1px solid var(--system-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 10px;
+  height: 40px;
+  cursor: grab;
+}
+
+.system-desktop-window__title {
+  color: var(--system-text);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.system-desktop-window__control--close:hover {
+  background: var(--system-danger);
+}
+
+.system-desktop-window__control--close:hover .mat-icon {
+  color: var(--system-text-on-accent);
+}
+
+/* Start Menu */
+.system-desktop-start-menu {
+  background: var(--system-menu-bg);
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
+  border-radius: var(--system-radius-lg);
+  border: 1px solid rgba(255,255,255,0.1);
+  box-shadow: var(--system-shadow);
+  padding: 10px;
+  animation: slideUp 0.2s ease-out;
+}
+
+.system-desktop-start-menu__item {
+  display: flex;
+  align-items: center;
+  padding: 12px;
+  border-radius: var(--system-radius);
+  color: var(--system-text);
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.system-desktop-start-menu__item:hover {
+  background: rgba(255,255,255,0.1);
+}
+
+--- THEME OVERRIDE EXAMPLE ---
+
+/* themes/cyberpunk/styles.css */
+:root {
+  /* Base variable overrides */
+  --system-bg: #0a0a12;
+  --system-border: rgba(100, 200, 255, 0.3);
+  --system-accent: #00f3ff;
+  --system-icon-bg: rgba(0, 243, 255, 0.1);
+  --system-icon-border: 1px solid rgba(0, 243, 255, 0.4);
+  
+  /* Desktop-specific variables */
+  --system-taskbar-glow: 0 0 20px rgba(0, 243, 255, 0.3);
+  --system-window-glow: 0 0 30px rgba(0, 243, 255, 0.15);
+}
+
+/* Optional: Direct class enhancements for complex effects */
+.system-desktop-taskbar {
+  box-shadow: var(--system-taskbar-glow);
+  backdrop-filter: blur(20px) !important;
+}
+
+.system-desktop-window {
+  box-shadow: var(--system-window-glow), var(--system-shadow);
+  border-color: var(--system-icon-border);
+}
+
+.system-desktop-icon {
+  backdrop-filter: blur(10px);
+  border-radius: 12px;
+}
+
+.system-desktop-icon:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 20px rgba(0, 243, 255, 0.4);
+}
+
+--- BACKWARD COMPATIBILITY ---
+
+| Concern | Solution |
+|---------|----------|
+| Existing themes break | NO changes to existing .taskbar, .window, etc. classes |
+| CSS specificity conflicts | Use same specificity; themes override via variables first |
+| JavaScript selectors break | Keep original class names in all querySelector calls |
+| Theme documentation confusion | Document .system-desktop-* as optional enhancement layer |
+
+================================================================================
+9. SYSTEM CLASS OVERRIDE GROUPS
 ================================================================================
 
 *** SEMANTIC GROUPS FOR BULK STYLING ***
 
 Group                    | Classes Included                          | Use Case
--------------------------|-------------------------------------------|------------------------------------------
+-------------------------|-------------------------------------------|------------------
 Typography               | .system-text*, .system-title*, .system-font-mono | Consistent text hierarchy
 Buttons                  | .system-btn*, .system-btn-group           | Action controls with theme colors
 Forms                    | .system-input*, .system-select, .system-checkbox, .system-switch | Form elements with focus states
@@ -570,6 +955,7 @@ Navigation               | .system-nav*, .system-menu*, .system-tabs* | Menus, t
 Data Display             | .system-table, .system-list*, .system-badge*, .system-stat | Tables, lists, and metrics
 Feedback                 | .system-alert*, .system-spinner, .system-skeleton | Status messages and loading states
 Utilities                | .system-hidden, .system-text-*, .system-m[tp]-*, .system-rounded | Quick layout helpers
+Desktop Shell [NEW]      | .system-desktop-*                         | OS shell element theming (taskbar, windows, icons)
 
 PRO TIP: Combine utility classes for rapid layout
 
@@ -585,7 +971,7 @@ PRO TIP: Combine utility classes for rapid layout
 </div>
 
 ================================================================================
-9. SYSTEM APP CONTAINER (.system-app)
+10. SYSTEM APP CONTAINER (.system-app)
 ================================================================================
 
 *** ZERO-CONFIG AUTO-STYLING FOR IFRAME APPS ***
@@ -593,7 +979,7 @@ PRO TIP: Combine utility classes for rapid layout
 The .system-app class is a special container that provides automatic, 
 theme-aware styling for all standard HTML elements within iframe-based 
 applications. When you wrap your app content in .system-app, you get 
-consistent typography, form styling, buttons, tables, and more—without 
+consistent typography, form styling, buttons, tables, and more--without 
 writing custom CSS.
 
 Key Features:
@@ -601,7 +987,7 @@ Key Features:
 - Reset & normalize: Removes browser defaults for consistent appearance
 - Responsive typography: Scales appropriately for window size
 - Form consistency: Inputs, selects, buttons match OS design language
-- Zero configuration: Just add the class—no additional setup required
+- Zero configuration: Just add the class--no additional setup required
 
 Usage Example:
 -------------------------------------------------------------------------------
@@ -666,20 +1052,192 @@ What .system-app Styles Automatically:
 Best Practices:
 1. Wrap entire app content in .system-app for maximum consistency
 2. Combine with .system-* classes for fine-grained control where needed
-3. Avoid custom CSS overrides unless absolutely necessary—leverage variables
+3. Avoid custom CSS overrides unless absolutely necessary--leverage variables
 4. Test theme switching to ensure your app adapts correctly
 5. Use semantic HTML inside .system-app for best accessibility
 
-> Pro Tip: For rapid prototyping, you can build entire functional apps using 
-> only .system-app + .system-* classes—no custom CSS required. The theme 
-> system handles all visual adaptation automatically.
+Pro Tip: For rapid prototyping, you can build entire functional apps using 
+only .system-app + .system-* classes--no custom CSS required. The theme 
+system handles all visual adaptation automatically.
 
 All .system-* classes use CSS variables (var(--system-*)) for colors, 
 spacing, and effects. This means they automatically adapt when the user 
-switches themes—no additional code needed in your app.
+switches themes--no additional code needed in your app.
 
 ================================================================================
-10. JAVASCRIPT & CANVAS ANIMATIONS
+11. LONG-PRESS INTERACTION MODEL [NEW v2.7+]
+================================================================================
+
+*** TOUCH-FIRST CONTEXT MENUS FOR DESKTOP ICONS ***
+
+Material Icons OS v2.7+ introduces a unified long-press interaction model for
+desktop icons and Start Menu items. This replaces right-click context menus
+on touch devices while maintaining keyboard/mouse compatibility.
+
+INTERACTION FLOW:
+1. User presses/holds desktop icon for 500ms
+2. Visual feedback: subtle scale + optional haptic vibration (navigator.vibrate)
+3. Context menu appears at touch/cursor position
+4. User selects action or taps outside to dismiss
+5. Menu auto-cleans up with proper event listener removal
+
+SETUPLONGPRESS() UTILITY FUNCTION:
+
+// Location: desktop.html <script> section
+// Purpose: Unified long-press detection for mouse + touch
+
+setupLongPress(element, callbacks, options = {})
+
+Parameters:
+-------------------------------------------------------------------------------
+element          | DOM Element to attach listeners to
+callbacks        | Object with event handlers:
+  * onLongPress  | Function(e): Called after 500ms hold (shows context menu)
+  * onShortPress | Function(e): Called on quick tap/click (launches app)
+  * onMove       | Function(e): Called if pointer moves during press (cancels)
+  * duration     | Number: Hold duration in ms (default: 500)
+  * preventContextMenu | Boolean: Suppress native contextmenu on long-press
+options          | Optional config:
+  * moveThreshold | Number: Pixels of movement to cancel long-press (default: 10)
+
+Returns: cleanup() function to remove all attached listeners
+
+Usage Example (Desktop Icon):
+-------------------------------------------------------------------------------
+const icon = document.createElement('div');
+icon.className = 'icon system-desktop-icon';
+icon.dataset.appId = 'my-app';
+
+const launchApp = () => { /* open app logic */ };
+
+const onLongPress = (e) => {
+  e.preventDefault();
+  const point = e.type.includes('touch') ? e.touches[0] : e;
+  
+  ContextMenu.show(
+    point.clientX,
+    point.clientY,
+    [
+      { 
+        label: 'Remove from Desktop', 
+        icon: 'delete_outline', 
+        value: 'remove',
+        danger: true 
+      }
+    ],
+    (action) => {
+      if (action === 'remove') {
+        DesktopManager.removeFromDesktop('my-app');
+        icon.remove();
+      }
+    }
+  );
+};
+
+setupLongPress(icon, {
+  onLongPress,
+  onShortPress: launchApp,
+  preventContextMenu: true
+});
+
+KEY FEATURES:
+* Cross-platform: Works with mouse, touch, pen input
+* Movement detection: Cancels if user drags during press
+* Haptic feedback: navigator.vibrate(10) on long-press (if supported)
+* Accessibility: Keyboard Enter/Space triggers short-press action
+* Cleanup: Returns function to remove all event listeners
+
+CONTEXTMENU API:
+
+ContextMenu.show(x, y, items, onSelect, onClose)
+
+Parameters:
+-------------------------------------------------------------------------------
+x, y        | Number: Screen coordinates for menu position
+items       | Array: Menu item definitions:
+  * label   | String: Display text
+  * icon    | String: Material Icons glyph name (optional)
+  * value   | Any: Identifier passed to onSelect callback
+  * danger  | Boolean: Render with danger color styling (optional)
+onSelect    | Function(value, item): Called when user selects menu item
+onClose     | Function(): Called when menu dismisses (click outside, Escape)
+
+Returns: Reference to created menu DOM element
+
+Usage Example:
+-------------------------------------------------------------------------------
+ContextMenu.show(
+  200,  // x coordinate
+  150,  // y coordinate
+  [
+    { label: 'Open', icon: 'launch', value: 'open' },
+    { label: 'Add to Desktop', icon: 'add_to_home_screen', value: 'add' },
+    { label: 'Remove', icon: 'delete', value: 'remove', danger: true }
+  ],
+  (action, item) => {
+    console.log('Selected:', action);
+    // Handle action logic
+  },
+  () => {
+    console.log('Menu closed');
+    // Optional cleanup
+  }
+);
+
+ContextMenu.hide()  // Programmatically dismiss open menu
+
+DESKTOPMANAGER INTEGRATION:
+
+// Persistence API for desktop icon state
+DesktopManager.addToDesktop(appId)    // Add app to desktop, save to localStorage
+DesktopManager.removeFromDesktop(appId) // Remove app, update storage
+DesktopManager.isOnDesktop(appId)     // Check if app is pinned (boolean)
+DesktopManager.getItems()             // Get array of pinned app IDs
+DesktopManager.saveItems(items)       // Manually save item array
+DesktopManager.clear()                // Remove all desktop items
+
+Storage: localStorage key 'os-desktop-items-v2'
+Format: JSON array of app ID strings: ["notes", "settings", "browser"]
+
+ACCESSIBILITY CONSIDERATIONS:
+
+1. Keyboard Support:
+   - Desktop icons have tabindex="0" and role="button"
+   - Enter/Space keys trigger onShortPress (launch app)
+   - Context menus require mouse/touch (future: keyboard nav)
+
+2. Screen Readers:
+   - Icons include aria-label: "AppName, long-press for options"
+   - Menu items should have descriptive labels
+   - Consider adding aria-live regions for dynamic menu announcements
+
+3. Reduced Motion:
+   - Long-press duration respects prefers-reduced-motion
+   - Animation feedback disabled when reduced motion enabled
+   - Haptic feedback skipped if motion reduced
+
+4. Touch Targets:
+   - Desktop icons minimum 56x68px (meets WCAG 2.1 touch target guidelines)
+   - Context menu items minimum 44px height
+   - Adequate spacing between interactive elements
+
+BEST PRACTICES:
+
+✓ Use setupLongPress for all desktop icon interactions
+✓ Always call e.preventDefault() in onLongPress to suppress native menu
+✓ Provide both onShortPress AND keyboard onkeydown handler
+✓ Keep context menus concise (3-5 items max)
+✓ Use danger: true for destructive actions (visual warning)
+✓ Test on actual touch devices (not just mouse simulation)
+✓ Verify haptic feedback doesn't interfere with UX
+
+✗ Don't use setupLongPress for non-interactive elements
+✗ Don't forget to prevent default on contextmenu event
+✗ Don't create context menus with only one item (use direct action instead)
+✗ Don't rely solely on visual feedback for long-press confirmation
+
+================================================================================
+12. JAVASCRIPT & CANVAS ANIMATIONS
 ================================================================================
 
 *** SCRIPT REQUIREMENTS (NON-NEGOTIABLE) ***
@@ -691,10 +1249,63 @@ switches themes—no additional code needed in your app.
 5. Cancel all requestAnimationFrame, setInterval, setTimeout
 6. Use proper canvas variable scoping (local const or this.canvas)
 
-[... Full JavaScript template and best practices as in original doc ...]
+MINIMUM VIABLE SCRIPT TEMPLATE:
+
+(function() {
+  'use strict';
+  
+  const canvas = document.getElementById('themeCanvas');
+  if (!canvas) { window.ThemeCleanup = function() {}; return; }
+  
+  const ctx = canvas.getContext('2d');
+  let animationFrame = null;
+  let resizeHandler = null;
+  
+  // HiDPI resize
+  function resizeCanvas() {
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = window.innerWidth * dpr;
+    canvas.height = window.innerHeight * dpr;
+    canvas.style.width = window.innerWidth + 'px';
+    canvas.style.height = window.innerHeight + 'px';
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.scale(dpr, dpr);
+  }
+  resizeCanvas();
+  resizeHandler = resizeCanvas;
+  window.addEventListener('resize', resizeHandler);
+  
+  // Enforce canvas layering
+  canvas.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none;background:transparent;';
+  
+  // Respect reduced motion
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    window.ThemeCleanup = function() {};
+    return;
+  }
+  
+  // Animation loop
+  function animate() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // Draw your animation here
+    animationFrame = requestAnimationFrame(animate);
+    if (ThemeManager?.trackAnimation) ThemeManager.trackAnimation(animationFrame);
+  }
+  animate();
+  
+  // REQUIRED cleanup
+  window.ThemeCleanup = function cleanup() {
+    if (animationFrame) cancelAnimationFrame(animationFrame);
+    if (resizeHandler) window.removeEventListener('resize', resizeHandler);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  };
+  
+  if (ThemeManager?.registerCleanup) ThemeManager.registerCleanup(() => {});
+})();
 
 ================================================================================
-11. CLEANUP SYSTEM
+13. CLEANUP SYSTEM
 ================================================================================
 
 The ThemeManager provides a robust cleanup system to prevent memory leaks 
@@ -707,10 +1318,33 @@ HOW CLEANUP WORKS:
 4. ThemeManager clears canvas and removes script element
 5. New theme loads -> Clean slate, no artifacts from previous theme
 
-[... Full cleanup documentation as in original doc ...]
+CLEANUP CHECKLIST FOR THEME SCRIPTS:
+
+[ ] Cancel all requestAnimationFrame with cancelAnimationFrame()
+[ ] Clear all setInterval with clearInterval()
+[ ] Clear all setTimeout with clearTimeout()
+[ ] Remove all event listeners with removeEventListener()
+[ ] Clear canvas with ctx.clearRect()
+[ ] Reset canvas transform with ctx.setTransform(1, 0, 0, 1, 0, 0)
+[ ] Delete any dynamically created DOM elements
+[ ] Reset any modified CSS variables to defaults
+
+TRACKING HELPERS (Use ThemeManager API):
+
+// In your theme script
+const rafId = requestAnimationFrame(animate);
+ThemeManager.trackAnimation(rafId);
+
+const intervalId = setInterval(update, 1000);
+ThemeManager.trackInterval(intervalId);
+
+const timeoutId = setTimeout(delayedAction, 5000);
+ThemeManager.trackTimeout(timeoutId);
+
+// These are automatically cleaned up when theme switches
 
 ================================================================================
-12. THEME SYSTEM API (THEMEMANAGER)
+14. THEME SYSTEM API (THEMEMANAGER)
 ================================================================================
 
 THEMEMANAGER OBJECT (Available in desktop.html):
@@ -739,10 +1373,14 @@ ThemeManager.trackInterval(intervalId);
 ThemeManager.trackTimeout(timeoutId);
 ThemeManager.registerCleanup(cleanupFn);
 
-[... Full API documentation as in original doc ...]
+// Broadcast theme to iframe apps
+ThemeManager.broadcastThemeToApps(themeId);
+
+// Get all CSS variables as object
+ThemeManager.getSystemVariables();  // returns: { "--system-bg": "#color", ... }
 
 ================================================================================
-13. BEST PRACTICES
+15. BEST PRACTICES
 ================================================================================
 
 1. USE CSS VARIABLES FOR MAINTAINABILITY
@@ -768,7 +1406,18 @@ ThemeManager.registerCleanup(cleanupFn);
   <button>Click</button>
 </div>
 
-4. DO NOT STYLE OS SHELL ELEMENTS IN THEME CSS
+4. USE .system-desktop-* FOR SHELL ENHANCEMENTS [NEW v2.7+]
+/* GOOD: Optional desktop class enhancements */
+.system-desktop-taskbar {
+  backdrop-filter: blur(20px);
+  box-shadow: var(--system-taskbar-glow);
+}
+/* BAD: Direct element styling */
+.taskbar {
+  background: red !important; /* Breaks variable system */
+}
+
+5. DO NOT STYLE OS SHELL ELEMENTS IN THEME CSS
 /* BAD: OS shell styling in theme (DO NOT DO) */
 .icon { background: red; }
 .window { border-color: blue; }
@@ -780,10 +1429,32 @@ ThemeManager.registerCleanup(cleanupFn);
   --system-icon-bg: rgba(0,0,0,0.5);
 }
 
-[... Remaining best practices as in original doc ...]
+6. TEST CLEANUP THOROUGHLY
+- Switch themes 10x rapidly
+- Check console for errors
+- Verify no memory growth
+- Confirm animations stop
+
+7. RESPECT ACCESSIBILITY
+- Support prefers-reduced-motion
+- Maintain contrast ratios
+- Test with screen readers
+- Provide fallbacks for backdrop-filter
+
+8. IMPLEMENT LONG-PRESS PROPERLY [NEW v2.7+]
+- Use setupLongPress() utility for all desktop icon interactions
+- Always pair onShortPress with keyboard onkeydown handler
+- Call e.preventDefault() in onLongPress to suppress native context menu
+- Keep context menus concise (3-5 items) with clear visual hierarchy
+- Test on real touch devices, not just mouse simulation
+
+9. RESPECT apps.json STRUCTURE [NEW v2.0]
+- Verify app IDs match between apps.json and desktop icon data-app-id
+- Respect sandbox permissions in iframe apps
+- Use os-theme-bridge.js for theme sync in all iframe apps
 
 ================================================================================
-14. COMMON PITFALLS
+16. COMMON PITFALLS
 ================================================================================
 
 *** THEME CSS STYLING OS SHELL ELEMENTS ***
@@ -802,14 +1473,84 @@ Solution: Use correct path, full background shorthand with !important, min-heigh
 Problem: Can't see CSS background through canvas
 Solution: Use clearRect() not fillRect(); set canvas CSS: background:transparent !important
 
-[... Remaining pitfalls as in original doc ...]
+*** CLEANUP NOT EXECUTING ***
+Problem: Animations continue after theme switch
+Solution: Ensure window.ThemeCleanup is set at global scope, not inside IIFE only
+
+*** CANVAS REFERENCE ERROR ***
+Problem: ReferenceError: canvas is not defined in cleanup
+Solution: Use this.canvas in ThemeManager.cleanup(), store canvas reference properly
+
+*** DESKTOP CLASSES NOT APPLYING ***
+Problem: .system-desktop-* classes have no effect
+Solution: Ensure desktop.html includes the class definitions in system-components style block
+
+*** ICONS RENDERING AS TEXT INSTEAD OF GLYPHS ***
+Problem: Icon names like "home" or "settings" display as words, not icons
+Solutions:
+1. Verify @font-face is declared in desktop.html <head> BEFORE .material-icons CSS
+2. Check font file path: /system/fonts/MaterialIcons-Regular.ttf exists
+3. Ensure .material-icons class includes font-feature-settings: 'liga'
+4. Verify server serves .ttf with MIME type: font/ttf
+5. Hard refresh browser (Ctrl+F5) to clear font cache
+6. Check DevTools Console for font load errors (404, CORS, MIME type)
+7. Confirm no Google Fonts CDN link is present (conflicts with local font)
+
+*** LONG-PRESS NOT TRIGGERING ON TOUCH [NEW v2.7+] ***
+Problem: Holding icon doesn't show context menu on mobile
+Solutions:
+1. Verify setupLongPress is called with touchstart/touchend listeners
+2. Check preventDefault isn't blocking touch events prematurely
+3. Ensure moveThreshold isn't too sensitive for finger tremor
+4. Test with duration: 300 for faster feedback during development
+
+*** CONTEXT MENU POSITIONING OFF-SCREEN [NEW v2.7+] ***
+Problem: Menu appears cut off at screen edges
+Solutions:
+1. ContextMenu.show() auto-clamps to window.innerWidth/innerHeight
+2. For custom positioning, add boundary checks:
+   x = Math.min(x, window.innerWidth - menuWidth)
+   y = Math.min(y, window.innerHeight - menuHeight)
+3. Consider flipping menu direction based on available space
+
+*** HAPTIC FEEDBACK TOO AGGRESSIVE [NEW v2.7+] ***
+Problem: Vibration feels jarring or drains battery
+Solutions:
+1. Use short duration: navigator.vibrate(10) not 100ms
+2. Wrap in feature detection: if (navigator.vibrate) { ... }
+3. Respect prefers-reduced-motion to skip haptics entirely
+4. Consider making haptics optional via theme settings
+
+*** KEYBOARD USERS CAN'T ACCESS CONTEXT MENU [NEW v2.7+] ***
+Problem: Long-press requires touch/mouse, excludes keyboard nav
+Solutions:
+1. Add Shift+F10 or Context Menu key handler as alternative trigger
+2. Provide "Options" button in app window header as fallback
+3. Document keyboard shortcuts in Help/Settings UI
+4. Future: Implement focusable menu with arrow key navigation
+
+*** APP NOT SHOWING IN START MENU [NEW v2.0] ***
+Problem: App defined in apps.json doesn't appear
+Solutions:
+1. Verify enabled: true in app config
+2. Check categoryId matches an existing category.id
+3. Verify apps.json is valid JSON (use JSON validator)
+4. Check console for apps.json load errors
+
+*** IFRAME APP THEME NOT SYNCING [NEW v2.0] ***
+Problem: App uses default styles, doesn't match OS theme
+Solutions:
+1. Ensure os-theme-bridge.js is loaded in iframe app
+2. Verify data-os-app attribute on body or root element
+3. Check postMessage isn't blocked by sandbox settings
+4. Test with console.log in bridge script to confirm message receipt
 
 ================================================================================
-15. PRE-DEPLOYMENT TESTING CHECKLIST
+17. PRE-DEPLOYMENT TESTING CHECKLIST
 ================================================================================
 
 Test                      | How to Test                              | Expected Result
---------------------------|------------------------------------------|---------------------------
+--------------------------|------------------------------------------|------------------
 CSS Variables Only        | Check theme CSS for OS shell selectors   | No .icon, .window, .taskbar, etc.
 Icon Variables            | Check :root for --system-icon-*          | All 4 icon variables present
 Background Image          | Apply theme -> Check if image loads      | Image visible, no 404 errors
@@ -831,16 +1572,338 @@ Variable Overrides        | Inspect :root in DevTools                | --system-
 Icon Background           | Load theme -> Check desktop icons        | Icons have theme background
 Icon Border               | Load theme -> Check icon borders         | Borders visible, match theme
 Icon Hover                | Hover over icons                         | Background + border brighten
+.system-desktop-* Classes | Inspect taskbar/windows in DevTools      | Classes present, styles apply
+Desktop Theme Override    | Add .system-desktop-taskbar rule in theme| Taskbar styling updates
+Local Font Loading        | Check Network tab for font file          | 200 OK, font/ttf MIME type
+Icon Glyph Rendering      | Inspect .material-icons element          | Displays glyph, not text "home"
+Font Fallback Behavior    | Temporarily rename font file -> refresh  | Graceful degradation (text fallback)
+CDN Link Removed          | Search desktop.html for fonts.googleapis | No external font links found
+@font-face Declaration    | Inspect <head> styles                    | Local @font-face present, correct path
+Long-Press Timing         | Hold icon 500ms on touch device          | Context menu appears at touch point
+Short-Press Launch        | Quick tap on desktop icon                | App launches, no menu shown
+Movement Cancellation     | Press + drag icon slightly               | Long-press cancels, no menu
+Keyboard Launch           | Focus icon, press Enter/Space            | App launches (short-press behavior)
+Context Menu Selection    | Long-press -> tap menu item              | Action executes, menu closes
+Context Menu Dismiss      | Long-press -> tap outside menu           | Menu closes, no action taken
+Escape Key Dismiss        | Open menu -> press Escape                | Menu closes cleanly
+Haptic Feedback           | Long-press on device with vibration      | Brief 10ms vibration (if supported)
+Reduced Motion (Long-Press)| Enable reduce motion -> long-press      | No animation/haptic, menu still works
+Touch Target Size         | Inspect icon in DevTools                 | Min 56x68px, adequate padding
+Menu Item Height          | Inspect .system-menu-item                | Min 44px height for touch
+aria-label Present        | Inspect desktop icon                     | aria-label includes "long-press for options"
+localStorage Persistence  | Add/remove icon -> refresh page          | Desktop state persists correctly
+apps.json Valid JSON      | Validate with JSON lint tool             | No syntax errors
+App Categories Load       | Open Start Menu                          | All categories display correctly
+App Icons Render          | Check Start Menu app list                | All app icons show as glyphs
+Iframe App Theme Sync     | Open app -> Switch theme                 | App colors update with OS theme
+Sandbox Permissions       | Check iframe attributes in DevTools      | Match apps.json sandbox config
+Multiple Instances        | Open app twice (if allowed)              | Two windows appear (or one if disabled)
 
 ================================================================================
-16. EXAMPLES
+18. EXAMPLES
 ================================================================================
 
-[... Example themes (Frosted Glass, Matrix, Light, Cyberpunk) as in original doc,
-    with updated icon variable overrides in each :root block ...]
+EXAMPLE 1: MATRIX THEME (themes/matrix/styles.css)
+-------------------------------------------------------------------------------
+:root {
+  --system-bg: #000;
+  --system-window-bg: #0a0a0a;
+  --system-header-bg: #1a1a1a;
+  --system-accent: #00ff41;
+  --system-accent-dim: #008f11;
+  --system-highlight: #00ff66;
+  --system-text: #00ff41;
+  --system-text-dim: #008f11;
+  --system-text-on-accent: #000;
+  --system-border: #003300;
+  --system-border-hover: #006600;
+  --system-font: 'Courier New', Courier, monospace;
+  --system-font-mono: 'Fira Code', monospace;
+  --system-shadow: 0 0 40px rgba(0, 255, 65, 0.2);
+  --system-success: #00ff41;
+  --system-warning: #ffaa00;
+  --system-danger: #ff3333;
+  --system-info: #0099ff;
+  
+  /* Icon variables (REQUIRED) */
+  --system-icon-bg: rgba(0, 20, 0, 0.6);
+  --system-icon-bg-hover: rgba(0, 255, 65, 0.2);
+  --system-icon-border: 1px solid rgba(0, 255, 65, 0.3);
+  --system-icon-border-hover: 1px solid rgba(0, 255, 65, 0.6);
+  
+  /* Desktop enhancements (OPTIONAL v2.7+) */
+  --system-taskbar-glow: 0 0 20px rgba(0, 255, 65, 0.3);
+  --system-window-glow: 0 0 30px rgba(0, 255, 65, 0.15);
+}
+
+html, html body, body {
+  background-color: #000 !important;
+  background-image: url('background.png') !important;
+  background-repeat: no-repeat !important;
+  background-position: center center !important;
+  background-attachment: fixed !important;
+  background-size: cover !important;
+  min-height: 100dvh !important;
+  min-width: 100vw !important;
+}
+
+#themeCanvas {
+  display: block !important;
+}
+
+/* Optional desktop class enhancements */
+.system-desktop-taskbar {
+  box-shadow: var(--system-taskbar-glow);
+  backdrop-filter: blur(20px);
+}
+
+.system-desktop-window {
+  box-shadow: var(--system-window-glow), var(--system-shadow);
+}
+
+.system-desktop-icon:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 20px rgba(0, 255, 65, 0.4);
+}
+
+/* Context menu enhancements for desktop (optional) */
+.desktop-context-menu {
+  animation: fadeIn 0.1s ease-out;
+  box-shadow: 0 8px 25px rgba(0,0,0,0.3) !important;
+  border: 1px solid rgba(255,255,255,0.15) !important;
+}
+
+.desktop-context-menu .system-menu-item:active {
+  background: rgba(255,255,255,0.2) !important;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+-------------------------------------------------------------------------------
+
+EXAMPLE 2: FROSTED GLASS THEME (themes/frosted-glass/styles.css)
+-------------------------------------------------------------------------------
+:root {
+  --system-bg: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  --system-window-bg: rgba(255, 255, 255, 0.2);
+  --system-header-bg: rgba(255, 255, 255, 0.3);
+  --system-accent: #ffffff;
+  --system-accent-dim: rgba(255, 255, 255, 0.7);
+  --system-highlight: rgba(255, 255, 255, 0.5);
+  --system-text: #ffffff;
+  --system-text-dim: rgba(255, 255, 255, 0.7);
+  --system-text-on-accent: #333;
+  --system-border: rgba(255, 255, 255, 0.3);
+  --system-border-hover: rgba(255, 255, 255, 0.5);
+  --system-menu-bg: rgba(30, 30, 46, 0.8);
+  --system-radius: 12px;
+  --system-radius-lg: 20px;
+  --system-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  --system-font: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --system-success: #4caf50;
+  --system-warning: #ffc107;
+  --system-danger: #f44336;
+  --system-info: #2196f3;
+  
+  /* Icon variables (REQUIRED) */
+  --system-icon-bg: rgba(255, 255, 255, 0.15);
+  --system-icon-bg-hover: rgba(255, 255, 255, 0.3);
+  --system-icon-border: 1px solid rgba(255, 255, 255, 0.3);
+  --system-icon-border-hover: 1px solid rgba(255, 255, 255, 0.5);
+  
+  /* Desktop enhancements (OPTIONAL v2.7+) */
+  --system-taskbar-blur: 25px;
+  --system-start-menu-blur: 25px;
+}
+
+html, html body, body {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+  min-height: 100dvh !important;
+  min-width: 100vw !important;
+}
+
+#themeCanvas {
+  display: none !important;
+}
+
+/* Glassmorphism enhancements */
+.system-desktop-taskbar {
+  backdrop-filter: blur(var(--system-taskbar-blur));
+  -webkit-backdrop-filter: blur(var(--system-taskbar-blur));
+}
+
+.system-desktop-start-menu {
+  backdrop-filter: blur(var(--system-start-menu-blur));
+  -webkit-backdrop-filter: blur(var(--system-start-menu-blur));
+}
+
+.system-desktop-window {
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
+}
+
+.system-desktop-icon {
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+-------------------------------------------------------------------------------
+
+EXAMPLE 3: themes.json ENTRY
+-------------------------------------------------------------------------------
+{
+  "matrix": {
+    "name": "Matrix",
+    "description": "Green terminal aesthetic with digital rain",
+    "css": "themes/matrix/styles.css",
+    "script": "themes/matrix/script.js",
+    "canvas": true,
+    "preview": "themes/matrix/preview.jpg",
+    "author": "Your Name",
+    "version": "1.0.0",
+    "settings": {
+      "rainSpeed": 50,
+      "characterSet": "Katakana"
+    }
+  },
+  "frosted-glass": {
+    "name": "Frosted Glass",
+    "description": "Translucent glassmorphism with blur effects",
+    "css": "themes/frosted-glass/styles.css",
+    "script": null,
+    "canvas": false,
+    "preview": "themes/frosted-glass/preview.jpg",
+    "author": "Your Name",
+    "version": "1.0.0"
+  }
+}
+-------------------------------------------------------------------------------
+
+EXAMPLE 4: apps.json v2.0 (COMPLETE)
+-------------------------------------------------------------------------------
+{
+  "version": "2.0",
+  "categories": [
+    {
+      "id": "system",
+      "name": "System",
+      "icon": "tune",
+      "order": 1,
+      "description": "OS configuration and utilities"
+    },
+    {
+      "id": "productivity",
+      "name": "Productivity",
+      "icon": "work",
+      "order": 2,
+      "description": "Work and organization tools"
+    },
+    {
+      "id": "entertainment",
+      "name": "Entertainment",
+      "icon": "movie",
+      "order": 3,
+      "description": "Media and leisure apps"
+    },
+    {
+      "id": "developer",
+      "name": "Developer",
+      "icon": "code",
+      "order": 4,
+      "description": "Coding and development tools"
+    }
+  ],
+  "apps": [
+    {
+      "id": "settings",
+      "name": "Settings",
+      "icon": "settings",
+      "type": "template",
+      "template": "settings",
+      "categoryId": "system",
+      "description": "Configure themes and OS preferences",
+      "order": 1,
+      "enabled": true,
+      "allowMultipleInstances": false
+    },
+    {
+      "id": "notes",
+      "name": "Notes",
+      "icon": "edit_note",
+      "type": "iframe",
+      "url": "/apps/notes/index.html",
+      "categoryId": "productivity",
+      "description": "Rich text note-taking with formatting",
+      "order": 1,
+      "enabled": true,
+      "permissions": ["localStorage"],
+      "sandbox": "allow-scripts allow-same-origin allow-forms allow-modals",
+      "allowMultipleInstances": true
+    },
+    {
+      "id": "file-manager",
+      "name": "File Manager",
+      "icon": "folder",
+      "type": "iframe",
+      "url": "/apps/files/index.html",
+      "categoryId": "system",
+      "description": "Browse and manage files",
+      "order": 2,
+      "enabled": true,
+      "sandbox": "allow-scripts allow-same-origin allow-forms",
+      "allowMultipleInstances": true
+    },
+    {
+      "id": "terminal",
+      "name": "Terminal",
+      "icon": "terminal",
+      "type": "iframe",
+      "url": "/apps/terminal/index.html",
+      "categoryId": "developer",
+      "description": "Command-line interface",
+      "order": 1,
+      "enabled": true,
+      "allowMultipleInstances": true,
+      "sandbox": "allow-scripts allow-same-origin"
+    },
+    {
+      "id": "browser",
+      "name": "Browser",
+      "icon": "language",
+      "type": "iframe",
+      "url": "/apps/browser/index.html",
+      "categoryId": "productivity",
+      "description": "Web browsing experience",
+      "order": 2,
+      "enabled": true,
+      "allowMultipleInstances": true,
+      "sandbox": "allow-scripts allow-same-origin allow-forms allow-popups"
+    },
+    {
+      "id": "ai-chat",
+      "name": "AI Chat",
+      "icon": "smart_toy",
+      "type": "iframe",
+      "url": "/apps/aichat/chat.html",
+      "categoryId": "productivity",
+      "description": "AI-powered chat assistant with code generation",
+      "order": 3,
+      "enabled": true,
+      "permissions": ["localStorage", "clipboard", "indexedDB"],
+      "sandbox": "allow-scripts allow-same-origin allow-forms allow-modals",
+      "allowMultipleInstances": true,
+      "minWidth": 400,
+      "minHeight": 500,
+      "defaultWidth": 600,
+      "defaultHeight": 700
+    }
+  ]
+}
+-------------------------------------------------------------------------------
 
 ================================================================================
-17. TROUBLESHOOTING
+19. TROUBLESHOOTING
 ================================================================================
 
 *** ICONS MISSING BACKGROUND/BORDER ***
@@ -856,7 +1919,7 @@ Problem: Theme CSS has .icon, .window, .taskbar, etc.
 Solutions:
 1. Remove all OS shell selectors from theme CSS
 2. Use :root variable overrides instead
-3. OS shell is styled in desktop.html #system-variables
+3. Use .system-desktop-* classes for enhanced theming (optional)
 
 *** BACKGROUND NOT SHOWING ***
 Problem: Background image/color not visible
@@ -869,11 +1932,97 @@ Solutions:
 6. Use full background shorthand with !important
 7. Add min-height: 100dvh !important to body
 
-[... Remaining troubleshooting as in original doc ...]
+*** CANVAS ANIMATION NOT STOPPING ***
+Problem: Animation continues after theme switch
+Solutions:
+1. Verify window.ThemeCleanup is set at global scope
+2. Check all requestAnimationFrame are cancelled
+3. Ensure event listeners are removed in cleanup
+4. Test with ThemeManager.trackAnimation() helper
+
+*** DESKTOP CLASSES NOT WORKING ***
+Problem: .system-desktop-* classes have no effect
+Solutions:
+1. Verify desktop.html includes class definitions
+2. Check CSS specificity - may need !important for overrides
+3. Ensure classes are added to HTML elements in desktop.html
+4. Test with simple override first (e.g., background color)
+
+*** THEME NOT PERSISTING ***
+Problem: Theme resets to default after refresh
+Solutions:
+1. Check localStorage is enabled in browser
+2. Verify ThemeManager.saveThemePreference() is called
+3. Check for console errors during init
+4. Test in incognito mode to rule out cache issues
+
+*** ICONS RENDERING AS TEXT INSTEAD OF GLYPHS ***
+Problem: Icon names like "home" or "settings" display as words, not icons
+Solutions:
+1. Verify @font-face is declared in desktop.html <head> BEFORE .material-icons CSS
+2. Check font file path: /system/fonts/MaterialIcons-Regular.ttf exists
+3. Ensure .material-icons class includes font-feature-settings: 'liga'
+4. Verify server serves .ttf with MIME type: font/ttf
+5. Hard refresh browser (Ctrl+F5) to clear font cache
+6. Check DevTools Console for font load errors (404, CORS, MIME type)
+7. Confirm no Google Fonts CDN link is present (conflicts with local font)
+
+*** LONG-PRESS NOT TRIGGERING [NEW v2.7+] ***
+Problem: Holding icon doesn't show context menu
+Solutions:
+1. Verify setupLongPress is attached to correct element
+2. Check duration parameter (default 500ms may feel long during testing)
+3. Ensure onLongPress calls e.preventDefault() to suppress native menu
+4. Test with console.log in onLongPress to confirm callback fires
+5. Verify moveThreshold isn't too sensitive for finger tremor
+
+*** CONTEXT MENU NOT DISMISSING [NEW v2.7+] ***
+Problem: Menu stays open after tapping outside
+Solutions:
+1. Verify ContextMenu.show() onClose callback is defined
+2. Check document click listener isn't being blocked by other handlers
+3. Ensure Escape key handler is attached (document.addEventListener)
+4. Test with ContextMenu.hide() called manually to isolate issue
+
+*** APP NOT SHOWING IN START MENU [NEW v2.0] ***
+Problem: App defined in apps.json doesn't appear in Start Menu
+Solutions:
+1. Verify apps.json is valid JSON (use online validator)
+2. Check enabled: true in app configuration
+3. Verify categoryId matches an existing category.id
+4. Check console for apps.json fetch errors
+5. Ensure apps.json path is correct relative to desktop.html
+
+*** IFRAME APP THEME NOT SYNCING [NEW v2.0] ***
+Problem: App uses default styles, doesn't match OS theme
+Solutions:
+1. Ensure os-theme-bridge.js is loaded in iframe app <head>
+2. Verify data-os-app attribute on body or root element
+3. Check postMessage isn't blocked by sandbox settings
+4. Test with console.log in bridge script to confirm message receipt
+5. Verify ThemeManager.broadcastThemeToApps() is called on window load
 
 ================================================================================
-18. QUICK START TEMPLATE
+20. QUICK START TEMPLATE
 ================================================================================
+
+IMPORTANT: MATERIAL ICONS FONT SETUP
+
+Ensure desktop.html includes the local @font-face declaration for 
+MaterialIcons-Regular.ttf (see Section 21). Do NOT include the Google 
+Fonts CDN link. Icons will not render correctly if the local font is 
+missing or the CDN is used instead.
+
+Required in desktop.html <head>:
+<style id="material-icons-font">
+@font-face {
+  font-family: 'Material Icons';
+  src: url('/system/fonts/MaterialIcons-Regular.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: block;
+}
+</style>
 
 FILE: themes/your-theme/styles.css
 -------------------------------------------------------------------------------
@@ -904,6 +2053,10 @@ FILE: themes/your-theme/styles.css
   --system-icon-bg-hover: rgba(255, 255, 255, 0.15);
   --system-icon-border: 1px solid rgba(255, 255, 255, 0.2);
   --system-icon-border-hover: 1px solid rgba(255, 255, 255, 0.4);
+  
+  /* Desktop enhancements (OPTIONAL v2.7+) */
+  --system-taskbar-glow: none;
+  --system-window-glow: none;
 }
 
 /* Background image support */
@@ -935,10 +2088,37 @@ html, html body, body {
   color: var(--system-text-on-accent, #fff);
 }
 
+/* Context menu enhancements for desktop (optional) */
+.desktop-context-menu {
+  animation: fadeIn 0.1s ease-out;
+  box-shadow: 0 8px 25px rgba(0,0,0,0.3) !important;
+  border: 1px solid rgba(255,255,255,0.15) !important;
+}
+
+.desktop-context-menu .system-menu-item:active {
+  background: rgba(255,255,255,0.2) !important;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Optional desktop class enhancements */
+.system-desktop-taskbar {
+  box-shadow: var(--system-taskbar-glow);
+}
+
+.system-desktop-window {
+  box-shadow: var(--system-window-glow), var(--system-shadow);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .system-btn,
   .system-card,
-  .system-app * {
+  .system-app *,
+  .system-desktop-icon,
+  .system-desktop-window {
     transition: none !important;
     animation: none !important;
   }
@@ -946,7 +2126,9 @@ html, html body, body {
 
 @supports not (backdrop-filter: blur(10px)) {
   .system-card,
-  .system-app .card {
+  .system-app .card,
+  .system-desktop-taskbar,
+  .system-desktop-start-menu {
     background: var(--system-window-bg) !important;
     backdrop-filter: none !important;
   }
@@ -1028,9 +2210,158 @@ FILE: Update themes.json
 }
 -------------------------------------------------------------------------------
 
+FILE: apps.json (REQUIRED v2.0)
+-------------------------------------------------------------------------------
+{
+  "version": "2.0",
+  "categories": [
+    {
+      "id": "system",
+      "name": "System",
+      "icon": "tune",
+      "order": 1,
+      "description": "OS configuration and utilities"
+    },
+    {
+      "id": "productivity",
+      "name": "Productivity",
+      "icon": "work",
+      "order": 2,
+      "description": "Work and organization tools"
+    }
+  ],
+  "apps": [
+    {
+      "id": "settings",
+      "name": "Settings",
+      "icon": "settings",
+      "type": "template",
+      "template": "settings",
+      "categoryId": "system",
+      "description": "Configure themes and OS preferences",
+      "order": 1,
+      "enabled": true,
+      "allowMultipleInstances": false
+    },
+    {
+      "id": "notes",
+      "name": "Notes",
+      "icon": "edit_note",
+      "type": "iframe",
+      "url": "/apps/notes/index.html",
+      "categoryId": "productivity",
+      "description": "Rich text note-taking with formatting",
+      "order": 1,
+      "enabled": true,
+      "permissions": ["localStorage"],
+      "sandbox": "allow-scripts allow-same-origin allow-forms allow-modals",
+      "allowMultipleInstances": true
+    }
+  ]
+}
+-------------------------------------------------------------------------------
+
 ================================================================================
-19. APPENDIX: DESKTOP.HTML INTEGRATION NOTES
+21. APPENDIX: DESKTOP.HTML INTEGRATION NOTES
 ================================================================================
+
+=== MATERIAL ICONS FONT SETUP (LOCAL FILE) ===
+
+CRITICAL: DO NOT USE GOOGLE FONTS CDN
+
+The OS is configured to use a local Material Icons font file for offline 
+compatibility and performance. Using the CDN will cause icons to fail when 
+offline and adds unnecessary external dependencies.
+
+REQUIRED SETUP IN desktop.html <head>:
+-------------------------------------------------------------------------------
+REMOVE THIS LINE (Google Fonts CDN):
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+
+ADD THIS LOCAL @font-face DECLARATION:
+<style id="material-icons-font">
+@font-face {
+  font-family: 'Material Icons';
+  src: url('/system/fonts/MaterialIcons-Regular.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: block;
+}
+</style>
+-------------------------------------------------------------------------------
+
+FILE REQUIREMENTS:
+-------------------------------------------------------------------------------
+Path: /system/fonts/MaterialIcons-Regular.ttf
+Format: TrueType Font (.ttf)
+Source: https://github.com/google/material-design-icons/blob/master/font/MaterialIcons-Regular.ttf
+Size: ~180KB (uncompressed)
+-------------------------------------------------------------------------------
+
+VERIFICATION CHECKLIST:
+[ ] Font file exists at /system/fonts/MaterialIcons-Regular.ttf
+[ ] Server serves .ttf files with correct MIME type: font/ttf
+[ ] No 404 errors in browser DevTools Network tab for the font file
+[ ] Icons render correctly (text like "home" displays as glyph, not word)
+[ ] Font loads without CORS errors (same-origin serving recommended)
+
+TROUBLESHOOTING:
+-------------------------------------------------------------------------------
+Problem: Icons show as text ("home") instead of glyphs
+Solutions:
+1. Verify @font-face is declared BEFORE .material-icons CSS rules
+2. Check font file path is correct (case-sensitive on Linux servers)
+3. Ensure font-feature-settings: 'liga' is present in .material-icons class
+4. Hard refresh browser (Ctrl+F5) to clear font cache
+5. Check Console for "Failed to load resource" errors
+
+Problem: Font fails to load (404 or CORS error)
+Solutions:
+1. Verify file exists at exact path /system/fonts/MaterialIcons-Regular.ttf
+2. Configure server MIME type: AddType font/ttf .ttf (Apache) or 
+   types { font/ttf ttf; } (Nginx)
+3. For cross-origin serving, add CORS header: 
+   Access-Control-Allow-Origin: *
+4. Consider converting to WOFF2 for better compression + broader support
+
+OPTIONAL: FONT FALLBACK STRATEGY
+-------------------------------------------------------------------------------
+For maximum reliability, add a ligature-based text fallback:
+
+.material-icons {
+  font-family: 'Material Icons', 'Material Icons Outlined', sans-serif !important;
+  
+  font-feature-settings: 'liga';
+  -webkit-font-feature-settings: 'liga';
+}
+
+PERFORMANCE TIP: Convert TTF to WOFF2
+-------------------------------------------------------------------------------
+WOFF2 offers ~30% smaller file size with identical quality:
+
+1. Convert using fonttools or online converter:
+   https://github.com/google/woff2
+
+2. Update @font-face with multiple formats for broader support:
+@font-face {
+  font-family: 'Material Icons';
+  src: url('/system/fonts/MaterialIcons-Regular.woff2') format('woff2'),
+       url('/system/fonts/MaterialIcons-Regular.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: block;
+}
+
+3. Update themes.json or build process to reference .woff2 first
+-------------------------------------------------------------------------------
+
+SECURITY NOTE: Sandbox Considerations
+-------------------------------------------------------------------------------
+If serving fonts to iframe apps with sandboxed content:
+- Ensure font is served from same origin as desktop.html
+- Or configure CORS headers: Access-Control-Allow-Origin: *
+- Avoid data: URIs for fonts (CSP restrictions, larger payload)
+-------------------------------------------------------------------------------
 
 CANVAS ELEMENT (in desktop.html):
 -------------------------------------------------------------------------------
@@ -1058,7 +2389,7 @@ THEME PERSISTENCE:
 
 IFRAME APP INTEGRATION:
 -------------------------------------------------------------------------------
-<!-- In desktop.html window content -->
+In desktop.html window content:
 <iframe 
   src="/apps/notes/index.html" 
   data-os-app="true"
@@ -1069,6 +2400,39 @@ IFRAME APP INTEGRATION:
 - Apps must include <script src="/os-theme-bridge.js">
 - Apps should use .system-app or .system-* classes for automatic theming
 - Theme sync via postMessage: parent -> iframe
+
+LONG-PRESS UTILITY (in desktop.html):
+-------------------------------------------------------------------------------
+setupLongPress(element, callbacks, options = {})
+-------------------------------------------------------------------------------
+- Unified touch/mouse long-press detection
+- 500ms default hold duration (configurable)
+- Movement detection to cancel accidental drags
+- Optional haptic feedback via navigator.vibrate(10)
+- Returns cleanup function to remove all listeners
+
+CONTEXT MENU API (in desktop.html):
+-------------------------------------------------------------------------------
+ContextMenu.show(x, y, items, onSelect, onClose)
+ContextMenu.hide()
+-------------------------------------------------------------------------------
+- Position-aware menu placement (auto-clamps to viewport)
+- Keyboard dismiss via Escape key
+- Click-outside-to-dismiss behavior
+- Proper event listener cleanup on close
+
+DESKTOPMANAGER API (in desktop.html):
+-------------------------------------------------------------------------------
+DesktopManager.addToDesktop(appId)
+DesktopManager.removeFromDesktop(appId)
+DesktopManager.isOnDesktop(appId)
+DesktopManager.getItems()
+DesktopManager.saveItems(items)
+DesktopManager.clear()
+-------------------------------------------------------------------------------
+- localStorage persistence for desktop icon state
+- Key: 'os-desktop-items-v2'
+- Format: JSON array of app ID strings
 
 OS SHELL ELEMENTS (Styled in desktop.html #system-variables):
 -------------------------------------------------------------------------------
@@ -1109,8 +2473,11 @@ OS SHELL ELEMENTS (Styled in desktop.html #system-variables):
 THEME CSS SHOULD NOT STYLE THESE ELEMENTS DIRECTLY.
 Use CSS variable overrides in :root instead.
 
-IMPORTANT: desktop.html body background uses `background-color` not 
-`background` shorthand. This allows themes to override with `background-image` 
+OPTIONAL: Add .system-desktop-* classes alongside original classes for
+enhanced theming capability (v2.7+ feature).
+
+IMPORTANT: desktop.html body background uses background-color not 
+background shorthand. This allows themes to override with background-image 
 without conflict.
 
 Theme CSS should use:
@@ -1121,7 +2488,7 @@ Theme CSS should use:
   }
 
 ================================================================================
-20. APPENDIX: UPDATED SYSTEM CLASSES (v2.7+)
+22. APPENDIX: UPDATED SYSTEM CLASSES (v2.7+)
 ================================================================================
 
 === CSS VARIABLE UPDATES (v2.7+) ===
@@ -1143,6 +2510,16 @@ Example theme override:
   --system-icon-border: 1px solid rgba(126, 200, 80, 0.3);
   --system-icon-border-hover: 1px solid rgba(126, 200, 80, 0.6);
 }
+
+=== OPTIONAL DESKTOP VARIABLES (v2.7+) ===
+
+Add these to desktop.html #system-variables for advanced theme control:
+-------------------------------------------------------------------------------
+--system-taskbar-glow       - Taskbar glow effect (default: none)
+--system-window-glow        - Window glow effect (default: none)
+--system-icon-glow          - Icon hover glow (default: none)
+--system-start-menu-blur    - Start menu blur amount (default: 15px)
+--system-taskbar-blur       - Taskbar blur amount (default: 15px)
 
 === ICON STYLING ARCHITECTURE (v2.7+) ===
 
@@ -1175,6 +2552,38 @@ BENEFITS:
 - Easier to create themed icon backgrounds (glass, solid, gradient)
 - Maintains v2.6+ architecture (themes only override variables)
 
+=== DESKTOP SHELL CLASSES (v2.7+ NEW) ===
+
+New .system-desktop-* class namespace for OS shell theming:
+-------------------------------------------------------------------------------
+.system-desktop-taskbar           - Taskbar container
+.system-desktop-taskbar__item     - Taskbar app button
+.system-desktop-taskbar__item--active - Active taskbar item
+.system-desktop-window            - Window container
+.system-desktop-window__header    - Window title bar
+.system-desktop-window__control--close - Close button
+.system-desktop-icon              - Desktop icon
+.system-desktop-icon__label       - Icon text label
+.system-desktop-start-menu        - Start menu panel
+.system-desktop-start-menu__item  - Start menu item
+.system-desktop-browser__toolbar  - Browser navigation bar
+.system-desktop-browser__address  - URL address bar
+...and 30+ more classes
+
+See Section 8 for complete reference.
+
+=== CONTEXT MENU CLASSES (v2.7+ NEW) ===
+
+New .system-menu and .desktop-context-menu classes for long-press menus:
+-------------------------------------------------------------------------------
+.system-menu                    - Base context menu container
+.system-menu-item               - Individual menu option
+.system-menu-item:hover         - Hover state styling
+.system-menu-item:active        - Active press state
+.system-menu-divider            - Horizontal separator
+.desktop-context-menu           - Desktop-specific menu enhancements
+.desktop-context-menu .system-menu-item:active - Enhanced press feedback
+
 === IFRAME APP THEME SYNC ===
 
 Apps running in iframes can automatically sync with the OS theme using the
@@ -1193,18 +2602,17 @@ The bridge script (included in iframe apps) provides:
 
 Usage in iframe app:
 -------------------------------------------------------------------------------
-<!-- Include in iframe app <head> -->
+Include in iframe app <head>:
 <script src="/os-theme-bridge.js"></script>
 
-<!-- Listen for theme changes in your app JS -->
+Listen for theme changes in your app JS:
 window.addEventListener('osThemeChanged', (e) => {
   console.log('Theme updated:', e.detail.themeId);
-  // Update app-specific UI if needed
 });
 -------------------------------------------------------------------------------
 
 ================================================================================
-21. APPENDIX: ARCHITECTURE CHANGES (v2.7+)
+23. APPENDIX: ARCHITECTURE CHANGES (v2.7+)
 ================================================================================
 
 === MAJOR ARCHITECTURE UPDATE (v2.6+) ===
@@ -1220,13 +2628,35 @@ Variable-First Theming:
 - Themes override variables in :root, not element selectors
 - Enables complete visual customization without structural changes
 
+=== NEW FEATURES (v2.7+) ===
+
+1. Desktop Shell System Classes:
+   - .system-desktop-* namespace for OS shell theming
+   - Additive only - original classes remain unchanged
+   - Provides semantic hooks for advanced theme effects
+   - Backward compatible with existing themes
+   - 40+ classes covering taskbar, windows, icons, start menu, browser
+
+2. Long-Press Interaction Model:
+   - setupLongPress() utility for unified touch/mouse detection
+   - ContextMenu API for consistent menu presentation
+   - DesktopManager API for persistent desktop state
+   - Keyboard accessibility with Enter/Space fallback
+   - Haptic feedback support with navigator.vibrate()
+
+3. Context Menu System Classes:
+   - .system-menu and .desktop-context-menu class library
+   - Automatic positioning and boundary clamping
+   - Escape key and click-outside dismissal
+   - Proper event listener cleanup
+
 === BUG FIXES (v2.7+) ===
 
 1. THEME MANAGER CLEANUP - CANVAS REFERENCE ERROR
 -------------------------------------------------------------------------------
 Problem: ReferenceError: canvas is not defined when switching themes
 Location: desktop.html ThemeManager.cleanup() method (~line 370)
-Fix: Changed `canvas.height` to `this.canvas.height`
+Fix: Changed canvas.height to this.canvas.height
 Impact: Themes now switch without crashing
 
 2. CSS LOADING - UNRELIABLE ONLOAD
@@ -1279,12 +2709,35 @@ CHANGE your body background to:
     min-width: 100vw !important;
   }
 
-STEP 3: Test Theme Switching
+STEP 3: (OPTIONAL) Add Desktop Class Enhancements
+-------------------------------------------------------------------------------
+ADD to your theme CSS for advanced effects:
+  .system-desktop-taskbar {
+    box-shadow: var(--system-taskbar-glow);
+    backdrop-filter: blur(20px);
+  }
+  
+  .system-desktop-icon:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 20px rgba(0, 120, 212, 0.4);
+  }
+
+STEP 4: (OPTIONAL) Implement Long-Press for Desktop Icons
+-------------------------------------------------------------------------------
+In your app's desktop icon creation code:
+  setupLongPress(icon, {
+    onLongPress: (e) => { /* show context menu */ },
+    onShortPress: () => { /* launch app */ },
+    preventContextMenu: true
+  });
+
+STEP 5: Test Theme Switching
 -------------------------------------------------------------------------------
 - Switch themes 10x rapidly
 - Check console for ReferenceError
 - Verify no memory leaks
 - Confirm canvas clears properly
+- Test long-press on touch device
 
 === TESTING CHECKLIST FOR V2.7 THEMES ===
 
@@ -1296,17 +2749,269 @@ STEP 3: Test Theme Switching
 [ ] Canvas cleanup works (no lingering animations)
 [ ] Icons have background and border
 [ ] Icons brighten on hover
+[ ] .system-desktop-* classes present in desktop.html (if using)
+[ ] Desktop class overrides work in theme CSS (if using)
+[ ] setupLongPress attached to desktop icons (if implementing long-press)
+[ ] Context menu appears on long-press (if implementing long-press)
+[ ] Keyboard Enter/Space launches app (accessibility check)
+[ ] aria-label present on desktop icons
 [ ] All v2.6 checklist items pass
+
+================================================================================
+24. APP REGISTRY: apps.json STRUCTURE (v2.0) [NEW]
+================================================================================
+
+The OS now uses a centralized `apps.json` registry to manage application 
+metadata, categories, permissions, and sandboxing. This enables dynamic app 
+loading, permission enforcement, and consistent theming across all apps.
+
+FILE LOCATION:
+/webos/apps.json
+
+SCHEMA:
+{
+  "version": "2.0",
+  "categories": [CategoryObject],
+  "apps": [AppObject]
+}
+
+CATEGORY OBJECT:
+-------------------------------------------------------------------------------
+Property     | Type    | Required | Description              | Example
+-------------|---------|----------|--------------------------|------------------
+id           | String  | Yes      | Unique identifier        | "system"
+name         | String  | Yes      | Display name             | "System"
+icon         | String  | Yes      | Material Icons glyph     | "tune"
+order        | Number  | Yes      | Sort order (ascending)   | 1
+description  | String  | Optional | Tooltip text             | "OS utilities"
+
+APP OBJECT (CORE):
+-------------------------------------------------------------------------------
+Property     | Type    | Required | Description              | Example
+-------------|---------|----------|--------------------------|------------------
+id           | String  | Yes      | Unique app identifier    | "notes"
+name         | String  | Yes      | Display name             | "Notes"
+icon         | String  | Yes      | Material Icons glyph     | "edit_note"
+type         | String  | Yes      | "iframe" or "template"   | "iframe"
+categoryId   | String  | Yes      | References category.id   | "productivity"
+description  | String  | Optional | Tooltip/help text        | "Note-taking app"
+order        | Number  | Yes      | Sort within category     | 1
+enabled      | Boolean | Yes      | Show/hide in UI          | true
+
+APP OBJECT (IFRAME TYPE):
+-------------------------------------------------------------------------------
+Property     | Type    | Required | Description              | Example
+-------------|---------|----------|--------------------------|------------------
+url          | String  | Yes      | Path to app entry point  | "/apps/notes/index.html"
+sandbox      | String  | Rec.     | iframe sandbox attrs     | "allow-scripts allow-same-origin"
+permissions  | Array   | Optional | Granted capabilities     | ["localStorage", "clipboard"]
+
+APP OBJECT (TEMPLATE TYPE):
+-------------------------------------------------------------------------------
+Property     | Type    | Required | Description              | Example
+-------------|---------|----------|--------------------------|------------------
+template     | String  | Yes      | Internal template ID     | "settings"
+
+ADVANCED PROPERTIES:
+-------------------------------------------------------------------------------
+Property                 | Type    | Default    | Description
+-------------------------|---------|------------|----------------------------------
+allowMultipleInstances   | Boolean | false      | Allow multiple windows
+minWidth/minHeight       | Number  | 300/200    | Minimum window dimensions
+defaultWidth/Height      | Number  | 600/400    | Initial window size
+
+SANDBOX ATTRIBUTES REFERENCE:
+-------------------------------------------------------------------------------
+Attribute              | Purpose                      | Recommended For
+-----------------------|------------------------------|--------------------------
+allow-scripts          | Enable JavaScript            | All iframe apps
+allow-same-origin      | Access localStorage/cookies  | Apps needing persistence
+allow-forms            | Submit forms                 | Apps with input fields
+allow-modals           | Show alert/confirm/prompt    | Use sparingly
+allow-popups           | Open new windows/tabs        | Browser apps only
+allow-top-navigation   | Navigate parent window       | Avoid (security risk)
+
+PERMISSIONS ARRAY:
+-------------------------------------------------------------------------------
+Permission    | Capability                  | App Access Pattern
+--------------|-----------------------------|----------------------------------
+localStorage  | Read/write localStorage     | window.localStorage
+sessionStorage| Read/write sessionStorage   | window.sessionStorage
+indexedDB     | Use IndexedDB database      | window.indexedDB
+clipboard     | Read/write clipboard        | navigator.clipboard
+geolocation   | Access device location      | navigator.geolocation
+camera/mic    | Media device access         | navigator.mediaDevices
+
+> Security Note: Permissions are declarative only in v2.0. Actual 
+> enforcement requires iframe sandbox configuration + app-level checks.
+
+COMPLETE apps.json EXAMPLE:
+-------------------------------------------------------------------------------
+{
+  "version": "2.0",
+  "categories": [
+    {
+      "id": "system",
+      "name": "System",
+      "icon": "tune",
+      "order": 1,
+      "description": "OS configuration and utilities"
+    },
+    {
+      "id": "productivity",
+      "name": "Productivity",
+      "icon": "work",
+      "order": 2,
+      "description": "Work and organization tools"
+    },
+    {
+      "id": "entertainment",
+      "name": "Entertainment",
+      "icon": "movie",
+      "order": 3,
+      "description": "Media and leisure apps"
+    },
+    {
+      "id": "developer",
+      "name": "Developer",
+      "icon": "code",
+      "order": 4,
+      "description": "Coding and development tools"
+    }
+  ],
+  "apps": [
+    {
+      "id": "settings",
+      "name": "Settings",
+      "icon": "settings",
+      "type": "template",
+      "template": "settings",
+      "categoryId": "system",
+      "description": "Configure themes and OS preferences",
+      "order": 1,
+      "enabled": true,
+      "allowMultipleInstances": false
+    },
+    {
+      "id": "notes",
+      "name": "Notes",
+      "icon": "edit_note",
+      "type": "iframe",
+      "url": "/apps/notes/index.html",
+      "categoryId": "productivity",
+      "description": "Rich text note-taking with formatting",
+      "order": 1,
+      "enabled": true,
+      "permissions": ["localStorage"],
+      "sandbox": "allow-scripts allow-same-origin allow-forms allow-modals",
+      "allowMultipleInstances": true
+    },
+    {
+      "id": "file-manager",
+      "name": "File Manager",
+      "icon": "folder",
+      "type": "iframe",
+      "url": "/apps/files/index.html",
+      "categoryId": "system",
+      "description": "Browse and manage files",
+      "order": 2,
+      "enabled": true,
+      "sandbox": "allow-scripts allow-same-origin allow-forms",
+      "allowMultipleInstances": true
+    },
+    {
+      "id": "terminal",
+      "name": "Terminal",
+      "icon": "terminal",
+      "type": "iframe",
+      "url": "/apps/terminal/index.html",
+      "categoryId": "developer",
+      "description": "Command-line interface",
+      "order": 1,
+      "enabled": true,
+      "allowMultipleInstances": true,
+      "sandbox": "allow-scripts allow-same-origin"
+    },
+    {
+      "id": "browser",
+      "name": "Browser",
+      "icon": "language",
+      "type": "iframe",
+      "url": "/apps/browser/index.html",
+      "categoryId": "productivity",
+      "description": "Web browsing experience",
+      "order": 2,
+      "enabled": true,
+      "allowMultipleInstances": true,
+      "sandbox": "allow-scripts allow-same-origin allow-forms allow-popups"
+    },
+    {
+      "id": "ai-chat",
+      "name": "AI Chat",
+      "icon": "smart_toy",
+      "type": "iframe",
+      "url": "/apps/aichat/chat.html",
+      "categoryId": "productivity",
+      "description": "AI-powered chat assistant with code generation",
+      "order": 3,
+      "enabled": true,
+      "permissions": ["localStorage", "clipboard", "indexedDB"],
+      "sandbox": "allow-scripts allow-same-origin allow-forms allow-modals",
+      "allowMultipleInstances": true,
+      "minWidth": 400,
+      "minHeight": 500,
+      "defaultWidth": 600,
+      "defaultHeight": 700
+    }
+  ]
+}
+
+APP LOADING FLOW:
+1. desktop.html init -> Load apps.json
+2. Parse categories + apps -> Render Start Menu by category
+3. User clicks app -> Create window with iframe (or template)
+4. Inject os-theme-bridge.js -> Sync theme via postMessage
+5. App renders with theme variables
+
+THEME DEVELOPER NOTES:
+- Apps can access metadata via window.OSAppConfig after bridge init
+- Theme variables auto-sync to iframe apps via postMessage
+- Use CSS variables for all styling to ensure theme compatibility
+
+MIGRATION: v1.0 -> v2.0
+1. Wrap apps in "apps" array property
+2. Add "version": "2.0" at root
+3. Define "categories" array with id/name/icon/order
+4. Add "categoryId" to each app
+5. Add "type": "iframe" or "template"
+6. Add "sandbox" and "permissions" as needed
+
+TROUBLESHOOTING apps.json:
+| Issue                    | Solution                                    |
+|--------------------------|---------------------------------------------|
+| App missing from menu    | Check enabled:true + categoryId matches    |
+| Iframe won't load        | Verify url path + sandbox attributes       |
+| Theme not syncing        | Ensure os-theme-bridge.js is loaded        |
+| localStorage undefined   | Add permission + allow-same-origin         |
+| Multiple windows fail    | Set allowMultipleInstances: true           |
 
 ================================================================================
 END OF DOCUMENTATION
 ================================================================================
 Material Icons OS - Theme Development Guide v2.7+
+App Registry Integration v2.0
 Verified against desktop.html and Rainy Forest theme example
 Includes 90+ .system-* classes with full reference tables
+Includes 40+ .system-desktop-* classes for OS shell theming [NEW]
+Includes setupLongPress() + ContextMenu API for long-press interactions [NEW]
+Includes apps.json v2.0 registry for app management [NEW]
 Uses CSS Variable Override System (No direct OS shell styling in themes)
 OS Shell styled in desktop.html #system-variables
 Icon Styling via CSS Variables (--system-icon-*)
+Desktop Shell Classes via .system-desktop-* namespace [NEW]
+Long-Press System via setupLongPress() + ContextMenu API [NEW]
+App Registry via apps.json v2.0 with categories, permissions, sandbox [NEW]
 ThemeManager Bugs Fixed (canvas reference, CSS loading, background apply)
+Material Icons: Local font file required (/system/fonts/MaterialIcons-Regular.ttf)
 For support, check browser console logs or ThemeManager API
 ================================================================================

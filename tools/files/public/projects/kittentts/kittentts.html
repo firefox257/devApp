@@ -245,7 +245,7 @@
     async function init() {
         try {
             log("🔄 Loading ONNX Model...");
-            session = await ort.InferenceSession.create('./kitten_tts_nano_v0_8.onnx', { 
+            session = await ort.InferenceSession.create('kitten_tts_nano_v0_8.onnx', { 
                 executionProviders: ['wasm'] 
             });
             log("✅ ONNX Model loaded");

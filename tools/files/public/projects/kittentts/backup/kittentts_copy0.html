@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>KittenTTS Mobile</title>
+    <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+    <style>
+        body { font-family: -apple-system, sans-serif; background: #121212; color: #eee; padding: 15px; margin: 0; }
+        .card { max-width: 450px; margin: 20px auto; background: #1e1e1e; padding: 20px; border-radius: 12px; border: 1px solid #333; }
+        h2 { color: #ff69b4; margin: 0 0 15px 0; font-size: 1.4rem; text-align: center; }
+        label { display: block; font-size: 11px; color: #888; margin-bottom: 4px; text-transform: uppercase; }
+        select, input, textarea { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #333; background: #2c2c2c; color: white; font-size: 16px; box-sizing: border-box; margin-bottom: 12px; }
+        button { width: 100%; padding: 16px; background: #ff69b4; color: white; border: none; border-radius: 8px; font-weight: bold; font-size: 18px; }
+        button:disabled { background: #444; color: #888; }
+        #log { margin-top: 15px; background: #000; padding: 10px; border-radius: 8px; font-family: monospace; font-size: 10px; color: #00ff41; height: 160px; overflow-y: auto; border: 1px solid #333; white-space: pre-wrap; }
+        
+        /* ✅ New phonetic output styles */
+        #phoneticOutput { 
+            margin-top: 12px; 
+            background: #252525; 
+            padding: 12px; 
+            border-radius: 8px; 
+            font-family: monospace; 
+            font-size: 12px; 
+            color: #7ec8ff; 
+            border: 1px solid #444;
+            white-space: pre-wrap;
+            min-height: 60px;
+            max-height: 120px;
+            overflow-y: auto;
+        }
+        .phonetic-label { color: #aaa; font-size: 10px; text-transform: uppercase; margin-bottom: 6px; display: block; }
+        .phoneme { display: inline-block; background: #333; padding: 2px 6px; margin: 2px; border-radius: 4px; font-size: 11px; }
+        .phoneme-id { color: #ff69b4; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h2>🐱 KittenTTS v0.8</h2>
+    
+    <label>Voice Artist</label>
+    <select id="voiceSelect">
+        <option value="Bella">Bella</option>
+        <option value="Jasper" selected>Jasper</option>
+        <option value="Luna">Luna</option>
+        <option value="Bruno">Bruno</option>
+        <option value="Rosie">Rosie</option>
+        <option value="Hugo">Hugo</option>
+        <option value="Kiki">Kiki</option>
+        <option value="Leo">Leo</option>
+    </select>
+
+    <label>Talking Speed: <span id="speedVal">1.0</span>x</label>
+    <input type="range" id="speedRange" min="0.5" max="2.0" step="0.1" value="1.0">
+
+    <label>Text</label>
+    <textarea id="textInput">Hello! Testing the shape fix on my iPhone.</textarea>
+
+    <!-- ✅ NEW: Phonetic Translation Output -->
+    <span class="phonetic-label">Phonetic Translation</span>
+    <div id="phoneticOutput">Enter text to see phonemes...</div>
+
+    <button id="runBtn">GENERATE SPEECH</button>
+    <div id="log">Status: Initializing...</div>
+</div>
+
+<script>
+    const logDiv = document.getElementById('log');
+    const phoneticOutput = document.getElementById('phoneticOutput');
+    
+    const log = (msg) => { 
+        logDiv.innerText += `\n> ${msg}`; 
+        logDiv.scrollTop = logDiv.scrollHeight; 
+    };
+    
+    const speedRange = document.getElementById('speedRange');
+    const speedVal = document.getElementById('speedVal');
+    speedRange.oninput = () => speedVal.innerText = speedRange.value;
+
+    let session = null;
+    let voices = {};
+
+    const voiceMap = {
+        "Bella": "expr-voice-2-f.npy", 
+        "Jasper": "expr-voice-2-m.npy",
+        "Luna": "expr-voice-3-f.npy", 
+        "Bruno": "expr-voice-3-m.npy",
+        "Rosie": "expr-voice-4-f.npy", 
+        "Hugo": "expr-voice-4-m.npy",
+        "Kiki": "expr-voice-5-f.npy", 
+        "Leo": "expr-voice-5-m.npy"
+    };
+
+    // ✅ Simple phoneme mapping for demonstration (expand as needed)
+    const phonemeMap = {
+        'a': 'æ', 'e': 'ɛ', 'i': 'ɪ', 'o': 'ɔ', 'u': 'ʌ',
+        'ae': 'eɪ', 'ee': 'i:', 'oo': 'u:', 'th': 'θ', 'sh': 'ʃ',
+        'ch': 'tʃ', 'zh': 'ʒ', 'ng': 'ŋ', 'y': 'j', 'w': 'w'
+    };
+
+    function textToPhonemes(text) {
+        // Basic character-to-phoneme conversion (expandable)
+        return text.toLowerCase()
+            .replace(/([aeiou])([aeiou])/g, '$1 $2') // separate vowel clusters
+            .split('')
+            .map(c => phonemeMap[c] || c)
+            .join(' ');
+    }
+
+    function textToIds(text) {
+        // Simple character mapping with phonetic tracking
+        const chars = text.toLowerCase().split('');
+        const ids = [];
+        const phonemeTokens = [];
+        
+        for (let c of chars) {
+            const code = c.charCodeAt(0) % 60;
+            ids.push(BigInt(code));
+            const phoneme = phonemeMap[c] || c;
+            phonemeTokens.push({ char: c, phoneme: phoneme, id: code });
+        }
+        
+        return { ids: new BigInt64Array(ids), phonemes: phonemeTokens };
+    }
+
+    function displayPhonetics(text, phonemeData) {
+        if (!phonemeData || phonemeData.length === 0) {
+            phoneticOutput.innerText = 'No phonetic data';
+            return;
+        }
+        
+        let html = '';
+        for (let p of phonemeData) {
+            html += `<span class="phoneme">"${p.char}" → <span class="phoneme-id">${p.phoneme}</span>[${p.id}]</span>`;
+        }
+        phoneticOutput.innerHTML = html;
+    }
+
+    function parseNpy(buffer) {
+        const view = new DataView(buffer);
+        const magic = String.fromCharCode(...new Uint8Array(buffer.slice(0, 6)));
+        if (magic !== "\x93NUMPY") throw new Error("Not a valid NPY file");
+        
+        const headerLen = view.getUint16(8, true);
+        const start = 10 + headerLen;
+        
+        return new Float32Array(buffer.slice(start, start + 1024));
+    }
+
+    async function init() {
+        try {
+            log("Loading ONNX Model...");
+            session = await ort.InferenceSession.create('./kitten_tts_nano_v0_8.onnx', { 
+                executionProviders: ['wasm'] 
+            });
+            
+            log("Fetching voices.npz...");
+            const response = await fetch('./voices.npz');
+            if (!response.ok) throw new Error(`Failed to fetch voices: ${response.status}`);
+            const arrayBuffer = await response.arrayBuffer();
+            
+            log("Unzipping voices...");
+            const zip = await JSZip.loadAsync(arrayBuffer);
+
+            for (const [name, filename] of Object.entries(voiceMap)) {
+                const file = zip.file(filename);
+                if (file) {
+                    const content = await file.async("arraybuffer");
+                    voices[name] = parseNpy(content);
+                    log(`✓ Loaded ${name} (${voices[name].length} features)`);
+                }
+            }
+            log("✅ System Ready.");
+        } catch (e) {
+            log("❌ INIT ERROR: " + e.message);
+            console.error(e);
+        }
+    }
+
+    async function speak() {
+        const btn = document.getElementById('runBtn');
+        const originalBtnText = btn.innerText;
+        btn.disabled = true;
+        btn.innerText = "Generating...";
+
+        try {
+            const voiceName = document.getElementById('voiceSelect').value;
+            const styleData = voices[voiceName];
+            if (!styleData) throw new Error("Voice style not loaded!");
+
+            log(`\n🎤 Generating ${voiceName}...`);
+            const text = document.getElementById('textInput').value.trim();
+            if (!text) throw new Error("Please enter some text");
+            
+            // ✅ Get both IDs and phonetic data
+            const { ids, phonemes } = textToIds(text);
+            
+            // ✅ Display phonetic translation
+            displayPhonetics(text, phonemes);
+            log(`🔤 Phonemes: ${phonemes.map(p=>p.phoneme).join(' ')}`);
+
+            const feeds = {
+                "input_ids": new ort.Tensor('int64', ids, [1, ids.length]),
+                "style": new ort.Tensor('float32', styleData, [1, styleData.length]),
+                "speed": new ort.Tensor('float32', new Float32Array([parseFloat(speedRange.value)]), [1])
+            };
+
+            log("🔄 Running Inference...");
+            const results = await session.run(feeds);
+            const outputKey = Object.keys(results)[0];
+            
+            if (!results[outputKey]?.data) {
+                throw new Error("No audio data in output");
+            }
+
+            log("✅ Success! Playing audio...");
+            await playAudio(results[outputKey].data);
+
+        } catch (e) {
+            log("❌ RUN ERROR: " + e.message);
+            console.error("Inference error:", e);
+        } finally {
+            btn.disabled = false;
+            btn.innerText = originalBtnText;
+        }
+    }
+
+    async function playAudio(data) {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        const ctx = new AudioCtx();
+        
+        if (ctx.state === 'suspended') {
+            await ctx.resume();
+        }
+        
+        const buffer = ctx.createBuffer(1, data.length, 24000);
+        const channelData = buffer.getChannelData(0);
+        
+        for (let i = 0; i < data.length; i++) {
+            channelData[i] = data[i];
+        }
+        
+        const source = ctx.createBufferSource();
+        source.buffer = buffer;
+        source.connect(ctx.destination);
+        source.start();
+        
+        log("🔊 Audio started.");
+        
+        source.onended = () => {
+            ctx.close();
+        };
+    }
+
+    // ✅ Live phonetic preview as user types
+    document.getElementById('textInput').addEventListener('input', (e) => {
+        const text = e.target.value.trim();
+        if (text.length > 0) {
+            const { phonemes } = textToIds(text);
+            displayPhonetics(text, phonemes);
+        } else {
+            phoneticOutput.innerText = 'Enter text to see phonemes...';
+        }
+    });
+
+    document.getElementById('runBtn').onclick = speak;
+    window.onload = init;
+</script>
+</body>
+</html>

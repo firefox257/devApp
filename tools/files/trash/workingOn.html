@@ -1,0 +1,991 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+  <title>🐱 KittenTTS ML Demo</title>
+  <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <style>
+    :root {
+      --bg: #121212; --card: #1e1e1e; --text: #e0e0e0;
+      --accent: #ff69b4; --success: #34c759; --warn: #ffcc00; --error: #ff3b30;
+      --border: #333; --mono: 'Menlo', 'Courier New', monospace;
+    }
+    body { font-family: -apple-system, system-ui, sans-serif; background: var(--bg); color: var(--text); padding: 16px; margin: 0; }
+    .card { max-width: 520px; margin: 20px auto; background: var(--card); padding: 20px; border-radius: 16px; border: 1px solid var(--border); }
+    h2 { color: var(--accent); margin: 0 0 16px; text-align: center; font-size: 1.3rem; }
+    label { display: block; font-size: 11px; color: #888; margin: 8px 0 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+    textarea, select, input[type="text"] { width: 100%; padding: 12px; border-radius: 10px; border: 1px solid var(--border); background: #2a2a2a; color: #fff; font-size: 14px; box-sizing: border-box; margin-bottom: 12px; font-family: var(--mono); }
+    textarea { min-height: 80px; resize: vertical; }
+    .row { display: flex; gap: 8px; }
+    .row > * { flex: 1; }
+    button { width: 100%; padding: 14px; background: var(--accent); color: white; border: none; border-radius: 10px; font-weight: 600; font-size: 16px; cursor: pointer; transition: opacity 0.2s; }
+    button:hover { opacity: 0.95; }
+    button:disabled { background: #444; color: #888; cursor: not-allowed; }
+    button.fallback { background: #333; border: 1px dashed var(--warn); }
+    button.secondary { background: #444; }
+    button.debug { background: #2a2a2a; border: 1px solid var(--border); font-size: 12px; padding: 10px; margin-top: 8px; }
+    button.download { background: #2a4a2a; border: 1px solid var(--success); font-size: 12px; padding: 10px; margin-top: 8px; }
+    button.test { background: #4a2a4a; border: 1px solid #ff69b4; font-size: 12px; padding: 10px; margin-top: 8px; }
+    
+    #phonemeOutput { 
+      background: #000; padding: 12px; border-radius: 10px; 
+      font-family: var(--mono); font-size: 13px; color: #7ec8ff; 
+      border: 1px solid var(--border); white-space: pre-wrap; 
+      min-height: 70px; max-height: 140px; overflow-y: auto; margin: 12px 0;
+    }
+    .phoneme { display: inline-block; background: #333; padding: 2px 7px; margin: 2px; border-radius: 5px; font-size: 12px; }
+    .phoneme .id { color: var(--accent); font-weight: bold; margin-left: 4px; opacity: 0.8; }
+    .unknown { background: #442222; border: 1px dashed var(--error); }
+    
+    .status { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; font-size: 11px; margin: 8px 0; }
+    .status-item { background: #252525; padding: 8px; border-radius: 6px; text-align: center; }
+    .badge { padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: bold; display: inline-block; margin-top: 4px; }
+    .ready { background: var(--success); color: #000; }
+    .loading { background: var(--warn); color: #000; }
+    .error { background: var(--error); color: #fff; }
+    .fallback { background: #555; color: #fff; }
+    
+    #debugPanel {
+      margin-top: 12px;
+      background: #1a1a1a;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px;
+      font-family: var(--mono);
+      font-size: 10px;
+      color: #00ff41;
+      max-height: 220px;
+      overflow-y: auto;
+    }
+    .debug-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 3px 0;
+      border-bottom: 1px solid #2a2a2a;
+    }
+    .debug-row:last-child { border-bottom: none; }
+    .debug-label { color: #888; }
+    .debug-value { color: #7ec8ff; font-weight: bold; }
+    .debug-warn { color: var(--warn); }
+    .debug-error { color: var(--error); }
+    
+    #log { margin-top: 12px; background: #000; padding: 10px; border-radius: 10px; font-family: var(--mono); font-size: 10px; color: #00ff41; height: 200px; overflow-y: auto; border: 1px solid var(--border); white-space: pre-wrap; }
+    
+    .note { font-size: 11px; color: #888; margin-top: 16px; padding: 10px; background: #252525; border-radius: 8px; border-left: 3px solid var(--accent); }
+    .note code { background: #333; padding: 2px 6px; border-radius: 3px; color: var(--accent); }
+    
+    .progress { height: 4px; background: #333; border-radius: 2px; margin: 8px 0; overflow: hidden; }
+    .progress-bar { height: 100%; background: var(--accent); width: 0%; transition: width 0.3s; }
+    
+    .audio-visualizer {
+      height: 50px;
+      background: #000;
+      border-radius: 8px;
+      margin: 10px 0;
+      display: flex;
+      align-items: flex-end;
+      padding: 5px;
+      gap: 2px;
+      overflow: hidden;
+    }
+    .audio-bar {
+      flex: 1;
+      background: linear-gradient(to top, var(--accent), #ff99cc);
+      border-radius: 2px;
+      min-width: 3px;
+      transition: height 0.1s;
+    }
+    
+    .test-section {
+      background: #2a1a2a;
+      border: 1px solid var(--accent);
+      border-radius: 10px;
+      padding: 12px;
+      margin: 12px 0;
+    }
+    .test-section label { color: var(--accent); }
+    
+    .phoneme-input-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .phoneme-input-row input {
+      flex: 1;
+      background: #1a1a1a;
+      border: 1px solid var(--border);
+      color: #7ec8ff;
+      font-family: var(--mono);
+      font-size: 12px;
+      padding: 8px;
+      border-radius: 6px;
+    }
+  </style>
+</head>
+<body>
+<div class="card">
+  <h2>🐱 KittenTTS ML Demo <span id="statusBadge" class="badge loading">Loading...</span></h2>
+  
+  <div class="note" style="margin-bottom: 12px;">
+    <strong>📁 Required files (same folder):</strong><br>
+    • <code>kitten_tts_nano_v0_8.onnx</code> (54MB)<br>
+    • <code>voices.npz</code> (3MB)<br>
+    <span style="color:#888; font-size:10px; margin-top:6px; display:block;">
+      ⚠️ Must be served via HTTP server (not file://)
+    </span>
+  </div>
+  
+  <div class="status">
+    <div class="status-item">
+      <div>Model</div>
+      <span id="modelStatus" class="badge loading">Loading...</span>
+    </div>
+    <div class="status-item">
+      <div>Dict</div>
+      <span id="dictStatus" class="badge loading">Loading...</span>
+    </div>
+    <div class="status-item">
+      <div>Voices</div>
+      <span id="voiceStatus" class="badge loading">Loading...</span>
+    </div>
+  </div>
+  <div class="progress"><div class="progress-bar" id="progressBar"></div></div>
+
+  <label>Voice Artist</label>
+  <select id="voiceSelect" disabled>
+    <option value="Bella">Bella (Female)</option>
+    <option value="Jasper" selected>Jasper (Male)</option>
+    <option value="Luna">Luna (Female)</option>
+    <option value="Bruno">Bruno (Male)</option>
+    <option value="Rosie">Rosie (Female)</option>
+    <option value="Hugo">Hugo (Male)</option>
+    <option value="Kiki">Kiki (Female)</option>
+    <option value="Leo">Leo (Male)</option>
+  </select>
+
+  <label>Text Input (Normal)</label>
+  <textarea id="textInput" placeholder="Type something..." disabled>Hello world, testing KittenTTS ML.</textarea>
+
+  <label>Phonemes (CMU Dict → KittenTTS IPA)</label>
+  <div id="phonemeOutput">Load model to see phonemes...</div>
+
+  <button id="generateBtn" disabled>🎙️ Generate Speech (ONNX)</button>
+  
+  <!-- ✅ DIRECT PHONEME TEST SECTION -->
+  <div class="test-section">
+    <label>🧪 DIRECT PHONEME TEST (Bypasses G2P)</label>
+    <div class="phoneme-input-row">
+      <input type="text" id="phonemeInput" placeholder="Enter phonemes: h ɛ l ˈoʊ" value="h ɛ l ˈoʊ w ˈɜr l d">
+      <button id="testBtn" class="test" style="flex:0 0 80px; padding: 8px;">TEST</button>
+    </div>
+    <div class="note" style="margin: 8px 0 0 0; padding: 8px; font-size: 10px;">
+      <strong>Quick Tests:</strong><br>
+      <code style="color:var(--accent); cursor:pointer;" onclick="setPhonemes('h ɛ l ˈoʊ')">h ɛ l ˈoʊ</code> (hello)<br>
+      <code style="color:var(--accent); cursor:pointer;" onclick="setPhonemes('k ˈæt')">k ˈæt</code> (cat)<br>
+      <code style="color:var(--accent); cursor:pointer;" onclick="setPhonemes('m j ˈaʊ')">m j ˈaʊ</code> (meow)
+    </div>
+  </div>
+  
+  <button id="fallbackBtn" class="fallback" style="margin-top:8px;">🔊 Fallback: Web Speech API</button>
+  <button id="downloadBtn" class="download" style="margin-top:8px; display:none;">💾 Download Audio (WAV)</button>
+  
+  <button id="toggleDebugBtn" class="debug" onclick="toggleDebug()">📊 Toggle Debug Info</button>
+  <div id="debugPanel" style="display:none;">
+    <div class="debug-row"><span class="debug-label">Model:</span><span class="debug-value" id="dbgModel">-</span></div>
+    <div class="debug-row"><span class="debug-label">Voice Dims:</span><span class="debug-value" id="dbgVoice">-</span></div>
+    <div class="debug-row"><span class="debug-label">Tokens:</span><span class="debug-value" id="dbgTokens">-</span></div>
+    <div class="debug-row"><span class="debug-label">Audio Samples:</span><span class="debug-value" id="dbgSamples">-</span></div>
+    <div class="debug-row"><span class="debug-label">Audio Range:</span><span class="debug-value" id="dbgRange">-</span></div>
+    <div class="debug-row"><span class="debug-label">DC Offset:</span><span class="debug-value" id="dbgDC">-</span></div>
+    <div class="debug-row"><span class="debug-label">NaN Count:</span><span class="debug-value" id="dbgNaN">-</span></div>
+    <div class="debug-row"><span class="debug-label">Sample Rate:</span><span class="debug-value" id="dbgRate">-</span></div>
+    <div class="debug-row"><span class="debug-label">Mode:</span><span class="debug-value" id="dbgMode">-</span></div>
+    <div class="debug-row"><span class="debug-label">Inference Time:</span><span class="debug-value" id="dbgTime">-</span></div>
+    <div class="debug-row"><span class="debug-label">Status:</span><span class="debug-value" id="dbgStatus">-</span></div>
+  </div>
+  
+  <div class="audio-visualizer" id="audioViz" style="display:none;"></div>
+  
+  <div id="log">Initializing KittenTTS ML pipeline...</div>
+</div>
+
+<script>
+// ============ CONFIG ============
+const MODEL_PATH = 'kitten_tts_mini_v0_8.onnx';
+const VOICES_PATH = 'voices.npz';
+const EXPECTED_STYLE_DIM = 256;
+const DEFAULT_SAMPLE_RATE = 24000;
+
+// ============ KITTEN TTS VOCABULARY ============
+const KITTEN_VOCAB = new Map([
+  ['<pad>', 0], ['<unk>', 1], ['<eos>', 10],
+  ['ɑ', 2], ['æ', 3], ['ɒ', 4], ['ɔ', 5], ['ʌ', 6],
+  ['ə', 7], ['ɜ', 8], ['ɪ', 9], ['ʊ', 11], ['u', 12],
+  ['i', 13], ['e', 14], ['ɛ', 15],
+  ['aɪ', 16], ['aʊ', 17], ['ɔɪ', 18], ['əʊ', 19], 
+  ['ɪə', 20], ['ɛə', 21], ['ʊə', 22],
+  ['b', 23], ['d', 24], ['f', 25], ['g', 26], ['h', 27],
+  ['j', 28], ['k', 29], ['l', 30], ['m', 31], ['n', 32],
+  ['ŋ', 33], ['p', 34], ['r', 35], ['s', 36], ['ʃ', 37],
+  ['t', 38], ['θ', 39], ['ð', 40], ['v', 41], ['w', 42],
+  ['z', 43], ['ʒ', 44], ['tʃ', 45], ['dʒ', 46],
+  ['ˈ', 47], ['ˌ', 48],
+  ['.', 49], [',', 50], ['?', 51], ['!', 52], 
+  [';', 53], [':', 54], ['-', 55], [' ', 56],
+  ['x', 57], ['y', 58]
+]);
+
+// Reverse map for display
+const VOCAB_REVERSE = new Map();
+KITTEN_VOCAB.forEach((v, k) => VOCAB_REVERSE.set(v, k));
+
+// ============ ARPABET → IPA ============
+const ARPABET_TO_IPA = {
+  'AA': 'ɑ', 'AE': 'æ', 'AH': 'ʌ', 'AO': 'ɔ', 'AW': 'aʊ', 'AY': 'aɪ',
+  'EH': 'ɛ', 'ER': 'ɜ', 'EY': 'e', 'IH': 'ɪ', 'IY': 'i',
+  'OW': 'əʊ', 'OY': 'ɔɪ', 'UH': 'ʊ', 'UW': 'u',
+  'B': 'b', 'CH': 'tʃ', 'D': 'd', 'DH': 'ð', 'F': 'f', 'G': 'g',
+  'HH': 'h', 'JH': 'dʒ', 'K': 'k', 'L': 'l', 'M': 'm', 'N': 'n',
+  'NG': 'ŋ', 'P': 'p', 'R': 'r', 'S': 's', 'SH': 'ʃ', 'T': 't',
+  'TH': 'θ', 'V': 'v', 'W': 'w', 'Y': 'j', 'Z': 'z', 'ZH': 'ʒ',
+  '0': '', '1': 'ˈ', '2': 'ˌ'
+};
+
+// ============ MINI CMU DICT ============
+const MINI_CMU_DICT = {
+  'hello': 'h ɛ l ˈoʊ', 'world': 'w ˈɜr l d', 'testing': 't ˈɛs t ɪ ŋ',
+  'kitten': 'k ˈɪt ən', 'tts': 't ˈiː t ˈiː s', 'the': 'ðə',
+  'cat': 'k ˈæt', 'is': 'ˈɪz', 'cute': 'k j ˈuːt', 'meow': 'm j ˈaʊ',
+  'yes': 'j ˈɛs', 'no': 'n ˈoʊ', 'good': 'ɡ ˈʊd', 'bye': 'b ˈaɪ',
+  'thanks': 'θ ˈæŋ ks', 'please': 'pl ˈiːz', 'sorry': 's ˈɔr i',
+  'help': 'h ˈɛlp', 'wait': 'w ˈeɪt', 'okay': 'oʊ k ˈeɪ',
+  'what': 'w ˈʌt', 'where': 'w ˈɛr', 'when': 'w ˈɛn', 'why': 'w ˈaɪ',
+  'how': 'h ˈaʊ', 'who': 'h ˈuː', 'i': 'ˈaɪ', 'you': 'j ˈuː',
+  'we': 'w ˈiː', 'they': 'ð ˈeɪ', 'it': 'ˈɪt', 'this': 'ð ˈɪs',
+  'that': 'ð ˈæt', 'here': 'h ˈɪr', 'there': 'ð ˈɛr', 'now': 'n ˈaʊ',
+  'then': 'ð ˈɛn', 'today': 't ə d ˈeɪ', 'tomorrow': 't ə m ˈɔr oʊ',
+  'yesterday': 'j ˈɛs tər d eɪ', 'iphone': 'ˈaɪ f oʊ n', 'apple': 'ˈæp əl'
+};
+
+// ============ LOGGING ============
+const logDiv = document.getElementById('log');
+const log = (msg, type = 'info') => { 
+  const time = new Date().toLocaleTimeString([], {hour12:false, minute:'2-digit', second:'2-digit'});
+  const colors = {info:'#00ff41', success:'#34c759', warn:'#ffcc00', error:'#ff3b30'};
+  logDiv.innerHTML += `<div style="color:${colors[type]}">[${time}] ${msg}</div>\n`;
+  logDiv.scrollTop = logDiv.scrollHeight; 
+};
+
+const updateStatus = (elId, text, cls) => {
+  const el = document.getElementById(elId);
+  el.textContent = text;
+  el.className = `badge ${cls}`;
+};
+
+const setProgress = (pct) => {
+  document.getElementById('progressBar').style.width = `${pct}%`;
+};
+
+const enableUI = (enabled) => {
+  document.getElementById('voiceSelect').disabled = !enabled;
+  document.getElementById('textInput').disabled = !enabled;
+  document.getElementById('generateBtn').disabled = !enabled;
+  document.getElementById('testBtn').disabled = !enabled;
+};
+
+function toggleDebug() {
+  const panel = document.getElementById('debugPanel');
+  panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+}
+
+function updateDebug(key, value, isWarn = false, isError = false) {
+  const el = document.getElementById(key);
+  if (el) {
+    el.textContent = value;
+    el.className = `debug-value ${isWarn ? 'debug-warn' : ''} ${isError ? 'debug-error' : ''}`;
+  }
+}
+
+// Set phonemes from quick test buttons
+function setPhonemes(phonemes) {
+  document.getElementById('phonemeInput').value = phonemes;
+}
+
+// ============ CMU DICT LOADER ============
+class CMUPhonemizer {
+  constructor() {
+    this.dict = new Map(Object.entries(MINI_CMU_DICT));
+    this.loaded = false;
+  }
+
+  async load() {
+    try {
+      log('📥 Fetching CMU Dict from GitHub...', 'info');
+      const response = await fetch('https://raw.githubusercontent.com/cmusphinx/cmudict/master/cmudict.dict', { cache: 'no-store' });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      
+      const text = await response.text();
+      let newWords = 0;
+      
+      for (const line of text.split('\n')) {
+        if (line.startsWith(';') || !line.trim()) continue;
+        const parts = line.trim().split(/\s+/);
+        if (parts.length < 2) continue;
+        
+        const word = parts[0].replace(/\(\d+\)$/, '').toLowerCase();
+        const arpabet = parts.slice(1);
+        const ipa = arpabet
+          .map(p => ARPABET_TO_IPA[p.replace(/\d$/, '')] || null)
+          .filter(x => x !== null)
+          .join(' ');
+        
+        if (!this.dict.has(word) && ipa) {
+          this.dict.set(word, ipa);
+          newWords++;
+        }
+      }
+      
+      this.loaded = true;
+      log(`✅ CMU Dict: ${this.dict.size} words (${newWords} from GitHub)`, 'success');
+      return this.dict.size;
+    } catch (e) {
+      log(`⚠️ Using embedded dict (${this.dict.size} words): ${e.message}`, 'warn');
+      this.loaded = true;
+      return this.dict.size;
+    }
+  }
+
+  toIPA(text) {
+    if (!this.loaded) throw new Error('Dictionary not loaded');
+    const words = text.toLowerCase().replace(/[^\w\s'-]/g, ' ').split(/\s+/).filter(w => w.length > 0);
+    const results = [];
+    for (const word of words) {
+      let ipa = this.dict.get(word);
+      if (!ipa) {
+        ipa = this.fallbackG2P(word);
+        results.push({ word, ipa, fromCMU: false });
+      } else {
+        results.push({ word, ipa, fromCMU: true });
+      }
+    }
+    return results;
+  }
+  
+  fallbackG2P(word) {
+    let ipa = word;
+    const safeMap = {
+      'a': 'æ', 'e': 'ɛ', 'i': 'ɪ', 'o': 'ɔ', 'u': 'ʌ',
+      'b': 'b', 'c': 'k', 'd': 'd', 'f': 'f', 'g': 'g',
+      'h': 'h', 'j': 'dʒ', 'k': 'k', 'l': 'l', 'm': 'm',
+      'n': 'n', 'p': 'p', 'r': 'r', 's': 's', 't': 't',
+      'v': 'v', 'w': 'w', 'x': 'ks', 'y': 'j', 'z': 'z',
+      'th': 'θ', 'sh': 'ʃ', 'ch': 'tʃ', 'ng': 'ŋ', 'ph': 'f'
+    };
+    for (const [digraph, replacement] of Object.entries(safeMap)) {
+      if (digraph.length > 1) ipa = ipa.replace(new RegExp(digraph, 'g'), replacement);
+    }
+    ipa = ipa.split('').map(c => safeMap[c] || c).join(' ');
+    return ipa;
+  }
+}
+
+// ============ NPY PARSER ============
+function parseNpy(buffer) {
+  const view = new DataView(buffer);
+  const magic = String.fromCharCode(...new Uint8Array(buffer.slice(0, 6)));
+  if (magic !== "\x93NUMPY") throw new Error("Not a valid NPY file");
+  const major = view.getUint8(6);
+  const headerLen = major === 1 ? view.getUint16(8, true) : view.getUint32(8, true);
+  const start = (major === 1 ? 10 : 18) + headerLen;
+  return new Float32Array(buffer.slice(start));
+}
+
+// ============ VOICE LOADER ============
+async function loadVoices(npzBuffer, expectedDim = EXPECTED_STYLE_DIM) {
+  const zip = await JSZip.loadAsync(npzBuffer);
+  const voices = {};
+  const voiceMap = {
+    "Bella": "expr-voice-2-f.npy", "Jasper": "expr-voice-2-m.npy",
+    "Luna": "expr-voice-3-f.npy", "Bruno": "expr-voice-3-m.npy",
+    "Rosie": "expr-voice-4-f.npy", "Hugo": "expr-voice-4-m.npy",
+    "Kiki": "expr-voice-5-f.npy", "Leo": "expr-voice-5-m.npy"
+  };
+  
+  let loaded = 0;
+  for (const [name, filename] of Object.entries(voiceMap)) {
+    const file = zip.file(filename);
+    if (!file) {
+      log(`⚠️ Voice file not found: ${filename}`, 'warn');
+      continue;
+    }
+    const content = await file.async("arraybuffer");
+    const raw = parseNpy(content);
+    
+    if (raw.length !== expectedDim) {
+      const blockSize = Math.floor(raw.length / expectedDim);
+      const downsampled = new Float32Array(expectedDim);
+      for (let i = 0; i < expectedDim; i++) {
+        let sum = 0;
+        for (let j = 0; j < blockSize; j++) {
+          const idx = i * blockSize + j;
+          if (idx < raw.length) sum += raw[idx];
+        }
+        downsampled[i] = sum / blockSize;
+      }
+      voices[name] = downsampled;
+      log(`🔧 ${name}: ${raw.length} → ${expectedDim}`, 'info');
+    } else {
+      voices[name] = raw;
+    }
+    loaded++;
+    log(`✓ ${name} (${voices[name].length} dims)`, 'success');
+  }
+  
+  if (loaded === 0) throw new Error("No voices loaded");
+  return voices;
+}
+
+// ============ TEXT → TOKEN IDS (Normal G2P) ============
+function textToTokenIds(text, phonemizer) {
+  const entries = phonemizer.toIPA(text);
+  const ids = [0n];
+  const tokens = [];
+  
+  for (const { word, ipa } of entries) {
+    for (const char of ipa.split('')) {
+      if (char === ' ') continue;
+      let id = KITTEN_VOCAB.get(char);
+      if (id === undefined) id = KITTEN_VOCAB.get('<unk>');
+      ids.push(BigInt(id));
+      tokens.push({ char, id, word });
+    }
+    ids.push(BigInt(KITTEN_VOCAB.get(' ')));
+  }
+  ids.push(10n, 0n);
+  
+  return { ids: new BigInt64Array(ids), tokens };
+}
+
+// ============ ✅ DIRECT PHONEME → TOKEN IDS (Bypasses G2P) ============
+function phonemesToTokenIds(phonemeString) {
+  // Split by spaces to get individual phonemes
+  const phonemes = phonemeString.trim().split(/\s+/).filter(p => p.length > 0);
+  const ids = [0n];
+  const tokens = [];
+  
+  log(`🔤 Input phonemes: [${phonemes.join(', ')}]`, 'info');
+  
+  for (const p of phonemes) {
+    let id = KITTEN_VOCAB.get(p);
+    if (id === undefined) {
+      // Try to find partial match
+      id = KITTEN_VOCAB.get('<unk>');
+      log(`⚠️ Unknown phoneme: "${p}" → <unk>`, 'warn');
+    }
+    ids.push(BigInt(id));
+    tokens.push({ char: p, id: id, word: 'direct' });
+  }
+  
+  // Add EOS and PAD
+  ids.push(10n, 0n);
+  
+  log(`✅ Token IDs: [${Array.from(ids).map(n => Number(n)).join(', ')}]`, 'info');
+  
+  return { ids: new BigInt64Array(ids), tokens };
+}
+
+function renderPhonemes(tokenData) {
+  const output = document.getElementById('phonemeOutput');
+  if (!tokenData || tokenData.tokens.length === 0) {
+    output.textContent = 'Type text to see phonemes...';
+    return;
+  }
+  let html = '';
+  for (const t of tokenData.tokens) {
+    const isUnknown = t.id === 1 && t.char !== '<unk>';
+    html += `<span class="phoneme${isUnknown ? ' unknown' : ''}">"${t.char}"<span class="id">[${t.id}]</span></span> `;
+  }
+  output.innerHTML = html.trim();
+}
+
+// ============ 🎵 AUDIO POST-PROCESSING ============
+function postProcessAudio(audioData, sampleRate) {
+  const cleaned = new Float32Array(audioData.length);
+  
+  // 1. Clean NaN/Infinity
+  let nanCount = 0;
+  for (let i = 0; i < audioData.length; i++) {
+    if (isFinite(audioData[i])) {
+      cleaned[i] = audioData[i];
+    } else {
+      cleaned[i] = 0;
+      nanCount++;
+    }
+  }
+  updateDebug('dbgNaN', nanCount > 0 ? `${nanCount} ⚠️` : '0', nanCount > 0);
+  
+  // 2. Remove DC Offset
+  let sum = 0;
+  for (let i = 0; i < cleaned.length; i++) {
+    sum += cleaned[i];
+  }
+  const dcOffset = sum / cleaned.length;
+  updateDebug('dbgDC', dcOffset.toFixed(6), Math.abs(dcOffset) > 0.01);
+  
+  for (let i = 0; i < cleaned.length; i++) {
+    cleaned[i] -= dcOffset;
+  }
+  
+  // 3. Simple smoothing
+  const smoothed = new Float32Array(cleaned.length);
+  const alpha = 0.3;
+  smoothed[0] = cleaned[0];
+  for (let i = 1; i < cleaned.length; i++) {
+    smoothed[i] = alpha * cleaned[i] + (1 - alpha) * smoothed[i - 1];
+  }
+  
+  // 4. Trim silence
+  const threshold = 0.002;
+  let startIdx = 0;
+  let endIdx = smoothed.length - 1;
+  
+  while (startIdx < endIdx && Math.abs(smoothed[startIdx]) < threshold) {
+    startIdx++;
+  }
+  while (endIdx > startIdx && Math.abs(smoothed[endIdx]) < threshold) {
+    endIdx--;
+  }
+  
+  const trimmed = smoothed.slice(startIdx, endIdx + 1);
+  
+  // 5. Normalize
+  if (trimmed.length > 0) {
+    let maxVal = 0;
+    for (const sample of trimmed) {
+      maxVal = Math.max(maxVal, Math.abs(sample));
+    }
+    
+    if (maxVal > 0.001) {
+      const scale = 0.9 / maxVal;
+      for (let i = 0; i < trimmed.length; i++) {
+        trimmed[i] = trimmed[i] * scale;
+      }
+    }
+  }
+  
+  return trimmed;
+}
+
+let lastAudioData = null;
+let lastSampleRate = DEFAULT_SAMPLE_RATE;
+
+// ============ 🔊 AUDIO PLAYER ============
+async function playAudio(float32Data, sampleRate) {
+  const cleanAudio = postProcessAudio(new Float32Array(float32Data), sampleRate);
+  
+  if (cleanAudio.length === 0) {
+    log('⚠️ No audio data after processing', 'warn');
+    updateDebug('dbgStatus', 'No Audio', false, true);
+    return false;
+  }
+  
+  lastAudioData = cleanAudio;
+  lastSampleRate = sampleRate;
+  document.getElementById('downloadBtn').style.display = 'block';
+  
+  let minVal = Infinity, maxVal = -Infinity;
+  for (const s of cleanAudio) {
+    minVal = Math.min(minVal, s);
+    maxVal = Math.max(maxVal, s);
+  }
+  
+  updateDebug('dbgSamples', cleanAudio.length);
+  updateDebug('dbgRange', `[${minVal.toFixed(3)}, ${maxVal.toFixed(3)}]`);
+  updateDebug('dbgRate', `${sampleRate}Hz`);
+  
+  showAudioVisualizer(cleanAudio);
+  
+  const AudioCtx = window.AudioContext || window.webkitAudioContext;
+  const ctx = new AudioCtx({ sampleRate });
+  
+  if (ctx.state === 'suspended') {
+    await ctx.resume();
+  }
+  
+  const buffer = ctx.createBuffer(1, cleanAudio.length, sampleRate);
+  const channelData = buffer.getChannelData(0);
+  
+  for (let i = 0; i < cleanAudio.length; i++) {
+    channelData[i] = Math.max(-1, Math.min(1, cleanAudio[i]));
+  }
+  
+  const source = ctx.createBufferSource();
+  source.buffer = buffer;
+  source.connect(ctx.destination);
+  source.start();
+  
+  log(`🔊 Playing ${cleanAudio.length} samples at ${sampleRate}Hz`, 'info');
+  updateDebug('dbgStatus', 'Playing ✓');
+  
+  return new Promise(resolve => {
+    source.onended = () => {
+      log('✓ Playback complete', 'success');
+      ctx.close();
+      resolve(true);
+    };
+  });
+}
+
+function showAudioVisualizer(audioData) {
+  const viz = document.getElementById('audioViz');
+  viz.style.display = 'flex';
+  viz.innerHTML = '';
+  
+  const numBars = 60;
+  const step = Math.floor(audioData.length / numBars);
+  
+  for (let i = 0; i < numBars; i++) {
+    const bar = document.createElement('div');
+    bar.className = 'audio-bar';
+    
+    let sum = 0;
+    for (let j = 0; j < step; j++) {
+      const idx = i * step + j;
+      if (idx < audioData.length) {
+        sum += Math.abs(audioData[idx]);
+      }
+    }
+    const avg = sum / step;
+    const height = Math.min(100, avg * 150);
+    bar.style.height = `${height}%`;
+    
+    viz.appendChild(bar);
+  }
+}
+
+// ============ 💾 WAV DOWNLOAD ============
+function downloadWAV(audioData, sampleRate) {
+  const buffer = new ArrayBuffer(44 + audioData.length * 2);
+  const view = new DataView(buffer);
+  
+  const writeString = (offset, string) => {
+    for (let i = 0; i < string.length; i++) {
+      view.setUint8(offset + i, string.charCodeAt(i));
+    }
+  };
+  
+  writeString(0, 'RIFF');
+  view.setUint32(4, 36 + audioData.length * 2, true);
+  writeString(8, 'WAVE');
+  writeString(12, 'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true);
+  view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true);
+  writeString(36, 'data');
+  view.setUint32(40, audioData.length * 2, true);
+  
+  for (let i = 0; i < audioData.length; i++) {
+    const sample = Math.max(-1, Math.min(1, audioData[i]));
+    const intSample = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
+    view.setInt16(44 + i * 2, intSample, true);
+  }
+  
+  const blob = new Blob([buffer], { type: 'audio/wav' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `kitten_tts_${Date.now()}.wav`;
+  a.click();
+  URL.revokeObjectURL(url);
+  
+  log('💾 Audio downloaded as WAV', 'success');
+}
+
+// ============ WEB SPEECH API (FALLBACK) ============
+let speechVoices = [];
+function initSpeechFallback() {
+  if (!('speechSynthesis' in window)) {
+    document.getElementById('fallbackBtn').disabled = true;
+    return;
+  }
+  const loadVoices = () => {
+    speechVoices = speechSynthesis.getVoices();
+    if (speechVoices.length > 0) document.getElementById('fallbackBtn').disabled = false;
+  };
+  speechSynthesis.onvoiceschanged = loadVoices;
+  loadVoices();
+  setTimeout(loadVoices, 500);
+}
+
+function speakFallback(text) {
+  speechSynthesis.cancel();
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.lang = 'en-US';
+  const voice = speechVoices.find(v => v.lang.startsWith('en')) || speechVoices[0];
+  if (voice) utterance.voice = voice;
+  utterance.onstart = () => log('🔊 Speaking...', 'info');
+  utterance.onend = () => log('✓ Done', 'success');
+  speechSynthesis.speak(utterance);
+}
+
+// ============ APP STATE ============
+let session = null;
+let phonemizer = null;
+let voices = {};
+let onnxReady = false;
+let dictReady = false;
+let voiceReady = false;
+
+// ============ DOWNLOAD BUTTON ============
+document.getElementById('downloadBtn').addEventListener('click', () => {
+  if (lastAudioData) {
+    downloadWAV(lastAudioData, lastSampleRate);
+  }
+});
+
+// ============ ✅ DIRECT PHONEME TEST BUTTON ============
+document.getElementById('testBtn').addEventListener('click', async () => {
+  if (!onnxReady || !voiceReady) {
+    log('❌ System not ready', 'error');
+    return;
+  }
+  
+  const btn = document.getElementById('testBtn');
+  const originalText = btn.innerText;
+  btn.disabled = true;
+  btn.innerText = '🔄 Testing...';
+  updateDebug('dbgStatus', 'Testing...');
+  updateDebug('dbgMode', 'DIRECT PHONEME');
+  
+  try {
+    const voiceName = document.getElementById('voiceSelect').value;
+    const phonemeString = document.getElementById('phonemeInput').value.trim();
+    
+    if (!phonemeString) {
+      throw new Error('Enter phonemes to test');
+    }
+    
+    log(`\n🧪 DIRECT PHONEME TEST`, 'info');
+    log(`🎤 Voice: ${voiceName}`, 'info');
+    log(`🔤 Phonemes: "${phonemeString}"`, 'info');
+    
+    // ✅ Bypass G2P - use phonemes directly
+    const { ids, tokens } = phonemesToTokenIds(phonemeString);
+    renderPhonemes({ tokens });
+    
+    updateDebug('dbgTokens', ids.length);
+    updateDebug('dbgVoice', voices[voiceName].length);
+    
+    const feeds = {
+      input_ids: new ort.Tensor('int64', ids, [1, ids.length]),
+      style: new ort.Tensor('float32', voices[voiceName], [1, voices[voiceName].length]),
+      speed: new ort.Tensor('float32', new Float32Array([1.0]), [1])
+    };
+    
+    log('🔄 Running inference...', 'info');
+    const start = performance.now();
+    const results = await session.run(feeds);
+    const elapsed = (performance.now() - start).toFixed(1);
+    updateDebug('dbgTime', `${elapsed}ms`);
+    log(`⏱️ Inference: ${elapsed}ms`, 'info');
+    
+    const outputKey = Object.keys(results)[0];
+    const rawAudio = results[outputKey].data;
+    
+    log(`📊 Raw samples: ${rawAudio.length}`, 'info');
+    await playAudio(rawAudio, DEFAULT_SAMPLE_RATE);
+    
+  } catch (e) {
+    log(`❌ Test Error: ${e.message}`, 'error');
+    updateDebug('dbgStatus', `Error: ${e.message}`, false, true);
+    console.error('Test error:', e);
+  } finally {
+    btn.disabled = false;
+    btn.innerText = 'TEST';
+  }
+});
+
+// ============ NORMAL GENERATE ============
+async function generateSpeech() {
+  if (!onnxReady || !voiceReady) {
+    log('❌ System not ready', 'error');
+    updateDebug('dbgStatus', 'Not Ready', false, true);
+    updateDebug('dbgMode', 'NORMAL G2P');
+    return;
+  }
+  
+  const btn = document.getElementById('generateBtn');
+  const originalText = btn.innerText;
+  btn.disabled = true;
+  btn.innerText = '🔄 Generating...';
+  updateDebug('dbgStatus', 'Generating...');
+  updateDebug('dbgMode', 'NORMAL G2P');
+  
+  try {
+    const voiceName = document.getElementById('voiceSelect').value;
+    const text = document.getElementById('textInput').value.trim();
+    if (!text) throw new Error('Enter text');
+    
+    log(`\n🎙️ ${voiceName}: "${text}"`, 'info');
+    const { ids, tokens } = textToTokenIds(text, phonemizer);
+    renderPhonemes({ tokens });
+    
+    updateDebug('dbgTokens', ids.length);
+    updateDebug('dbgVoice', voices[voiceName].length);
+    
+    const feeds = {
+      input_ids: new ort.Tensor('int64', ids, [1, ids.length]),
+      style: new ort.Tensor('float32', voices[voiceName], [1, voices[voiceName].length]),
+      speed: new ort.Tensor('float32', new Float32Array([1.0]), [1])
+    };
+    
+    log('🔄 Running inference...', 'info');
+    const start = performance.now();
+    const results = await session.run(feeds);
+    const elapsed = (performance.now() - start).toFixed(1);
+    updateDebug('dbgTime', `${elapsed}ms`);
+    log(`⏱️ Inference: ${elapsed}ms`, 'info');
+    
+    const outputKey = Object.keys(results)[0];
+    const rawAudio = results[outputKey].data;
+    
+    log(`📊 Raw samples: ${rawAudio.length}`, 'info');
+    await playAudio(rawAudio, DEFAULT_SAMPLE_RATE);
+    
+  } catch (e) {
+    log(`❌ Error: ${e.message}`, 'error');
+    updateDebug('dbgStatus', `Error: ${e.message}`, false, true);
+    console.error('Inference error:', e);
+  } finally {
+    btn.disabled = false;
+    btn.innerText = originalText;
+  }
+}
+
+// ============ LIVE PHONEME PREVIEW ============
+function handleTextUpdate() {
+  if (!phonemizer?.loaded) return;
+  const text = document.getElementById('textInput').value.trim();
+  if (!text) { 
+    document.getElementById('phonemeOutput').textContent = 'Type text...'; 
+    return; 
+  }
+  try {
+    const { tokens } = textToTokenIds(text, phonemizer);
+    renderPhonemes({ tokens });
+  } catch (e) {}
+}
+
+// ============ EVENTS ============
+document.getElementById('textInput').addEventListener('input', handleTextUpdate);
+document.getElementById('generateBtn').addEventListener('click', generateSpeech);
+document.getElementById('fallbackBtn').addEventListener('click', () => {
+  const text = document.getElementById('textInput').value.trim();
+  if (text) speakFallback(text);
+});
+
+// ============ INIT ============
+async function init() {
+  setProgress(10);
+  log('🔍 Checking environment...', 'info');
+  updateDebug('dbgModel', 'Loading...');
+  
+  if (ort?.env?.wasm) {
+    ort.env.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/';
+    ort.env.wasm.numThreads = navigator.hardwareConcurrency || 4;
+    log(`🔧 WASM: ${ort.env.wasm.numThreads} threads`, 'info');
+  }
+  
+  // 1. CMU Dict
+  try {
+    setProgress(20);
+    phonemizer = new CMUPhonemizer();
+    await phonemizer.load();
+    dictReady = true;
+    updateStatus('dictStatus', `✅ ${phonemizer.dict.size}`, 'ready');
+    setProgress(40);
+  } catch (e) {
+    updateStatus('dictStatus', '❌', 'error');
+    log(`❌ Dict: ${e.message}`, 'error');
+  }
+  
+  // 2. ONNX Model
+  try {
+    setProgress(50);
+    log(`📥 Loading: ${MODEL_PATH}`, 'info');
+    
+    if (typeof ort === 'undefined') {
+      throw new Error('ONNX Runtime not loaded');
+    }
+    
+    session = await ort.InferenceSession.create(MODEL_PATH, { 
+      executionProviders: ['wasm'],
+      logSeverityLevel: 2
+    });
+    
+    onnxReady = true;
+    updateStatus('modelStatus', '✅', 'ready');
+    updateDebug('dbgModel', 'Loaded ✓');
+    log(`✅ Model loaded`, 'success');
+    log(`📊 Inputs: ${session.inputNames.join(', ')}`, 'info');
+    log(`📊 Outputs: ${session.outputNames.join(', ')}`, 'info');
+    setProgress(70);
+    
+  } catch (e) {
+    updateStatus('modelStatus', '❌', 'error');
+    updateDebug('dbgModel', 'Failed ✗', false, true);
+    log(`❌ Model: ${e.message}`, 'error');
+  }
+  
+  // 3. Voices
+  try {
+    setProgress(75);
+    log(`📥 Loading: ${VOICES_PATH}`, 'info');
+    const response = await fetch(VOICES_PATH, { cache: 'no-store' });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const npzBuffer = await response.arrayBuffer();
+    voices = await loadVoices(npzBuffer, EXPECTED_STYLE_DIM);
+    voiceReady = true;
+    updateStatus('voiceStatus', `✅ ${Object.keys(voices).length}`, 'ready');
+    setProgress(90);
+  } catch (e) {
+    updateStatus('voiceStatus', '❌', 'error');
+    log(`❌ Voices: ${e.message}`, 'error');
+  }
+  
+  initSpeechFallback();
+  
+  const canGenerate = onnxReady && voiceReady && dictReady;
+  enableUI(canGenerate);
+  setProgress(100);
+  
+  const badge = document.getElementById('statusBadge');
+  if (canGenerate) {
+    badge.textContent = 'Ready';
+    badge.className = 'badge ready';
+    updateDebug('dbgStatus', 'Ready ✓');
+    updateDebug('dbgMode', '-');
+    log('✨ Ready! Generate speech 🎙️', 'success');
+  } else {
+    badge.textContent = 'Limited';
+    badge.className = 'badge fallback';
+    updateDebug('dbgStatus', 'Limited ⚠️', true);
+    updateDebug('dbgMode', '-');
+    log('⚠️ Fallback available', 'warn');
+    document.getElementById('fallbackBtn').disabled = false;
+  }
+  
+  handleTextUpdate();
+}
+
+// ============ START ============
+window.addEventListener('load', init);
+</script>
+</body>
+</html>

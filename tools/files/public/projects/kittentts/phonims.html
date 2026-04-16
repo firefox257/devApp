@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>KittenTTS: Phoneme Extractor</title>
+    <style>
+        body { font-family: -apple-system, system-ui, sans-serif; background: #121212; color: #e0e0e0; padding: 15px; margin: 0; }
+        .wrapper { max-width: 600px; margin: auto; }
+        h3 { color: #007aff; margin-bottom: 10px; }
+        #console { background: #0a0a0a; border: 1px solid #333; height: 200px; overflow-y: auto; font-family: 'SF Mono', 'Menlo', monospace; font-size: 11px; padding: 10px; border-radius: 10px; white-space: pre-wrap; margin-bottom: 15px; line-height: 1.4; }
+        .log-info { color: #5ac8fa; } .log-success { color: #34c759; font-weight: bold; }
+        .log-warn { color: #ffcc00; } .log-error { color: #ff3b30; border-left: 3px solid #ff3b30; padding-left: 6px; background: #1a0a0a; padding: 4px 6px; margin: 2px 0; }
+        textarea { width: 100%; height: 80px; background: #222; color: #fff; border: 1px solid #444; border-radius: 10px; padding: 12px; box-sizing: border-box; font-size: 16px; margin-bottom: 10px; }
+        .controls { display: flex; gap: 10px; margin-bottom: 10px; }
+        button { flex: 1; background: #007aff; color: white; border: none; padding: 14px; border-radius: 10px; font-weight: 600; font-size: 15px; cursor: pointer; transition: opacity 0.2s; }
+        button:disabled { opacity: 0.4; cursor: not-allowed; filter: grayscale(0.8); }
+        .status { background: #222; padding: 12px; border-radius: 10px; margin-bottom: 15px; font-size: 14px; display: flex; align-items: center; gap: 8px; }
+        .spinner { width: 14px; height: 14px; border: 2px solid #555; border-top-color: #007aff; border-radius: 50%; animation: spin 0.8s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .checklist { background: #1a1a1a; padding: 10px; border-radius: 8px; margin-top: 10px; font-size: 12px; color: #aaa; }
+        .checklist li { margin: 4px 0; }
+        .checklist .ok { color: #34c759; } .checklist .fail { color: #ff3b30; }
+    </style>
+</head>
+<body>
+<div class="wrapper">
+    <h3>🐱 KittenTTS: Phoneme Extractor</h3>
+    <div class="status">
+        <div id="statusIcon" class="spinner"></div>
+        <span id="engineStatus">Initializing...</span>
+    </div>
+    <div id="console">--- Starting Diagnostics ---</div>
+    <div class="checklist" id="checklist">
+        <ul id="checkItems"></ul>
+    </div>
+    <textarea id="textInput">Hello world, testing phonemes on iPhone.</textarea>
+    <div class="controls">
+        <button id="phonemeBtn" disabled>Get Phonemes</button>
+        <button id="retryBtn" onclick="location.reload()">Retry</button>
+    </div>
+</div>
+
+<script>
+const consoleDiv = document.getElementById('console');
+const statusEl = document.getElementById('engineStatus');
+const statusIcon = document.getElementById('statusIcon');
+const checklistEl = document.getElementById('checkItems');
+const phonemeBtn = document.getElementById('phonemeBtn');
+const textInput = document.getElementById('textInput');
+
+function log(msg, type = 'info') {
+    const div = document.createElement('div');
+    div.className = `log-${type}`;
+    const time = new Date().toLocaleTimeString([], {hour12: false, hour:'2-digit', minute:'2-digit'});
+    div.innerText = `[${time}] ${msg}`;
+    consoleDiv.appendChild(div);
+    consoleDiv.scrollTop = consoleDiv.scrollHeight;
+}
+
+function addCheck(text, ok) {
+    const li = document.createElement('li');
+    li.innerHTML = ok ? `<span class="ok">✅ ${text}</span>` : `<span class="fail">❌ ${text}</span>`;
+    checklistEl.appendChild(li);
+}
+
+function setStatus(msg, icon = 'spinner') {
+    statusEl.innerText = msg;
+    statusIcon.style.display = icon === 'spinner' ? 'block' : 'none';
+}
+
+// ============== eSpeak NG PHONEMIZER WRAPPER ==============
+class ESpeakPhonemizer {
+    constructor() {
+        this.worker = null;
+        this.ready = false;
+        this.callbacks = new Map();
+        this.initTimeout = null;
+    }
+
+    async init() {
+        return new Promise((resolve, reject) => {
+            try {
+                // Timeout protection for iOS Safari worker hangs
+                this.initTimeout = setTimeout(() => reject(new Error('⏱️ Timeout: Worker did not respond in 15s.')), 15000);
+                
+                log('🔧 Spawning Web Worker (module)...', 'info');
+                // ✅ CRITICAL FIX: { type: 'module' } enables import.meta.url support
+                this.worker = new Worker('js_espeakng.worker.js', { type: 'module' });
+                
+                this.worker.onmessage = (e) => {
+                    const data = e.data;
+                    
+                    // Worker posts "ready" when eSpeakNG finishes initialization
+                    if (data === 'ready') {
+                        clearTimeout(this.initTimeout);
+                        this.ready = true;
+                        log('✅ eSpeak NG engine ready', 'success');
+                        resolve();
+                        return;
+                    }
+
+                    // Handle method responses
+                    if (data.callback !== undefined && this.callbacks.has(data.callback)) {
+                        const { resolve: res, reject: rej } = this.callbacks.get(data.callback);
+                        this.callbacks.delete(data.callback);
+                        
+                        // Worker format: { callback, done: true, result: [{ code, ipa }] }
+                        const result = data.result?.[0];
+                        if (result?.code === 0) {
+                            res(result.ipa || '(no output)');
+                        } else {
+                            rej(new Error(result?.message || `eSpeak failed with code ${result?.code}`));
+                        }
+                    }
+                };
+
+                this.worker.onerror = (err) => {
+                    clearTimeout(this.initTimeout);
+                    reject(new Error(`Worker Error: ${err.message}`));
+                };
+
+            } catch (err) {
+                reject(err);
+            }
+        });
+    }
+
+    async phonemize(text) {
+        if (!this.ready) throw new Error('Engine not ready');
+        return new Promise((resolve, reject) => {
+            const id = Date.now() + Math.random().toString(36).slice(2);
+            this.callbacks.set(id, { resolve, reject });
+            
+            // Exact protocol expected by your worker.js:
+            // { method, args, callback }
+            this.worker.postMessage({ 
+                method: 'synthesize_ipa', 
+                args: [text], 
+                callback: id 
+            });
+        });
+    }
+
+    terminate() {
+        if (this.worker) this.worker.terminate();
+        this.callbacks.clear();
+        this.ready = false;
+    }
+}
+
+const engine = new ESpeakPhonemizer();
+
+// ============== INITIALIZATION & DIAGNOSTICS ==============
+(async function() {
+    try {
+        log('📍 Protocol: ' + window.location.protocol, 'info');
+        if (window.location.protocol === 'file:') {
+            log('🚨 FATAL: Running from file://. iOS blocks Workers/WASM locally.', 'error');
+            addCheck('Served via HTTP/HTTPS', false);
+            setStatus('Failed: Use HTTP Server');
+            return;
+        }
+        addCheck('HTTP Server detected', true);
+
+        try {
+            const res = await fetch('js_espeakng.worker.js', { method: 'HEAD' });
+            if (!res.ok) throw new Error(res.status);
+            addCheck('js_espeakng.worker.js found', true);
+        } catch {
+            addCheck('js_espeakng.worker.js missing', false);
+        }
+
+        log('⏳ Loading phoneme engine...', 'info');
+        setStatus('Loading eSpeak...');
+        await engine.init();
+        
+        setStatus('✅ Ready');
+        phonemeBtn.disabled = false;
+        log('🟢 Tap button to extract phonemes!', 'success');
+        log('💡 Tip: eSpeak requires .wasm and .data files in the same folder', 'info');
+        
+    } catch (err) {
+        setStatus('❌ Failed');
+        log(`🚨 ${err.message}`, 'error');
+        log('💡 iOS Safari requires: HTTPS/localhost + valid worker path', 'warn');
+    }
+})();
+
+// ============== EVENT HANDLERS ==============
+phonemeBtn.addEventListener('click', async () => {
+    try {
+        const text = textInput.value.trim();
+        if (!text) return log('⚠️ Enter text first', 'warn');
+        
+        log('🔍 Extracting IPA...', 'info');
+        const res = await engine.phonemize(text);
+        log(`🗣️ IPA: ${res}`, 'success');
+    } catch (err) { log(`❌ ${err.message}`, 'error'); }
+});
+
+window.addEventListener('beforeunload', () => engine.terminate());
+</script>
+</body>
+</html>

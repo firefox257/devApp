@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>AI Chat</title>
+    
+    <!-- 🔽 THEME BRIDGE - Syncs with parent OS theme -->
+    <script src="/projects/desktop/os-theme-bridge.js"></script>
+    
+    <!-- 🔽 AI Chat Component -->
+    <script type="module" src="/system/ux/aichat.js"></script>
+    
+    <style>
+        /* 🔽 Inherit theme variables from parent via os-theme-bridge */
+        :root {
+            --system-bg: var(--system-bg, #ffffff);
+            --system-text: var(--system-text, #333333);
+            --system-border: var(--system-border, #cccccc);
+            --system-accent: var(--system-accent, #007bff);
+            --system-window-bg: var(--system-window-bg, #ffffff);
+        }
+        
+        /* 🔽 Base styles - minimal, let theme variables handle appearance */
+        * {
+            box-sizing: border-box;
+        }
+        
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: var(--system-font, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
+            overflow: hidden;
+            display: flex;
+            height: 100dvh;
+            width: 100vw;
+            background-color: var(--system-bg, #ffffff);
+            color: var(--system-text, #333333);
+        }
+
+        /* 🔽 AI Chat component fills the viewport */
+        ai-chat {
+            flex-grow: 1;
+            width: 100%;
+            height: 100%;
+        }
+        
+        /* 🔽 Accessibility: Reduced motion */
+        @media (prefers-reduced-motion: reduce) {
+            *,
+            *::before,
+            *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+                scroll-behavior: auto !important;
+            }
+        }
+        
+        /* 🔽 Scrollbar styling - theme-aware */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: var(--system-bg, #f1f1f1);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: var(--system-border, #888);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--system-text-dim, #555);
+        }
+    </style>
+</head>
+<body>
+    <!-- 🔽 .system-app wrapper for automatic theme styling inheritance -->
+    <div class="system-app">
+        <ai-chat></ai-chat>
+    </div>
+    
+    <script>
+        // 🔽 Listen for theme changes from parent OS
+        window.addEventListener('osThemeChanged', (event) => {
+            console.log('AI Chat: Theme updated to', event.detail.themeId);
+            // The os-theme-bridge.js automatically applies CSS variables
+            // This event is for any app-specific reactions you might need
+        });
+        
+        // 🔽 Notify parent that app is ready (optional, bridge handles most of this)
+        window.addEventListener('load', () => {
+            if (window.parent && window.parent !== window) {
+                window.parent.postMessage({ 
+                    type: 'os-app-ready', 
+                    source: 'ai-chat-app',
+                    timestamp: Date.now()
+                }, '*');
+            }
+        });
+        
+        // 🔽 Handle keyboard shortcuts (optional enhancement)
+        document.addEventListener('keydown', (e) => {
+            // F5 to refresh (useful during development)
+            if (e.key === 'F5') {
+                e.preventDefault();
+                window.location.reload();
+            }
+        });
+    </script>
+</body>
+</html>

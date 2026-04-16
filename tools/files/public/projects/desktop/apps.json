@@ -1,0 +1,136 @@
+{
+	"version": "2.0",
+	"categories": [
+		{
+			"id": "system",
+			"name": "System",
+			"icon": "tune",
+			"order": 1,
+			"description": "OS configuration and utilities"
+		},
+		{
+			"id": "productivity",
+			"name": "Productivity",
+			"icon": "work",
+			"order": 2,
+			"description": "Work and organization tools"
+		},
+		{
+			"id": "entertainment",
+			"name": "Entertainment",
+			"icon": "movie",
+			"order": 3,
+			"description": "Media and leisure apps"
+		},
+		{
+			"id": "developer",
+			"name": "Developer",
+			"icon": "code",
+			"order": 4,
+			"description": "Coding, development tools, debugging, and utilities"
+		}
+	],
+	"apps": [
+		{
+			"id": "settings",
+			"name": "Settings",
+			"icon": "settings",
+			"type": "template",
+			"template": "settings",
+			"categoryId": "system",
+			"description": "Configure themes and OS preferences",
+			"order": 1,
+			"enabled": true,
+			"allowMultipleInstances": false,
+			"consoleCapture": true
+		},
+		{
+			"id": "notes",
+			"name": "Notes",
+			"icon": "edit_note",
+			"type": "iframe",
+			"url": "/apps/notes/index.html",
+			"categoryId": "productivity",
+			"description": "Rich text note-taking with formatting",
+			"order": 1,
+			"enabled": true,
+			"permissions": ["localStorage"],
+			"sandbox": "allow-scripts allow-same-origin allow-forms allow-modals",
+			"allowMultipleInstances": true,
+			"consoleCapture": false
+		},
+		{
+			"id": "file-manager",
+			"name": "File Manager",
+			"icon": "folder",
+			"type": "iframe",
+			"url": "/apps/filemanager/filemanager.html",
+			"categoryId": "system",
+			"description": "Browse and manage files",
+			"order": 2,
+			"enabled": true,
+			"sandbox": "allow-scripts allow-same-origin allow-forms",
+			"allowMultipleInstances": true,
+			"consoleCapture": false
+		},
+		{
+			"id": "ai-chat",
+			"name": "AI Chat",
+			"icon": "smart_toy",
+			"type": "iframe",
+			"url": "/apps/aichat/chat.html",
+			"categoryId": "productivity",
+			"description": "AI-powered chat assistant with code generation",
+			"order": 3,
+			"enabled": true,
+			"permissions": ["localStorage", "clipboard", "indexedDB"],
+			"sandbox": "allow-scripts allow-same-origin allow-forms allow-modals",
+			"allowMultipleInstances": true,
+			"consoleCapture": false
+		},
+		{
+			"id": "3d-modeler",
+			"name": "3D Modeler",
+			"icon": "3d_rotation",
+			"type": "iframe",
+			"url": "/apps/csgscad/csgEditor.html",
+			"categoryId": "productivity",
+			"description": "Design and prepare models for 3D printing",
+			"order": 4,
+			"enabled": true,
+			"permissions": ["localStorage", "indexedDB", "clipboard"],
+			"sandbox": "allow-scripts allow-same-origin allow-forms allow-modals allow-downloads",
+			"allowMultipleInstances": true,
+			"consoleCapture": false
+		},
+		{
+			"id": "developer-sdk",
+			"name": "Developer SDK",
+			"icon": "api",
+			"type": "iframe",
+			"url": "/apps/devApp/devApp.html",
+			"categoryId": "developer",
+			"description": "API documentation, testing console, and integration tools",
+			"order": 1,
+			"enabled": true,
+			"permissions": ["localStorage", "indexedDB", "clipboard"],
+			"sandbox": "allow-scripts allow-same-origin allow-forms allow-modals allow-downloads",
+			"allowMultipleInstances": true,
+			"consoleCapture": true
+		},
+		{
+			"id": "capture-console",
+			"name": "Capture Console",
+			"description": "View real-time console logs from desktop and apps",
+			"icon": "terminal",
+			"type": "template",
+			"template": "capture-console",
+			"categoryId": "developer",
+			"enabled": true,
+			"allowMultipleInstances": false,
+			"order": 900,
+			"permissions": ["console-read"],
+			"consoleCapture": true
+		}
+	]
+}

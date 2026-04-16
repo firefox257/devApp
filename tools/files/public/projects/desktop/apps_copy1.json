@@ -1,0 +1,105 @@
+{
+  "version": "2.0",
+  "categories": [
+    {
+      "id": "system",
+      "name": "System",
+      "icon": "tune",
+      "order": 1,
+      "description": "OS configuration and utilities"
+    },
+    {
+      "id": "productivity",
+      "name": "Productivity",
+      "icon": "work",
+      "order": 2,
+      "description": "Work and organization tools"
+    },
+    {
+      "id": "entertainment",
+      "name": "Entertainment",
+      "icon": "movie",
+      "order": 3,
+      "description": "Media and leisure apps"
+    },
+    {
+      "id": "developer",
+      "name": "Developer",
+      "icon": "code",
+      "order": 4,
+      "description": "Coding and development tools"
+    }
+  ],
+  "apps": [
+    {
+      "id": "settings",
+      "name": "Settings",
+      "icon": "settings",
+      "type": "template",
+      "template": "settings",
+      "categoryId": "system",
+      "showOnDesktop": true,
+      "description": "Configure themes and OS preferences",
+      "order": 1,
+      "enabled": true,
+      "allowMultipleInstances": false
+    },
+    {
+      "id": "notes",
+      "name": "Notes",
+      "icon": "edit_note",
+      "type": "iframe",
+      "url": "/apps/notes/index.html",
+      "categoryId": "productivity",
+      "showOnDesktop": true,
+      "description": "Rich text note-taking with formatting",
+      "order": 1,
+      "enabled": true,
+      "permissions": ["localStorage"],
+      "sandbox": "allow-scripts allow-same-origin allow-forms allow-modals",
+      "allowMultipleInstances": true
+    },
+    {
+      "id": "file-manager",
+      "name": "File Manager",
+      "icon": "folder",
+      "type": "iframe",
+      "url": "/apps/files/index.html",
+      "categoryId": "system",
+      "showOnDesktop": false,
+      "description": "Browse and manage files",
+      "order": 2,
+      "enabled": true,
+      "sandbox": "allow-scripts allow-same-origin allow-forms",
+      "allowMultipleInstances": true
+    },
+    {
+      "id": "terminal",
+      "name": "Terminal",
+      "icon": "terminal",
+      "type": "iframe",
+      "url": "/apps/terminal/index.html",
+      "categoryId": "developer",
+      "showOnDesktop": true,
+      "description": "Command-line interface",
+      "order": 1,
+      "enabled": true,
+      "allowMultipleInstances": true,
+      "sandbox": "allow-scripts allow-same-origin"
+    },
+    {
+      "id": "browser",
+      "name": "Browser",
+      "icon": "language",
+      "type": "iframe",
+      "url": "/apps/browser/index.html",
+      "categoryId": "productivity",
+      "showOnDesktop": true,
+      "description": "Web browsing experience",
+      "order": 2,
+      "enabled": true,
+      "allowMultipleInstances": true,
+      "sandbox": "allow-scripts allow-same-origin allow-forms allow-popups"
+    }
+  ]
+}

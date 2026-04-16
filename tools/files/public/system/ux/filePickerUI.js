@@ -63,124 +63,124 @@ export function injectStyles() {
     
     /* File Type Icons */
     .material-icons.icon-folder {
-        color: #FFB300; /* Amber - folders */
+        color: var(--mi-fp-icon-folder, #FFB300); /* Amber - folders */
     }
     
     .material-icons.icon-file {
-        color: #1976D2; /* Blue - files */
+        color: var(--mi-fp-icon-file, #1976D2); /* Blue - files */
     }
     
     .material-icons.icon-up-dir {
-        color: #0288D1; /* Light Blue - parent directory */
+        color: var(--mi-fp-icon-up-dir, #0288D1); /* Light Blue - parent directory */
     }
     
     /* Toolbar Action Icons */
     .material-icons.icon-create {
-        color: #388E3C; /* Green - create new */
+        color: var(--mi-fp-action-create, #388E3C); /* Green - create new */
     }
     
     .material-icons.icon-rename {
-        color: #1976D2; /* Blue - edit/rename */
+        color: var(--mi-fp-action-rename, #1976D2); /* Blue - edit/rename */
     }
     
     .material-icons.icon-copy {
-        color: #0288D1; /* Light Blue - copy */
+        color: var(--mi-fp-action-copy, #0288D1); /* Light Blue - copy */
     }
     
     .material-icons.icon-cut {
-        color: #F57C00; /* Orange - cut */
+        color: var(--mi-fp-action-cut, #F57C00); /* Orange - cut */
     }
     
     .material-icons.icon-paste {
-        color: #388E3C; /* Green - paste */
+        color: var(--mi-fp-action-paste, #388E3C); /* Green - paste */
     }
     
     .material-icons.icon-delete {
-        color: #D32F2F; /* Red - delete */
+        color: var(--mi-fp-action-delete, #D32F2F); /* Red - delete */
     }
     
     .material-icons.icon-download {
-        color: #388E3C; /* Green - download */
+        color: var(--mi-fp-action-download, #388E3C); /* Green - download */
     }
     
     .material-icons.icon-upload {
-        color: #1976D2; /* Blue - upload */
+        color: var(--mi-fp-action-upload, #1976D2); /* Blue - upload */
     }
     
     .material-icons.icon-cancel {
-        color: #757575; /* Gray - cancel/close */
+        color: var(--mi-fp-action-cancel, #757575); /* Gray - cancel/close */
     }
     
     .material-icons.icon-confirm {
-        color: #388E3C; /* Green - confirm/check */
+        color: var(--mi-fp-action-confirm, #388E3C); /* Green - confirm/check */
     }
     
     .material-icons.icon-refresh {
-        color: #1976D2; /* Blue - refresh */
+        color: var(--mi-fp-action-refresh, #1976D2); /* Blue - refresh */
     }
     
     /* Hover States - Brighten colors on hover */
     .file-picker-menu-bar button:hover:not(:disabled) .material-icons.icon-folder,
     .file-picker-list-table .file-icon .material-icons.icon-folder:hover {
-        color: #FFC107;
+        color: var(--mi-fp-icon-folder-hover, #FFC107);
     }
     
     .file-picker-menu-bar button:hover:not(:disabled) .material-icons.icon-file,
     .file-picker-list-table .file-icon .material-icons.icon-file:hover {
-        color: #2196F3;
+        color: var(--mi-fp-icon-file-hover, #2196F3);
     }
     
     .file-picker-menu-bar button:hover:not(:disabled) .material-icons.icon-up-dir {
-        color: #03A9F4;
+        color: var(--mi-fp-icon-up-dir-hover, #03A9F4);
     }
     
     .file-picker-menu-bar button:hover:not(:disabled) .material-icons.icon-create {
-        color: #4CAF50;
+        color: var(--mi-fp-action-create-hover, #4CAF50);
     }
     
     .file-picker-menu-bar button:hover:not(:disabled) .material-icons.icon-rename {
-        color: #2196F3;
+        color: var(--mi-fp-action-rename-hover, #2196F3);
     }
     
     .file-picker-menu-bar button:hover:not(:disabled) .material-icons.icon-copy {
-        color: #03A9F4;
+        color: var(--mi-fp-action-copy-hover, #03A9F4);
     }
     
     .file-picker-menu-bar button:hover:not(:disabled) .material-icons.icon-cut {
-        color: #FF9800;
+        color: var(--mi-fp-action-cut-hover, #FF9800);
     }
     
     .file-picker-menu-bar button:hover:not(:disabled) .material-icons.icon-paste {
-        color: #4CAF50;
+        color: var(--mi-fp-action-paste-hover, #4CAF50);
     }
     
     .file-picker-menu-bar button:hover:not(:disabled) .material-icons.icon-delete {
-        color: #F44336;
+        color: var(--mi-fp-action-delete-hover, #F44336);
     }
     
     .file-picker-menu-bar button:hover:not(:disabled) .material-icons.icon-download {
-        color: #4CAF50;
+        color: var(--mi-fp-action-download-hover, #4CAF50);
     }
     
     .file-picker-menu-bar button:hover:not(:disabled) .material-icons.icon-upload {
-        color: #2196F3;
+        color: var(--mi-fp-action-upload-hover, #2196F3);
     }
     
     .file-picker-menu-bar button:hover:not(:disabled) .material-icons.icon-cancel {
-        color: #9E9E9E;
+        color: var(--mi-fp-action-cancel-hover, #9E9E9E);
     }
     
     .file-picker-menu-bar button:hover:not(:disabled) .material-icons.icon-confirm {
-        color: #4CAF50;
+        color: var(--mi-fp-action-confirm-hover, #4CAF50);
     }
     
     .file-picker-menu-bar button:hover:not(:disabled) .material-icons.icon-refresh {
-        color: #2196F3;
+        color: var(--mi-fp-action-refresh-hover, #2196F3);
     }
     
     /* Disabled State - Gray out all icons */
     .file-picker-menu-bar button:disabled .material-icons {
-        color: #BDBDBD !important;
+        color: var(--mi-fp-icon-disabled, #BDBDBD) !important;
     }
     /* ===== END MATERIAL ICONS COLOR CODING ===== */
 
@@ -192,11 +192,13 @@ export function injectStyles() {
         width: 100%;
         height: 100%;
         overflow: hidden;
-        border: 1px solid #ccc;
+        border: 1px solid var(--mi-fp-border, #ccc);
         font-family: 'Fira Code', 'Cascadia Code', 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
         font-size: 14px;
         line-height: ${LINE_HEIGHT_EM};
         box-sizing: border-box;
+        background-color: var(--mi-fp-bg-container, #ffffff);
+        color: var(--mi-fp-text-primary, #000000);
     }
     
     /* Global box-sizing for descendants */
@@ -206,8 +208,8 @@ export function injectStyles() {
 
     /* Title Bar Styles to show the full path */
     .file-picker-title-bar {
-        background-color: #333;
-        color: #fff;
+        background-color: var(--mi-fp-bg-titlebar, #333);
+        color: var(--mi-fp-text-on-titlebar, #fff);
         padding: 4px 8px;
         font-weight: bold;
         flex-shrink: 0;
@@ -230,8 +232,8 @@ export function injectStyles() {
     .file-picker-menu-bar {
         width: 100%;
         border-collapse: collapse;
-        background-color: #f8f8f8;
-        border-bottom: 1px solid #eee;
+        background-color: var(--mi-fp-bg-menubar, #f8f8f8);
+        border-bottom: 1px solid var(--mi-fp-border, #eee);
         flex-shrink: 0;
         display: table;
         table-layout: fixed;
@@ -242,7 +244,7 @@ export function injectStyles() {
     }
 
     .file-picker-menu-bar td {
-        border: 1px solid #ddd;
+        border: 1px solid var(--mi-fp-border, #ddd);
         text-align: center;
         vertical-align: middle;
         padding: 0;
@@ -252,7 +254,7 @@ export function injectStyles() {
     .file-picker-menu-bar button {
         background-color: transparent;
         border: none;
-        color: #555;
+        color: var(--mi-fp-text-secondary, #555);
         padding: 0 6px;
         margin: 0;
         cursor: pointer;
@@ -270,8 +272,8 @@ export function injectStyles() {
     }
 
     .file-picker-menu-bar button:hover:not(:disabled) {
-        background-color: #e0e0e0;
-        border-color: #ccc;
+        background-color: var(--mi-fp-hover-bg, #e0e0e0);
+        border-color: var(--mi-fp-border-hover, #ccc);
     }
 
     .file-picker-menu-bar button:disabled {
@@ -284,8 +286,8 @@ export function injectStyles() {
         display: flex;
         align-items: center;
         padding: 2px 5px;
-        background-color: #e9e9e9;
-        border-bottom: 1px solid #ddd;
+        background-color: var(--mi-fp-bg-pathbar, #e9e9e9);
+        border-bottom: 1px solid var(--mi-fp-border, #ddd);
         flex-shrink: 0;
         height: 24px;
         box-sizing: border-box;
@@ -301,7 +303,7 @@ export function injectStyles() {
     .file-picker-refresh-button {
         background-color: transparent;
         border: none;
-        color: #555;
+        color: var(--mi-fp-text-secondary, #555);
         cursor: pointer;
         font-size: 1em;
         padding: 0 5px;
@@ -310,15 +312,15 @@ export function injectStyles() {
         align-items: center;
     }
     .file-picker-refresh-button:hover {
-        background-color: #e0e0e0;
+        background-color: var(--mi-fp-hover-bg, #e0e0e0);
     }
 
     /* File list area */
     .file-picker-list-container {
         flex-grow: 1;
         overflow-y: auto;
-        background-color: #ffffff;
-        color: #000000;
+        background-color: var(--mi-fp-bg-list, #ffffff);
+        color: var(--mi-fp-text-primary, #000000);
     }
 
     .file-picker-list-table {
@@ -331,7 +333,7 @@ export function injectStyles() {
     .file-picker-list-table td {
         padding: 4px 8px;
         text-align: left;
-        border-bottom: 1px solid #eee;
+        border-bottom: 1px solid var(--mi-fp-border, #eee);
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -339,16 +341,16 @@ export function injectStyles() {
     }
 
     .file-picker-list-table th {
-        background-color: #f0f0f0;
+        background-color: var(--mi-fp-bg-header, #f0f0f0);
         font-weight: bold;
-        color: #333;
+        color: var(--mi-fp-text-primary, #333);
         position: sticky;
         top: 0;
         z-index: 1;
     }
 
     .file-picker-list-table tr:hover {
-        background-color: #f5f5f5;
+        background-color: var(--mi-fp-row-hover, #f5f5f5);
     }
 
     /* ===== FIX: Tighten spacing between Checkbox and File Name ===== */
@@ -385,7 +387,7 @@ export function injectStyles() {
     .file-picker-list-table .file-name,
     .file-picker-list-table .up-directory {
         cursor: pointer;
-        color: #007bff;
+        color: var(--mi-fp-link-color, #007bff);
         text-decoration: none;
         text-align: left !important;
     }
@@ -406,9 +408,9 @@ export function injectStyles() {
         cursor: pointer;
     }
     
-    /* New Wrapper for Modal Dialogs */
+    /* ✅ UPDATED: Dialog Overlay - Positioned within file picker container */
     .file-picker-dialog-overlay {
-        position: fixed;
+        position: absolute;
         top: 0;
         left: 0;
         width: 100%;
@@ -417,10 +419,41 @@ export function injectStyles() {
         display: none;
         align-items: center;
         justify-content: center;
-        z-index: 99999999999;
+        z-index: 1000;
     }
 
-    /* Popup Message Styles */
+    /* ===== CONTAINER-RELATIVE POPUP (centered within file picker) ===== */
+    .file-picker-popup-contained {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background-color: var(--mi-fp-popup-success-bg, #4CAF50);
+        color: var(--mi-fp-popup-text, white);
+        padding: 10px 20px;
+        border-radius: 5px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+        z-index: 1002;
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity 0.25s ease, visibility 0.25s ease;
+        pointer-events: none;
+        max-width: 90%;
+        text-align: center;
+        font-weight: 500;
+    }
+
+    .file-picker-popup-contained.show {
+        opacity: 1;
+        visibility: visible;
+    }
+
+    .file-picker-popup-contained.error {
+        background-color: var(--mi-fp-popup-error-bg, #f44336);
+    }
+    /* ===== END CONTAINER-RELATIVE POPUP ===== */
+
+    /* Popup Message Styles - Keep global for notifications */
     .file-picker-popup {
         position: fixed;
         top: 20px;
@@ -448,12 +481,12 @@ export function injectStyles() {
 
     /* Confirmation Dialog Styles */
     .file-picker-confirm-dialog {
-        background-color: #fff;
-        border: 1px solid #ccc;
+        background-color: var(--mi-fp-dialog-bg, #fff);
+        border: 1px solid var(--mi-fp-border, #ccc);
         padding: 20px;
         border-radius: 8px;
         box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
-        z-index: 99999999999; 
+        z-index: 1001;
         display: flex;
         flex-direction: column;
         gap: 15px;
@@ -464,7 +497,7 @@ export function injectStyles() {
     .file-picker-confirm-dialog p {
         margin: 0;
         font-size: 1.1em;
-        color: #333;
+        color: var(--mi-fp-text-primary, #333);
         text-align: center;
     }
 
@@ -475,7 +508,7 @@ export function injectStyles() {
     }
 
     .file-picker-confirm-dialog-buttons button {
-        background-color: #007bff;
+        background-color: var(--mi-fp-btn-primary-bg, #007bff);
         color: white;
         border: none;
         padding: 8px 16px;
@@ -487,25 +520,25 @@ export function injectStyles() {
     }
 
     .file-picker-confirm-dialog-buttons button.cancel {
-        background-color: #6c757d;
+        background-color: var(--mi-fp-btn-secondary-bg, #6c757d);
     }
 
     .file-picker-confirm-dialog-buttons button:hover {
-        background-color: #0056b3;
+        background-color: var(--mi-fp-btn-primary-hover, #0056b3);
     }
 
     .file-picker-confirm-dialog-buttons button.cancel:hover {
-        background-color: #5a6268;
+        background-color: var(--mi-fp-btn-secondary-hover, #5a6268);
     }
 
     /* Prompt Dialog Styles */
     .file-picker-prompt-dialog {
-        background-color: #fff;
-        border: 1px solid #ccc;
+        background-color: var(--mi-fp-dialog-bg, #fff);
+        border: 1px solid var(--mi-fp-border, #ccc);
         padding: 20px;
         border-radius: 8px;
         box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
-        z-index: 99999999999;
+        z-index: 1001;
         display: flex;
         flex-direction: column;
         gap: 15px;
@@ -516,14 +549,14 @@ export function injectStyles() {
     .file-picker-prompt-dialog p {
         margin: 0;
         font-size: 1.1em;
-        color: #333;
+        color: var(--mi-fp-text-primary, #333);
         text-align: center;
     }
 
     .file-picker-prompt-dialog input[type="text"] {
         width: calc(100% - 16px);
         padding: 8px;
-        border: 1px solid #ddd;
+        border: 1px solid var(--mi-fp-input-border, #ddd);
         border-radius: 4px;
         font-size: 1em;
         box-sizing: border-box;
@@ -536,7 +569,7 @@ export function injectStyles() {
     }
 
     .file-picker-prompt-dialog-buttons button {
-        background-color: #007bff;
+        background-color: var(--mi-fp-btn-primary-bg, #007bff);
         color: white;
         border: none;
         padding: 8px 16px;
@@ -547,25 +580,25 @@ export function injectStyles() {
     }
 
     .file-picker-prompt-dialog-buttons button.cancel {
-        background-color: #6c757d;
+        background-color: var(--mi-fp-btn-secondary-bg, #6c757d);
     }
 
     .file-picker-prompt-dialog-buttons button:hover {
-        background-color: #0056b3;
+        background-color: var(--mi-fp-btn-primary-hover, #0056b3);
     }
 
     .file-picker-prompt-dialog-buttons button.cancel:hover {
-        background-color: #5a6268;
+        background-color: var(--mi-fp-btn-secondary-hover, #5a6268);
     }
     
     /* New Creation Dialog Styles (Prompt with Radio Buttons) */
     .file-picker-creation-dialog {
-        background-color: #fff;
-        border: 1px solid #ccc;
+        background-color: var(--mi-fp-dialog-bg, #fff);
+        border: 1px solid var(--mi-fp-border, #ccc);
         padding: 20px;
         border-radius: 8px;
         box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
-        z-index: 99999999999;
+        z-index: 1001;
         display: flex; 
         flex-direction: column;
         gap: 15px;
@@ -576,7 +609,7 @@ export function injectStyles() {
     .file-picker-creation-dialog p {
         margin: 0;
         font-size: 1.1em;
-        color: #333;
+        color: var(--mi-fp-text-primary, #333);
         text-align: center;
     }
 
@@ -597,7 +630,7 @@ export function injectStyles() {
     .file-picker-creation-dialog input[type="text"] {
         width: calc(100% - 16px);
         padding: 8px;
-        border: 1px solid #ddd;
+        border: 1px solid var(--mi-fp-input-border, #ddd);
         border-radius: 4px;
         font-size: 1em;
         box-sizing: border-box;
@@ -610,7 +643,7 @@ export function injectStyles() {
     }
     
     .file-picker-creation-dialog-buttons button {
-        background-color: #007bff;
+        background-color: var(--mi-fp-btn-primary-bg, #007bff);
         color: white;
         border: none;
         padding: 8px 16px;
@@ -621,22 +654,30 @@ export function injectStyles() {
     }
 
     .file-picker-creation-dialog-buttons button.cancel {
-        background-color: #6c757d;
+        background-color: var(--mi-fp-btn-secondary-bg, #6c757d);
     }
 
     .file-picker-creation-dialog-buttons button:hover {
-        background-color: #0056b3;
+        background-color: var(--mi-fp-btn-primary-hover, #0056b3);
     }
 
     .file-picker-creation-dialog-buttons button.cancel:hover {
-        background-color: #5a6268;
+        background-color: var(--mi-fp-btn-secondary-hover, #5a6268);
     }
     
-    /* Button text span for "Use Path" button */
+    /* Button text span for "Use Path" button - HIDDEN for icon-only mode */
     .file-picker-menu-bar button .btn-text {
+        display: none;
         font-size: 0.9em;
         margin-left: 2px;
         vertical-align: middle;
+    }
+    
+    /* Ensure icon is vertically centered when text is hidden */
+    .file-picker-menu-bar button.use-path-btn .material-icons.icon-confirm {
+        vertical-align: middle;
+        display: inline-flex;
+        align-items: center;
     }
 `;
 	
@@ -660,7 +701,7 @@ export function formatBytes(bytes) {
 }
 
 /**
- * Shows a temporary popup message.
+ * Shows a temporary popup message (GLOBAL - viewport centered).
  * @param {string} message The message to display.
  * @param {boolean} isError True if it's an error message, false for success.
  */
@@ -674,7 +715,7 @@ export function showPopupMessage(message, isError = false) {
     }
 
     popup.textContent = message;
-    popup.classList.remove('error', 'show'); // Reset classes
+    popup.classList.remove('error', 'show');
     if (isError) {
         popup.classList.add('error');
     }
@@ -682,184 +723,20 @@ export function showPopupMessage(message, isError = false) {
 
     setTimeout(() => {
         popup.classList.remove('show');
-    }, 3000); // Hide after 3 seconds
+    }, 3000);
 }
 
 /**
- * Shows a confirmation dialog.
- * @param {string} message The confirmation message.
- * @returns {Promise<boolean>} Resolves to true if confirmed, false if canceled.
- */
-export function showConfirmDialog(message) {
-    return new Promise(resolve => {
-        const dialogOverlay = getDialogOverlay(); // Get the single overlay
-        dialogOverlay.innerHTML = `
-            <div class="file-picker-confirm-dialog">
-                <p class="file-picker-confirm-message">${message}</p>
-                <div class="file-picker-confirm-dialog-buttons">
-                    <button class="confirm-ok">OK</button>
-                    <button class="cancel">Cancel</button>
-                </div>
-            </div>
-        `;
-
-        const okBtn = dialogOverlay.querySelector('.confirm-ok');
-        const cancelBtn = dialogOverlay.querySelector('.cancel');
-
-        dialogOverlay.style.display = 'flex';
-
-        const handleResolve = (result) => {
-            dialogOverlay.style.display = 'none';
-            resolve(result);
-        }
-
-        okBtn.addEventListener('click', () => handleResolve(true), { once: true });
-        cancelBtn.addEventListener('click', () => handleResolve(false), { once: true });
-    });
-}
-
-/**
- * Shows a prompt dialog for text input.
- * @param {string} message The prompt message.
- * @param {string} defaultValue The default value for the input.
- * @returns {Promise<string|null>} Resolves to the input string if OK, null if canceled.
- */
-export function showPromptDialog(message, defaultValue = '') {
-    return new Promise(resolve => {
-        const dialogOverlay = getDialogOverlay(); // Get the single overlay
-        dialogOverlay.innerHTML = `
-            <div class="file-picker-prompt-dialog">
-                <p class="file-picker-prompt-message">${message}</p>
-                <input type="text" class="file-picker-prompt-input" value="${defaultValue}" />
-                <div class="file-picker-prompt-dialog-buttons">
-                    <button class="prompt-ok">OK</button>
-                    <button class="cancel">Cancel</button>
-                </div>
-            </div>
-        `;
-        
-        const inputEl = dialogOverlay.querySelector('.file-picker-prompt-input');
-        const okBtn = dialogOverlay.querySelector('.prompt-ok');
-        const cancelBtn = dialogOverlay.querySelector('.cancel');
-
-        dialogOverlay.style.display = 'flex';
-        inputEl.focus();
-        inputEl.select(); // Select the default value
-
-        const handleResolve = (result) => {
-            // Remove listeners for Enter/Escape
-            inputEl.removeEventListener('keydown', handleKeyDown);
-            dialogOverlay.style.display = 'none';
-            resolve(result);
-        }
-        
-        const handleOk = () => handleResolve(inputEl.value);
-        const handleCancel = () => handleResolve(null);
-        
-        const handleKeyDown = (e) => {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                handleOk();
-            } else if (e.key === 'Escape') {
-                e.preventDefault();
-                handleCancel();
-            }
-        };
-
-        okBtn.addEventListener('click', handleOk, { once: true });
-        cancelBtn.addEventListener('click', handleCancel, { once: true });
-        inputEl.addEventListener('keydown', handleKeyDown);
-    });
-}
-
-/**
- * Shows a dialog to create a new file or directory.
- * @returns {Promise<{name: string, type: 'file'|'directory'}|null>} Resolves to object with name and type, or null if canceled.
- */
-export function showCreationDialog() {
-    return new Promise(resolve => {
-        const dialogOverlay = getDialogOverlay();
-        dialogOverlay.innerHTML = `
-            <div class="file-picker-creation-dialog">
-                <p>Create New Item</p>
-                
-                <div class="file-picker-creation-dialog-options">
-                    <label>
-                        <input type="radio" name="creationType" value="file" checked>
-                        <span class="material-icons material-icons-sm icon-file" aria-hidden="true">insert_drive_file</span> File
-                    </label>
-                    <label>
-                        <input type="radio" name="creationType" value="directory">
-                        <span class="material-icons material-icons-sm icon-folder" aria-hidden="true">folder</span> Directory
-                    </label>
-                </div>
-
-                <input type="text" class="file-picker-item-name-input" placeholder="Enter name" />
-                
-                <div class="file-picker-creation-dialog-buttons">
-                    <button class="create-ok">Create</button>
-                    <button class="cancel">Cancel</button>
-                </div>
-            </div>
-        `;
-
-        const inputEl = dialogOverlay.querySelector('.file-picker-item-name-input');
-        const okBtn = dialogOverlay.querySelector('.create-ok');
-        const cancelBtn = dialogOverlay.querySelector('.cancel');
-
-        dialogOverlay.style.display = 'flex';
-        inputEl.focus();
-
-        const handleResolve = (result) => {
-            // Remove listeners for Enter/Escape
-            inputEl.removeEventListener('keydown', handleKeyDown);
-            dialogOverlay.style.display = 'none';
-            resolve(result);
-        }
-
-        const handleOk = () => {
-            const name = inputEl.value.trim();
-            const type = dialogOverlay.querySelector('input[name="creationType"]:checked').value;
-
-            if (!name) {
-                inputEl.placeholder = "Name cannot be empty!";
-                inputEl.focus();
-                return;
-            }
-
-            handleResolve({ name, type });
-        };
-        const handleCancel = () => handleResolve(null);
-        
-        const handleKeyDown = (e) => {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                handleOk();
-            } else if (e.key === 'Escape') {
-                e.preventDefault();
-                handleCancel();
-            }
-        };
-
-        okBtn.addEventListener('click', handleOk, { once: true });
-        cancelBtn.addEventListener('click', handleCancel, { once: true });
-        inputEl.addEventListener('keydown', handleKeyDown);
-    });
-}
-
-
-/**
- * Gets or creates a single, global overlay for all dialogs.
- * This prevents z-index issues and provides a consistent modal experience.
+ * Gets or creates a dialog overlay within a specific picker container.
+ * @param {HTMLElement} pickerContainer - The file picker container
  * @returns {HTMLElement} The dialog overlay element.
  */
-export function getDialogOverlay() {
-    let overlay = document.getElementById('file-picker-dialog-overlay');
+export function getDialogOverlay(pickerContainer) {
+    let overlay = pickerContainer.querySelector('.file-picker-dialog-overlay');
     if (!overlay) {
         overlay = document.createElement('div');
-        overlay.id = 'file-picker-dialog-overlay';
         overlay.className = 'file-picker-dialog-overlay';
-        document.body.appendChild(overlay);
+        pickerContainer.appendChild(overlay);
     }
     return overlay;
 }

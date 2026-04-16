@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>File Picker — Fullscreen Edge-to-Edge</title>
+  
+  <!-- ✅ OS Theme Bridge for iframe apps (REQUIRED) -->
+  <script src="/projects/desktop/os-theme-bridge.js"></script>
+  
+  <style>
+    /* ===== FULLSCREEN RESET & LAYOUT ===== */
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    
+    html, body {
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      background: var(--system-bg, #f5f5f5);
+      color: var(--system-text, #333);
+      font-family: var(--system-font, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif);
+    }
+
+    #fullscreen-picker-wrapper.system-app {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      z-index: 10000;
+      background: var(--system-window-bg, #fff);
+    }
+
+    /* Force picker to fill wrapper completely */
+    #fullscreen-picker-wrapper .file-picker-container-wrapper {
+      width: 100% !important;
+      height: 100% !important;
+      max-width: none !important;
+      max-height: none !important;
+      border-radius: 0 !important;
+      box-shadow: none !important;
+      border: none !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      display: flex !important;
+      flex-direction: column !important;
+      background: transparent;
+      color: var(--system-text);
+    }
+
+    /* ===== FILE LIST CONTAINER - ENABLE BOTH SCROLL DIRECTIONS ===== */
+    #fullscreen-picker-wrapper .file-picker-list-container {
+      flex-grow: 1 !important;
+      min-height: 0 !important;
+      overflow: auto !important;  /* ← BOTH horizontal AND vertical scroll */
+      -webkit-overflow-scrolling: touch;
+    }
+
+    /* ===== TABLE LAYOUT - ALLOW CONTENT TO EXPAND ===== */
+    #fullscreen-picker-wrapper .file-picker-list-table {
+      table-layout: auto !important;  /* ← KEY: let content determine column widths */
+      width: auto !important;         /* ← Allow table to grow beyond container */
+      min-width: 100%;                /* ← But never shrink below 100% */
+      border-collapse: collapse;
+    }
+    
+    #fullscreen-picker-wrapper .file-picker-list-table th,
+    #fullscreen-picker-wrapper .file-picker-list-table td {
+      padding: 8px 12px;
+      text-align: left;
+      border-bottom: 1px solid var(--system-border, #ddd);
+      color: var(--system-text);
+      white-space: nowrap;  /* Keep cell content on one line */
+    }
+    
+    #fullscreen-picker-wrapper .file-picker-list-table th {
+      background: var(--system-header-bg, #f0f0f0);
+      font-weight: 600;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+    
+    #fullscreen-picker-wrapper .file-picker-list-table tr:hover {
+      background: var(--system-highlight, rgba(0,120,212,0.1));
+    }
+
+    /* ===== COLUMN WIDTHS - FLEXIBLE NAME, FIXED OTHERS ===== */
+    
+    /* Icon column - fixed width, tight padding */
+    #fullscreen-picker-wrapper .file-picker-list-table th:nth-child(1),
+    #fullscreen-picker-wrapper .file-picker-list-table td:nth-child(1) {
+      width: 40px;
+      min-width: 40px;
+      max-width: 40px;
+      padding: 8px 4px 8px 12px;
+      text-align: left;
+    }
+
+    /* Checkbox column - fixed width, centered */
+    #fullscreen-picker-wrapper .file-picker-list-table th:nth-child(2),
+    #fullscreen-picker-wrapper .file-picker-list-table td:nth-child(2) {
+      width: 40px;
+      min-width: 40px;
+      max-width: 40px;
+      padding: 8px 0;
+      text-align: center;
+    }
+
+    /* Name column - FLEXIBLE, no truncation, no max-width */
+    #fullscreen-picker-wrapper .file-picker-list-table th:nth-child(3),
+    #fullscreen-picker-wrapper .file-picker-list-table td:nth-child(3) {
+      min-width: 200px;
+      padding: 8px 12px;
+      /* NO overflow/ellipsis - allow full content display */
+    }
+
+    /* Size column - fixed width, right-aligned */
+    #fullscreen-picker-wrapper .file-picker-list-table th:nth-child(4),
+    #fullscreen-picker-wrapper .file-picker-list-table td:nth-child(4) {
+      width: 100px;
+      min-width: 100px;
+      max-width: 100px;
+      text-align: right;
+      padding: 8px 12px;
+    }
+
+    /* Filename element - block display, no truncation */
+    #fullscreen-picker-wrapper .file-picker-list-table .file-name,
+    #fullscreen-picker-wrapper .file-picker-list-table .directory-name {
+      display: block;           /* ← Takes full cell width */
+      white-space: nowrap;      /* ← Keep on one line */
+      color: var(--system-accent, #0078d4);
+      text-decoration: none;
+      cursor: pointer;
+      /* NO overflow/ellipsis - let parent scroll instead */
+    }
+    
+    /* Icon alignment */
+    #fullscreen-picker-wrapper .file-picker-list-table .file-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: flex-start;
+      width: 100%;
+    }
+
+    /* ✅ Use system button classes where possible */
+    #fullscreen-picker-wrapper .file-picker-btn,
+    #fullscreen-picker-wrapper button {
+      background: var(--system-accent, #0078d4);
+      color: var(--system-text-on-accent, #fff);
+      border: none;
+      padding: 8px 16px;
+      border-radius: var(--system-radius, 8px);
+      cursor: pointer;
+      font-family: inherit;
+      transition: opacity 0.2s ease;
+    }
+    
+    #fullscreen-picker-wrapper .file-picker-btn:hover,
+    #fullscreen-picker-wrapper button:hover {
+      opacity: 0.9;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }
+    
+    #fullscreen-picker-wrapper .file-picker-btn-secondary {
+      background: transparent;
+      border: 1px solid var(--system-border, #ccc);
+      color: var(--system-text, #333);
+    }
+
+    /* Optional: subtle backdrop for modal feel */
+    #fullscreen-picker-wrapper::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: var(--system-backdrop, rgba(0,0,0,0.1));
+      z-index: -1;
+      pointer-events: none;
+    }
+
+    /* ===== RESULT PANEL - Use system alert classes ===== */
+    #result-panel {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: var(--system-menu-bg, rgba(255,255,255,0.95));
+      border-top: 1px solid var(--system-border, #ddd);
+      padding: 8px 16px;
+      font-size: 0.9em;
+      color: var(--system-text, #333);
+      display: none;
+      z-index: 10001;
+      max-height: 20vh;
+      overflow-y: auto;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+    }
+    #result-panel.show { 
+      display: block; 
+      pointer-events: auto;
+      animation: slideUp 0.2s ease;
+    }
+    #result-panel.error {
+      background: var(--system-danger, #ffebee);
+      color: var(--system-text-on-accent, #c62828);
+      border-top-color: var(--system-danger, #ef9a9a);
+    }
+    #result-panel.success {
+      background: var(--system-success, #e8f5e9);
+      color: var(--system-text, #2e7d32);
+      border-top-color: var(--system-success, #81c784);
+    }
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    #result-panel code {
+      background: var(--system-bg, #f0f0f0);
+      padding: 2px 6px;
+      border-radius: var(--system-radius, 4px);
+      font-family: var(--system-font-mono, monospace);
+      color: var(--system-accent, #0078d4);
+    }
+
+    /* ===== ACCESSIBILITY ===== */
+    #fullscreen-picker-wrapper .file-picker-list-container:focus {
+      outline: 2px solid var(--system-accent, #007bff);
+      outline-offset: -2px;
+    }
+
+    /* Scrollbar styling with system variables */
+    #fullscreen-picker-wrapper .file-picker-list-container {
+      scrollbar-width: thin;
+      scrollbar-color: var(--system-border, #ccc) transparent;
+    }
+    #fullscreen-picker-wrapper .file-picker-list-container::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;  /* ← Also style horizontal scrollbar */
+    }
+    #fullscreen-picker-wrapper .file-picker-list-container::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    #fullscreen-picker-wrapper .file-picker-list-container::-webkit-scrollbar-thumb {
+      background-color: var(--system-border, #ccc);
+      border-radius: var(--system-radius, 4px);
+    }
+    
+    /* ✅ Respect reduced motion preference */
+    @media (prefers-reduced-motion: reduce) {
+      #result-panel,
+      #fullscreen-picker-wrapper .file-picker-btn,
+      #fullscreen-picker-wrapper button {
+        transition: none !important;
+        animation: none !important;
+      }
+    }
+  </style>
+</head>
+<body data-os-app>
+  <div id="fullscreen-picker-wrapper" class="system-app" aria-label="File Picker"></div>
+  
+  <!-- Result panel for demo feedback -->
+  <div id="result-panel" role="status" aria-live="polite"></div>
+
+  <script type="module">
+    import { createfilePicker } from '/system/ux/filePicker.js';
+
+    const wrapper = document.getElementById('fullscreen-picker-wrapper');
+    const resultPanel = document.getElementById('result-panel');
+
+    // ✅ Listen for OS theme changes
+    window.addEventListener('osThemeChanged', (e) => {
+      console.log('🎨 Theme updated:', e.detail.themeId);
+    });
+
+    // ✅ Optional: Use OsThemeBridge API
+    if (window.OsThemeBridge) {
+      const vars = window.OsThemeBridge.getVariables();
+      console.log('📦 Current theme variables:', vars);
+      
+      const unsubscribe = window.OsThemeBridge.onChange((theme) => {
+        console.log('🔄 Theme changed:', theme.themeId);
+      });
+    }
+
+    // Create picker instance
+    const pickerDialog = createfilePicker();
+    const pickerInstance = pickerDialog.querySelector('.file-picker-container-wrapper');
+    
+    // Strip dialog wrapper styles and mount directly
+    pickerDialog.style.cssText = '';
+    pickerDialog.removeAttribute('style');
+    wrapper.appendChild(pickerInstance);
+
+    // Configure picker
+    pickerInstance['dom.buttonText'] = 'Select';
+
+    // ✅ Add system button classes to picker buttons
+    setTimeout(() => {
+      const selectBtn = pickerInstance.querySelector('button[data-action="select"]');
+      const cancelBtn = pickerInstance.querySelector('button[data-action="cancel"]');
+      
+      if (selectBtn) selectBtn.classList.add('system-btn', 'system-btn-sm');
+      if (cancelBtn) cancelBtn.classList.add('system-btn', 'system-btn-secondary', 'system-btn-sm');
+      
+      const rows = pickerInstance.querySelectorAll('.file-picker-row');
+      rows.forEach(row => row.classList.add('system-list-item'));
+    }, 100);
+
+    // Handle selection
+    pickerInstance.onfilepick = (event, filePath) => {
+      showResult(`✅ Selected: <code>${escapeHtml(filePath)}</code>`, 'success');
+      console.log('📁 File picked:', filePath);
+    };
+
+    // Handle cancellation
+    pickerInstance.oncancel = (event) => {
+      showResult(`❌ Cancelled`, 'error');
+      console.log('🚫 Picker cancelled');
+    };
+
+    // Show result panel
+    function showResult(message, type = 'info') {
+      resultPanel.innerHTML = message;
+      resultPanel.className = `show ${type === 'error' ? 'error' : type === 'success' ? 'success' : ''}`;
+      
+      setTimeout(() => {
+        resultPanel.classList.remove('show');
+      }, 4000);
+    }
+
+    // Escape HTML for safe display
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    // Keyboard: Escape cancels
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        pickerInstance.oncancel?.(new Event('cancel'));
+      }
+    });
+
+    // Focus file list for keyboard navigation
+    setTimeout(() => {
+      const listContainer = pickerInstance.querySelector('.file-picker-list-container');
+      if (listContainer) {
+        listContainer.tabIndex = 0;
+        listContainer.classList.add('system-overflow-auto');
+        listContainer.focus({ preventScroll: true });
+      }
+    }, 50);
+
+    // Handle window resize
+    window.addEventListener('resize', () => {
+      pickerInstance.querySelector('.file-picker-list-container')?.dispatchEvent(new Event('scroll'));
+    }, { passive: true });
+  </script>
+</body>
+</html>

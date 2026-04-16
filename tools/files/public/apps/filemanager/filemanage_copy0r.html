@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>File Picker — Fullscreen</title>
+  
+  
+  <style>
+    /* ===== FULLSCREEN RESET & LAYOUT ===== */
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    
+    html, body {
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      background: var(--system-bg, #f5f5f5);
+      font-family: var(--system-font, 'Fira Code', monospace);
+    }
+
+    /* Fullscreen wrapper for the picker */
+    #fullscreen-picker-wrapper {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2vmin;
+      z-index: 10000;
+    }
+
+    /* Make the picker itself fill available space */
+    #fullscreen-picker-wrapper .file-picker-container-wrapper {
+      width: 100%;
+      height: 100%;
+      max-width: none;
+      max-height: none;
+      border-radius: 0;
+      box-shadow: none;
+    }
+
+    /* Optional: subtle backdrop for modal feel */
+    #fullscreen-picker-wrapper::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: var(--system-backdrop, rgba(0,0,0,0.2));
+      z-index: -1;
+    }
+
+    /* ===== OPTIONAL: RESULT DISPLAY (for demo) ===== */
+    #result-panel {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: var(--system-panel-bg, rgba(255,255,255,0.95));
+      border-top: 1px solid var(--system-border, #ddd);
+      padding: 8px 16px;
+      font-size: 0.9em;
+      color: var(--system-text, #333);
+      display: none;
+      z-index: 10001;
+      max-height: 20vh;
+      overflow-y: auto;
+    }
+    #result-panel.show { display: block; }
+    #result-panel code {
+      background: var(--system-code-bg, #f0f0f0);
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-family: inherit;
+    }
+  </style>
+</head>
+<body>
+  <!-- Fullscreen picker container -->
+  <div id="fullscreen-picker-wrapper"></div>
+  
+  <!-- Optional result panel for demo feedback -->
+  <div id="result-panel"></div>
+
+  <script type="module">
+    // Import your file picker factory
+    import { createfilePicker } from '/system/ux/filePicker.js';
+
+    const wrapper = document.getElementById('fullscreen-picker-wrapper');
+    const resultPanel = document.getElementById('result-panel');
+
+    // Create and mount the picker instance
+    const pickerDialog = createfilePicker();
+    const pickerInstance = pickerDialog.querySelector('.file-picker-container-wrapper');
+    
+    // Remove dialog wrapper styling — we want the picker to fill our fullscreen container
+    pickerDialog.style.cssText = ''; 
+    wrapper.appendChild(pickerInstance);
+
+    // Configure the picker
+    pickerInstance['dom.buttonText'] = 'Select'; // Show text on confirm button
+    
+    // Optional: start at a specific path
+    // pickerInstance.filePath = '/documents/'; 
+
+    // Handle file selection
+    pickerInstance.onfilepick = (event, filePath) => {
+      showResult(`✅ Selected: <code>${escapeHtml(filePath)}</code>`);
+      console.log('File picked:', filePath);
+      
+      // Optional: auto-close after selection
+      // setTimeout(() => window.close(), 500); 
+    };
+
+    // Handle cancellation
+    pickerInstance.oncancel = (event) => {
+      showResult(`❌ Cancelled`, true);
+      console.log('Picker cancelled');
+      
+      // Optional: auto-close on cancel
+      // setTimeout(() => window.close(), 500);
+    };
+
+    // Helper: display result in panel
+    function showResult(message, isError = false) {
+      resultPanel.innerHTML = message;
+      resultPanel.className = `show${isError ? ' error' : ''}`;
+      
+      // Auto-hide after 4 seconds
+      setTimeout(() => {
+        resultPanel.classList.remove('show');
+      }, 4000);
+    }
+
+    // Helper: escape HTML for safe display
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    // Optional: keyboard shortcut to close (Escape)
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        pickerInstance.oncancel?.(new Event('cancel'));
+      }
+    });
+
+    // Focus the picker for immediate keyboard access
+    setTimeout(() => {
+      pickerInstance.querySelector('.file-picker-list-container')?.focus();
+    }, 100);
+  </script>
+</body>
+</html>

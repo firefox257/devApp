@@ -1,0 +1,789 @@
+/* ========================================
+   Matrix Theme - v3.4 (Responsive + Title Icons)
+   Material Icons OS - Theme Development Guide v2.7.1+
+   Unified Mobile/Desktop Optimization
+   ======================================== */
+
+:root {
+  /* Colors */
+  --system-bg: #0d0d0d;
+  --system-accent: #00ff41;
+  --system-accent-dim: #008f11;
+  --system-highlight: #00ff66;
+  --system-text: #00ff41;
+  --system-text-dim: #008f11;
+  --system-text-on-accent: #000000;
+  --system-success: #00ff41;
+  --system-warning: #ffaa00;
+  --system-danger: #ff3333;
+  --system-info: #0099ff;
+
+  /* Backgrounds */
+  --system-window-bg: rgba(10, 10, 10, 0.75);
+  --system-header-bg: rgba(26, 26, 26, 0.85);
+  --system-menu-bg: rgba(10, 10, 10, 0.85);
+  --system-icon-bg: rgba(0, 255, 65, 0.15);
+  --system-icon-bg-hover: rgba(0, 255, 65, 0.3);
+
+  /* Borders */
+  --system-border: rgba(0, 255, 65, 0.3);
+  --system-border-hover: #00ff41;
+  --system-icon-border: 1px solid rgba(0, 255, 65, 0.4);
+  --system-icon-border-hover: 1px solid rgba(0, 255, 65, 0.6);
+
+  /* Effects - FLUID VALUES FOR RESPONSIVE SCALING */
+  --system-radius: clamp(4px, 1vw, 6px);
+  --system-radius-lg: clamp(8px, 1.5vw, 12px);
+  --system-shadow: 0 0 clamp(20px, 4vw, 40px) rgba(0, 255, 65, 0.2);
+  --system-taskbar-blur: clamp(15px, 3vw, 25px);
+  --system-start-menu-blur: clamp(15px, 3vw, 25px);
+  --system-taskbar-glow: 0 0 clamp(15px, 3vw, 25px) rgba(0, 255, 65, 0.4);
+  --system-window-glow: 0 0 clamp(20px, 4vw, 30px) rgba(0, 255, 65, 0.15);
+  --system-icon-glow: 0 0 clamp(10px, 2vw, 15px) rgba(0, 255, 65, 0.4);
+
+  /* Typography - FLUID SCALING */
+  --system-font: 'Courier New', Courier, monospace;
+  --system-font-mono: 'Courier New', Courier, monospace;
+
+  /* Layout - FLUID VALUES */
+  --system-taskbar-height: clamp(44px, 8vh, 50px);
+  --system-safe-bottom: env(safe-area-inset-bottom, 0px);
+
+  /* Animation Timing */
+  --system-transition-fast: 0.15s ease;
+  --system-transition-normal: 0.25s ease;
+  --system-transition-slow: 0.4s ease;
+
+  /* Animation Effects */
+  --system-glow: 0 0 clamp(15px, 3vw, 20px) rgba(0, 255, 65, 0.4);
+  --system-glow-intense: 0 0 clamp(20px, 4vw, 30px) rgba(0, 255, 65, 0.6), 0 0 clamp(40px, 8vw, 60px) rgba(0, 255, 65, 0.3);
+
+  /* === NEW: Start Menu Title Icon (v2.7.1+) === */
+  --system-start-menu-title-icon: var(--system-accent);
+}
+
+/* ========================================
+   BASE STYLES - RESPONSIVE FOUNDATION
+   ======================================== */
+html, body {
+  background: #000 url('themes/matrix/background.png') no-repeat center center fixed !important;
+  background-size: cover !important;
+  min-height: 100dvh !important;
+  min-width: 100vw !important;
+  font-family: var(--system-font-mono);
+  color: var(--system-text);
+  margin: 0;
+  padding: 0;
+  /* Prevent zoom on mobile input focus */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* CRT Scanline Effect - Animated (respects reduced motion) */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background: 
+    linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%),
+    linear-gradient(90deg, rgba(0, 255, 65, 0.03) 1px, transparent 1px);
+  background-size: 100% 2px, 3px 100%;
+  z-index: 9999;
+  pointer-events: none;
+  animation: scanline-move 8s linear infinite;
+  opacity: 0.7;
+}
+
+/* Screen curvature vignette */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(ellipse at center, transparent 0%, rgba(0, 0, 0, 0.4) 100%);
+  z-index: 9998;
+  pointer-events: none;
+  opacity: 0.3;
+}
+
+/* Canvas Background */
+#themeCanvas {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ========================================
+   ANIMATION KEYFRAMES (unchanged - already optimized)
+   ======================================== */
+/* ... [keep all existing @keyframes from your original file] ... */
+
+/* ========================================
+   SHARED UTILITY CLASSES - TOUCH OPTIMIZED
+   ======================================== */
+.system-blur {
+  backdrop-filter: blur(clamp(8px, 2vw, 10px)) !important;
+  -webkit-backdrop-filter: blur(clamp(8px, 2vw, 10px)) !important;
+}
+
+.system-blur-sm {
+  backdrop-filter: blur(clamp(4px, 1vw, 5px)) !important;
+  -webkit-backdrop-filter: blur(clamp(4px, 1vw, 5px)) !important;
+}
+
+.system-blur-lg {
+  backdrop-filter: blur(clamp(10px, 2.5vw, 12px)) !important;
+  -webkit-backdrop-filter: blur(clamp(10px, 2.5vw, 12px)) !important;
+}
+
+.system-glow {
+  box-shadow: var(--system-glow) !important;
+}
+
+.system-glow-text {
+  text-shadow: 0 0 clamp(6px, 1.5vw, 8px) rgba(0, 255, 65, 0.6) !important;
+  animation: matrix-flicker 4s infinite;
+}
+
+/* Hardware acceleration + touch feedback */
+.system-btn,
+.system-btn-icon,
+.system-card,
+.system-desktop-icon,
+.system-desktop-window,
+.system-desktop-taskbar__item,
+.system-nav-item,
+.system-menu-item,
+.start-menu-category,
+.start-menu-app {
+  will-change: transform, box-shadow, filter;
+  transform: translateZ(0);
+  /* Ensure minimum touch target */
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* Touch feedback: use :active instead of :hover on touch devices */
+@media (hover: none) and (pointer: coarse) {
+  .system-btn:hover,
+  .system-btn-icon:hover,
+  .system-desktop-icon:hover,
+  .system-nav-item:hover,
+  .system-menu-item:hover,
+  .start-menu-category:hover,
+  .start-menu-app:hover {
+    transform: none !important;
+  }
+  .system-btn:active,
+  .system-btn-icon:active,
+  .system-desktop-icon:active,
+  .system-nav-item:active,
+  .system-menu-item:active,
+  .start-menu-category:active,
+  .start-menu-app:active {
+    transform: scale(0.98);
+    background: var(--system-icon-bg-hover) !important;
+  }
+}
+
+/* ========================================
+   TASKBAR - RESPONSIVE + SAFE AREAS
+   ======================================== */
+.system-desktop-taskbar {
+  position: absolute;
+  bottom: 0;
+  width: 100%;
+  z-index: 3000;
+  background: rgba(5, 5, 5, 0.85) !important;
+  border-top: 1px solid var(--system-border);
+  border-bottom: 1px solid rgba(0, 255, 65, 0.2);
+  backdrop-filter: blur(var(--system-taskbar-blur)) !important;
+  -webkit-backdrop-filter: blur(var(--system-taskbar-blur)) !important;
+  box-shadow: 0 -5px clamp(20px, 4vw, 30px) rgba(0, 255, 65, 0.2), 0 0 clamp(30px, 6vw, 40px) rgba(0, 255, 65, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 clamp(6px, 2vw, 10px);
+  box-sizing: border-box;
+  /* Safe area for notched devices */
+  padding-bottom: var(--system-safe-bottom);
+}
+
+.system-desktop-taskbar__left,
+.system-desktop-taskbar__right {
+  display: flex;
+  align-items: center;
+  gap: clamp(4px, 1.5vw, 8px);
+}
+
+.system-desktop-taskbar__item,
+.system-desktop-taskbar__start-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--system-radius);
+  background: rgba(0, 255, 65, 0.08) !important;
+  border: 1px solid rgba(0, 255, 65, 0.25);
+  color: #00ff41 !important;
+  cursor: pointer;
+  transition: all var(--system-transition-normal);
+  backdrop-filter: blur(clamp(8px, 2vw, 10px)) !important;
+  -webkit-backdrop-filter: blur(clamp(8px, 2vw, 10px)) !important;
+  position: relative;
+  overflow: hidden;
+  /* Touch target enforcement */
+  min-width: clamp(40px, 9vw, 44px);
+  height: clamp(40px, 9vw, 44px);
+}
+
+.system-desktop-taskbar__start-btn {
+  width: clamp(36px, 8vw, 40px);
+  height: clamp(36px, 8vw, 40px);
+  box-shadow: 0 0 clamp(10px, 2vw, 15px) rgba(0, 255, 65, 0.2);
+}
+
+.system-desktop-taskbar__item .mat-icon,
+.system-desktop-taskbar__start-btn .mat-icon {
+  color: #00ff41 !important;
+  text-shadow: 0 0 clamp(6px, 1.5vw, 8px) rgba(0, 255, 65, 0.5);
+  filter: drop-shadow(0 0 clamp(3px, 0.8vw, 4px) rgba(0, 255, 65, 0.4));
+  transition: all var(--system-transition-fast);
+  position: relative;
+  z-index: 1;
+  font-size: clamp(18px, 4vw, 20px) !important;
+}
+
+/* ... [keep existing taskbar hover/active states, just ensure clamp() usage] ... */
+
+/* ========================================
+   START MENU - v2.0 HIERARCHICAL + TITLE ICONS
+   ======================================== */
+
+/* Base Start Menu - Fluid sizing */
+.system-desktop-start-menu {
+  position: absolute;
+  bottom: calc(var(--system-taskbar-height) + clamp(8px, 2vw, 10px));
+  left: clamp(8px, 2vw, 10px);
+  width: min(320px, 92vw);
+  max-width: 96vw;
+  z-index: 3001;
+  background: rgba(5, 5, 5, 0.9) !important;
+  border: 1px solid var(--system-border);
+  border-radius: var(--system-radius-lg);
+  padding: clamp(8px, 2vw, 10px);
+  backdrop-filter: blur(var(--system-start-menu-blur)) !important;
+  -webkit-backdrop-filter: blur(var(--system-start-menu-blur)) !important;
+  box-shadow: 0 0 clamp(30px, 6vw, 50px) rgba(0, 255, 65, 0.3), 0 clamp(8px, 2vw, 10px) clamp(30px, 6vw, 40px) rgba(0, 0, 0, 0.5);
+  animation: slideUp 0.2s ease-out;
+  display: none;
+  /* Safe area handling */
+  margin-bottom: var(--system-safe-bottom);
+}
+
+/* === Start Menu Header with Title Icon (v2.7.1+) === */
+.start-menu-header {
+  display: flex;
+  align-items: center;
+  gap: clamp(6px, 1.5vw, 8px);
+  padding: clamp(8px, 2vw, 12px) clamp(12px, 3vw, 16px);
+  border-bottom: 1px solid var(--system-border);
+  background: var(--system-header-bg) !important;
+  border-radius: var(--system-radius-lg) var(--system-radius-lg) 0 0;
+  min-height: clamp(44px, 10vw, 52px);
+  backdrop-filter: blur(clamp(10px, 2.5vw, 12px)) !important;
+  -webkit-backdrop-filter: blur(clamp(10px, 2.5vw, 12px)) !important;
+}
+
+/* Back Button - Hidden on root, visible in category views */
+.start-menu-back {
+  background: transparent !important;
+  border: none !important;
+  color: var(--system-text) !important;
+  padding: clamp(4px, 1vw, 6px) !important;
+  cursor: pointer;
+  display: none; /* Hidden by default (root view) */
+  width: clamp(32px, 7vw, 36px);
+  height: clamp(32px, 7vw, 36px);
+  border-radius: var(--system-radius);
+  transition: background var(--system-transition-fast);
+  min-width: 44px;
+  min-height: 44px;
+}
+
+/* Show back button when header has category class */
+.start-menu-header--category .start-menu-back {
+  display: inline-flex !important;
+}
+
+.start-menu-back:hover {
+  background: var(--system-icon-bg) !important;
+}
+
+.start-menu-back .mat-icon {
+  font-size: clamp(18px, 4vw, 20px) !important;
+  text-shadow: 0 0 clamp(6px, 1.5vw, 8px) rgba(0, 255, 65, 0.5);
+}
+
+/* Title with Dynamic Icon */
+.start-menu-title {
+  flex: 1;
+  font-weight: 600;
+  color: var(--system-text);
+  text-align: center;
+  font-size: clamp(13px, 3vw, 15px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(4px, 1vw, 6px);
+  text-shadow: 0 0 clamp(6px, 1.5vw, 8px) rgba(0, 255, 65, 0.4);
+}
+
+/* === Title Icon Styling (NEW v2.7.1+) === */
+.start-menu-title-icon {
+  font-size: clamp(16px, 4vw, 18px) !important;
+  color: var(--system-start-menu-title-icon) !important;
+  flex-shrink: 0;
+  vertical-align: middle;
+  text-shadow: 0 0 clamp(8px, 2vw, 10px) rgba(0, 255, 65, 0.5);
+  filter: drop-shadow(0 0 clamp(4px, 1vw, 5px) rgba(0, 255, 65, 0.4));
+  transition: text-shadow var(--system-transition-fast), filter var(--system-transition-fast);
+}
+
+/* Optional: Enhanced title icon glow on hover (desktop only) */
+@media (hover: hover) and (pointer: fine) {
+  .start-menu-title:hover .start-menu-title-icon {
+    text-shadow: 0 0 clamp(12px, 3vw, 15px) rgba(0, 255, 65, 0.8);
+    filter: drop-shadow(0 0 clamp(6px, 1.5vw, 8px) rgba(0, 255, 65, 0.6));
+  }
+}
+
+.start-menu-close {
+  background: transparent !important;
+  border: none !important;
+  color: var(--system-text-dim) !important;
+  padding: clamp(4px, 1vw, 6px) !important;
+  cursor: pointer;
+  width: clamp(32px, 7vw, 36px);
+  height: clamp(32px, 7vw, 36px);
+  border-radius: var(--system-radius);
+  transition: all var(--system-transition-fast);
+  min-width: 44px;
+  min-height: 44px;
+}
+
+.start-menu-close:hover {
+  color: var(--system-danger) !important;
+  background: rgba(255, 51, 51, 0.1) !important;
+}
+
+/* Scrollable Content Area */
+.start-menu-content {
+  max-height: calc(70dvh - clamp(50px, 12vw, 60px));
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: clamp(4px, 1vw, 8px) clamp(2px, 0.5vw, 4px);
+  /* Smooth scrolling with momentum */
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: var(--system-border) transparent;
+}
+
+/* Category Items (Root View) */
+.start-menu-category {
+  display: flex;
+  align-items: center;
+  gap: clamp(8px, 2vw, 12px);
+  padding: clamp(10px, 2.5vw, 14px) clamp(12px, 3vw, 16px);
+  border-radius: var(--system-radius);
+  cursor: pointer;
+  transition: background var(--system-transition-fast), transform var(--system-transition-fast);
+  margin: clamp(2px, 0.5vw, 4px) clamp(4px, 1vw, 8px);
+  min-height: 44px;
+  background: transparent !important;
+  border: 1px solid transparent;
+}
+
+.start-menu-category:hover {
+  background: var(--system-icon-bg) !important;
+  border-color: var(--system-border);
+  backdrop-filter: blur(clamp(8px, 2vw, 10px)) !important;
+  -webkit-backdrop-filter: blur(clamp(8px, 2vw, 10px)) !important;
+}
+
+.start-menu-category:active {
+  transform: scale(0.98);
+}
+
+.start-menu-category-info {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.start-menu-category-name {
+  font-weight: 600;
+  color: var(--system-text);
+  font-size: clamp(13px, 3vw, 14px);
+  text-shadow: 0 0 clamp(6px, 1.5vw, 8px) rgba(0, 255, 65, 0.4);
+}
+
+/* Hide description on small screens to save space */
+.start-menu-category-desc {
+  font-size: clamp(10px, 2.5vw, 11px);
+  color: var(--system-text-dim);
+  opacity: 0.8;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+@media (max-width: 400px) {
+  .start-menu-category-desc {
+    display: none;
+  }
+}
+
+.start-menu-category-count {
+  font-size: clamp(10px, 2.5vw, 11px);
+  color: var(--system-text-dim);
+  background: rgba(0, 255, 65, 0.1);
+  padding: 2px clamp(6px, 1.5vw, 8px);
+  border-radius: clamp(8px, 2vw, 10px);
+  border: 1px solid var(--system-border);
+}
+
+/* App Items (in Category or Other Apps) */
+.start-menu-app {
+  display: flex;
+  align-items: center;
+  gap: clamp(8px, 2vw, 12px);
+  padding: clamp(8px, 2vw, 10px) clamp(12px, 3vw, 16px);
+  border-radius: var(--system-radius);
+  cursor: pointer;
+  transition: background var(--system-transition-fast), transform var(--system-transition-fast);
+  margin: clamp(1px, 0.5vw, 2px) clamp(4px, 1vw, 8px);
+  min-height: 44px;
+  background: transparent !important;
+  border: 1px solid transparent;
+}
+
+.start-menu-app:hover {
+  background: var(--system-icon-bg) !important;
+  border-color: var(--system-border);
+  backdrop-filter: blur(clamp(8px, 2vw, 10px)) !important;
+  -webkit-backdrop-filter: blur(clamp(8px, 2vw, 10px)) !important;
+}
+
+.start-menu-app:active {
+  transform: scale(0.98);
+}
+
+.start-menu-app .mat-icon {
+  font-size: clamp(18px, 4vw, 20px) !important;
+  color: var(--system-text-dim) !important;
+  text-shadow: 0 0 clamp(6px, 1.5vw, 8px) rgba(0, 255, 65, 0.4);
+  transition: all var(--system-transition-fast);
+  flex-shrink: 0;
+}
+
+.start-menu-app:hover .mat-icon {
+  color: var(--system-text) !important;
+  text-shadow: 0 0 clamp(10px, 2.5vw, 12px) rgba(0, 255, 65, 0.7);
+}
+
+.start-menu-app-name {
+  font-size: clamp(12px, 3vw, 13px);
+  color: var(--system-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.start-menu-app-desc {
+  font-size: clamp(10px, 2.5vw, 11px);
+  color: var(--system-text-dim);
+  opacity: 0;
+  transition: opacity var(--system-transition-fast);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.start-menu-app:hover .start-menu-app-desc {
+  opacity: 0.8;
+}
+
+/* Hide app descriptions on very small screens */
+@media (max-width: 360px) {
+  .start-menu-app-desc {
+    display: none;
+  }
+}
+
+/* Section Headers */
+.start-menu-section-header {
+  font-size: clamp(10px, 2.5vw, 11px);
+  color: var(--system-text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: clamp(8px, 2vw, 12px) clamp(12px, 3vw, 16px) clamp(4px, 1vw, 8px);
+  margin: clamp(4px, 1vw, 8px) 0;
+  border-bottom: 1px solid var(--system-border);
+  font-weight: 600;
+}
+
+/* Empty State */
+.start-menu-empty {
+  text-align: center;
+  padding: clamp(20px, 5vw, 40px) clamp(12px, 3vw, 20px);
+  color: var(--system-text-dim);
+  font-size: clamp(12px, 3vw, 13px);
+}
+
+.start-menu-empty .mat-icon {
+  font-size: clamp(32px, 8vw, 48px) !important;
+  color: rgba(0, 255, 65, 0.3) !important;
+  margin-bottom: clamp(8px, 2vw, 12px);
+  text-shadow: 0 0 clamp(8px, 2vw, 10px) rgba(0, 255, 65, 0.3);
+  animation: matrix-flicker 4s infinite;
+}
+
+/* ========================================
+   DESKTOP ICONS - RESPONSIVE + GLITCH
+   ======================================== */
+.system-desktop-icon {
+  background: var(--system-icon-bg) !important;
+  border: var(--system-icon-border);
+  border-radius: var(--system-radius);
+  backdrop-filter: blur(clamp(6px, 1.5vw, 8px)) !important;
+  -webkit-backdrop-filter: blur(clamp(6px, 1.5vw, 8px)) !important;
+  transition: all var(--system-transition-fast);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+  position: relative;
+  overflow: hidden;
+  /* Fluid sizing for icon container */
+  width: clamp(64px, 14vw, 80px);
+  padding: clamp(8px, 2vw, 12px);
+}
+
+/* ... [keep existing icon styles, just ensure clamp() usage for icon/label sizes] ... */
+
+.system-desktop-icon__icon {
+  font-size: clamp(24px, 5vw, 32px) !important;
+  text-shadow: 0 0 clamp(10px, 2.5vw, 12px) rgba(0, 255, 65, 0.8) !important;
+  filter: drop-shadow(0 0 clamp(5px, 1.2vw, 6px) rgba(0, 255, 65, 0.6));
+  transition: filter var(--system-transition-fast), text-shadow var(--system-transition-fast);
+  position: relative;
+}
+
+.system-desktop-icon__label {
+  font-size: clamp(10px, 2.5vw, 11px);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
+  transition: text-shadow var(--system-transition-fast);
+  position: relative;
+  margin-top: clamp(4px, 1vw, 6px);
+  line-height: 1.3;
+}
+
+/* ========================================
+   WINDOWS - FLUID SIZING
+   ======================================== */
+.system-desktop-window {
+  background: var(--system-window-bg) !important;
+  border: 1px solid var(--system-border);
+  border-radius: var(--system-radius-lg);
+  box-shadow: var(--system-window-glow), var(--system-shadow), 0 0 clamp(40px, 8vw, 60px) rgba(0, 255, 65, 0.1);
+  backdrop-filter: blur(clamp(10px, 2.5vw, 12px)) !important;
+  -webkit-backdrop-filter: blur(clamp(10px, 2.5vw, 12px)) !important;
+  animation: matrix-window-open 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  opacity: 0;
+  /* Fluid min/max sizing */
+  min-width: clamp(280px, 90vw, 320px);
+  min-height: clamp(200px, 60vh, 280px);
+  max-width: 96vw;
+  max-height: calc(100dvh - var(--system-taskbar-height) - var(--system-safe-bottom) - clamp(20px, 4vw, 40px));
+}
+
+.system-desktop-window__header {
+  background: var(--system-header-bg) !important;
+  border-bottom: 1px solid var(--system-border);
+  backdrop-filter: blur(clamp(8px, 2vw, 10px)) !important;
+  -webkit-backdrop-filter: blur(clamp(8px, 2vw, 10px)) !important;
+  position: relative;
+  overflow: hidden;
+  height: clamp(36px, 8vw, 40px);
+  padding: 0 clamp(8px, 2vw, 10px);
+}
+
+.system-desktop-window__title {
+  font-size: clamp(12px, 2.5vw, 13px);
+  text-shadow: 0 0 clamp(6px, 1.5vw, 8px) rgba(0, 255, 65, 0.4);
+  animation: matrix-flicker 5s infinite;
+}
+
+.system-desktop-window__controls {
+  display: flex;
+  gap: clamp(4px, 1vw, 6px);
+}
+
+.system-desktop-window__control {
+  width: clamp(28px, 6vw, 32px);
+  height: clamp(28px, 6vw, 32px);
+  border-radius: var(--system-radius);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+}
+
+/* ... [keep remaining window styles with clamp() adjustments] ... */
+
+/* ========================================
+   ACCESSIBILITY - ENHANCED FOR MOBILE
+   ======================================== */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    animation-delay: 0s !important;
+  }
+  
+  /* Disable all glitch/transform effects */
+  .system-card,
+  .system-desktop-icon,
+  .system-desktop-window,
+  .system-alert,
+  .system-avatar,
+  .system-desktop-start-menu__avatar,
+  .system-btn-icon,
+  .start-menu-category,
+  .start-menu-app {
+    opacity: 1 !important;
+    transform: none !important;
+    animation: none !important;
+  }
+  
+  /* Disable glitch utilities */
+  .system-glitch,
+  .system-glitch-text,
+  .system-glitch-ambient,
+  .system-glitch-heavy,
+  .system-glitch-scanline,
+  .system-glitch-window,
+  .system-glitch-scramble,
+  .system-glitch-noise,
+  .system-desktop-icon.glitch-active,
+  .system-btn-icon-glitch,
+  .start-menu-title-icon {
+    animation: none !important;
+    clip-path: none !important;
+    filter: none !important;
+    text-shadow: none !important;
+  }
+  
+  body::after {
+    animation: none !important;
+    background-size: 100% 2px !important;
+  }
+  
+  .terminal-cursor {
+    animation: none !important;
+    opacity: 1 !important;
+  }
+  
+  .system-progress-bar,
+  .system-progress-bar::after {
+    animation: none !important;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .system-card::before,
+  .system-progress-bar::after,
+  .system-desktop-window__header::after,
+  .system-desktop-browser__toolbar::after,
+  .system-nav-item::before,
+  .system-menu-item::before,
+  .start-menu-category::before,
+  .start-menu-app::before,
+  .system-glitch-scanline::after,
+  .system-glitch-noise::before {
+    display: none !important;
+  }
+  
+  /* Fallback solid backgrounds */
+  .system-card,
+  .system-desktop-window,
+  .system-desktop-start-menu,
+  .system-desktop-taskbar {
+    background: rgba(10, 10, 10, 0.98) !important;
+  }
+}
+
+/* ========================================
+   MOBILE-SPECIFIC OPTIMIZATIONS
+   ======================================== */
+@media (max-width: 480px) {
+  /* Larger touch targets on small screens */
+  .system-btn,
+  .system-btn-icon,
+  .system-nav-item,
+  .system-menu-item,
+  .start-menu-category,
+  .start-menu-app,
+  .system-desktop-taskbar__item {
+    min-height: 48px;
+    min-width: 48px;
+  }
+  
+  /* Compact spacing */
+  .system-card-body,
+  .system-card-header,
+  .system-card-footer {
+    padding: clamp(10px, 3vw, 12px);
+  }
+  
+  /* Hide non-essential UI elements */
+  .start-menu-category-desc,
+  .start-menu-app-desc,
+  .system-form-help:not(:focus-within) {
+    display: none;
+  }
+  
+  /* Adjust Start Menu width on very small screens */
+  .system-desktop-start-menu {
+    width: 96vw;
+    left: 2vw;
+  }
+}
+
+/* Landscape orientation adjustments */
+@media (orientation: landscape) and (max-height: 500px) {
+  .system-desktop-start-menu {
+    bottom: calc(var(--system-taskbar-height) + 5px);
+    max-height: calc(80dvh - var(--system-taskbar-height));
+  }
+  
+  .start-menu-content {
+    max-height: calc(60dvh - 60px);
+  }
+  
+  /* Allow windows to use more vertical space in landscape */
+  .system-desktop-window {
+    max-height: calc(100dvh - var(--system-taskbar-height) - var(--system-safe-bottom) - 10px);
+  }
+}
+
+/* ========================================
+   FALLBACK & COMPATIBILITY (unchanged)
+   ======================================== */
+/* ... [keep your existing @supports not (backdrop-filter), high-contrast, and print styles] ... */

@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Notes</title>
+  
+  <!-- OS Theme Bridge for automatic theme sync -->
+  <link rel="stylesheet" href="/projects/desktop/os-theme-bridge.css">
+  <script src="/projects/desktop/os-theme-bridge.js"></script>
+  
+  <style>
+    /* App-specific styles - leverage system variables */
+    :root {
+      --notes-toolbar-height: 52px;
+      --notes-editor-min-height: calc(100vh - var(--notes-toolbar-height) - 40px);
+    }
+    
+    .notes-app {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      padding: 12px;
+      box-sizing: border-box;
+      background: transparent;
+    }
+    
+    .notes-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      padding: 8px 12px;
+      background: var(--system-header-bg);
+      border: 1px solid var(--system-border);
+      border-radius: var(--system-radius);
+      margin-bottom: 12px;
+      flex-shrink: 0;
+    }
+    
+    .notes-toolbar-divider {
+      width: 1px;
+      height: 28px;
+      background: var(--system-border);
+      margin: 0 4px;
+    }
+    
+    .notes-editor-container {
+      flex: 1;
+      min-height: var(--notes-editor-min-height);
+      background: var(--system-window-bg);
+      border: 1px solid var(--system-border);
+      border-radius: var(--system-radius-lg);
+      padding: 16px;
+      overflow-y: auto;
+      box-shadow: var(--system-shadow);
+      transition: background 0.2s ease, border-color 0.2s ease;
+    }
+    
+    .notes-editor {
+      width: 100%;
+      min-height: 100%;
+      outline: none;
+      font-family: var(--system-font);
+      font-size: 16px;
+      line-height: 1.6;
+      color: var(--system-text);
+      background: transparent;
+      caret-color: var(--system-accent);
+    }
+    
+    .notes-editor:empty:before {
+      content: "Start typing your note...";
+      color: var(--system-text-dim);
+      font-style: italic;
+      pointer-events: none;
+    }
+    
+    .notes-editor:focus {
+      border-color: var(--system-accent);
+      box-shadow: 0 0 0 3px rgba(0, 120, 212, 0.15);
+    }
+    
+    /* Font size selector */
+    .notes-font-size {
+      width: 70px !important;
+    }
+    
+    /* Font family selector */
+    .notes-font-family {
+      min-width: 140px !important;
+      font-family: var(--system-font);
+    }
+    
+    .notes-font-family option {
+      font-family: var(--system-font);
+    }
+    
+    .notes-font-family option[value*="mono"] {
+      font-family: var(--system-font-mono);
+    }
+    
+    /* Color picker wrapper */
+    .notes-color-wrapper {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 0 4px;
+    }
+    
+    .notes-color-picker {
+      width: 32px;
+      height: 32px;
+      padding: 0;
+      border: 1px solid var(--system-border);
+      border-radius: var(--system-radius);
+      background: var(--system-window-bg);
+      cursor: pointer;
+      overflow: hidden;
+    }
+    
+    .notes-color-picker::-webkit-color-swatch {
+      border: none;
+      border-radius: calc(var(--system-radius) - 2px);
+    }
+    
+    .notes-color-picker::-moz-color-swatch {
+      border: none;
+      border-radius: calc(var(--system-radius) - 2px);
+    }
+    
+    /* Status bar */
+    .notes-status {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 12px;
+      font-size: 11px;
+      color: var(--system-text-dim);
+      border-top: 1px solid var(--system-border);
+      margin-top: 8px;
+    }
+    
+    .notes-status-dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--system-success);
+      margin-right: 6px;
+      animation: pulse 2s infinite;
+    }
+    
+    .notes-status-dot.saved {
+      background: var(--system-success);
+      animation: none;
+    }
+    
+    .notes-status-dot.syncing {
+      background: var(--system-warning);
+      animation: pulse 1s infinite;
+    }
+    
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    
+    /* Responsive adjustments */
+    @media (max-width: 600px) {
+      .notes-toolbar {
+        gap: 4px;
+        padding: 6px 8px;
+      }
+      
+      .notes-toolbar-divider {
+        display: none;
+      }
+      
+      .notes-font-size,
+      .notes-font-family {
+        width: auto !important;
+        min-width: auto !important;
+        font-size: 12px !important;
+      }
+      
+      .notes-app {
+        padding: 8px;
+      }
+      
+      .notes-editor-container {
+        padding: 12px;
+        border-radius: var(--system-radius);
+      }
+    }
+    
+    /* Reduced motion support */
+    @media (prefers-reduced-motion: reduce) {
+      .notes-status-dot,
+      .notes-editor-container {
+        animation: none !important;
+        transition: none !important;
+      }
+    }
+    
+    /* Fallback for no backdrop-filter */
+    @supports not (backdrop-filter: blur(10px)) {
+      .notes-toolbar,
+      .notes-editor-container {
+        background: var(--system-window-bg) !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Main app container with auto-styling -->
+  <div class="system-app notes-app">
+    
+    <!-- Formatting Toolbar -->
+    <div class="notes-toolbar system-card system-p-2">
+      
+      <!-- Font Family -->
+      <label class="system-text-small system-text-dim" for="notes-font-family">Font</label>
+      <select id="notes-font-family" class="system-select notes-font-family" title="Font family">
+        <option value="var(--system-font)">Default</option>
+        <option value="'Segoe UI', Tahoma, Geneva, Verdana, sans-serif">Segoe UI</option>
+        <option value="'Courier New', Courier, monospace">Courier</option>
+        <option value="Georgia, 'Times New Roman', serif">Georgia</option>
+        <option value="'Fira Code', monospace">Fira Code</option>
+        <option value="Arial, Helvetica, sans-serif">Arial</option>
+        <option value="var(--system-font-mono)">Monospace</option>
+      </select>
+      
+      <div class="notes-toolbar-divider"></div>
+      
+      <!-- Font Size -->
+      <label class="system-text-small system-text-dim" for="notes-font-size">Size</label>
+      <select id="notes-font-size" class="system-select notes-font-size" title="Font size">
+        <option value="12px">12px</option>
+        <option value="14px">14px</option>
+        <option value="16px" selected>16px</option>
+        <option value="18px">18px</option>
+        <option value="20px">20px</option>
+        <option value="24px">24px</option>
+      </select>
+      
+      <div class="notes-toolbar-divider"></div>
+      
+      <!-- Text Color -->
+      <div class="notes-color-wrapper">
+        <label class="system-text-small system-text-dim" for="notes-color">Color</label>
+        <input type="color" id="notes-color" class="notes-color-picker" value="#333333" title="Text color">
+      </div>
+      
+      <div class="notes-toolbar-divider"></div>
+      
+      <!-- Clear Formatting -->
+      <button id="notes-clear" class="system-btn system-btn-secondary system-btn-sm" title="Clear formatting">
+        <span class="mat-icon system-icon-sm">format_clear</span>
+        <span class="system-text-small">Clear</span>
+      </button>
+      
+      <!-- Spacer -->
+      <div style="flex: 1"></div>
+      
+      <!-- Save Status -->
+      <div class="system-flex system-align-center">
+        <span id="notes-status-dot" class="notes-status-dot"></span>
+        <span id="notes-status-text" class="system-text-small system-text-dim">Saved</span>
+      </div>
+      
+    </div>
+    
+    <!-- Editor Area -->
+    <div class="notes-editor-container">
+      <div 
+        id="notes-editor" 
+        class="notes-editor" 
+        contenteditable="true"
+        role="textbox"
+        aria-label="Note content"
+        aria-multiline="true"
+      ></div>
+    </div>
+    
+    <!-- Status Bar -->
+    <div class="notes-status">
+      <div>
+        <span id="notes-word-count" class="system-text-small">0 words</span>
+        <span class="system-text-small system-text-dim"> • </span>
+        <span id="notes-char-count" class="system-text-small system-text-dim">0 characters</span>
+      </div>
+      <div class="system-text-small system-text-dim">
+        Auto-saves • <span id="notes-last-saved">Never</span>
+      </div>
+    </div>
+    
+  </div>
+
+  <script>
+    (function() {
+      'use strict';
+      
+      // === DOM References ===
+      const editor = document.getElementById('notes-editor');
+      const fontFamily = document.getElementById('notes-font-family');
+      const fontSize = document.getElementById('notes-font-size');
+      const textColor = document.getElementById('notes-color');
+      const clearBtn = document.getElementById('notes-clear');
+      const statusDot = document.getElementById('notes-status-dot');
+      const statusText = document.getElementById('notes-status-text');
+      const wordCount = document.getElementById('notes-word-count');
+      const charCount = document.getElementById('notes-char-count');
+      const lastSaved = document.getElementById('notes-last-saved');
+      
+      // === Constants ===
+      const STORAGE_KEY = 'notes-app-content';
+      const SETTINGS_KEY = 'notes-app-settings';
+      const SAVE_DELAY = 1000; // ms before auto-save
+      
+      // === State ===
+      let saveTimeout = null;
+      let isSyncing = false;
+      
+      // === Initialize ===
+      function init() {
+        loadContent();
+        loadSettings();
+        updateCounts();
+        setupEventListeners();
+        setupThemeSync();
+        
+        // Focus editor on load
+        setTimeout(() => editor.focus(), 100);
+      }
+      
+      // === Content Management ===
+      function loadContent() {
+        try {
+          const saved = localStorage.getItem(STORAGE_KEY);
+          if (saved) {
+            const data = JSON.parse(saved);
+            editor.innerHTML = data.content || '';
+            if (data.lastSaved) {
+              updateLastSaved(new Date(data.lastSaved));
+            }
+          }
+        } catch (e) {
+          console.warn('Failed to load notes:', e);
+        }
+      }
+      
+      function saveContent() {
+        if (isSyncing) return;
+        
+        isSyncing = true;
+        updateStatus('syncing');
+        
+        try {
+          const data = {
+            content: editor.innerHTML,
+            lastSaved: new Date().toISOString()
+          };
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+          updateLastSaved(new Date());
+          updateStatus('saved');
+        } catch (e) {
+          console.error('Failed to save notes:', e);
+          updateStatus('error');
+        } finally {
+          isSyncing = false;
+        }
+      }
+      
+      function scheduleSave() {
+        if (saveTimeout) clearTimeout(saveTimeout);
+        updateStatus('editing');
+        
+        saveTimeout = setTimeout(() => {
+          saveContent();
+          updateCounts();
+        }, SAVE_DELAY);
+      }
+      
+      // === Settings Management ===
+      function loadSettings() {
+        try {
+          const saved = localStorage.getItem(SETTINGS_KEY);
+          if (saved) {
+            const settings = JSON.parse(saved);
+            if (settings.fontFamily) fontFamily.value = settings.fontFamily;
+            if (settings.fontSize) fontSize.value = settings.fontSize;
+            if (settings.textColor) textColor.value = settings.textColor;
+            applySettings();
+          }
+        } catch (e) {
+          console.warn('Failed to load settings:', e);
+        }
+      }
+      
+      function saveSettings() {
+        try {
+          const settings = {
+            fontFamily: fontFamily.value,
+            fontSize: fontSize.value,
+            textColor: textColor.value
+          };
+          localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+        } catch (e) {
+          console.warn('Failed to save settings:', e);
+        }
+      }
+      
+      function applySettings() {
+        editor.style.fontFamily = fontFamily.value;
+        editor.style.fontSize = fontSize.value;
+        editor.style.color = textColor.value;
+        saveSettings();
+      }
+      
+      // === UI Updates ===
+      function updateCounts() {
+        const text = editor.textContent || '';
+        const words = text.trim() ? text.trim().split(/\s+/).length : 0;
+        const chars = text.length;
+        
+        wordCount.textContent = `${words} word${words !== 1 ? 's' : ''}`;
+        charCount.textContent = `${chars} character${chars !== 1 ? 's' : ''}`;
+      }
+      
+      function updateLastSaved(date) {
+        const now = new Date();
+        const diff = Math.floor((now - date) / 1000);
+        
+        let formatted;
+        if (diff < 60) formatted = 'just now';
+        else if (diff < 3600) formatted = `${Math.floor(diff / 60)}m ago`;
+        else if (diff < 86400) formatted = `${Math.floor(diff / 3600)}h ago`;
+        else formatted = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        
+        lastSaved.textContent = formatted;
+      }
+      
+      function updateStatus(state) {
+        statusDot.classList.remove('saved', 'syncing');
+        
+        switch (state) {
+          case 'saved':
+            statusDot.classList.add('saved');
+            statusText.textContent = 'Saved';
+            break;
+          case 'syncing':
+            statusDot.classList.add('syncing');
+            statusText.textContent = 'Saving...';
+            break;
+          case 'editing':
+            statusDot.classList.remove('saved');
+            statusText.textContent = 'Editing...';
+            break;
+          case 'error':
+            statusDot.style.background = 'var(--system-danger)';
+            statusText.textContent = 'Save failed';
+            setTimeout(() => {
+              statusDot.style.background = '';
+              updateStatus('saved');
+            }, 3000);
+            break;
+        }
+      }
+      
+      // === Event Listeners ===
+      function setupEventListeners() {
+        // Editor input
+        editor.addEventListener('input', () => {
+          scheduleSave();
+          updateCounts();
+        });
+        
+        // Formatting controls
+        fontFamily.addEventListener('change', () => {
+          applySettings();
+          editor.focus();
+        });
+        
+        fontSize.addEventListener('change', () => {
+          applySettings();
+          editor.focus();
+        });
+        
+        textColor.addEventListener('input', () => {
+          applySettings();
+          editor.focus();
+        });
+        
+        // Clear formatting
+        clearBtn.addEventListener('click', () => {
+          // Preserve content, remove inline styles
+          const content = editor.innerHTML;
+          const temp = document.createElement('div');
+          temp.innerHTML = content;
+          
+          // Remove inline style attributes from all elements
+          temp.querySelectorAll('*').forEach(el => {
+            el.removeAttribute('style');
+          });
+          
+          editor.innerHTML = temp.innerHTML;
+          
+          // Reset controls to defaults
+          fontFamily.value = 'var(--system-font)';
+          fontSize.value = '16px';
+          textColor.value = '#333333';
+          applySettings();
+          
+          scheduleSave();
+          editor.focus();
+        });
+        
+        // Keyboard shortcuts
+        editor.addEventListener('keydown', (e) => {
+          // Ctrl/Cmd + S to force save
+          if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+            e.preventDefault();
+            if (saveTimeout) clearTimeout(saveTimeout);
+            saveContent();
+          }
+        });
+        
+        // Blur handling - save when editor loses focus
+        editor.addEventListener('blur', () => {
+          if (saveTimeout) {
+            clearTimeout(saveTimeout);
+            saveContent();
+          }
+        });
+      }
+      
+      // === Theme Bridge Integration ===
+      function setupThemeSync() {
+        // Listen for OS theme changes via the bridge
+        window.addEventListener('osThemeChanged', (e) => {
+          console.log('Notes app: theme updated to', e.detail?.themeId);
+          // No manual action needed - CSS variables auto-update
+          // But we can refresh UI if needed:
+          updateStatus('saved'); // Refresh status indicator colors
+        });
+        
+        // Request initial theme sync (bridge handles this, but explicit is safe)
+        if (window.OsThemeBridge?.requestSync) {
+          window.OsThemeBridge.requestSync();
+        }
+      }
+      
+      // === Accessibility Enhancements ===
+      function setupAccessibility() {
+        // ARIA live region for status updates
+        statusText.setAttribute('aria-live', 'polite');
+        
+        // Keyboard navigation for toolbar
+        const toolbar = document.querySelector('.notes-toolbar');
+        toolbar.addEventListener('keydown', (e) => {
+          if (e.key === 'Tab') {
+            toolbar.classList.add('keyboard-nav');
+          }
+        });
+        toolbar.addEventListener('mousedown', () => {
+          toolbar.classList.remove('keyboard-nav');
+        });
+      }
+      
+      // === Start App ===
+      init();
+      setupAccessibility();
+      
+      // Expose minimal API for debugging/testing
+      window.NotesApp = {
+        getContent: () => editor.innerHTML,
+        setContent: (html) => { editor.innerHTML = html; scheduleSave(); },
+        forceSave: () => { if (saveTimeout) clearTimeout(saveTimeout); saveContent(); }
+      };
+      
+    })();
+  </script>
+</body>
+</html>
