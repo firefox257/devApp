@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Material Icons OS - Fullscreen</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { 
+      width: 100%; height: 100%; overflow: hidden; 
+      background: #000; touch-action: none; 
+    }
+    #desktopFrame {
+      width: 100vw; height: 100dvh; border: none; display: block;
+      touch-action: manipulation;
+    }
+    
+    /* Fullscreen exit hint (shown on iOS) */
+    .fullscreen-exit-hint {
+      position: fixed; top: 20px; right: 20px;
+      background: rgba(30,30,30,0.9); color: #fff;
+      padding: 10px 16px; border-radius: 12px;
+      font-size: 13px; font-family: system-ui, sans-serif;
+      display: flex; align-items: center; gap: 8px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+      z-index: 10000; animation: fadeInOut 4s forwards;
+      pointer-events: none;
+    }
+    .fullscreen-exit-hint .material-icons { font-size: 18px; }
+    
+    @keyframes fadeInOut {
+      0%, 100% { opacity: 0; transform: translateY(-10px); }
+      10%, 90% { opacity: 1; transform: translateY(0); }
+    }
+    
+    /* Loading state */
+    #loadingOverlay {
+      position: fixed; inset: 0; background: var(--system-bg, #1a1a2e);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      color: var(--system-text, #e0e0e0); font-family: system-ui, sans-serif;
+      z-index: 9999; transition: opacity 0.3s ease;
+    }
+    #loadingOverlay.hidden { opacity: 0; pointer-events: none; }
+    .loading-spinner {
+      width: 40px; height: 40px; border: 3px solid rgba(255,255,255,0.2);
+      border-top-color: var(--system-accent, #6366f1); border-radius: 50%;
+      animation: spin 1s linear infinite; margin-bottom: 16px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <!-- Loading overlay -->
+  <div id="loadingOverlay">
+    <div class="loading-spinner"></div>
+    <p>Loading Material Icons OS...</p>
+  </div>
+
+  <!-- Main desktop iframe -->
+  <iframe id="desktopFrame" src="desktop.html" allow="fullscreen; clipboard-read; clipboard-write"></iframe>
+
+  <script>
+    /**
+     * MainDesktop Controller
+     * Handles fullscreen API and gesture forwarding for iframe-based desktop
+     */
+    const MainDesktop = {
+      frame: null,
+      isFullscreen: false,
+      isIOS: /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1),
+      
+      // Swipe gesture config for iOS fullscreen exit
+      swipeConfig: {
+        threshold: 80,
+        cornerZone: 120,
+        startX: 0,
+        startY: 0,
+        isTracking: false
+      },
+
+      init() {
+        this.frame = document.getElementById('desktopFrame');
+        this.setupMessageListener();
+        this.setupFullscreenListeners();
+        if (this.isIOS) this.setupIOSSwipeExit();
+        
+        // Hide loading when iframe loads
+        this.frame.onload = () => {
+          document.getElementById('loadingOverlay')?.classList.add('hidden');
+          // Notify desktop that wrapper is ready
+          this.notifyDesktop('wrapperReady', { isIOS: this.isIOS });
+        };
+        
+        console.log('🖥️ MainDesktop initialized');
+      },
+
+      /**
+       * Listen for commands FROM desktop.html iframe
+       */
+      setupMessageListener() {
+        window.addEventListener('message', (e) => {
+          // Security: validate origin if needed
+          // if (e.origin !== window.location.origin) return;
+          
+          const { type, payload } = e.data || {};
+          
+          switch(type) {
+            case 'requestFullscreen':
+              this.enterFullscreen(payload?.element || 'desktop');
+              break;
+            case 'exitFullscreen':
+              this.exitFullscreen();
+              break;
+            case 'toggleFullscreen':
+              this.toggleFullscreen(payload?.element || 'desktop');
+              break;
+            case 'fullscreenStatus':
+              // Desktop is asking for current status
+              this.notifyDesktop('fullscreenStatus', { 
+                isFullscreen: this.isFullscreen,
+                isIOS: this.isIOS 
+              });
+              break;
+          }
+        });
+      },
+
+      /**
+       * Listen for browser fullscreen change events
+       */
+      setupFullscreenListeners() {
+        ['fullscreenchange', 'webkitfullscreenchange', 'mozfullscreenchange', 'MSFullscreenChange'].forEach(evt => {
+          document.addEventListener(evt, () => {
+            const newStatus = !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement);
+            if (newStatus !== this.isFullscreen) {
+              this.isFullscreen = newStatus;
+              this.notifyDesktop('fullscreenChanged', { isFullscreen: newStatus });
+              console.log(`🔄 Fullscreen state: ${newStatus ? 'ON' : 'OFF'}`);
+            }
+          });
+        });
+      },
+
+      /**
+       * iOS-specific swipe-from-top-right to exit fullscreen
+       */
+      setupIOSSwipeExit() {
+        const { threshold, cornerZone } = this.swipeConfig;
+        let visualFeedback = null;
+
+        const isInCorner = (x, y) => x > (window.innerWidth - cornerZone) && y < cornerZone;
+        
+        const getDiagonalDistance = (x1, y1, x2, y2) => {
+          const dx = x2 - x1, dy = y2 - y1;
+          return (dx < 0 && dy > 0) ? Math.sqrt(dx*dx + dy*dy) : 0;
+        };
+
+        const createVisualFeedback = () => {
+          if (visualFeedback) return visualFeedback;
+          visualFeedback = document.createElement('div');
+          visualFeedback.className = 'fullscreen-exit-hint';
+          visualFeedback.innerHTML = '<span class="material-icons">swipe_down</span>Swipe diagonally to exit';
+          document.body.appendChild(visualFeedback);
+          return visualFeedback;
+        };
+
+        const handleTouchStart = (e) => {
+          if (!this.isFullscreen) return;
+          const touch = e.touches[0];
+          if (isInCorner(touch.clientX, touch.clientY)) {
+            this.swipeConfig.isTracking = true;
+            this.swipeConfig.startX = touch.clientX;
+            this.swipeConfig.startY = touch.clientY;
+            const fb = createVisualFeedback();
+            fb.style.opacity = '0.7';
+          }
+        };
+
+        const handleTouchMove = (e) => {
+          if (!this.swipeConfig.isTracking || !this.isFullscreen) return;
+          e.preventDefault();
+          const touch = e.touches[0];
+          const dist = getDiagonalDistance(
+            this.swipeConfig.startX, this.swipeConfig.startY,
+            touch.clientX, touch.clientY
+          );
+          if (dist > 0 && visualFeedback) {
+            const progress = Math.min(dist / threshold, 1);
+            visualFeedback.style.opacity = String(0.7 + progress * 0.3);
+            visualFeedback.style.transform = `translate(${progress * -10}px, ${progress * 10}px)`;
+          }
+        };
+
+        const handleTouchEnd = (e) => {
+          if (!this.swipeConfig.isTracking) return;
+          const touch = e.changedTouches[0];
+          const dist = getDiagonalDistance(
+            this.swipeConfig.startX, this.swipeConfig.startY,
+            touch.clientX, touch.clientY
+          );
+          
+          if (dist >= threshold && this.isFullscreen) {
+            // Swipe confirmed - exit fullscreen
+            this.exitFullscreen();
+            if (navigator.vibrate) navigator.vibrate(20);
+          }
+          
+          // Cleanup
+          if (visualFeedback) {
+            visualFeedback.style.animation = 'fadeInOut 0.3s forwards';
+            setTimeout(() => visualFeedback?.remove(), 300);
+            visualFeedback = null;
+          }
+          this.swipeConfig.isTracking = false;
+          this.swipeConfig.startX = 0;
+          this.swipeConfig.startY = 0;
+        };
+
+        document.addEventListener('touchstart', handleTouchStart, { passive: true });
+        document.addEventListener('touchmove', handleTouchMove, { passive: false });
+        document.addEventListener('touchend', handleTouchEnd, { passive: true });
+        
+        console.log('📱 iOS swipe exit gestures enabled');
+      },
+
+      /**
+       * Enter fullscreen mode
+       */
+      async enterFullscreen(target = 'desktop') {
+        try {
+          const elem = target === 'desktop' ? document.documentElement : document.getElementById(target);
+          if (!elem) return false;
+          
+          const requestFS = elem.requestFullscreen || elem.webkitRequestFullscreen || elem.mozRequestFullScreen || elem.msRequestFullscreen;
+          if (requestFS) {
+            await requestFS.call(elem);
+            this.isFullscreen = true;
+            console.log('✅ Entered fullscreen');
+            return true;
+          }
+        } catch (err) {
+          console.error('❌ Fullscreen request failed:', err);
+          // Fallback: notify desktop of failure
+          this.notifyDesktop('fullscreenError', { message: err.message });
+        }
+        return false;
+      },
+
+      /**
+       * Exit fullscreen mode
+       */
+      exitFullscreen() {
+        try {
+          const exitFS = document.exitFullscreen || document.webkitExitFullscreen || document.mozCancelFullScreen || document.msExitFullscreen;
+          if (exitFS) {
+            exitFS.call(document);
+            this.isFullscreen = false;
+            console.log('✅ Exited fullscreen');
+            return true;
+          }
+        } catch (err) {
+          console.error('❌ Exit fullscreen failed:', err);
+        }
+        return false;
+      },
+
+      /**
+       * Toggle fullscreen
+       */
+      toggleFullscreen(target = 'desktop') {
+        return this.isFullscreen ? this.exitFullscreen() : this.enterFullscreen(target);
+      },
+
+      /**
+       * Send message TO desktop.html iframe
+       */
+      notifyDesktop(type, payload = {}) {
+        if (!this.frame?.contentWindow) return;
+        try {
+          this.frame.contentWindow.postMessage({ 
+            type: `mainDesktop:${type}`, 
+            payload,
+            timestamp: Date.now()
+          }, '*'); // Restrict to specific origin in production
+          console.log(`📤 Sent to desktop: ${type}`, payload);
+        } catch (e) {
+          console.warn('⚠ Failed to message desktop:', e);
+        }
+      },
+
+      /**
+       * Public API for external scripts
+       */
+      api: {
+        isFullscreen: () => MainDesktop.isFullscreen,
+        enter: () => MainDesktop.enterFullscreen(),
+        exit: () => MainDesktop.exitFullscreen(),
+        toggle: () => MainDesktop.toggleFullscreen(),
+        notify: (type, payload) => MainDesktop.notifyDesktop(type, payload)
+      }
+    };
+
+    // Initialize when DOM ready
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => MainDesktop.init());
+    } else {
+      MainDesktop.init();
+    }
+
+    // Expose globally for debugging
+    window.MainDesktop = MainDesktop.api;
+  </script>
+</body>
+</html>

@@ -50,8 +50,16 @@
 			"glowIntensity": 0.6
 		}
 	},
-
-
+	"futuristic": {
+		"name": "Futuristic",
+		"description": "White and warm orange technology aesthetic with particle effects",
+		"css": "themes/futuristic/futuristic.css",
+		"script": "themes/futuristic/futuristic.js",
+		"canvas": true,
+		"preview": "themes/futuristic/preview.jpg",
+		"author": "Your Name",
+		"version": "1.0.0"
+	},
 	"try": {
 		"name": "try",
 		"description": "Elegant translucent theme with backdrop blur effects",
@@ -63,12 +71,8 @@
 	}
 
 
-
-
-
-
-
-
-
-
 }
+
+
+
+

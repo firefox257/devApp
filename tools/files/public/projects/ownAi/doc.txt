@@ -1,0 +1,224 @@
+================================================================================
+PURE-JS LLM INFERENCE LIBRARY - DOCUMENTATION
+================================================================================
+
+OVERVIEW
+--------
+A from-scratch JavaScript library for running large language models (LLMs)
+directly in the browser and Node.js. Built without TypeScript or external
+ML frameworks, this library implements the complete inference stack:
+model loading, quantization, tensor math, tokenization, attention caching,
+sampling, and transformer forward passes.
+
+Target Environments: Modern Browsers (WebGPU/WebAssembly), Node.js
+Model Formats: GGUF, Safetensors (extensible)
+Language: Pure JavaScript (ES Modules)
+
+================================================================================
+ARCHITECTURE & DATA FLOW
+================================================================================
+
+The library is composed of 7 core modules that work in a strict pipeline:
+
+1. loader.js      - Fetches and parses raw model files into memory buffers
+2. quant.js       - Dequantizes packed weights (INT4/INT8) to Float32/16
+3. tensor.js      - Core math backend (matmul, add, norm, softmax, WebGPU)
+4. kv-cache.js    - Pre-allocates and manages attention state across tokens
+5. sampler.js     - Converts logits to next token IDs (temp, top-p, top-k)
+6. tokenizer.js   - Maps text to token IDs using BPE/SentencePiece rules
+7. transformer.js - Orchestrates the forward pass using all above modules
+
+Data Flow:
+[Prompt] -> tokenizer.js -> [Token IDs] -> transformer.js -> [Logits]
+-> sampler.js -> [Next Token ID] -> tokenizer.js -> [Text] -> Loop
+
+================================================================================
+MODULE DOCUMENTATION
+================================================================================
+
+1. tensor.js - Core Math Backend
+---------------------------------
+Purpose: Handles all numerical operations on multi-dimensional arrays.
+Implementation Note: CPU fallback uses Float32Array loops. Production
+requires WebGPU compute shaders or WASM SIMD for acceptable performance.
+
+API:
+  class Tensor(data, shape, device='cpu')
+    - data: Float32Array or Array of numbers
+    - shape: Array of dimensions [batch, seq, heads, dim]
+    - device: 'cpu' | 'webgpu'
+
+  reshape(newShape) -> Tensor
+    Returns a new view with adjusted dimensions.
+
+  add(other) -> Tensor
+    Element-wise addition. Requires matching shapes.
+
+  matmul(other) -> Tensor
+    Matrix multiplication. MUST be WebGPU-accelerated for >1024 dim.
+
+  softmax(dim=-1) -> Tensor
+    Applies softmax along specified dimension.
+
+  layerNorm(weight, bias, eps=1e-5) -> Tensor
+    Applies RMSNorm or LayerNorm per token.
+
+2. quant.js - Weight Dequantization
+------------------------------------
+Purpose: Converts compact quantized formats (GGUF Q4_0, Q8_0, etc.)
+back to floating point tensors for inference.
+
+API:
+  dequantQ4_0(packedUint8, scale) -> Float32Array
+    Dequantizes 132-byte blocks into 256 F32 values.
+
+  dequantQ8_0(packedUint8, scale) -> Float32Array
+    Handles 8-bit quantization with per-block scaling.
+
+  dequantF16(arrayBuffer) -> Float32Array
+    Converts IEEE 754 half-precision to single-precision.
+
+3. loader.js - Model File Parser
+---------------------------------
+Purpose: Streams and parses GGUF or Safetensors files, extracting
+metadata, tensor names, shapes, types, and raw byte offsets.
+
+API:
+  loadGGUF(url, progressCallback) -> Promise<TensorMap>
+    Downloads model, parses header, builds tensor dictionary.
+    progressCallback: (progress: 0-1, status: string) => void
+
+  loadSafetensors(url, progressCallback) -> Promise<TensorMap>
+    Parses JSON header + binary payload for HuggingFace format.
+
+4. kv-cache.js - Attention State Manager
+-----------------------------------------
+Purpose: Pre-allocates and manages Key/Value buffers for multi-query
+or grouped-query attention. Enables O(1) token generation.
+
+API:
+  class KVCache(numLayers, headDim, maxSeqLen, batchSize=1)
+    - Pre-allocates Float32Array buffers for keys and values.
+
+  update(layerIdx, kTensor, vTensor) -> void
+    Copies new token K/V into cache at current sequence position.
+
+  get(layerIdx, seqLen) -> {k: Float32Array, v: Float32Array}
+    Returns sliced cache up to current sequence length.
+
+  reset() -> void
+    Clears sequence counter for new generation.
+
+5. sampler.js - Logits to Token Converter
+------------------------------------------
+Purpose: Applies temperature scaling, top-p/top-k filtering, and
+probabilistic sampling to select the next token.
+
+API:
+  sampleLogits(logits, temperature=0.7, topP=0.9) -> number
+    - logits: Float32Array of vocabulary-sized scores
+    - Returns: Next token ID (integer)
+
+  greedySample(logits) -> number
+    Returns argmax(logits). Deterministic.
+
+6. tokenizer.js - BPE / SentencePiece Encoder
+----------------------------------------------
+Purpose: Converts between raw text and integer token IDs using
+Byte-Pair Encoding or Unigram models.
+
+API:
+  class BPETokenizer(vocabMap, mergeRules, regexPattern)
+
+  encode(text) -> number[]
+    Splits text, applies merge rules, returns token IDs.
+
+  decode(tokenIds) -> string
+    Maps IDs back to strings, handles byte decoding.
+
+7. transformer.js - Model Forward Pass
+---------------------------------------
+Purpose: Orchestrates the complete LLM forward pass. Handles
+embeddings, attention, feed-forward networks, residual connections,
+and final unembedding to logits.
+
+API:
+  class Transformer(weights, config)
+    - weights: Parsed and dequantized tensor dictionary
+    - config: { vocabSize, hiddenSize, numLayers, numHeads, maxSeqLen, ... }
+
+  forward(inputIds, attentionMask) -> Tensor
+    Runs one full pass. Returns logits [batch, seq, vocab].
+    Internally uses kv-cache.js for incremental decoding.
+
+================================================================================
+USAGE EXAMPLE
+================================================================================
+
+// Initialize components
+const loader = await loadGGUF('models/llama-3-8b-q4.gguf', logProgress);
+const tokenizer = new BPETokenizer(vocab, merges, regex);
+const transformer = new Transformer(loader.tensors, loader.config);
+const cache = transformer.kvCache;
+
+// Generate loop
+const prompt = "Explain quantum computing in 3 sentences.";
+let tokens = tokenizer.encode(prompt);
+let generated = 0;
+
+while (generated < 512) {
+  const logits = transformer.forward(tokens, null);
+  const nextToken = sampleLogits(logits.slice(-1)[0], 0.7, 0.9);
+  tokens.push(nextToken);
+  generated++;
+
+  if (nextToken === tokenizer.vocab['<|end_of_text|>']) break;
+  process.stdout.write(tokenizer.decode([nextToken]));
+}
+
+================================================================================
+PERFORMANCE & OPTIMIZATION GUIDELINES
+================================================================================
+
+1. WebGPU is Mandatory for Viability
+   - Pure JS CPU matmul will run at <5 tokens/sec for 7B models.
+   - Implement tensor.js ops as WGSL compute shaders.
+   - Use storage buffers for weights/activations to avoid GPU-CPU transfer.
+
+2. Memory Management
+   - Pre-allocate all buffers (weights, KV cache, activations).
+   - Use Float32Array for activations, keep weights quantized until needed.
+   - Clear KV cache between generations to prevent OOM.
+
+3. Streaming and Async Execution
+   - Yield control every N tokens using setTimeout or queueMicrotask.
+   - Prevents main thread blocking in browsers.
+
+4. Chunked Loading
+   - Use HTTP Range requests to load model in 1MB-4MB chunks.
+   - Parse headers first, stream tensors on-demand if possible.
+
+================================================================================
+BUILD & TESTING RECOMMENDATIONS
+================================================================================
+
+- Use native ES modules (import/export). No bundlers required for dev.
+- Test each module in isolation with known tensor inputs/outputs.
+- Validate against reference Python/PyTorch implementations.
+- Benchmark: tokens/sec, peak memory, GPU utilization.
+- CI: Run headless WebGPU tests via Puppeteer or Node with webgpu-polyfill.
+
+================================================================================
+FUTURE ROADMAP
+================================================================================
+
+Phase 1: CPU fallback + GGUF loading + basic BPE tokenizer
+Phase 2: WebGPU tensor backend + KV cache + greedy sampling
+Phase 3: Top-p/temperature sampling + streaming generation
+Phase 4: Chat templates + system prompts + stop token handling
+Phase 5: Safetensors support + ONNX runtime adapter
+Phase 6: Speculative decoding + draft model integration
+
+================================================================================
+END OF DOCUMENTATION
+================================================================================

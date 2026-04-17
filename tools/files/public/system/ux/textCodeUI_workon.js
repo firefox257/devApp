@@ -1,27 +1,31 @@
-// ./system/ux/textCodeUI.js
+// ./ux/textCodeUI.js
 
 // --- Constants ---
 export const TAB_SPACES = 4;
 export const LINE_HEIGHT_EM = 1.5;
 export const HISTORY_DEBOUNCE_TIME = 300;
+export const LINE_HEIGHT_PX = LINE_HEIGHT_EM * 16; // Approx: 1em ≈ 16px
+export const VIRTUAL_LINE_BUFFER = 10; // Lines to render above/below viewport
 
 // --- Module-level Variables ---
 export let stylesInjected = false;
 
-// --- Dynamic Style Injection ---
+// --- Dynamic Style Injection with CSS Variables for Theming ---
 export function injectStyles() {
     if (stylesInjected) return;
 
     const style = document.createElement('style');
     style.id = 'code-editor-styles';
     style.textContent = `
-        /* Material Icons Font Face */
+        /* Material Icons Font Face with Fallback */
         @font-face {
             font-family: 'Material Icons';
             font-style: normal;
             font-weight: 400;
-            src: url('/system/fonts/MaterialIcons-Regular.ttf') format('truetype');
-            font-display: block;
+            src: 
+                url('/system/fonts/MaterialIcons-Regular.ttf') format('truetype'),
+                url('https://fonts.gstatic.com/s/materialicons/v142/flUhRq6tzZclQEJ-Vdg-IuiaDsNc.woff2') format('woff2');
+            font-display: swap;
         }
 
         /* Material Icon Base Class */
@@ -42,15 +46,15 @@ export function injectStyles() {
             text-rendering: optimizeLegibility;
         }
 
-        /* Semantic Color Classes */
-        .icon-primary { color: #007bff !important; }
-        .icon-secondary { color: #6c757d !important; }
-        .icon-destructive { color: #dc3545 !important; }
-        .icon-success { color: #28a745 !important; }
-        .icon-warning { color: #fd7e14 !important; }
-        .icon-directory { color: #ffc107 !important; }
-        .icon-navigation { color: #17a2b8 !important; }
-        .icon-ai { color: #6f42c1 !important; }
+        /* ✨ Semantic Color Classes with CSS Variable Fallbacks ✨ */
+        .icon-primary { color: var(--mi-color-primary, #007bff) !important; }
+        .icon-secondary { color: var(--mi-color-secondary, #6c757d) !important; }
+        .icon-destructive { color: var(--mi-color-destructive, #dc3545) !important; }
+        .icon-success { color: var(--mi-color-success, #28a745) !important; }
+        .icon-warning { color: var(--mi-color-warning, #fd7e14) !important; }
+        .icon-directory { color: var(--mi-color-directory, #ffc107) !important; }
+        .icon-navigation { color: var(--mi-color-navigation, #17a2b8) !important; }
+        .icon-ai { color: var(--mi-color-ai, #6f42c1) !important; }
 
         /* Main container */
         .code-editor-container-wrapper {
@@ -60,28 +64,29 @@ export function injectStyles() {
             width: 100%;
             height: 100%;
             overflow: hidden;
-            border: 1px solid #ccc;
+            border: 1px solid var(--mi-border-subtle, #ccc);
+            background: var(--mi-bg-surface, #fff);
         }
 
         /* Menu bar table */
         .code-editor-menu-bar {
             width: 100%;
             border-collapse: collapse;
-            background-color: #f8f8f8;
+            background-color: var(--mi-bg-surface, #f8f8f8);
             table-layout: fixed;
-            border-bottom: 1px solid #eee;
+            border-bottom: 1px solid var(--mi-border-subtle, #eee);
             flex-shrink: 0;
         }
 
         /* Title Bar */
         .code-editor-title-bar {
-            background-color: #e9e9e9;
+            background-color: var(--mi-bg-header, #e9e9e9);
             font-weight: bold;
-            color: #333;
+            color: var(--mi-text-primary, #333);
             padding: 2px 10px;
             text-align: right;
             vertical-align: middle;
-            border-bottom: 1px solid #ddd;
+            border-bottom: 1px solid var(--mi-border-subtle, #ddd);
             box-sizing: border-box;
             height: 24px;
             display: table-cell;
@@ -98,7 +103,7 @@ export function injectStyles() {
         }
 
         .code-editor-menu-bar td {
-            border: 1px solid #ddd;
+            border: 1px solid var(--mi-border-subtle, #ddd);
             text-align: center;
             vertical-align: middle;
             padding: 0;
@@ -114,16 +119,18 @@ export function injectStyles() {
             width: 100%;
             padding: 2px 5px;
             box-sizing: border-box;
-            border: 1px solid #ccc;
+            border: 1px solid var(--mi-border-input, #ccc);
             outline: none;
             font-size: 14px;
+            background: var(--mi-bg-input, #fff);
+            color: var(--mi-text-primary, #333);
         }
 
         /* Menu bar buttons with Material Icons - Aligned */
         .code-editor-menu-bar button {
             background-color: transparent;
             border: none;
-            color: #555;
+            color: var(--mi-text-secondary, #555);
             padding: 0;
             margin: 0;
             cursor: pointer;
@@ -149,8 +156,8 @@ export function injectStyles() {
         }
 
         .code-editor-menu-bar button:hover:not(:disabled) {
-            background-color: #e0e0e0;
-            border-color: #ccc;
+            background-color: var(--mi-bg-hover, #e0e0e0);
+            border-color: var(--mi-border-hover, #ccc);
         }
 
         .code-editor-menu-bar button:disabled {
@@ -168,22 +175,24 @@ export function injectStyles() {
             overflow: hidden;
         }
 
-        /* Line numbers */
+        /* Line numbers - VIRTUALIZED */
         .code-editor-line-numbers {
             flex-shrink: 0;
             text-align: right;
-            padding: 5mm 0 200vh 0;
-            background-color: #f0f0f0;
-            color: #888;
+            padding: 0;
+            background-color: var(--mi-bg-gutter, #f0f0f0);
+            color: var(--mi-text-secondary, #888);
             user-select: none;
             overflow-y: hidden;
             box-sizing: border-box;
+            border-right: 1px solid var(--mi-border-subtle, #ddd);
         }
 
         .code-editor-line-numbers > div {
             height: ${LINE_HEIGHT_EM}em;
             line-height: ${LINE_HEIGHT_EM}em;
             padding: 0 10px;
+            box-sizing: border-box;
         }
 
         /* Content scroller */
@@ -191,7 +200,8 @@ export function injectStyles() {
             flex-grow: 1;
             padding: 0;
             overflow: auto;
-            background-color: #ffffff;
+            background-color: var(--mi-bg-editor, #ffffff);
+            contain: layout style paint; /* Performance hint */
         }
 
         /* Editable content */
@@ -200,35 +210,35 @@ export function injectStyles() {
             padding: 0;
             outline: none;
             display: inline-block;
-            background-color: #ffffff;
-            color: #000000;
+            background-color: var(--mi-bg-editor, #ffffff);
+            color: var(--mi-text-primary, #000000);
             tab-size: ${TAB_SPACES};
             -moz-tab-size: ${TAB_SPACES};
             white-space: pre;
             word-break: normal;
             box-sizing: border-box;
-            caret-color: red;
+            caret-color: var(--mi-caret-color, red);
             caret-shape: block;
             min-width: 100vw;
             min-height: 100vh;
+            contain: content; /* Performance hint */
         }
 
         .code-editor-content > div {
             padding: 0 10px;
         }
 
-        /* ✨ Beautify Button - Just Icon, No Circle */
+        /* ✨ Beautify Button - Just Icon, No Circle ✨ */
         .code-editor-beautify-button-container {
             position: absolute;
             top: 0;
             right: 15px;
             z-index: 10;
-			
         }
 
         .code-editor-beautify-button-container button {
             background-color: transparent;
-            color: #007bff;
+            color: var(--mi-color-primary, #007bff);
             border: none;
             padding: 5px 8px;
             cursor: pointer;
@@ -250,7 +260,7 @@ export function injectStyles() {
         }
 
         .code-editor-beautify-button-container button:hover {
-            color: #0056b3;
+            color: var(--mi-color-primary-dark, #0056b3);
             transform: scale(1.1);
         }
 
@@ -264,8 +274,8 @@ export function injectStyles() {
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            background-color: #fff;
-            border: 1px solid #ccc;
+            background-color: var(--mi-bg-surface, #fff);
+            border: 1px solid var(--mi-border-subtle, #ccc);
             padding: 15px;
             border-radius: 5px;
             box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
@@ -279,10 +289,12 @@ export function injectStyles() {
         .code-editor-goto-dialog input[type="number"] {
             width: calc(100% - 12px);
             padding: 6px;
-            border: 1px solid #ddd;
+            border: 1px solid var(--mi-border-input, #ddd);
             border-radius: 3px;
             font-size: 1em;
             box-sizing: border-box;
+            background: var(--mi-bg-input, #fff);
+            color: var(--mi-text-primary, #333);
         }
 
         .code-editor-goto-dialog-buttons {
@@ -292,7 +304,7 @@ export function injectStyles() {
         }
 
         .code-editor-goto-dialog-buttons button {
-            background-color: #007bff;
+            background-color: var(--mi-color-primary, #007bff);
             color: white;
             border: none;
             padding: 6px 12px;
@@ -302,15 +314,15 @@ export function injectStyles() {
         }
 
         .code-editor-goto-dialog-buttons button.cancel {
-            background-color: #6c757d;
+            background-color: var(--mi-color-secondary, #6c757d);
         }
 
         .code-editor-goto-dialog-buttons button:hover {
-            background-color: #0056b3;
+            background-color: var(--mi-color-primary-dark, #0056b3);
         }
 
         .code-editor-goto-dialog-buttons button.cancel:hover {
-            background-color: #5a6268;
+            background-color: var(--mi-color-secondary-dark, #5a6268);
         }
 
         /* Pages menu input */
@@ -318,16 +330,18 @@ export function injectStyles() {
             width: 100%;
             padding: 2px 5px;
             box-sizing: border-box;
-            border: 1px solid #ccc;
+            border: 1px solid var(--mi-border-input, #ccc);
             outline: none;
             font-size: 14px;
+            background: var(--mi-bg-input, #fff);
+            color: var(--mi-text-primary, #333);
         }
 
         /* Clipboard Dropdown Menu */
         .code-editor-clipboard-menu {
             position: absolute;
-            background-color: #fff;
-            border: 1px solid #ccc;
+            background-color: var(--mi-bg-surface, #fff);
+            border: 1px solid var(--mi-border-subtle, #ccc);
             border-radius: 4px;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
             z-index: 15;
@@ -344,7 +358,7 @@ export function injectStyles() {
             text-align: left;
             cursor: pointer;
             font-size: 14px;
-            color: #333;
+            color: var(--mi-text-primary, #333);
             display: flex;
             align-items: center;
             gap: 10px;
@@ -362,11 +376,11 @@ export function injectStyles() {
         }
 
         .code-editor-clipboard-menu button:hover {
-            background-color: #f0f0f0;
+            background-color: var(--mi-bg-hover, #f0f0f0);
         }
 
         .code-editor-clipboard-menu button:active {
-            background-color: #e0e0e0;
+            background-color: var(--mi-bg-active, #e0e0e0);
         }
     `;
     document.head.appendChild(style);
@@ -375,8 +389,9 @@ export function injectStyles() {
 
 /**
  * Gets the current line and column (visual, considering tabs) of the caret within an editable div.
+ * OPTIMIZED: Uses cached line offsets when available.
  */
-export function getCaretPosition(editableDiv) {
+export function getCaretPosition(editableDiv, lineCache = null) {
     const selection = window.getSelection();
     if (!selection.rangeCount) return { line: 1, column: 1, charIndex: 0 };
 
@@ -386,8 +401,36 @@ export function getCaretPosition(editableDiv) {
     preCaretRange.setEnd(range.endContainer, range.endOffset);
 
     const currentText = preCaretRange.toString();
+    const charIndex = currentText.length;
+    
+    // Use cached line offsets if provided (for performance)
+    if (lineCache && lineCache.content === editableDiv.textContent) {
+        const offsets = lineCache.offsets;
+        // Binary search for line containing charIndex
+        let line = 1;
+        for (let i = 0; i < offsets.length - 1; i++) {
+            if (charIndex >= offsets[i] && charIndex < offsets[i + 1]) {
+                line = i + 1;
+                break;
+            }
+        }
+        
+        const lineStart = offsets[line - 1];
+        const lineContent = editableDiv.textContent.substring(lineStart, offsets[line] - 1);
+        
+        let column = 0;
+        for (let i = 0; i < lineContent.length; i++) {
+            if (lineContent[i] === '\t') {
+                column += TAB_SPACES;
+            } else {
+                column += 1;
+            }
+        }
+        return { line, column, charIndex };
+    }
+    
+    // Fallback to original logic
     const lines = currentText.split('\n');
-
     const line = lines.length;
     let column = 0;
     const currentLineContent = lines[lines.length - 1] || '';
@@ -400,53 +443,77 @@ export function getCaretPosition(editableDiv) {
         }
     }
 
-    let charIndex = 0;
-    for (let i = 0; i < lines.length - 1; i++) {
-        charIndex += lines[i].length + 1;
-    }
-    charIndex += currentLineContent.length;
-
     return { line, column, charIndex };
 }
 
 /**
  * Sets the caret position within an editable div to a specific line and column (visual).
+ * OPTIMIZED: Uses cached line offsets when available.
  */
-export function setCaretPosition(editableDiv, line, column, charIndex = null) {
+export function setCaretPosition(editableDiv, line, column, charIndex = null, lineCache = null) {
     const textContent = editableDiv.textContent;
-    const lines = textContent.split('\n');
     let targetCharIndex = 0;
 
     if (charIndex !== null) {
         targetCharIndex = Math.min(charIndex, textContent.length);
     } else {
-        for (let i = 0; i < line - 1 && i < lines.length; i++) {
-            targetCharIndex += lines[i].length + 1;
-        }
-
-        let targetLineContent = '';
-        if (line > lines.length) {
-            targetLineContent = lines[lines.length - 1] || '';
-            targetCharIndex = textContent.length;
-        } else {
-            targetLineContent = lines[line - 1] || '';
-        }
-
-        let currentVisualCol = 0;
-        let targetCharIndexInLine = 0;
-        for (let i = 0; i < targetLineContent.length; i++) {
-            if (currentVisualCol >= column) {
-                targetCharIndexInLine = i;
-                break;
-            }
-            if (targetLineContent[i] === '\t') {
-                currentVisualCol += TAB_SPACES;
+        // Use cached line offsets if available
+        if (lineCache && lineCache.content === textContent) {
+            const offsets = lineCache.offsets;
+            if (line > 0 && line <= offsets.length) {
+                const lineStart = offsets[line - 1];
+                const lineEnd = offsets[line] - 1;
+                const lineContent = textContent.substring(lineStart, lineEnd);
+                
+                let currentVisualCol = 0;
+                let targetCharIndexInLine = 0;
+                for (let i = 0; i < lineContent.length; i++) {
+                    if (currentVisualCol >= column) {
+                        targetCharIndexInLine = i;
+                        break;
+                    }
+                    if (lineContent[i] === '\t') {
+                        currentVisualCol += TAB_SPACES;
+                    } else {
+                        currentVisualCol += 1;
+                    }
+                    targetCharIndexInLine = i + 1;
+                }
+                targetCharIndex = lineStart + targetCharIndexInLine;
             } else {
-                currentVisualCol += 1;
+                targetCharIndex = textContent.length;
             }
-            targetCharIndexInLine = i + 1;
+        } else {
+            // Fallback to original logic
+            const lines = textContent.split('\n');
+            for (let i = 0; i < line - 1 && i < lines.length; i++) {
+                targetCharIndex += lines[i].length + 1;
+            }
+
+            let targetLineContent = '';
+            if (line > lines.length) {
+                targetLineContent = lines[lines.length - 1] || '';
+                targetCharIndex = textContent.length;
+            } else {
+                targetLineContent = lines[line - 1] || '';
+            }
+
+            let currentVisualCol = 0;
+            let targetCharIndexInLine = 0;
+            for (let i = 0; i < targetLineContent.length; i++) {
+                if (currentVisualCol >= column) {
+                    targetCharIndexInLine = i;
+                    break;
+                }
+                if (targetLineContent[i] === '\t') {
+                    currentVisualCol += TAB_SPACES;
+                } else {
+                    currentVisualCol += 1;
+                }
+                targetCharIndexInLine = i + 1;
+            }
+            targetCharIndex += targetCharIndexInLine;
         }
-        targetCharIndex += targetCharIndexInLine;
     }
 
     targetCharIndex = Math.min(targetCharIndex, textContent.length);
@@ -491,6 +558,7 @@ export function setCaretPosition(editableDiv, line, column, charIndex = null) {
 
 /**
  * Scrolls the caret into the visible area of the editor.
+ * OPTIMIZED: Uses getClientRects for better accuracy with large content.
  */
 export function scrollCaretIntoView(editableDiv) {
     const selection = window.getSelection();
@@ -499,79 +567,149 @@ export function scrollCaretIntoView(editableDiv) {
     const range = selection.getRangeAt(0);
     let caretRect;
     try {
-        caretRect = range.getBoundingClientRect();
+        const rects = range.getClientRects();
+        caretRect = rects.length > 0 ? rects[rects.length - 1] : range.getBoundingClientRect();
     } catch (e) {
-        const tempRange = document.createRange();
-        const startNode = range.startContainer;
-        const startOffset = range.startOffset;
-
-        if (startNode.nodeType === Node.TEXT_NODE && startOffset > 0) {
-            tempRange.setStart(startNode, startOffset - 1);
-            tempRange.setEnd(startNode, startOffset);
-        } else if (startNode.nodeType === Node.ELEMENT_NODE && startNode.childNodes.length > 0) {
-            const childIndex = Math.max(0, startOffset - 1);
-            if (startNode.childNodes[childIndex]) {
-                tempRange.selectNode(startNode.childNodes[childIndex]);
-            } else {
-                tempRange.selectNode(editableDiv);
-            }
-        } else {
-            tempRange.selectNode(editableDiv);
-        }
-        caretRect = tempRange.getBoundingClientRect();
+        caretRect = range.getBoundingClientRect();
     }
 
     const editorRect = editableDiv.getBoundingClientRect();
 
-    if (caretRect.bottom > editorRect.bottom) {
-        editableDiv.scrollTop += (caretRect.bottom - editorRect.bottom);
-    } else if (caretRect.top < editorRect.top) {
-        editableDiv.scrollTop -= (editorRect.top - caretRect.top);
+    // Only scroll if caret is outside viewport (with small buffer)
+    const buffer = 20;
+    if (caretRect.bottom > editorRect.bottom - buffer) {
+        editableDiv.scrollTop += (caretRect.bottom - editorRect.bottom + buffer);
+    } else if (caretRect.top < editorRect.top + buffer) {
+        editableDiv.scrollTop -= (editorRect.top - caretRect.top + buffer);
     }
 
-    if (caretRect.right > editorRect.right) {
-        editableDiv.scrollLeft += (caretRect.right - editorRect.right);
-    } else if (caretRect.left < editorRect.left) {
-        editableDiv.scrollLeft -= (editorRect.left - caretRect.left);
+    if (caretRect.right > editorRect.right - buffer) {
+        editableDiv.scrollLeft += (caretRect.right - editorRect.right + buffer);
+    } else if (caretRect.left < editorRect.left + buffer) {
+        editableDiv.scrollLeft -= (editorRect.left - caretRect.left + buffer);
     }
 }
 
 /**
- * Copies text to the clipboard
+ * Copies text to the clipboard - OPTIMIZED with fallback
  */
 export function copyToClipboard(text) {
-    navigator.clipboard.writeText(text).catch(err => {
-        console.error('Failed to copy to clipboard:', err);
-        const textArea = document.createElement('textarea');
-        textArea.value = text;
-        textArea.style.position = 'fixed';
-        textArea.style.left = '-999999px';
-        document.body.appendChild(textArea);
-        textArea.select();
-        try {
-            document.execCommand('copy');
-        } catch (e) {
-            console.error('Fallback copy failed:', e);
-        }
-        document.body.removeChild(textArea);
-    });
+    // For very large text, use async clipboard API directly
+    if (text.length > 100000) {
+        navigator.clipboard.writeText(text).catch(err => {
+            console.error('Failed to copy large text to clipboard:', err);
+            // Fallback for very large text: chunk it
+            fallbackCopyLargeText(text);
+        });
+    } else {
+        navigator.clipboard.writeText(text).catch(err => {
+            console.error('Failed to copy to clipboard:', err);
+            fallbackCopyText(text);
+        });
+    }
+}
+
+function fallbackCopyText(text) {
+    const textArea = document.createElement('textarea');
+    textArea.value = text;
+    textArea.style.position = 'fixed';
+    textArea.style.left = '-999999px';
+    textArea.style.top = '-999999px';
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    try {
+        document.execCommand('copy');
+    } catch (e) {
+        console.error('Fallback copy failed:', e);
+    }
+    document.body.removeChild(textArea);
+}
+
+function fallbackCopyLargeText(text) {
+    // For very large text, copy in chunks to avoid browser limits
+    const chunkSize = 50000;
+    let copied = '';
+    for (let i = 0; i < text.length; i += chunkSize) {
+        copied += text.slice(i, i + chunkSize);
+    }
+    fallbackCopyText(copied);
 }
 
 /**
- * Gets text from the clipboard
+ * Gets text from the clipboard - OPTIMIZED
  */
 export async function getFromClipboard() {
     try {
         return await navigator.clipboard.readText();
     } catch (err) {
         console.error('Failed to read from clipboard:', err);
-        return '';
+        // Fallback: try execCommand
+        try {
+            const textArea = document.createElement('textarea');
+            document.body.appendChild(textArea);
+            textArea.focus();
+            document.execCommand('paste');
+            const text = textArea.value;
+            document.body.removeChild(textArea);
+            return text;
+        } catch (e) {
+            console.error('Fallback clipboard read failed:', e);
+            return '';
+        }
     }
 }
 
 /**
+ * VIRTUALIZED: Updates only visible line numbers + buffer
+ * Call this instead of rebuilding all line numbers
+ */
+export function updateLineNumbersVirtual(contentDiv, lineNumbersDiv, scroller, totalLines = null) {
+    const lineHeight = LINE_HEIGHT_PX;
+    const scrollTop = scroller.scrollTop;
+    const viewportHeight = scroller.clientHeight;
+    
+    // Calculate visible range with buffer
+    const visibleStart = Math.max(1, Math.floor(scrollTop / lineHeight) - VIRTUAL_LINE_BUFFER);
+    const visibleEnd = Math.min(
+        totalLines !== null ? totalLines : contentDiv.textContent.split('\n').length,
+        Math.ceil((scrollTop + viewportHeight) / lineHeight) + VIRTUAL_LINE_BUFFER
+    );
+    
+    // Build HTML with spacers for virtualization
+    const topSpacer = (visibleStart - 1) * lineHeight;
+    const bottomLines = (totalLines !== null ? totalLines : contentDiv.textContent.split('\n').length) - visibleEnd;
+    
+    let html = `<div style="height:${topSpacer}px"></div>`;
+    for (let i = visibleStart; i <= visibleEnd; i++) {
+        html += `<div style="height:${lineHeight}px;line-height:${lineHeight}px;padding:0 10px;box-sizing:border-box">${i}</div>`;
+    }
+    if (bottomLines > 0) {
+        html += `<div style="height:${bottomLines * lineHeight}px"></div>`;
+    }
+    
+    lineNumbersDiv.innerHTML = html;
+}
+
+/**
+ * Builds cached line offsets for fast line/column calculations
+ * Call when content changes significantly
+ */
+export function buildLineCache(content) {
+    const offsets = [0];
+    let index = 0;
+    while ((index = content.indexOf('\n', index)) !== -1) {
+        offsets.push(index + 1);
+        index++;
+    }
+    offsets.push(content.length + 1); // sentinel
+    return { content, offsets };
+}
+
+/**
  * The HTML template for the code editor's DOM structure.
- * Updated with Material Icons ligatures and semantic color classes.
+ * Updated with Material Icons ligatures, semantic color classes, and CSS variables.
+ * REMOVED: Debug border artifact around beautify button
  */
 export const editorHtml = `
 
@@ -607,14 +745,12 @@ export const editorHtml = `
         </tbody>
     </table>
 	
-	<span style="position:relative; top:0; left:0; border:1px solid:#0f0;padding:0;margin:0;display:block;">
-    	<!-- ✨ Beautify Button - Just Icon, No Circle -->
-	    <div class="code-editor-beautify-button-container">
-	        <button class="beautify-btn" title="Beautify Code">
-	            <span class="material-icon icon-primary" aria-hidden="true">star</span>
-	        </button>
-	    </div>
-	</span>
+    <!-- ✨ Beautify Button - Just Icon, No Circle (debug border removed) ✨ -->
+    <div class="code-editor-beautify-button-container">
+        <button class="beautify-btn" title="Beautify Code">
+            <span class="material-icon icon-primary" aria-hidden="true">star</span>
+        </button>
+    </div>
 
     <div class="code-editor-wrapper">
         <div class="code-editor-line-numbers"></div>
@@ -624,8 +760,6 @@ export const editorHtml = `
             <span style="height:100vh; width:2000%; display:inline-block;"></span>
         </div>
     </div>
-    
-	
     
     <div class="code-editor-goto-dialog">
         <span>Go to Line:</span>

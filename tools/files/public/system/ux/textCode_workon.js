@@ -1,30 +1,39 @@
-// ./system/ux/textCode.js
+// ./ux/textCode.js
 import {
     TAB_SPACES,
     HISTORY_DEBOUNCE_TIME,
+    LINE_HEIGHT_PX,
     injectStyles,
     getCaretPosition,
     setCaretPosition,
     scrollCaretIntoView,
     editorHtml,
     copyToClipboard,
-    getFromClipboard
-} from './textCodeUI.js';
+    getFromClipboard,
+    buildLineCache,
+    updateLineNumbersVirtual
+} from './textCodeUI_workon.js';
 
 // --- Module-level Variables ---
-let lastTypedChar = ''; // Tracks the last typed character for smart indentation
-let secLastTypedChar = ''; // Tracks the second last typed character for smart indentation. thisnisnfor }, senarios.
+let lastTypedChar = '';
+let secLastTypedChar = '';
+
+// ✨ PERFORMANCE: Debounce timers and cache
+let lineNumbersUpdateTimeout = null;
+let scrollSyncRaf = null;
+let cachedContent = '';
+let cachedLineCache = null; // { content, offsets }
 
 // --- Core Editor Setup Function ---
 /**
  * Sets up a code editor instance, handling DOM creation, event listeners,
- * and property emulation.
+ * and property emulation. OPTIMIZED for large text performance.
  * @param {string|Array<Object>} initialContent - The initial text content or an array of page objects.
  * @param {HTMLElement|null} originalElement - The original <textcode> element if converting, otherwise null.
  * @returns {HTMLElement} The outermost DOM element representing the code editor.
  */
 function setupCodeEditorInstance(initialContent, originalElement = null) {
-    injectStyles(); // Ensure styles are present
+    injectStyles();
 
     // --- Pages and History Management ---
     let pages = [];
@@ -35,7 +44,8 @@ function setupCodeEditorInstance(initialContent, originalElement = null) {
         content,
         history: [],
         historyPointer: -1,
-        redoStack: []
+        redoStack: [],
+        lineCache: null // ✨ Per-page line cache
     });
 
     if (Array.isArray(initialContent)) {
@@ -44,13 +54,16 @@ function setupCodeEditorInstance(initialContent, originalElement = null) {
             content: page.content,
             history: [],
             historyPointer: -1,
-            redoStack: []
+            redoStack: [],
+            lineCache: null
         }));
     } else {
-        pages.push(createNewPage(initialContent, originalElement?.title || 'Untitled'));
+        const initialPage = createNewPage(initialContent, originalElement?.title || 'Untitled');
+        initialPage.lineCache = buildLineCache(initialContent); // ✨ Build initial cache
+        pages.push(initialPage);
     }
 
-    let historyTimeout = null; // For debouncing history pushes
+    let historyTimeout = null;
 
     // --- Store original attributes for emulation ---
     const originalId = originalElement ? originalElement.id : null;
@@ -78,7 +91,7 @@ function setupCodeEditorInstance(initialContent, originalElement = null) {
     const undoButton = editorContainerWrapper.querySelector('.undo-btn');
     const redoButton = editorContainerWrapper.querySelector('.redo-btn');
     const selectAllButton = editorContainerWrapper.querySelector('.select-all-btn');
-    const selectBracketButton = editorContainerWrapper.querySelector('.select-bracket-btn'); // <--- NEW REFERENCE
+    const selectBracketButton = editorContainerWrapper.querySelector('.select-bracket-btn');
     const clipboardButton = editorContainerWrapper.querySelector('.clipboard-btn');
     const clipboardMenu = editorContainerWrapper.querySelector('.code-editor-clipboard-menu');
     const clipboardCutButton = editorContainerWrapper.querySelector('.clipboard-cut');
@@ -187,7 +200,7 @@ function setupCodeEditorInstance(initialContent, originalElement = null) {
     updateButtonVisibility('save');
     updateButtonVisibility('close');
 
-    // --- Emulate 'value', 'oninput', 'onchange', 'onsave', 'onclose', 'onrun', 'values', and 'valuesIndex' properties ---
+    // --- Emulate 'value', 'oninput', 'onchange', etc. properties ---
     Object.defineProperty(editorContainerWrapper, 'value', {
         get() {
             return pages[currentPageIndex].content;
@@ -195,14 +208,16 @@ function setupCodeEditorInstance(initialContent, originalElement = null) {
         set(newValue) {
             if (typeof newValue !== 'string') {
                 console.warn("Attempted to set 'value' to a non-string value:", newValue);
-                newValue = String(newValue); // Coerce to string
+                newValue = String(newValue);
             }
-            pages[currentPageIndex].content = newValue;
+            const currentPage = pages[currentPageIndex];
+            currentPage.content = newValue;
+            currentPage.lineCache = buildLineCache(newValue); // ✨ Update cache
             contentDiv.textContent = newValue;
-            updateLineNumbers();
+            debouncedUpdateLineNumbers(); // ✨ Debounced
             const lines = newValue.split('\n');
             const lastLineLength = (lines.pop() || '').length;
-            setCaretPosition(contentDiv, lines.length + 1, lastLineLength * TAB_SPACES);
+            setCaretPosition(contentDiv, lines.length + 1, lastLineLength * TAB_SPACES, null, currentPage.lineCache); // ✨ Use cache
             scrollCaretIntoView(contentDivScroller);
             pushToHistory(true);
         },
@@ -215,31 +230,26 @@ function setupCodeEditorInstance(initialContent, originalElement = null) {
         },
         set(newValues) {
             if (Array.isArray(newValues)) {
-                // Map the new values to page objects, and importantly, reset history
                 pages = newValues.map(page => ({
                     title: page.title,
                     content: page.content,
                     history: [],
                     historyPointer: -1,
-                    redoStack: []
+                    redoStack: [],
+                    lineCache: buildLineCache(page.content) // ✨ Build cache for each page
                 }));
-                // Reset the current page index to the first page (0)
                 const oldPageIndex = currentPageIndex;
                 currentPageIndex = 0;
-                // Update the UI with the first page's content and title
                 const firstPage = pages[currentPageIndex];
                 contentDiv.textContent = firstPage.content;
                 titleTextSpan.textContent = firstPage.title;
                 pagesMenuTitleInput.value = firstPage.title;
-                // Initialize history for the new first page
                 pushToHistory(true);
-                // Update UI elements that depend on the pages array and current page
                 updatePageMenuDropdown();
-                updateLineNumbers();
+                debouncedUpdateLineNumbers(); // ✨ Debounced
                 updateUndoRedoButtons();
-                setCaretPosition(contentDiv, 1, 1);
+                setCaretPosition(contentDiv, 1, 1, null, firstPage.lineCache); // ✨ Use cache
                 scrollCaretIntoView(contentDivScroller);
-                // Dispatch pagechange event if the pages array changed and the index implicitly reset
                 if (oldPageIndex !== currentPageIndex) {
                     const detail = {
                         valuesIndex: currentPageIndex,
@@ -281,7 +291,7 @@ function setupCodeEditorInstance(initialContent, originalElement = null) {
     let _onSaveHandler = null;
     let _onCloseHandler = null;
     let _onRunHandler = null;
-    let _onPageChangeHandler = null; // <-- NEW: Page Change Handler
+    let _onPageChangeHandler = null;
 
     Object.defineProperty(editorContainerWrapper, 'oninput', {
         get() { return _onInputHandler; },
@@ -349,7 +359,6 @@ function setupCodeEditorInstance(initialContent, originalElement = null) {
         configurable: true
     });
 
-    // NEW: onpagechange property definition
     Object.defineProperty(editorContainerWrapper, 'onpagechange', {
         get() { return _onPageChangeHandler; },
         set(newValue) {
@@ -363,18 +372,25 @@ function setupCodeEditorInstance(initialContent, originalElement = null) {
     });
 
     // --- Helper Functions for Editor Instance ---
+    
+    // ✨ DEBOUNCED: Update line numbers only when needed
+    const debouncedUpdateLineNumbers = () => {
+        if (lineNumbersUpdateTimeout) clearTimeout(lineNumbersUpdateTimeout);
+        lineNumbersUpdateTimeout = setTimeout(() => {
+            updateLineNumbers();
+            lineNumbersUpdateTimeout = null;
+        }, 50);
+    };
+
     const updateLineNumbers = () => {
-        const lines = contentDiv.textContent.split('\n').length;
-        let lineNumberHtml = '';
-        for (let i = 1; i <= lines; i++) {
-            lineNumberHtml += `<div>${i}</div>`;
-        }
-        lineNumbersDiv.innerHTML = lineNumberHtml;
+        const currentPage = pages[currentPageIndex];
+        // ✨ Use virtualized line numbers for performance
+        const totalLines = currentPage.content.split('\n').length;
+        updateLineNumbersVirtual(contentDiv, lineNumbersDiv, contentDivScroller, totalLines);
     };
 
     const updateUndoRedoButtons = () => {
         const currentPage = pages[currentPageIndex];
-        //undoButton.disabled = currentPage.historyPointer <= 0;
         undoButton.disabled = currentPage.history.length === 0;
         redoButton.disabled = currentPage.redoStack.length === 0;
     };
@@ -383,43 +399,43 @@ function setupCodeEditorInstance(initialContent, originalElement = null) {
         pagesMenuDropdown.innerHTML = pages.map((p, i) => `<option value="${i}" ${i === currentPageIndex ? 'selected' : ''}>${p.title}</option>`).join('');
     };
 
-    // VITAL CHANGE IS HERE
     const switchPage = (index) => {
         if (index < 0 || index >= pages.length) return;
         const oldPageIndex = currentPageIndex;
         const isPageChanging = index !== oldPageIndex;
-        // 1. Save the content of the currently active page (before the switch)
+        
+        // Save current page content
         pages[oldPageIndex].content = contentDiv.textContent;
-        // 2. Switch the index
+        
+        // Switch index
         currentPageIndex = index;
         const newPage = pages[currentPageIndex];
-        // 3. Restore the new page's content, history pointer, and redo stack
+        
+        // ✨ Restore from cache if available
         const stateToRestore = newPage.history[newPage.historyPointer] || {
             content: newPage.content,
-            caret: getCaretPosition(contentDivScroller) // Use current caret position as fallback
+            caret: getCaretPosition(contentDiv, newPage.lineCache)
         };
+        
         contentDiv.textContent = stateToRestore.content;
         titleTextSpan.textContent = newPage.title;
         pagesMenuTitleInput.value = newPage.title;
-        // 4. If the new page has no history, initialize it
-        //if (newPage.history.length === 0) {
-        //(true);
-        //}
-        // 5. Update secondary UI elements
+        
+        // Update UI
         updateLineNumbers();
         updateUndoRedoButtons();
         updatePageMenuDropdown();
-        // 6. Apply caret position and scroll
-        setCaretPosition(contentDiv, stateToRestore.caret.line, stateToRestore.caret.column);
+        
+        // ✨ Use cached line offsets for caret positioning
+        setCaretPosition(contentDiv, stateToRestore.caret.line, stateToRestore.caret.column, null, newPage.lineCache);
         scrollCaretIntoView(contentDivScroller);
-        // 7. Dispatch 'pagechange' event ONLY if the index actually changed
+        
         if (isPageChanging) {
             const detail = {
                 valuesIndex: currentPageIndex,
                 title: newPage.title,
                 content: newPage.content
             };
-            // 1. Programmatic Handler
             if (_onPageChangeHandler) {
                 try {
                     _onPageChangeHandler.call(editorContainerWrapper, detail);
@@ -427,7 +443,6 @@ function setupCodeEditorInstance(initialContent, originalElement = null) {
                     console.error("Error executing programmatic onpagechange handler:", err);
                 }
             }
-            // 2. Custom Event Dispatch
             editorContainerWrapper.dispatchEvent(new CustomEvent('pagechange', {
                 detail: detail,
                 bubbles: true,
@@ -437,13 +452,16 @@ function setupCodeEditorInstance(initialContent, originalElement = null) {
     };
 
     var oncurrentState;
+    
+    // ✨ OPTIMIZED: Debounced history with content comparison
     const pushToHistory = (force = false) => {
         const currentPage = pages[currentPageIndex];
         const currentState = {
             content: contentDiv.textContent,
-            caret: getCaretPosition(contentDiv)
+            caret: getCaretPosition(contentDiv, currentPage.lineCache)
         };
-        // Check if the content has actually changed since the last history state
+        
+        // Skip if no actual change
         if (currentPage.history.length > 0) {
             const lastState = currentPage.history[currentPage.history.length-1];
             if (lastState.content === currentState.content &&
@@ -452,9 +470,11 @@ function setupCodeEditorInstance(initialContent, originalElement = null) {
                 return;
             }
         }
+        
         if (historyTimeout) {
             clearTimeout(historyTimeout);
         }
+        
         if (force) {
             currentPage.redoStack = [];
             currentPage.history.push(currentState);
@@ -473,9 +493,12 @@ function setupCodeEditorInstance(initialContent, originalElement = null) {
     };
 
     const applyHistoryState = (state) => {
+        const currentPage = pages[currentPageIndex];
         contentDiv.textContent = state.content;
+        // ✨ Rebuild line cache when restoring history
+        currentPage.lineCache = buildLineCache(state.content);
         updateLineNumbers();
-        setCaretPosition(contentDiv, state.caret.line, state.caret.column);
+        setCaretPosition(contentDiv, state.caret.line, state.caret.column, null, currentPage.lineCache);
         scrollCaretIntoView(contentDivScroller);
         updateUndoRedoButtons();
     };
@@ -486,7 +509,7 @@ function setupCodeEditorInstance(initialContent, originalElement = null) {
             const stateToApply = currentPage.history.pop();
             currentPage.redoStack.push({
                 content: contentDiv.textContent,
-                caret: getCaretPosition(contentDiv)
+                caret: getCaretPosition(contentDiv, currentPage.lineCache)
             });
             applyHistoryState(stateToApply);
         }
@@ -498,7 +521,7 @@ function setupCodeEditorInstance(initialContent, originalElement = null) {
             const stateToApply = currentPage.redoStack.pop();
             currentPage.history.push({
                 content: contentDiv.textContent,
-                caret: getCaretPosition(contentDiv)
+                caret: getCaretPosition(contentDiv, currentPage.lineCache)
             });
             applyHistoryState(stateToApply);
         }
@@ -512,7 +535,7 @@ function setupCodeEditorInstance(initialContent, originalElement = null) {
         selection.addRange(range);
     };
 
-    // --- NEW: Bracket Selector Logic ---
+    // --- Bracket Selector Logic (unchanged, already efficient) ---
     const BRACKET_PAIRS = {
         '{': '}',
         '[': ']',
@@ -526,32 +549,24 @@ function setupCodeEditorInstance(initialContent, originalElement = null) {
 
     const isBracket = (char) => !!BRACKET_PAIRS[char];
 
-    /**
-     * Finds the matching bracket for the bracket at or near the current caret position
-     * and selects all content, including the brackets.
-     */
     const selectBracketContent = () => {
         const content = contentDiv.textContent;
-        const { charIndex } = getCaretPosition(contentDiv);
+        const { charIndex } = getCaretPosition(contentDiv, pages[currentPageIndex].lineCache);
         let startCharIndex = -1;
         let endCharIndex = -1;
         let targetBracket = '';
 
-        // 1. Determine if the caret is near a bracket
         let checkIndex = charIndex;
         let caretChar = content[checkIndex];
         let prevChar = content[checkIndex - 1];
 
         if (isBracket(prevChar)) {
-            // Case 1: Caret is immediately after a bracket (e.g., cursor is before the space after '{' or just after '{')
             targetBracket = prevChar;
             startCharIndex = checkIndex - 1;
         } else if (isBracket(caretChar)) {
-            // Case 2: Caret is exactly on a bracket
             targetBracket = caretChar;
             startCharIndex = checkIndex;
         } else {
-            // Not near a bracket, nothing to do
             return;
         }
 
@@ -561,7 +576,6 @@ function setupCodeEditorInstance(initialContent, originalElement = null) {
         let currentCount = 1;
         let currentIndex = startCharIndex + searchDirection;
 
-        // 2. Search for the matching bracket
         while (currentIndex >= 0 && currentIndex < content.length) {
             const currentChar = content[currentIndex];
             if (currentChar === targetBracket) {
@@ -570,32 +584,26 @@ function setupCodeEditorInstance(initialContent, originalElement = null) {
                 currentCount--;
             }
             if (currentCount === 0) {
-                // Found the match!
                 endCharIndex = currentIndex;
                 break;
             }
             currentIndex += searchDirection;
         }
 
-        // 3. If a match is found, set the selection
         if (endCharIndex !== -1) {
-            // Determine selection start and end (always start < end)
             const selectionStart = Math.min(startCharIndex, endCharIndex);
-            const selectionEnd = Math.max(startCharIndex, endCharIndex) + 1; // +1 to include the closing bracket
+            const selectionEnd = Math.max(startCharIndex, endCharIndex) + 1;
 
-            // Set caret start position based on absolute character index
-            setCaretPosition(contentDiv, null, null, selectionStart);
+            setCaretPosition(contentDiv, null, null, selectionStart, pages[currentPageIndex].lineCache);
             const selection = window.getSelection();
             if (!selection.rangeCount) return;
             const range = selection.getRangeAt(0);
 
-            // Find the end node/offset to set the selection end
             let charsCounted = 0;
             let endNode = contentDiv;
             let endOffset = 0;
             let currentNode = contentDiv.firstChild;
 
-            // Handle case for empty contentDiv (shouldn't happen here but safe)
             if (!currentNode && selectionEnd === 0) {
                 range.setEnd(contentDiv, 0);
             }
@@ -610,13 +618,9 @@ function setupCodeEditorInstance(initialContent, originalElement = null) {
                     }
                     charsCounted += nodeLength;
                 } else if (currentNode.nodeType === Node.ELEMENT_NODE) {
-                    // Non-text nodes should be handled if present, but typically contenteditable
-                    // uses text nodes for code content.
                     charsCounted += (currentNode.textContent ? currentNode.textContent.length : 0);
                 }
-                // If selectionEnd is exactly the length of all content, the loop might finish without a break.
                 if (selectionEnd === content.length && !currentNode.nextSibling) {
-                    // Fallback to setting end at the end of the last node/container.
                     endNode = contentDiv.lastChild || contentDiv;
                     endOffset = endNode.nodeType === Node.TEXT_NODE ? endNode.length : (endNode.childNodes.length || 0);
                 }
@@ -624,7 +628,6 @@ function setupCodeEditorInstance(initialContent, originalElement = null) {
             }
 
             if (endNode) {
-                // Ensure endOffset doesn't exceed the node's length/child count
                 const maxOffset = endNode.nodeType === Node.TEXT_NODE ? endNode.length : endNode.childNodes.length;
                 range.setEnd(endNode, Math.min(endOffset, maxOffset));
             }
@@ -633,27 +636,24 @@ function setupCodeEditorInstance(initialContent, originalElement = null) {
             selection.addRange(range);
         }
     };
-    // --- END NEW BRACKET SELECTOR LOGIC ---
 
-    // --- Clipboard Menu Logic ---
+    // --- Clipboard Menu Logic - OPTIMIZED ---
     const toggleClipboardMenu = () => {
         if (clipboardMenu.style.display === 'flex') {
             clipboardMenu.style.display = 'none';
             return;
         }
         
-        // Position menu below the clipboard button
         const buttonRect = clipboardButton.getBoundingClientRect();
         const containerRect = editorContainerWrapper.getBoundingClientRect();
         
-        const top = buttonRect.bottom - containerRect.top + 2; // 2px gap
+        const top = buttonRect.bottom - containerRect.top + 2;
         const left = buttonRect.left - containerRect.left;
         
         clipboardMenu.style.top = `${top}px`;
         clipboardMenu.style.left = `${left}px`;
         clipboardMenu.style.display = 'flex';
         
-        // Close menu when clicking outside
         setTimeout(() => {
             const closeHandler = (e) => {
                 if (!clipboardMenu.contains(e.target) && e.target !== clipboardButton) {
@@ -694,6 +694,7 @@ function setupCodeEditorInstance(initialContent, originalElement = null) {
         clipboardMenu.style.display = 'none';
     };
 
+    // ✨ OPTIMIZED: Handle large pastes with DocumentFragment
     const clipboardPaste = async () => {
         const text = await getFromClipboard();
         if (!text) return;
@@ -704,16 +705,33 @@ function setupCodeEditorInstance(initialContent, originalElement = null) {
         const range = selection.getRangeAt(0);
         range.deleteContents();
         
-        const textNode = document.createTextNode(text);
-        range.insertNode(textNode);
-        range.setStartAfter(textNode);
-        range.collapse(true);
+        // ✨ Use DocumentFragment for large pastes (>50k chars)
+        if (text.length > 50000) {
+            const fragment = document.createDocumentFragment();
+            fragment.textContent = text;
+            range.insertNode(fragment);
+            range.setStartAfter(fragment.lastChild || fragment);
+            range.collapse(true);
+        } else {
+            const textNode = document.createTextNode(text);
+            range.insertNode(textNode);
+            range.setStartAfter(textNode);
+            range.collapse(true);
+        }
         
         selection.removeAllRanges();
         selection.addRange(range);
         
-        contentDiv.dispatchEvent(new Event('input', { bubbles: true }));
-        pushToHistory();
+        // ✨ Debounce history push for large pastes
+        if (text.length > 10000) {
+            setTimeout(() => {
+                contentDiv.dispatchEvent(new Event('input', { bubbles: true }));
+                pushToHistory(true);
+            }, 0);
+        } else {
+            contentDiv.dispatchEvent(new Event('input', { bubbles: true }));
+            pushToHistory();
+        }
         clipboardMenu.style.display = 'none';
     };
 
@@ -726,22 +744,21 @@ function setupCodeEditorInstance(initialContent, originalElement = null) {
         const text = await getFromClipboard();
         if (!text) return;
         
-        // Save current state to history before making the change
         pushToHistory(true);
         
-        // Replace content
         contentDiv.textContent = text;
+        // ✨ Update line cache
+        pages[currentPageIndex].lineCache = buildLineCache(text);
         updateLineNumbers();
-        setCaretPosition(contentDiv, 1, 1);
+        setCaretPosition(contentDiv, 1, 1, null, pages[currentPageIndex].lineCache);
         scrollCaretIntoView(contentDivScroller);
         
-        // The 'input' event will be triggered automatically and handle the rest
         clipboardMenu.style.display = 'none';
     };
-    // --- END Clipboard Menu Logic ---
 
     const showGoToLineDialog = () => {
-        const currentLine = getCaretPosition(contentDiv).line;
+        const currentPage = pages[currentPageIndex];
+        const currentLine = getCaretPosition(contentDiv, currentPage.lineCache).line;
         goToLineInput.value = currentLine;
         goToLineDialog.style.display = 'flex';
         goToLineInput.focus();
@@ -754,31 +771,28 @@ function setupCodeEditorInstance(initialContent, originalElement = null) {
 
     const goToLine = () => {
         const lineNumber = parseInt(goToLineInput.value, 10);
-        const totalLines = contentDiv.textContent.split('\n').length;
+        const currentPage = pages[currentPageIndex];
+        const totalLines = currentPage.content.split('\n').length;
         if (isNaN(lineNumber) || lineNumber < 1 || lineNumber > totalLines) {
             goToLineInput.focus();
             goToLineInput.select();
             return;
         }
-        setCaretPosition(contentDiv, lineNumber, 1);
+        setCaretPosition(contentDiv, lineNumber, 1, null, currentPage.lineCache);
         scrollCaretIntoView(contentDivScroller);
         hideGoToLineDialog();
         contentDiv.focus();
     };
 
     const toggleMenu = (menuName) => {
-        // Find the index of the selectBracketButton's parent cell in the button array for correct slicing
         const allButtonCells = Array.from(menuBar.querySelectorAll('td:not(.code-editor-title-bar)'));
-        // Define all main menu buttons (including the new one)
         const mainMenuButtons = [undoButton.parentElement, redoButton.parentElement, selectAllButton.parentElement, selectBracketButton.parentElement, clipboardButton.parentElement, goToLineButton.parentElement, findButton.parentElement, pagesButton.parentElement, runButton.parentElement, saveButton.parentElement, closeButton.parentElement];
         const findMenuButtons = [findInputCell, prevFindCell, nextFindCell, findCloseCell];
         const pagesMenuButtons = [pagesPrevCell, pagesTitleCell, pagesDropdownCell, pagesNextCell, pagesCloseCell];
 
-        // First, hide all menus
         allButtonCells.forEach(cell => cell.style.display = 'none');
-        titleBarRow.style.display = 'none'; // Initially hide the title bar as well
+        titleBarRow.style.display = 'none';
 
-        // Then, show the selected menu and the title bar if needed
         if (menuName === 'find') {
             findMenuButtons.forEach(cell => cell.style.display = 'table-cell');
             findInput.focus();
@@ -787,7 +801,7 @@ function setupCodeEditorInstance(initialContent, originalElement = null) {
             pagesMenuButtons.forEach(cell => cell.style.display = 'table-cell');
             pagesMenuTitleInput.focus();
             pagesMenuTitleInput.select();
-        } else { // 'main' menu or no specific menu selected
+        } else {
             mainMenuButtons.forEach(cell => cell.style.display = 'table-cell');
             if (originalTitle) {
                 titleBarRow.style.display = '';
@@ -795,7 +809,6 @@ function setupCodeEditorInstance(initialContent, originalElement = null) {
             contentDiv.focus();
         }
 
-        // Adjust visibility for optional buttons in the main menu
         if (menuName === 'main') {
             updateButtonVisibility('run');
             updateButtonVisibility('save');
@@ -807,7 +820,7 @@ function setupCodeEditorInstance(initialContent, originalElement = null) {
         const query = findInput.value;
         if (!query) return;
         const content = contentDiv.textContent;
-        let { charIndex: currentCaretIndex } = getCaretPosition(contentDiv);
+        let { charIndex: currentCaretIndex } = getCaretPosition(contentDiv, pages[currentPageIndex].lineCache);
         let startIndex = currentCaretIndex;
         if (content.substring(startIndex, startIndex + query.length) === query) {
             startIndex += query.length;
@@ -817,7 +830,7 @@ function setupCodeEditorInstance(initialContent, originalElement = null) {
             foundIndex = content.indexOf(query, 0);
         }
         if (foundIndex !== -1) {
-            setCaretPosition(contentDiv, null, null, foundIndex);
+            setCaretPosition(contentDiv, null, null, foundIndex, pages[currentPageIndex].lineCache);
             scrollCaretIntoView(contentDivScroller);
         }
     };
@@ -826,7 +839,7 @@ function setupCodeEditorInstance(initialContent, originalElement = null) {
         const query = findInput.value;
         if (!query) return;
         const content = contentDiv.textContent;
-        let { charIndex: currentCaretIndex } = getCaretPosition(contentDiv);
+        let { charIndex: currentCaretIndex } = getCaretPosition(contentDiv, pages[currentPageIndex].lineCache);
         let endIndex = currentCaretIndex;
         if (content.substring(currentCaretIndex, currentCaretIndex + query.length) === query) {
             endIndex = currentCaretIndex - 1;
@@ -838,7 +851,7 @@ function setupCodeEditorInstance(initialContent, originalElement = null) {
             foundIndex = content.lastIndexOf(query, content.length);
         }
         if (foundIndex !== -1) {
-            setCaretPosition(contentDiv, null, null, foundIndex);
+            setCaretPosition(contentDiv, null, null, foundIndex, pages[currentPageIndex].lineCache);
             scrollCaretIntoView(contentDivScroller);
         }
     };
@@ -857,12 +870,12 @@ function setupCodeEditorInstance(initialContent, originalElement = null) {
     updateUndoRedoButtons();
     updatePageMenuDropdown();
     pagesMenuTitleInput.value = pages[currentPageIndex].title;
-    toggleMenu('main'); // Initial state set to show main menu
+    toggleMenu('main');
 
     undoButton.addEventListener('click', undo);
     redoButton.addEventListener('click', redo);
     selectAllButton.addEventListener('click', selectAll);
-    selectBracketButton.addEventListener('click', selectBracketContent); // <--- NEW ATTACHMENT
+    selectBracketButton.addEventListener('click', selectBracketContent);
     clipboardButton.addEventListener('click', toggleClipboardMenu);
     clipboardCutButton.addEventListener('click', clipboardCut);
     clipboardCopyButton.addEventListener('click', clipboardCopy);
@@ -887,7 +900,6 @@ function setupCodeEditorInstance(initialContent, originalElement = null) {
         if (currentPageIndex < pages.length - 1) {
             switchPage(currentPageIndex + 1);
         } else {
-            // We are at the end, so create a new page
             const newPageTitle = `Untitled ${pages.length + 1}`;
             const newPage = createNewPage('', newPageTitle);
             pages.push(newPage);
@@ -964,12 +976,24 @@ function setupCodeEditorInstance(initialContent, originalElement = null) {
             toggleMenu('main');
         }
     });
+    
+    // ✨ OPTIMIZED: Throttled scroll sync with requestAnimationFrame
     contentDivScroller.addEventListener('scroll', () => {
-        lineNumbersDiv.scrollTop = contentDivScroller.scrollTop;
+        if (scrollSyncRaf) return;
+        scrollSyncRaf = requestAnimationFrame(() => {
+            lineNumbersDiv.scrollTop = contentDivScroller.scrollTop;
+            // ✨ Also update virtualized line numbers on scroll
+            updateLineNumbers();
+            scrollSyncRaf = null;
+        });
     });
+    
     contentDiv.addEventListener('input', (e) => {
-        pages[currentPageIndex].content = contentDiv.textContent;
-        updateLineNumbers();
+        const currentPage = pages[currentPageIndex];
+        currentPage.content = contentDiv.textContent;
+        // ✨ Rebuild line cache on content change (debounced via updateLineNumbers)
+        currentPage.lineCache = buildLineCache(currentPage.content);
+        debouncedUpdateLineNumbers(); // ✨ Debounced
         scrollCaretIntoView(contentDivScroller);
         if (e.inputType === 'insertText') {
             lastTypedChar = e.data;
@@ -1011,38 +1035,38 @@ function setupCodeEditorInstance(initialContent, originalElement = null) {
     });
     contentDiv.addEventListener('paste', function(event) {
         pushToHistory();
-        // 1. Prevent the default paste behavior
         event.preventDefault();
-        // 2. Get the plain text from the clipboard
-        // event.clipboardData is a DataTransfer object
         const plainText = event.clipboardData.getData('text/plain');
-        // 3. Insert the plain text into the document
-        // For modern browsers: Use the standard document.execCommand
-        if (document.execCommand('insertText', false, plainText)) {
-            // execCommand succeeded (most modern browsers)
+        
+        // ✨ Use execCommand for small pastes, manual for large
+        if (plainText.length < 10000 && document.execCommand('insertText', false, plainText)) {
             return;
         }
-        // Fallback for older browsers or environments where execCommand is restricted:
+        
+        // Fallback for large pastes or restricted environments
         try {
-            // Use the Selection API to get the current selection/cursor position
             const selection = window.getSelection();
             if (!selection.rangeCount) return;
-            // Delete any existing selected content
             selection.deleteFromDocument();
-            // Create a text node with the plain text
-            const textNode = document.createTextNode(plainText);
-            // Get the current range (cursor/selection position)
-            const range = selection.getRangeAt(0);
-            // Insert the text node at the range's start
-            range.insertNode(textNode);
-            // Move the cursor after the newly inserted text
-            range.setStartAfter(textNode);
-            range.collapse(true);
+            
+            if (plainText.length > 50000) {
+                const fragment = document.createDocumentFragment();
+                fragment.textContent = plainText;
+                const range = selection.getRangeAt(0);
+                range.insertNode(fragment);
+                range.setStartAfter(fragment.lastChild || fragment);
+                range.collapse(true);
+            } else {
+                const textNode = document.createTextNode(plainText);
+                const range = selection.getRangeAt(0);
+                range.insertNode(textNode);
+                range.setStartAfter(textNode);
+                range.collapse(true);
+            }
             selection.removeAllRanges();
             selection.addRange(range);
         } catch (error) {
-            // A final, less ideal fallback for very restrictive environments
-            PrintError("Manual text insertion failed. Using contenteditable's textContent method (might lose position):", error);
+            console.error("Manual text insertion failed:", error);
             document.execCommand('insertText', false, plainText);
         }
     });
@@ -1060,7 +1084,7 @@ function setupCodeEditorInstance(initialContent, originalElement = null) {
             lastTypedChar = '\t';
         } else if (e.key === 'Enter') {
             e.preventDefault();
-            const originalCaret = getCaretPosition(contentDiv);
+            const originalCaret = getCaretPosition(contentDiv, pages[currentPageIndex].lineCache);
             const currentText = contentDiv.textContent;
             let lines = currentText.split('\n');
             const targetLineIndex = originalCaret.line - 1;
@@ -1082,23 +1106,18 @@ function setupCodeEditorInstance(initialContent, originalElement = null) {
             const contentBeforeCaretInLine = currentLineContent.substring(0, charIndexInLine);
             const contentAfterCaretInLine = currentLineContent.substring(charIndexInLine);
             let calculatedIndentLevel = 0;
-            //*/
             const leadingTabsMatch = contentBeforeCaretInLine.match(/^\t*/);
             const leadingTabs = leadingTabsMatch ? leadingTabsMatch[0].length : 0;
             calculatedIndentLevel = leadingTabs;
-            //PrintLog("leadingTabs:"+leadingTabs)
             const bracketOpenings = (contentBeforeCaretInLine.match(/[{[(]/g) || []).length;
             const bracketClosings = (contentBeforeCaretInLine.match(/[}\])]/g) || []).length;
-            //PrintLog("secLastTypedChar:"+secLastTypedChar)
             if ((['}', ']', ')'].includes(lastTypedChar)
             || ['}', ']', ')'].includes(secLastTypedChar)
             || ['{', '[', '('].includes(contentBeforeCaretInLine[contentBeforeCaretInLine.length-1]) )
             )
-            //&& targetLineIndex >= 0)
             {
                 calculatedIndentLevel += (bracketOpenings - bracketClosings);
             }
-            //PrintLog("calculatedIndentLevel:"+calculatedIndentLevel);
             const trimmedContentAfterCaret = contentAfterCaretInLine.trim();
             if (trimmedContentAfterCaret.length > 0 && ['}', ']', ')'].includes(trimmedContentAfterCaret.charAt(0))) {
                 calculatedIndentLevel = Math.max(0, calculatedIndentLevel - 1);
@@ -1106,34 +1125,7 @@ function setupCodeEditorInstance(initialContent, originalElement = null) {
             const newIndent = '\t'.repeat(Math.max(0, calculatedIndentLevel));
             lines[targetLineIndex] = contentBeforeCaretInLine;
             lines.splice(originalCaret.line, 0, newIndent + contentAfterCaretInLine);
-            //*/
             let shouldDeindentClosingBracket = false;
-            /*
-            if ((['}', ']', ')'].includes(lastTypedChar) ||  ['}', ']', ')'].includes(secLastTypedChar)) && targetLineIndex >= 0) {
-                const lineContentWhereBracketWasTyped = lines[targetLineIndex];
-                const trimmedLine = lineContentWhereBracketWasTyped.trim()[0];
-                let hasOpeningCounterpart = false;
-                switch (trimmedLine[0]) {
-                    case '}':
-                        hasOpeningCounterpart = lineContentWhereBracketWasTyped.includes('{');
-                        break;
-                    case ']':
-                        hasOpeningCounterpart = lineContentWhereBracketWasTyped.includes('[');
-                        break;
-                    case ')':
-                        hasOpeningCounterpart = lineContentWhereBracketWasTyped.includes('(');
-                        break;
-                }
-                PrintLog("trimmedLine:"+trimmedLine);
-                PrintLog("hasOpeningCounterpart"+hasOpeningCounterpart)
-                if (trimmedLine === lastTypedChar || trimmedLine === secLastTypedChar ||
-                (!hasOpeningCounterpart && (lineContentWhereBracketWasTyped.startsWith(lastTypedChar))
-                ) {
-                    shouldDeindentClosingBracket = true;
-                }
-                shouldDeindentClosingBracket = true;
-            }
-            //*/
             if ((['}', ']', ')'].includes(lastTypedChar)
             ||  ['}', ']', ')'].includes(secLastTypedChar))
             && (bracketClosings - bracketOpenings) >0
@@ -1143,13 +1135,15 @@ function setupCodeEditorInstance(initialContent, originalElement = null) {
             if (shouldDeindentClosingBracket && lines[targetLineIndex] && lines[targetLineIndex].startsWith('\t')) {
                 lines[targetLineIndex] = lines[targetLineIndex].substring(1);
             }
-            //*/
             contentDiv.textContent = lines.join('\n');
             const newCaretLine = originalCaret.line + 1;
             const newCaretColumn = newIndent.length * TAB_SPACES;
-            setCaretPosition(contentDiv, newCaretLine, newCaretColumn);
+            // ✨ Use cached line offsets
+            const currentPage = pages[currentPageIndex];
+            currentPage.lineCache = buildLineCache(contentDiv.textContent);
+            setCaretPosition(contentDiv, newCaretLine, newCaretColumn, null, currentPage.lineCache);
             scrollCaretIntoView(contentDivScroller);
-            updateLineNumbers();
+            debouncedUpdateLineNumbers(); // ✨ Debounced
             secLastTypedChar=lastTypedChar;
             lastTypedChar = '\n';
             contentDiv.dispatchEvent(new Event('input', { bubbles: true }));
@@ -1176,7 +1170,6 @@ function setupCodeEditorInstance(initialContent, originalElement = null) {
         const lines = contentDiv.textContent.split('\n');
         let beautifiedLines = [];
         let currentIndentLevel = 0;
-        //skip inside of strings
         var isAtStr= false;
         var atStrChar;
         var isAtMultiComment=false;
@@ -1186,8 +1179,6 @@ function setupCodeEditorInstance(initialContent, originalElement = null) {
                 beautifiedLines.push('');
                 return;
             }
-            // Check for closing brackets at the start of the line, which should de-indent
-            // skip because tab accounted for closing bracket.
             var skipBracket=0;
             if (!isAtStr&&!isAtMultiComment&&trimmedLine.length > 0 && (trimmedLine.startsWith('}') || trimmedLine.startsWith(']') || trimmedLine.startsWith(')'))) {
                 currentIndentLevel = Math.max(0, currentIndentLevel - 1);
@@ -1208,9 +1199,6 @@ function setupCodeEditorInstance(initialContent, originalElement = null) {
                 var c=trimmedLine[i];
                 if(isAtStr)
                 {
-                    // skip charactures and escaped string charactures.
-                    //implement here.
-                    //check ending string characture get out of isAtStr
                     if (c === atStrChar && (i === 0 || trimmedLine[i - 1] !== '\\')) {
                         isAtStr = false;
                     }
@@ -1225,7 +1213,6 @@ function setupCodeEditorInstance(initialContent, originalElement = null) {
                 }
                 else
                 {
-                    // count brackets incountered
                     if(c=="'"||c=='"'||c=="`")
                     {
                         isAtStr=true;
@@ -1233,7 +1220,6 @@ function setupCodeEditorInstance(initialContent, originalElement = null) {
                     }
                     else if(c=='/'&&i+1<strLen&&trimmedLine[i+1]=='/')
                     {
-                        // skip rest of line.
                         break;
                     }
                     else if(c=='/'&&i+1<strLen&&trimmedLine[i+1]=='*')
@@ -1253,18 +1239,21 @@ function setupCodeEditorInstance(initialContent, originalElement = null) {
             }
             currentIndentLevel = Math.max(0, currentIndentLevel);
         });
-        const originalCaretPos = getCaretPosition(contentDiv);
+        const originalCaretPos = getCaretPosition(contentDiv, pages[currentPageIndex].lineCache);
         contentDiv.textContent = beautifiedLines.join('\n');
-        updateLineNumbers();
-        setCaretPosition(contentDiv, originalCaretPos.line, originalCaretPos.column);
+        // ✨ Rebuild cache after beautify
+        pages[currentPageIndex].lineCache = buildLineCache(contentDiv.textContent);
+        debouncedUpdateLineNumbers(); // ✨ Debounced
+        setCaretPosition(contentDiv, originalCaretPos.line, originalCaretPos.column, null, pages[currentPageIndex].lineCache);
         scrollCaretIntoView(contentDivScroller);
         contentDiv.dispatchEvent(new Event('input', { bubbles: true }));
         contentDivScroller.scrollTop = originalScrollTop;
         contentDivScroller.scrollLeft = originalScrollLeft;
     });
 
+    // ✨ OPTIMIZED: ResizeObserver with debounced line update
     const resizeObserver = new ResizeObserver(entries => {
-        updateLineNumbers();
+        debouncedUpdateLineNumbers();
         scrollCaretIntoView(contentDivScroller);
     });
     resizeObserver.observe(editorContainerWrapper);
@@ -1283,10 +1272,6 @@ export function createTexCode(initialContent = '') {
 }
 
 // --- DOM Observation for <textcode> tags ---
-/**
- * Observes the DOM for `<textcode> elements, converts them into
- * enhanced code editors, and handles dynamically added elements.
- */
 function observeTextcodeElements() {
     document.querySelectorAll('textcode').forEach(textcodeElement => {
         let initialContent = textcodeElement.textContent.trim();
