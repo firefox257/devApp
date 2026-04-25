@@ -131,6 +131,57 @@
 			"order": 900,
 			"permissions": ["console-read"],
 			"consoleCapture": true
+		},
+		{
+			"id": "style-demo",
+			"name": "Style Demo",
+			"icon": "palette",
+			"type": "iframe",
+			"url": "/apps/styleDemo/styleDemo.html",
+			"categoryId": "developer",
+			"description": "Demonstrates all system styles and icon groups",
+			"order": 1,
+			"enabled": true,
+			"permissions": [],
+			"sandbox": "allow-scripts allow-same-origin",
+			"allowMultipleInstances": true,
+			"defaultWidth": 800,
+			"defaultHeight": 600
+		},
+		{
+			"id": "graph-calc",
+			"name": "Graph Calc",
+			"icon": "calculate",
+			"type": "iframe",
+			"url": "/apps/graph-calc/graph-calc.html",
+			"categoryId": "developer",
+			"description": "Scientific graphing calculator with variables",
+			"order": 2,
+			"enabled": true,
+			"permissions": ["localStorage"],
+			"sandbox": "allow-scripts allow-same-origin allow-forms",
+			"allowMultipleInstances": true,
+			"defaultWidth": 400,
+			"defaultHeight": 600
+		},
+		{
+			"id": "ai-image-generator",
+			"name": "AI Image Generator",
+			"icon": "image_search",
+			"type": "iframe",
+			"url": "/apps/picGen/picGen.html",
+			"categoryId": "entertainment",
+			"description": "Generate images from text prompts using AI",
+			"order": 1,
+			"enabled": true,
+			"permissions": ["localStorage", "clipboard", "indexedDB", "downloads"],
+			"sandbox": "allow-scripts allow-same-origin allow-forms allow-modals allow-downloads",
+			"allowMultipleInstances": true,
+			"consoleCapture": false
 		}
 	]
 }
+
+
+
+

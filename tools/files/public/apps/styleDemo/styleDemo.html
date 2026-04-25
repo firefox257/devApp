@@ -1,0 +1,1295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>System Style Demo • Material Icons OS v2.7+</title>
+  
+  <!-- REQUIRED: Theme Bridge CSS for base .system-* styles -->
+  <link rel="stylesheet" href="/projects/desktop/os-theme-bridge.css" />
+  
+  <!-- REQUIRED: Theme Sync Bridge for iframe apps -->
+  <script src="/projects/desktop/os-theme-bridge.js"></script>
+  
+  <!-- REQUIRED: Local Material Icons Font -->
+  <style id="material-icons-font">
+    @font-face {
+      font-family: 'Material Icons';
+      src: url('/system/fonts/MaterialIcons-Regular.ttf') format('truetype');
+      font-weight: normal;
+      font-style: normal;
+      font-display: block;
+    }
+    .material-icons, .mat-icon {
+      font-family: 'Material Icons', sans-serif !important;
+      font-feature-settings: 'liga';
+      -webkit-font-smoothing: antialiased;
+      font-size: 24px;
+      line-height: 1;
+      display: inline-block;
+      white-space: nowrap;
+    }
+  </style>
+  
+  <style>
+    :root {
+      --demo-gap: 16px;
+      --demo-section-padding: 20px;
+      --modal-z: 4000;
+      --overlay-z: 3999;
+      --desktop-icon-size: 72px;
+      --desktop-icon-label-height: 20px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      padding: 0;
+      min-height: 100dvh;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      background: var(--system-bg);
+      color: var(--system-text);
+      font-family: var(--system-font, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif);
+    }
+
+    .demo-wrapper {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: var(--demo-section-padding);
+      padding-bottom: 80px;
+    }
+
+    .demo-section {
+      margin-bottom: 28px;
+      padding-bottom: 24px;
+      border-bottom: 1px solid var(--system-border);
+    }
+    .demo-section:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .section-header .mat-icon { font-size: 24px; }
+
+    /* ========== DESKTOP ICONS GRID ========== */
+    .desktop-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+      gap: 20px 16px;
+      padding: 20px;
+      background: var(--system-bg);
+      border-radius: var(--system-radius-lg);
+      border: 1px solid var(--system-border);
+      min-height: 200px;
+    }
+
+    .system-desktop-icon {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 4px;
+      background: var(--system-icon-bg);
+      border: var(--system-icon-border);
+      border-radius: var(--system-radius);
+      cursor: pointer;
+      user-select: none;
+      transition: all 0.15s ease;
+      width: 100%;
+      max-width: 80px;
+      outline: none;
+    }
+    .system-desktop-icon:active,
+    .system-desktop-icon:focus {
+      background: var(--system-highlight);
+      border-color: var(--system-accent);
+      box-shadow: 0 0 0 2px var(--system-accent);
+    }
+    .system-desktop-icon--selected {
+      background: var(--system-highlight);
+      border-color: var(--system-accent);
+    }
+    .system-desktop-icon__icon {
+      width: var(--desktop-icon-size);
+      height: var(--desktop-icon-size);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 32px;
+      color: var(--system-text);
+    }
+    .system-desktop-icon__label {
+      font-size: 11px;
+      color: var(--system-text);
+      text-align: center;
+      line-height: 1.2;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      width: 100%;
+      padding: 0 4px;
+    }
+
+    /* ========== START MENU PREVIEW ========== */
+    .start-menu-preview {
+      position: relative;
+      background: var(--system-menu-bg);
+      backdrop-filter: blur(15px);
+      -webkit-backdrop-filter: blur(15px);
+      border: 1px solid var(--system-border);
+      border-radius: var(--system-radius-lg);
+      box-shadow: var(--system-shadow);
+      max-width: 320px;
+      margin: 0 auto;
+      overflow: hidden;
+    }
+    .start-menu-header {
+      padding: 16px;
+      border-bottom: 1px solid var(--system-border);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .start-menu-avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: var(--system-accent);
+      color: var(--system-text-on-accent);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+      font-size: 14px;
+    }
+    .start-menu-user-info .name {
+      font-weight: 600;
+      font-size: 14px;
+    }
+    .start-menu-user-info .email {
+      font-size: 11px;
+      color: var(--system-text-dim);
+    }
+    .start-menu-list {
+      padding: 8px 0;
+      max-height: 280px;
+      overflow-y: auto;
+    }
+    .start-menu-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 16px;
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+    .start-menu-item:active {
+      background: rgba(255,255,255,0.12);
+    }
+    .start-menu-item .mat-icon {
+      font-size: 20px;
+      width: 20px;
+      text-align: center;
+    }
+    .start-menu-item .label {
+      flex: 1;
+      font-size: 13px;
+    }
+    .start-menu-item .badge {
+      font-size: 10px;
+      padding: 2px 8px;
+      border-radius: 10px;
+    }
+    .start-menu-divider {
+      height: 1px;
+      background: var(--system-border);
+      margin: 4px 0;
+    }
+    .start-menu-footer {
+      padding: 12px 16px;
+      border-top: 1px solid var(--system-border);
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      color: var(--system-text-dim);
+    }
+
+    /* ========== NOTIFICATION TOASTS ========== */
+    .toast-container {
+      position: fixed;
+      bottom: 70px;
+      right: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      z-index: 5000;
+      max-width: 320px;
+      pointer-events: none;
+    }
+    .toast {
+      background: var(--system-menu-bg);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--system-border);
+      border-radius: var(--system-radius);
+      box-shadow: var(--system-shadow);
+      padding: 12px 16px;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      pointer-events: auto;
+      animation: toastSlideIn 0.2s ease-out;
+      max-width: 100%;
+    }
+    @keyframes toastSlideIn {
+      from { opacity: 0; transform: translateX(20px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+    .toast .mat-icon {
+      font-size: 20px;
+      margin-top: 2px;
+      flex-shrink: 0;
+    }
+    .toast-content {
+      flex: 1;
+      min-width: 0;
+    }
+    .toast-title {
+      font-weight: 600;
+      font-size: 13px;
+      margin-bottom: 4px;
+    }
+    .toast-message {
+      font-size: 12px;
+      color: var(--system-text-dim);
+      line-height: 1.3;
+    }
+    .toast-close {
+      width: 24px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      background: transparent;
+      border: none;
+      color: var(--system-text-dim);
+      cursor: pointer;
+      padding: 0;
+      flex-shrink: 0;
+    }
+    .toast-close:active {
+      background: var(--system-highlight);
+      color: var(--system-text);
+    }
+
+    /* ========== BROWSER WINDOW PREVIEW ========== */
+    .browser-window {
+      background: var(--system-window-bg);
+      border: 1px solid var(--system-border);
+      border-radius: var(--system-radius-lg);
+      box-shadow: var(--system-shadow);
+      overflow: hidden;
+      max-width: 500px;
+      margin: 0 auto;
+    }
+    .browser-toolbar {
+      background: var(--system-header-bg);
+      border-bottom: 1px solid var(--system-border);
+      padding: 8px 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      height: 44px;
+    }
+    .browser-btn {
+      width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      background: transparent;
+      border: 1px solid var(--system-border);
+      color: var(--system-text);
+      cursor: pointer;
+      padding: 0;
+    }
+    .browser-btn:active {
+      background: var(--system-highlight);
+      border-color: var(--system-accent);
+    }
+    .browser-address {
+      flex: 1;
+      background: var(--system-bg);
+      border: 1px solid var(--system-border);
+      border-radius: 20px;
+      padding: 6px 12px;
+      font-size: 12px;
+      color: var(--system-text);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .browser-address .mat-icon {
+      font-size: 14px;
+      color: var(--system-text-dim);
+    }
+    .browser-iframe-container {
+      padding: 16px;
+      min-height: 200px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--system-text-dim);
+      font-size: 13px;
+    }
+    .browser-iframe-container .mat-icon {
+      font-size: 48px;
+      margin-bottom: 12px;
+      color: var(--system-text-dim);
+    }
+
+    /* ========== FILE MANAGER PREVIEW ========== */
+    .file-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+      gap: 12px;
+      padding: 12px;
+    }
+    .file-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      padding: 10px 8px;
+      border-radius: var(--system-radius);
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+    .file-item:active {
+      background: var(--system-highlight);
+    }
+    .file-item .mat-icon {
+      font-size: 32px;
+      color: var(--system-text);
+    }
+    .file-item .label {
+      font-size: 11px;
+      text-align: center;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      width: 100%;
+    }
+    .file-item.folder .mat-icon { color: var(--system-icon-group-file); }
+    .file-item.image .mat-icon { color: var(--system-icon-group-media); }
+    .file-item.doc .mat-icon { color: var(--system-icon-group-file); }
+
+    /* ========== SETTINGS PANEL PREVIEW ========== */
+    .settings-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+    }
+    .setting-card {
+      background: var(--system-window-bg);
+      border: 1px solid var(--system-border);
+      border-radius: var(--system-radius);
+      padding: 14px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      cursor: pointer;
+      transition: border-color 0.15s ease;
+    }
+    .setting-card:active {
+      border-color: var(--system-accent);
+    }
+    .setting-card .mat-icon {
+      font-size: 24px;
+      width: 24px;
+      text-align: center;
+    }
+    .setting-card .label {
+      font-weight: 500;
+      font-size: 13px;
+    }
+    .setting-card .desc {
+      font-size: 11px;
+      color: var(--system-text-dim);
+      margin-top: 2px;
+    }
+
+    /* ========== CONTEXT MENU (reused from before) ========== */
+    .demo-context-menu {
+      position: absolute;
+      min-width: 180px;
+      background: var(--system-menu-bg);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: var(--system-radius);
+      box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+      padding: 6px 0;
+      z-index: var(--modal-z);
+      display: none;
+      animation: menuFade 0.12s ease-out;
+    }
+    .demo-context-menu.active { display: block; }
+    @keyframes menuFade {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .demo-menu-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
+      color: var(--system-text);
+      font-size: 13px;
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+    .demo-menu-item:active {
+      background: rgba(255,255,255,0.12);
+    }
+    .demo-menu-item.danger:active {
+      background: rgba(244, 67, 54, 0.2);
+    }
+    .demo-menu-item .mat-icon {
+      font-size: 18px;
+      width: 18px;
+      text-align: center;
+    }
+    .demo-menu-divider {
+      height: 1px;
+      background: var(--system-border);
+      margin: 4px 0;
+    }
+
+    /* ========== TASKBAR (reused + enhanced) ========== */
+    .taskbar-preview {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 14px;
+      background: var(--system-bg);
+      border-top: 1px solid var(--system-border);
+      border-radius: var(--system-radius);
+      gap: 12px;
+    }
+    .taskbar-apps {
+      display: flex;
+      gap: 6px;
+      flex: 1;
+      overflow-x: auto;
+      padding: 2px 0;
+    }
+    .taskbar-item {
+      min-width: 44px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: var(--system-radius);
+      background: rgba(255,255,255,0.05);
+      border: 1px solid var(--system-border);
+      color: var(--system-text);
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .taskbar-item:active {
+      background: rgba(255,255,255,0.15);
+      border-color: var(--system-border);
+    }
+    .taskbar-item--active {
+      background: rgba(255,255,255,0.25);
+      border-color: var(--system-accent);
+      position: relative;
+    }
+    .taskbar-item--active::after {
+      content: '';
+      position: absolute;
+      bottom: 4px;
+      width: 16px;
+      height: 3px;
+      background: var(--system-accent);
+      border-radius: 2px;
+    }
+    .taskbar-item .mat-icon { font-size: 18px; }
+    .taskbar-tray {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      color: var(--system-text-dim);
+      font-size: 12px;
+    }
+
+    /* Theme Status Badge */
+    #theme-status {
+      font-family: var(--system-font-mono, monospace);
+      font-size: 11px;
+      padding: 4px 10px;
+      border-radius: 20px;
+      background: var(--system-bg);
+      border: 1px solid var(--system-border);
+      color: var(--system-accent);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    #theme-status .mat-icon { font-size: 14px; }
+
+    /* Component Showcases */
+    .btn-showcase { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+    .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
+    .card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+    .alert-stack { display: flex; flex-direction: column; gap: 10px; }
+    .stats-row { display: flex; gap: 20px; flex-wrap: wrap; }
+    .icon-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 12px; }
+    .icon-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 8px;
+      border-radius: var(--system-radius);
+      background: var(--system-window-bg);
+      border: 1px solid var(--system-border);
+    }
+    .icon-item:active { background: var(--system-highlight); }
+    .icon-item .mat-icon { font-size: 28px; }
+    .icon-item .label { font-size: 10px; color: var(--system-text-dim); text-align: center; line-height: 1.2; }
+
+    /* Responsive */
+    @media (max-width: 600px) {
+      .demo-wrapper { padding: 12px; }
+      .btn-showcase { flex-direction: column; align-items: stretch; }
+      .stats-row { flex-direction: column; }
+      .desktop-grid { grid-template-columns: repeat(4, 1fr); }
+      .taskbar-preview { flex-wrap: wrap; }
+      .toast-container { bottom: 60px; right: 10px; left: 10px; }
+      .toast { max-width: 100%; }
+    }
+
+    /* Reduced Motion */
+    @media (prefers-reduced-motion: reduce) {
+      .system-desktop-icon, .system-btn, .system-card,
+      .toast, .demo-context-menu, .start-menu-item {
+        transition: none !important;
+        animation: none !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="system-app">
+    <div class="demo-wrapper">
+      
+      <!-- Header -->
+      <header class="system-card system-mb-4">
+        <div class="system-card-body">
+          <div class="system-flex" style="justify-content: space-between; align-items: flex-start; gap: 16px;">
+            <div>
+              <h1 class="system-title system-mb-1">System Style Demo</h1>
+              <p class="system-text system-text-dim">
+                Material Icons OS v2.7+ • Desktop Items, Start Menu, Toasts, Browser & More
+              </p>
+            </div>
+            <div class="system-text-right">
+              <span id="theme-status">
+                <span class="mat-icon" data-icon-group="status-info">sync</span>
+                <span>Listening...</span>
+              </span>
+            </div>
+          </div>
+          <div class="system-mt-3 system-flex" style="gap: 8px; flex-wrap: wrap;">
+            <span class="system-badge system-badge-success">v2.7 Compatible</span>
+            <span class="system-badge system-badge-info">Mobile-First</span>
+            <span class="system-badge">Desktop Items</span>
+            <span class="system-badge system-badge-warning">No Hover</span>
+          </div>
+        </div>
+      </header>
+
+      <!-- ========== NEW: DESKTOP ICONS ========== -->
+      <section class="demo-section">
+        <div class="section-header">
+          <span class="mat-icon" data-icon-group="file">grid_view</span>
+          <h2 class="system-subtitle">Desktop Icons • Long-Press Interaction</h2>
+        </div>
+        <p class="system-text-small system-text-dim system-mb-3">
+          Desktop icons using <code>.system-desktop-icon</code> with long-press context menus.
+          Tap/click to launch • Hold for options • Keyboard: focus + Enter to launch
+        </p>
+
+        <div class="desktop-grid" id="desktop-grid">
+          <!-- Icons injected by JS -->
+        </div>
+
+        <p class="system-text-small system-text-dim system-mt-3">
+          💡 <strong>Try it:</strong> Long-press (or hold click) on any icon to see the context menu.
+          Press <kbd>Tab</kbd> to focus an icon, then <kbd>Enter</kbd> to launch.
+        </p>
+      </section>
+
+      <!-- ========== NEW: START MENU PREVIEW ========== -->
+      <section class="demo-section">
+        <div class="section-header">
+          <span class="mat-icon" data-icon-group="navigation">apps</span>
+          <h2 class="system-subtitle">Start Menu Preview</h2>
+        </div>
+        <p class="system-text-small system-text-dim system-mb-3">
+          Start menu panel with user header, categorized app list, and footer actions.
+        </p>
+
+        <div class="start-menu-preview">
+          <div class="start-menu-header">
+            <div class="start-menu-avatar">U</div>
+            <div class="start-menu-user-info">
+              <div class="name">User</div>
+              <div class="email">user@material-os.local</div>
+            </div>
+          </div>
+          <div class="start-menu-list">
+            <div class="start-menu-item">
+              <span class="mat-icon" data-icon-group="navigation">settings</span>
+              <span class="label">Settings</span>
+            </div>
+            <div class="start-menu-item">
+              <span class="mat-icon" data-icon-group="file">folder</span>
+              <span class="label">File Manager</span>
+            </div>
+            <div class="start-menu-item">
+              <span class="mat-icon" data-icon-group="navigation">language</span>
+              <span class="label">Browser</span>
+            </div>
+            <div class="start-menu-item">
+              <span class="mat-icon" data-icon-group="file">edit_note</span>
+              <span class="label">Notes</span>
+              <span class="badge system-badge system-badge-warning">3</span>
+            </div>
+            <div class="start-menu-divider"></div>
+            <div class="start-menu-item">
+              <span class="mat-icon" data-icon-group="system">terminal</span>
+              <span class="label">Terminal</span>
+            </div>
+            <div class="start-menu-item">
+              <span class="mat-icon" data-icon-group="communication">chat</span>
+              <span class="label">AI Chat</span>
+            </div>
+            <div class="start-menu-divider"></div>
+            <div class="start-menu-item">
+              <span class="mat-icon" data-icon-group="action-destructive">power_settings_new</span>
+              <span class="label">Shut Down</span>
+            </div>
+          </div>
+          <div class="start-menu-footer">
+            <span>v2.7.0</span>
+            <span>Press <kbd>Esc</kbd> to close</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========== NEW: NOTIFICATION TOASTS ========== -->
+      <section class="demo-section">
+        <div class="section-header">
+          <span class="mat-icon" data-icon-group="status-info">notifications</span>
+          <h2 class="system-subtitle">Notification Toasts</h2>
+        </div>
+        <p class="system-text-small system-text-dim system-mb-3">
+          Slide-in toasts for system notifications. Auto-dismiss + manual close support.
+        </p>
+
+        <div class="system-flex" style="gap: 10px; flex-wrap: wrap;">
+          <button class="system-btn system-btn-sm" id="show-info-toast">
+            <span class="mat-icon" data-icon-group="status-info">info</span> Info Toast
+          </button>
+          <button class="system-btn system-btn-sm system-btn-success" id="show-success-toast">
+            <span class="mat-icon" data-icon-group="status-success">check_circle</span> Success Toast
+          </button>
+          <button class="system-btn system-btn-sm system-btn-warning" id="show-warning-toast">
+            <span class="mat-icon" data-icon-group="status-warning">warning</span> Warning Toast
+          </button>
+          <button class="system-btn system-btn-sm system-btn-danger" id="show-error-toast">
+            <span class="mat-icon" data-icon-group="status-error">error</span> Error Toast
+          </button>
+        </div>
+
+        <p class="system-text-small system-text-dim system-mt-2">
+          💡 Toasts appear bottom-right. Tap the × to dismiss early, or wait for auto-dismiss.
+        </p>
+      </section>
+
+      <!-- ========== NEW: BROWSER WINDOW PREVIEW ========== -->
+      <section class="demo-section">
+        <div class="section-header">
+          <span class="mat-icon" data-icon-group="navigation">language</span>
+          <h2 class="system-subtitle">Browser Window Preview</h2>
+        </div>
+        <p class="system-text-small system-text-dim system-mb-3">
+          Browser window chrome with navigation toolbar and iframe container.
+        </p>
+
+        <div class="browser-window">
+          <div class="browser-toolbar">
+            <button class="browser-btn" aria-label="Back"><span class="mat-icon">arrow_back</span></button>
+            <button class="browser-btn" aria-label="Forward"><span class="mat-icon">arrow_forward</span></button>
+            <button class="browser-btn" aria-label="Refresh"><span class="mat-icon">refresh</span></button>
+            <div class="browser-address">
+              <span class="mat-icon">security</span>
+              <span>https://material-icons-os.local</span>
+            </div>
+            <button class="browser-btn" aria-label="More"><span class="mat-icon">more_vert</span></button>
+          </div>
+          <div class="browser-iframe-container">
+            <div style="text-align: center;">
+              <span class="mat-icon" data-icon-group="navigation">language</span>
+              <p class="system-text system-mt-2">Web content loads here</p>
+              <p class="system-text-small system-text-dim">Iframe sandbox: <code>allow-scripts allow-same-origin</code></p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========== NEW: FILE MANAGER PREVIEW ========== -->
+      <section class="demo-section">
+        <div class="section-header">
+          <span class="mat-icon" data-icon-group="file">folder</span>
+          <h2 class="system-subtitle">File Manager Preview</h2>
+        </div>
+        <p class="system-text-small system-text-dim system-mb-3">
+          File grid with folder/document/image items using icon groups for color coding.
+        </p>
+
+        <div class="file-grid">
+          <div class="file-item folder">
+            <span class="mat-icon">folder</span>
+            <span class="label">Documents</span>
+          </div>
+          <div class="file-item folder">
+            <span class="mat-icon">folder</span>
+            <span class="label">Downloads</span>
+          </div>
+          <div class="file-item image">
+            <span class="mat-icon">image</span>
+            <span class="label">Photos</span>
+          </div>
+          <div class="file-item doc">
+            <span class="mat-icon">description</span>
+            <span class="label">Report.pdf</span>
+          </div>
+          <div class="file-item doc">
+            <span class="mat-icon">article</span>
+            <span class="label">Notes.txt</span>
+          </div>
+          <div class="file-item image">
+            <span class="mat-icon">photo_library</span>
+            <span class="label">Vacation</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========== NEW: SETTINGS PANEL PREVIEW ========== -->
+      <section class="demo-section">
+        <div class="section-header">
+          <span class="mat-icon" data-icon-group="system">tune</span>
+          <h2 class="system-subtitle">Settings Panel Preview</h2>
+        </div>
+        <p class="system-text-small system-text-dim system-mb-3">
+          Settings cards with icons and descriptions using <code>.setting-card</code> pattern.
+        </p>
+
+        <div class="settings-grid">
+          <div class="setting-card">
+            <span class="mat-icon" data-icon-group="navigation">palette</span>
+            <div>
+              <div class="label">Themes</div>
+              <div class="desc">Change OS appearance</div>
+            </div>
+          </div>
+          <div class="setting-card">
+            <span class="mat-icon" data-icon-group="system">display_settings</span>
+            <div>
+              <div class="label">Display</div>
+              <div class="desc">Resolution & scaling</div>
+            </div>
+          </div>
+          <div class="setting-card">
+            <span class="mat-icon" data-icon-group="communication">notifications</span>
+            <div>
+              <div class="label">Notifications</div>
+              <div class="desc">Alert preferences</div>
+            </div>
+          </div>
+          <div class="setting-card">
+            <span class="mat-icon" data-icon-group="system">security</span>
+            <div>
+              <div class="label">Security</div>
+              <div class="desc">Privacy & permissions</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Existing sections (abbreviated for brevity) -->
+      <section class="demo-section">
+        <div class="section-header">
+          <span class="mat-icon" data-icon-group="action-primary">smart_button</span>
+          <h2 class="system-subtitle">Buttons</h2>
+        </div>
+        <div class="btn-showcase">
+          <button class="system-btn">Primary</button>
+          <button class="system-btn-secondary">Secondary</button>
+          <button class="system-btn-ghost">Ghost</button>
+          <button class="system-btn-danger">Danger</button>
+          <button class="system-btn" disabled>Disabled</button>
+        </div>
+      </section>
+
+      <section class="demo-section">
+        <div class="section-header">
+          <span class="mat-icon" data-icon-group="action-primary">edit</span>
+          <h2 class="system-subtitle">Forms & Inputs</h2>
+        </div>
+        <div class="form-grid">
+          <div class="system-form-group">
+            <label class="system-label" for="demo-text">Text Input</label>
+            <input type="text" id="demo-text" class="system-input" placeholder="Enter text...">
+          </div>
+          <div class="system-form-group">
+            <label class="system-label" for="demo-select">Select</label>
+            <select id="demo-select" class="system-select">
+              <option>Option 1</option><option>Option 2</option><option>Option 3</option>
+            </select>
+          </div>
+        </div>
+      </section>
+
+      <section class="demo-section">
+        <div class="section-header">
+          <span class="mat-icon" data-icon-group="file">view_quilt</span>
+          <h2 class="system-subtitle">Cards & Layout</h2>
+        </div>
+        <div class="card-grid">
+          <div class="system-card">
+            <div class="system-card-header">Card Header</div>
+            <div class="system-card-body"><p class="system-text">Standard card pattern.</p></div>
+            <div class="system-card-footer"><button class="system-btn system-btn-sm">Action</button></div>
+          </div>
+          <div class="system-panel system-p-3">
+            <h3 class="system-heading system-mb-2">Panel</h3>
+            <p class="system-text-small">Subtle container for secondary content.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="demo-section">
+        <div class="section-header">
+          <span class="mat-icon" data-icon-group="file">table_chart</span>
+          <h2 class="system-subtitle">Data Display</h2>
+        </div>
+        <table class="system-table system-mb-4">
+          <thead><tr><th>ID</th><th>Item</th><th>Status</th><th>Value</th></tr></thead>
+          <tbody>
+            <tr><td class="system-font-mono">#001</td><td>Project</td>
+              <td><span class="system-badge system-badge-success">Active</span></td>
+              <td class="system-font-mono">$1,240</td></tr>
+            <tr><td class="system-font-mono">#002</td><td>Task</td>
+              <td><span class="system-badge system-badge-warning">Pending</span></td>
+              <td class="system-font-mono">$0</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="demo-section">
+        <div class="section-header">
+          <span class="mat-icon" data-icon-group="status-info">notifications_active</span>
+          <h2 class="system-subtitle">Feedback & Status</h2>
+        </div>
+        <div class="alert-stack">
+          <div class="system-alert system-alert-info"><span class="mat-icon" data-icon-group="status-info">info</span><span><strong>Info:</strong> Update available.</span></div>
+          <div class="system-alert system-alert-success"><span class="mat-icon" data-icon-group="status-success">check_circle</span><span><strong>Success:</strong> Saved.</span></div>
+          <div class="system-alert system-alert-warning"><span class="mat-icon" data-icon-group="status-warning">warning</span><span><strong>Warning:</strong> Low storage.</span></div>
+          <div class="system-alert system-alert-danger"><span class="mat-icon" data-icon-group="status-error">error</span><span><strong>Error:</strong> Connection failed.</span></div>
+        </div>
+      </section>
+
+      <!-- Footer -->
+      <footer class="system-text-center system-text-dim system-text-small system-mt-5">
+        <p class="system-mb-1">Material Icons OS v2.7+ Style Demo</p>
+        <div class="system-flex" style="justify-content: center; gap: 8px; flex-wrap: wrap;">
+          <span class="system-badge">Theme Sync: Active</span>
+          <span class="system-badge system-badge-info">Mobile-First</span>
+          <span class="system-badge system-badge-success">Desktop Items</span>
+        </div>
+        <p class="system-mt-3" id="footer-theme-info">
+          <span class="mat-icon" data-icon-group="status-info">info</span>
+          Switch themes in Settings to see instant adaptation
+        </p>
+      </footer>
+
+    </div>
+  </div>
+
+  <!-- Toast Container (fixed position) -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <!-- Context Menu (hidden by default) -->
+  <div class="demo-context-menu" id="desktop-context-menu" role="menu">
+    <div class="demo-menu-item" role="menuitem" tabindex="-1" data-action="open">
+      <span class="mat-icon" data-icon-group="action-primary">launch</span>
+      <span>Open</span>
+    </div>
+    <div class="demo-menu-item" role="menuitem" tabindex="-1" data-action="add-to-desktop">
+      <span class="mat-icon" data-icon-group="action-primary">add_to_home_screen</span>
+      <span>Add to Desktop</span>
+    </div>
+    <div class="demo-menu-divider" role="separator"></div>
+    <div class="demo-menu-item" role="menuitem" tabindex="-1" data-action="rename">
+      <span class="mat-icon" data-icon-group="navigation">edit</span>
+      <span>Rename</span>
+    </div>
+    <div class="demo-menu-divider" role="separator"></div>
+    <div class="demo-menu-item danger" role="menuitem" tabindex="-1" data-action="remove">
+      <span class="mat-icon" data-icon-group="action-destructive">delete</span>
+      <span style="color: var(--system-danger);">Remove from Desktop</span>
+    </div>
+  </div>
+
+  <script>
+    (function() {
+      'use strict';
+      
+      const statusEl = document.getElementById('theme-status');
+      const footerInfo = document.getElementById('footer-theme-info');
+      
+      // ========== DESKTOP ICONS DATA ==========
+      const desktopApps = [
+        { id: 'settings', name: 'Settings', icon: 'settings', group: 'system' },
+        { id: 'files', name: 'File Manager', icon: 'folder', group: 'file' },
+        { id: 'browser', name: 'Browser', icon: 'language', group: 'navigation' },
+        { id: 'notes', name: 'Notes', icon: 'edit_note', group: 'file' },
+        { id: 'terminal', name: 'Terminal', icon: 'terminal', group: 'system' },
+        { id: 'chat', name: 'AI Chat', icon: 'smart_toy', group: 'communication' },
+        { id: 'photos', name: 'Photos', icon: 'photo_library', group: 'media' },
+        { id: 'music', name: 'Music', icon: 'music_note', group: 'media' }
+      ];
+
+      // ========== RENDER DESKTOP ICONS ==========
+      function renderDesktopIcons() {
+        const grid = document.getElementById('desktop-grid');
+        if (!grid) return;
+        
+        grid.innerHTML = desktopApps.map(app => `
+          <div class="system-desktop-icon" 
+               tabindex="0" 
+               role="button"
+               aria-label="${app.name}, long-press for options"
+               data-app-id="${app.id}"
+               data-app-name="${app.name}">
+            <span class="system-desktop-icon__icon">
+              <span class="mat-icon" data-icon-group="${app.group}">${app.icon}</span>
+            </span>
+            <span class="system-desktop-icon__label">${app.name}</span>
+          </div>
+        `).join('');
+      }
+
+      // ========== LONG-PRESS / CONTEXT MENU LOGIC ==========
+      const contextMenu = document.getElementById('desktop-context-menu');
+      let activeIcon = null;
+      let pressTimer = null;
+      const PRESS_DURATION = 400;
+
+      function showContextMenu(x, y, iconEl) {
+        activeIcon = iconEl;
+        const rect = contextMenu.getBoundingClientRect();
+        let menuX = x;
+        let menuY = y + 10;
+        
+        // Boundary checks
+        if (menuX + rect.width > window.innerWidth) menuX = window.innerWidth - rect.width - 10;
+        if (menuY + rect.height > window.innerHeight) menuY = window.innerHeight - rect.height - 10;
+        
+        contextMenu.style.left = menuX + 'px';
+        contextMenu.style.top = menuY + 'px';
+        contextMenu.classList.add('active');
+        iconEl.classList.add('system-desktop-icon--selected');
+        
+        // Haptic feedback if supported
+        if (navigator.vibrate) navigator.vibrate(10);
+      }
+
+      function hideContextMenu() {
+        contextMenu.classList.remove('active');
+        if (activeIcon) {
+          activeIcon.classList.remove('system-desktop-icon--selected');
+          activeIcon = null;
+        }
+        if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
+      }
+
+      function handleIconPressStart(e, iconEl) {
+        e.preventDefault();
+        const point = e.type.includes('touch') ? e.touches[0] : e;
+        
+        pressTimer = setTimeout(() => {
+          showContextMenu(point.clientX, point.clientY, iconEl);
+        }, PRESS_DURATION);
+      }
+
+      function handleIconPressEnd() {
+        if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
+      }
+
+      function handleIconLaunch(appId, appName) {
+        console.log(`🚀 Launching: ${appName} (${appId})`);
+        showToast('success', 'App Launched', `${appName} is opening...`);
+      }
+
+      // Attach long-press handlers to desktop icons
+      function initDesktopIcons() {
+        const grid = document.getElementById('desktop-grid');
+        if (!grid) return;
+
+        grid.addEventListener('touchstart', (e) => {
+          const icon = e.target.closest('.system-desktop-icon');
+          if (icon) handleIconPressStart(e, icon);
+        }, { passive: false });
+
+        grid.addEventListener('touchend', (e) => {
+          const icon = e.target.closest('.system-desktop-icon');
+          if (icon && !contextMenu.classList.contains('active')) {
+            handleIconPressEnd();
+            const appId = icon.dataset.appId;
+            const appName = icon.dataset.appName;
+            handleIconLaunch(appId, appName);
+          }
+        });
+
+        grid.addEventListener('touchmove', handleIconPressEnd);
+        grid.addEventListener('touchcancel', handleIconPressEnd);
+
+        grid.addEventListener('mousedown', (e) => {
+          const icon = e.target.closest('.system-desktop-icon');
+          if (icon) handleIconPressStart(e, icon);
+        });
+
+        grid.addEventListener('mouseup', (e) => {
+          const icon = e.target.closest('.system-desktop-icon');
+          if (icon && !contextMenu.classList.contains('active')) {
+            handleIconPressEnd();
+            const appId = icon.dataset.appId;
+            const appName = icon.dataset.appName;
+            handleIconLaunch(appId, appName);
+          }
+        });
+
+        grid.addEventListener('mouseleave', handleIconPressEnd);
+
+        // Keyboard support
+        grid.addEventListener('keydown', (e) => {
+          if (e.target.classList.contains('system-desktop-icon')) {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              const appId = e.target.dataset.appId;
+              const appName = e.target.dataset.appName;
+              handleIconLaunch(appId, appName);
+            }
+          }
+        });
+
+        // Context menu item actions
+        contextMenu.querySelectorAll('.demo-menu-item').forEach(item => {
+          item.addEventListener('click', function() {
+            const action = this.dataset.action;
+            const appId = activeIcon?.dataset.appId;
+            const appName = activeIcon?.dataset.appName;
+            
+            console.log(`🎯 Context action: ${action} on ${appName}`);
+            
+            if (action === 'open') {
+              handleIconLaunch(appId, appName);
+            } else if (action === 'remove') {
+              showToast('warning', 'Removed', `${appName} removed from desktop`);
+              activeIcon?.remove();
+            } else if (action === 'rename') {
+              showToast('info', 'Rename', `Renaming ${appName}...`);
+            }
+            
+            hideContextMenu();
+          });
+        });
+
+        // Close menu on outside click
+        document.addEventListener('click', (e) => {
+          if (contextMenu.classList.contains('active') && 
+              !contextMenu.contains(e.target) && 
+              !e.target.closest('.system-desktop-icon')) {
+            hideContextMenu();
+          }
+        });
+
+        document.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape') hideContextMenu();
+        });
+      }
+
+      // ========== TOAST NOTIFICATIONS ==========
+      function showToast(type, title, message, duration = 4000) {
+        const container = document.getElementById('toast-container');
+        if (!container) return;
+
+        const icons = {
+          info: { icon: 'info', group: 'status-info' },
+          success: { icon: 'check_circle', group: 'status-success' },
+          warning: { icon: 'warning', group: 'status-warning' },
+          error: { icon: 'error', group: 'status-error' }
+        };
+        const cfg = icons[type] || icons.info;
+
+        const toast = document.createElement('div');
+        toast.className = 'toast';
+        toast.setAttribute('role', 'status');
+        toast.setAttribute('aria-live', 'polite');
+        toast.innerHTML = `
+          <span class="mat-icon" data-icon-group="${cfg.group}">${cfg.icon}</span>
+          <div class="toast-content">
+            <div class="toast-title">${title}</div>
+            <div class="toast-message">${message}</div>
+          </div>
+          <button class="toast-close" aria-label="Dismiss">
+            <span class="mat-icon">close</span>
+          </button>
+        `;
+
+        const closeBtn = toast.querySelector('.toast-close');
+        closeBtn.addEventListener('click', () => {
+          toast.remove();
+        });
+
+        container.appendChild(toast);
+
+        // Auto-dismiss
+        setTimeout(() => {
+          if (toast.parentNode) {
+            toast.style.opacity = '0';
+            toast.style.transform = 'translateX(20px)';
+            setTimeout(() => toast.remove(), 200);
+          }
+        }, duration);
+      }
+
+      // ========== THEME SYNC ==========
+      function handleThemeChange(detail) {
+        console.log('🎨 Theme updated:', detail.themeId);
+        if (statusEl) {
+          statusEl.innerHTML = `<span class="mat-icon" data-icon-group="status-success">check_circle</span><span>${detail.themeId || 'custom'}</span>`;
+          statusEl.style.borderColor = 'var(--system-accent)';
+        }
+        if (footerInfo) {
+          footerInfo.innerHTML = `<span class="mat-icon" data-icon-group="status-success">palette</span>Active theme: <strong>${detail.themeId || 'custom'}</strong> • ${Object.keys(detail.variables || {}).length} variables`;
+        }
+      }
+
+      // ========== INIT ==========
+      function init() {
+        // Theme events
+        window.addEventListener('osThemeChanged', (e) => handleThemeChange(e.detail));
+        window.addEventListener('osBridgeReady', (e) => console.log('🔗 Bridge ready:', e.detail.appId));
+
+        // Render desktop icons
+        renderDesktopIcons();
+        initDesktopIcons();
+
+        // Toast buttons
+        document.getElementById('show-info-toast')?.addEventListener('click', () => 
+          showToast('info', 'System Update', 'A new OS update is available.'));
+        document.getElementById('show-success-toast')?.addEventListener('click', () => 
+          showToast('success', 'Saved', 'Your changes have been saved.'));
+        document.getElementById('show-warning-toast')?.addEventListener('click', () => 
+          showToast('warning', 'Storage Low', 'You have less than 1GB free.'));
+        document.getElementById('show-error-toast')?.addEventListener('click', () => 
+          showToast('error', 'Connection Failed', 'Please check your network settings.'));
+
+        // Browser toolbar buttons
+        document.querySelectorAll('.browser-btn').forEach(btn => {
+          btn.addEventListener('click', function() {
+            const action = this.getAttribute('aria-label');
+            console.log(`🌐 Browser: ${action}`);
+            if (action === 'Refresh') showToast('info', 'Refreshing', 'Reloading page...');
+          });
+        });
+
+        // Start menu items
+        document.querySelectorAll('.start-menu-item').forEach(item => {
+          item.addEventListener('click', function() {
+            const label = this.querySelector('.label')?.textContent;
+            console.log(`📱 Start Menu: ${label}`);
+            if (label === 'Shut Down') {
+              showToast('warning', 'Shutting Down', 'Saving session...');
+            } else {
+              showToast('success', 'Launching', `${label} is opening...`);
+            }
+          });
+        });
+
+        // Settings cards
+        document.querySelectorAll('.setting-card').forEach(card => {
+          card.addEventListener('click', function() {
+            const label = this.querySelector('.label')?.textContent;
+            console.log(`⚙️ Settings: ${label}`);
+            showToast('info', 'Opening', `${label} settings...`);
+          });
+        });
+
+        // File items
+        document.querySelectorAll('.file-item').forEach(item => {
+          item.addEventListener('click', function() {
+            const label = this.querySelector('.label')?.textContent;
+            console.log(`📁 File: ${label}`);
+            showToast('info', 'Opening', `Opening ${label}...`);
+          });
+        });
+
+        // Button feedback logging
+        document.querySelectorAll('.system-btn, .browser-btn, .taskbar-item').forEach(el => {
+          el.addEventListener('click', function() {
+            if (!this.disabled) console.log('🔘 Interacted:', this.textContent?.trim() || this.getAttribute('aria-label'));
+          });
+        });
+
+        // Initial status
+        if (statusEl) {
+          statusEl.innerHTML = `<span class="mat-icon" data-icon-group="status-info">sync</span><span>Bridge active</span>`;
+        }
+
+        console.log('✅ Enhanced Desktop Demo initialized');
+        console.log('💡 Tip: Long-press desktop icons for context menu');
+      }
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+      } else {
+        init();
+      }
+
+      // Demo API
+      window.StyleDemo = {
+        getTheme: () => OsThemeBridge?.getVariables?.() || {},
+        refreshTheme: () => OsThemeBridge?.refresh?.(),
+        logVariables: () => { const v = StyleDemo.getTheme(); console.table(v); return v; },
+        showToast,
+        launchApp: (id, name) => handleIconLaunch(id, name)
+      };
+    })();
+  </script>
+</body>
+</html>

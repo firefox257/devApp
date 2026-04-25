@@ -1,0 +1,836 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>🧠 Browser Next-Word Predictor (SwiGLU + RoPE + Custom Tokenizer)</title>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.21.0/dist/tf.min.js"></script>
+<style>
+:root {
+	--primary: #6366f1; --primary-hover: #4f46e5; --bg: #0f172a;
+	--card: #1e293b; --text: #f1f5f9; --text-dim: #94a3b8;
+	--success: #22c55e; --warning: #f59e0b; --error: #ef4444;
+	--code-bg: #020617; --border: #334155;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+	font-family: 'Segoe UI', system-ui, sans-serif;
+	background: var(--bg); color: var(--text); line-height: 1.6;
+	padding: 20px; min-height: 100vh;
+}
+.container { max-width: 1100px; margin: 0 auto; }
+header { text-align: center; padding: 2rem 1rem; border-bottom: 1px solid #334155; margin-bottom: 2rem; }
+h1 { font-size: 1.8rem; margin-bottom: 0.5rem;
+	background: linear-gradient(135deg, #6366f1, #a855f7);
+	-webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.subtitle { color: var(--text-dim); font-size: 0.95rem; }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
+.card { background: var(--card); border-radius: 12px; padding: 1.5rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.3); border: 1px solid var(--border); }
+.card h3 { margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 0.5rem; color: var(--primary); }
+
+textarea, input, select {
+	width: 100%; padding: 0.75rem; border: 1px solid var(--border);
+	border-radius: 8px; background: var(--code-bg); color: var(--text);
+	font-size: 0.95rem; font-family: 'Consolas', monospace; resize: vertical;
+}
+textarea:focus, input:focus, select:focus {
+	outline: none; border-color: var(--primary);
+	box-shadow: 0 0 0 3px rgba(99,102,241,0.3);
+}
+textarea { min-height: 120px; }
+
+.input-group { margin-bottom: 1rem; }
+label { display: block; margin-bottom: 0.4rem; font-size: 0.9rem; color: var(--text-dim); }
+.checkbox-group { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem; }
+.checkbox-group input[type="checkbox"] { width: auto; margin: 0; cursor: pointer; }
+.checkbox-group label { margin: 0; cursor: pointer; color: var(--text); font-size: 0.9rem; }
+
+.btn {
+	background: var(--primary); color: white; border: none;
+	padding: 0.75rem 1.5rem; border-radius: 8px; font-size: 1rem;
+	font-weight: 600; cursor: pointer; transition: all 0.2s;
+	display: inline-flex; align-items: center; gap: 0.5rem;
+	width: 100%; justify-content: center;
+}
+.btn:hover { background: var(--primary-hover); transform: translateY(-1px); }
+.btn:disabled { background: #475569; cursor: not-allowed; transform: none; }
+.btn-row { display: flex; gap: 0.75rem; margin-top: 1rem; }
+.btn-row .btn { flex: 1; }
+
+.status { margin-top: 1rem; padding: 0.75rem; border-radius: 8px; font-size: 0.9rem; display: none; }
+.status.show { display: block; }
+.status.training { background: rgba(245,158,11,0.2); color: var(--warning); }
+.status.success { background: rgba(34,197,94,0.2); color: var(--success); }
+.status.error { background: rgba(239,68,68,0.2); color: var(--error); }
+
+.log-area {
+	background: var(--code-bg); border-radius: 8px; padding: 1rem;
+	font-family: monospace; font-size: 0.85rem; max-height: 180px;
+	overflow-y: auto; border: 1px solid var(--border); white-space: pre-wrap;
+}
+
+.loss-chart { height: 120px; background: var(--code-bg); border-radius: 8px; margin-top: 1rem; position: relative; overflow: hidden; border: 1px solid var(--border); }
+.loss-bar { position: absolute; bottom: 0; width: 3px; background: linear-gradient(to top, var(--primary), #a855f7); border-radius: 2px 2px 0 0; transition: height 0.1s; }
+
+.prediction-list { margin-top: 1rem; display: flex; flex-direction: column; gap: 0.5rem; }
+.prediction-item {
+	display: flex; justify-content: space-between; align-items: center;
+	padding: 0.75rem 1rem; background: var(--code-bg); border-radius: 8px;
+	border-left: 3px solid var(--primary);
+}
+.prediction-item .rank { font-weight: bold; color: var(--primary); min-width: 24px; }
+.prediction-item .token { font-family: monospace; flex: 1; margin: 0 1rem; color: #a5b4fc; }
+.prediction-item .prob { font-size: 0.85rem; color: var(--text-dim); }
+
+.completion-area { margin-top: 1rem; }
+.completion-input { display: flex; gap: 0.75rem; margin-bottom: 1rem; }
+.completion-input input { flex: 1; }
+.completion-result {
+	background: linear-gradient(135deg, var(--card), #334155);
+	border-radius: 12px; padding: 1.25rem; text-align: center;
+	border: 2px solid transparent; transition: border-color 0.3s;
+}
+.completion-result.ready { border-color: var(--primary); }
+.completion-result .prompt { color: var(--text-dim); font-size: 0.9rem; margin-bottom: 0.5rem; }
+.completion-result .suggestion { font-size: 1.5rem; font-weight: bold; font-family: monospace; color: var(--success); }
+.completion-result .full { margin-top: 0.5rem; color: var(--text-dim); font-size: 0.95rem; }
+
+.stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.75rem; margin-top: 1rem; }
+.stat-box { background: var(--code-bg); padding: 0.75rem; border-radius: 8px; text-align: center; }
+.stat-box .value { font-size: 1.4rem; font-weight: bold; color: var(--primary); }
+.stat-box .label { font-size: 0.8rem; color: var(--text-dim); }
+
+.tokenizer-status { display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: var(--text-dim); margin-top: 0.5rem; }
+.status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--warning); }
+.status-dot.success { background: var(--success); }
+.status-dot.error { background: var(--error); }
+
+.arch-info { font-size: 0.9rem; color: var(--text-dim); line-height: 1.8; }
+.arch-info code { background: var(--code-bg); padding: 2px 6px; border-radius: 4px; color: #a5b4fc; font-family: monospace; }
+
+footer { text-align: center; padding: 2rem; color: var(--text-dim); font-size: 0.9rem; border-top: 1px solid var(--border); margin-top: 2rem; }
+footer a { color: var(--primary); text-decoration: none; }
+footer a:hover { text-decoration: underline; }
+
+@media (max-width: 768px) {
+	.grid { grid-template-columns: 1fr; }
+	.completion-input { flex-direction: column; }
+	.stats-grid { grid-template-columns: 1fr 1fr; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+<header>
+<h1>🧠 Browser Next-Word Predictor <span style="font-size:0.7em;vertical-align:super;color:var(--warning)">SwiGLU + RoPE</span></h1>
+<p class="subtitle">Train a causal language model in-browser • Custom regex tokenizer (whitespace-ignored)</p>
+</div>
+
+<div class="grid">
+<!-- Training Data -->
+<div class="card">
+<h3>📚 Training Samples</h3>
+<p style="color:var(--text-dim);margin-bottom:1rem;font-size:0.9rem">Edit sample sentences. Vocabulary is built from your text using regex tokenization (whitespace ignored).</p>
+<textarea id="sampleText" placeholder="Enter training sentences, one per line...">The cat sat on the mat!
+The dog ran in the park.
+I love machine learning.
+TensorFlow.js runs in the browser?
+SwiGLU activation improves performance!
+Next word prediction is fun?
+Artificial intelligence will transform!
+The quick brown fox jumps.
+Hello world this is a test.
+Browser based AI training works.</textarea>
+<div class="stats-grid">
+<div class="stat-box"><div class="value" id="sampleCount">10</div><div class="label">Samples</div></div>
+<div class="stat-box"><div class="value" id="vocabSize">—</div><div class="label">Vocab Size</div></div>
+</div>
+<div class="tokenizer-status">
+<span class="status-dot" id="tokDot"></span>
+<span id="tokStatus">Building tokenizer from samples...</span>
+</div>
+</div>
+
+<!-- Training Controls -->
+<div class="card">
+<h3>⚙️ Train Model</h3>
+<div class="input-group">
+<label for="epochs">Epochs</label>
+<input type="number" id="epochs" value="50" min="10" max="200" step="10">
+</div>
+<div class="input-group">
+<label for="learningRate">Learning Rate</label>
+<select id="learningRate">
+<option value="0.01">0.01 (Stable)</option>
+<option value="0.005" selected>0.005 (Balanced)</option>
+<option value="0.001">0.001 (Precise)</option>
+</select>
+</div>
+<div class="input-group">
+<label for="seqLength">Sequence Length</label>
+<select id="seqLength">
+<option value="8">8 tokens (Fast)</option>
+<option value="12" selected>12 tokens (Balanced)</option>
+<option value="16">16 tokens (Detailed)</option>
+</select>
+</div>
+<div class="checkbox-group">
+<input type="checkbox" id="enableRoPE" checked />
+<label for="enableRoPE">Enable RoPE (Rotary Positional Embedding)</label>
+</div>
+<button class="btn" id="trainBtn" disabled>🔄 Building tokenizer...</button>
+<div id="trainStatus" class="status"></div>
+<div class="loss-chart" id="lossChart"></div>
+<div class="log-area" id="trainLog">Waiting for tokenizer...</div>
+</div>
+
+<!-- Architecture -->
+<div class="card">
+<h3>🏗️ Model Architecture</h3>
+<div class="arch-info">
+<strong>Input:</strong> Token IDs (seq_len) via custom regex tokenizer<br>
+<strong>Embedding:</strong> <code>Embedding(vocab+1, hidden_dim)</code> (+1 for &lt;unk&gt;)<br>
+<strong>RoPE:</strong> <span id="ropeStatus">Enabled (Custom Layer)</span><br>
+<strong>SwiGLU Block ×2:</strong><br>
+&nbsp;&nbsp;├─ Gate: <code>Dense(hidden)</code> → <code>Swish</code><br>
+&nbsp;&nbsp;├─ Value: <code>Dense(hidden)</code><br>
+&nbsp;&nbsp;└─ Output: <code>Swish(gate) ⊗ value</code><br>
+<strong>Output Head:</strong> <code>Dense(vocab+1)</code> + softmax<br><br>
+<strong>Loss:</strong> Categorical Cross-Entropy (next-token)<br>
+<strong>Optimizer:</strong> Adam | <strong>Max Seq:</strong> <span id="archSeq">12</span> tokens<br>
+<strong>Vocab:</strong> <span id="archVocab">—</span> tokens (dynamic) • <strong>Token ID 0:</strong> &lt;unk&gt;
+</div>
+</div>
+
+<!-- Prediction -->
+<div class="card">
+<h3>🔮 Next-Word Prediction</h3>
+<p style="color:var(--text-dim);margin-bottom:1rem;font-size:0.9rem">Type a prompt and get SwiGLU-powered suggestions:</p>
+<div class="completion-area">
+<div class="completion-input">
+<input type="text" id="promptInput" placeholder="Start typing a sentence..." disabled>
+<button class="btn" id="predictBtn" disabled style="width:auto;min-width:100px">✨ Complete</button>
+</div>
+<div class="completion-result" id="resultBox">
+<div class="prompt" id="displayPrompt">Waiting for model...</div>
+<div class="suggestion" id="topSuggestion">—</div>
+<div class="full" id="fullSuggestion"></div>
+</div>
+</div>
+<div class="prediction-list" id="topPredictions"></div>
+<div id="predictStatus" class="status"></div>
+</div>
+</div>
+
+<!-- Full-width: Results & Controls -->
+<div class="card">
+<h3>🎯 Live Completion Test</h3>
+<div class="completion-input">
+<input type="text" id="livePrompt" placeholder="Type to see live suggestions..." disabled>
+</div>
+<div class="prediction-list" id="livePredictions" style="max-height:200px;overflow-y:auto"></div>
+<div class="btn-row">
+<button class="btn" style="background:#475569" onclick="resetAll()">🔄 Reset All</button>
+<button class="btn" style="background:var(--success)" onclick="exportModel()" id="exportBtn" disabled>💾 Export Model</button>
+</div>
+<div id="liveStatus" class="status"></div>
+</div>
+
+<footer>
+<p>Built with ❤️ using <a href="https://www.tensorflow.org/js" target="_blank">TensorFlow.js</a></p>
+<p style="margin-top:0.5rem;font-size:0.8rem">
+SwiGLU: <code>Swish(x·W_gate) ⊗ (x·W_value)</code> • RoPE: <code>Custom TF.js Layer</code> • Tokenizer: <code>Regex [a-zA-Z0-9]+|[^a-zA-Z0-9\s] (whitespace-ignored)</code>
+</p>
+</footer>
+</div>
+
+<script>
+// ========== CONFIG ==========
+const MAX_VOCAB_SIZE = 5000;
+const HIDDEN_DIM = 64;
+const NUM_LAYERS = 2;
+const MAX_SEQ_LEN = 12;
+// ============================
+
+// Global state
+let customTokenizer = null;
+let model = null;
+let vocab = null;
+let idToToken = {};
+let isTraining = false;
+let lossHistory = [];
+let useRoPE = true;
+
+// DOM Elements
+const els = {
+	sampleText: document.getElementById('sampleText'),
+	epochs: document.getElementById('epochs'),
+	lr: document.getElementById('learningRate'),
+	seqLen: document.getElementById('seqLength'),
+	enableRoPE: document.getElementById('enableRoPE'),
+	trainBtn: document.getElementById('trainBtn'),
+	trainStatus: document.getElementById('trainStatus'),
+	trainLog: document.getElementById('trainLog'),
+	lossChart: document.getElementById('lossChart'),
+	promptInput: document.getElementById('promptInput'),
+	predictBtn: document.getElementById('predictBtn'),
+	resultBox: document.getElementById('resultBox'),
+	displayPrompt: document.getElementById('displayPrompt'),
+	topSuggestion: document.getElementById('topSuggestion'),
+	fullSuggestion: document.getElementById('fullSuggestion'),
+	topPredictions: document.getElementById('topPredictions'),
+	livePrompt: document.getElementById('livePrompt'),
+	livePredictions: document.getElementById('livePredictions'),
+	tokDot: document.getElementById('tokDot'),
+	tokStatus: document.getElementById('tokStatus'),
+	sampleCount: document.getElementById('sampleCount'),
+	vocabSize: document.getElementById('vocabSize'),
+	archSeq: document.getElementById('archSeq'),
+	archVocab: document.getElementById('archVocab'),
+	exportBtn: document.getElementById('exportBtn'),
+	ropeStatus: document.getElementById('ropeStatus')
+};
+
+els.archSeq.textContent = MAX_SEQ_LEN;
+els.enableRoPE.addEventListener('change', () => {
+		useRoPE = els.enableRoPE.checked;
+		els.ropeStatus.textContent = useRoPE ? 'Enabled (Custom Layer)' : 'Disabled';
+	});
+
+// ========== Logger ==========
+function log(msg, type = 'info') {
+	const time = new Date().toLocaleTimeString();
+	const prefix = type === 'error' ? '❌' : type === 'success' ? '✅' : type === 'warn' ? '⚠️' : 'ℹ️';
+	els.trainLog.innerHTML += `[${time}] ${prefix} ${msg}\n`;
+	els.trainLog.scrollTop = els.trainLog.scrollHeight;
+}
+
+function showStatus(el, msg, type) {
+	if (!el) return;
+	el.textContent = msg;
+	el.className = `status show ${type}`;
+}
+
+// ==========================================
+// 1. TOKENIZER IMPLEMENTATION (Whitespace-Ignoring)
+// ==========================================
+function buildTokenizer(corpus) {
+  // 1. Alphanumeric sequences = "words"
+  // 2. Non-alphanumeric, non-whitespace chars = single token
+  // 3. ALL whitespace (\s) is IGNORED completely
+  const tokenRegex = /[a-zA-Z0-9]+|[^a-zA-Z0-9\s]/g;
+  const rawTokens = corpus.match(tokenRegex) || [];
+
+  // Remove duplicates
+  const uniqueTokens = [...new Set(rawTokens)];
+
+  // Sort using explicit character-by-character comparator
+  uniqueTokens.sort((a, b) => {
+    const maxLen = Math.max(a.length, b.length);
+    for (let i = 0; i < maxLen; i++) {
+      const charA = i < a.length ? a.charCodeAt(i) : -1;
+      const charB = i < b.length ? b.charCodeAt(i) : -1;
+      if (charA !== charB) return charA - charB;
+    }
+    return 0;
+  });
+
+  const vocabulary = uniqueTokens;
+  const decoder = {};
+
+  // Assign IDs starting at 1
+  vocabulary.forEach((token, index) => {
+    decoder[token] = index + 1;
+  });
+
+  // Encode: text -> array of IDs (0 = unknown token)
+  // Whitespace is silently skipped
+  const encode = (text) => {
+    return (text.match(tokenRegex) || []).map(token => decoder[token] || 0);
+  };
+
+  // Decode: array of IDs -> text WITHOUT whitespace
+  // (whitespace was never tokenized, so cannot be reconstructed)
+  const decode = (ids) => {
+    return ids.map(id => (id > 0 && id <= vocabulary.length) ? vocabulary[id - 1] : '').join('');
+  };
+
+  return { vocabulary, decoder, encode, decode };
+}
+// ==========================================
+
+// ========== Safe Encode Wrapper ==========
+function safeEncode(text) {
+	if (!customTokenizer) return [];
+	try {
+		return customTokenizer.encode(text);
+	} catch (e) {
+		console.warn('Encode error:', e);
+		return [];
+	}
+}
+
+// ========== Build Vocabulary from Training Samples ==========
+async function buildVocabulary() {
+	const corpus = els.sampleText.value;
+	customTokenizer = buildTokenizer(corpus);
+
+	// Populate idToToken map (id -> token string)
+	vocab = customTokenizer.vocabulary;
+	idToToken = {};
+	vocab.forEach((token, idx) => {
+			idToToken[idx + 1] = token.replace(/\n/g, '\\n').replace(/\t/g, '\\t').replace(/\r/g, '\\r');
+		});
+
+	// Update UI
+	els.vocabSize.textContent = vocab.length.toLocaleString();
+	els.archVocab.textContent = vocab.length.toLocaleString();
+
+	log(`✓ Vocabulary built: ${vocab.length} unique tokens`);
+	return true;
+}
+
+// ========== Initialize Tokenizer ==========
+async function initTokenizer() {
+	els.tokStatus.textContent = 'Building from samples...';
+	els.tokDot.className = 'status-dot';
+
+	try {
+		await buildVocabulary();
+
+		if (vocab.length === 0) {
+			throw new Error('No tokens extracted from samples');
+		}
+
+		els.tokDot.className = 'status-dot success';
+		els.tokStatus.textContent = `✓ Custom tokenizer ready • ${vocab.length} tokens`;
+
+		// Enable controls
+		els.trainBtn.disabled = false;
+		els.trainBtn.innerHTML = '🚀 Prepare & Train';
+		els.promptInput.disabled = false;
+		els.livePrompt.disabled = false;
+		els.predictBtn.disabled = false;
+
+		updateSampleStats();
+		log('🔤 Custom tokenizer initialized');
+	} catch (e) {
+		els.tokDot.className = 'status-dot error';
+		els.tokStatus.textContent = `Error: ${e.message?.slice(0, 25)}`;
+		log(`✗ Tokenizer failed: ${e.message}`, 'error');
+	}
+}
+
+// ========== Update Sample Stats (Triggers vocab rebuild on edit) ==========
+function updateSampleStats() {
+	const lines = els.sampleText.value.trim().split('\n').filter(l => l.trim());
+	els.sampleCount.textContent = lines.length;
+
+	// Rebuild vocab live as user edits (debounced)
+	if (customTokenizer) {
+		clearTimeout(window.vocabRebuildTimer);
+		window.vocabRebuildTimer = setTimeout(() => {
+				buildVocabulary().then(() => {
+						log('🔄 Vocabulary updated from samples');
+					});
+			}, 500);
+	}
+}
+els.sampleText.addEventListener('input', updateSampleStats);
+
+// ========== CUSTOM RoPE LAYER FOR TF.JS ==========
+function computeRoPEConstants(seqLen, hiddenDim, base = 10000) {
+	const halfDim = Math.floor(hiddenDim / 2);
+	const freqs = [];
+	for (let i = 0; i < halfDim; i++) {
+		freqs.push(1 / Math.pow(base, (2 * i) / hiddenDim));
+	}
+
+	const sinTable = [];
+	const cosTable = [];
+	for (let pos = 0; pos < seqLen; pos++) {
+		const sinRow = [], cosRow = [];
+		for (let i = 0; i < halfDim; i++) {
+			const theta = pos * freqs[i];
+			sinRow.push(Math.sin(theta));
+			cosRow.push(Math.cos(theta));
+		}
+		sinTable.push(sinRow);
+		cosTable.push(cosRow);
+	}
+	return { sinTable, cosTable, halfDim, hiddenDim };
+}
+
+class RoPELayer extends tf.layers.Layer {
+	constructor(config) {
+		super(config);
+		this.seqLen = config.seqLen;
+		this.hiddenDim = config.hiddenDim;
+		this.base = config.base || 10000;
+
+		const { sinTable, cosTable, halfDim } = computeRoPEConstants(
+			this.seqLen, this.hiddenDim, this.base
+		);
+		this.sinTable = sinTable;
+		this.cosTable = cosTable;
+		this.halfDim = halfDim;
+	}
+
+	static className = 'RoPELayer';
+
+	computeOutputShape(inputShape) {
+		return inputShape;
+	}
+
+	call(inputs, kwargs) {
+		return tf.tidy(() => {
+				const x = inputs[0];
+				const { sinTable, cosTable, halfDim, hiddenDim } = this;
+				const seqLen = this.seqLen;
+
+				const sinTensor = tf.reshape(
+					tf.tensor2d(sinTable, [seqLen, halfDim]),
+					[1, seqLen, halfDim]
+				);
+				const cosTensor = tf.reshape(
+					tf.tensor2d(cosTable, [seqLen, halfDim]),
+					[1, seqLen, halfDim]
+				);
+
+				const x1 = tf.slice(x, [0, 0, 0], [-1, -1, halfDim]);
+				const x2 = tf.slice(x, [0, 0, halfDim], [-1, -1, halfDim]);
+
+				const rotated1 = tf.sub(tf.mul(x1, cosTensor), tf.mul(x2, sinTensor));
+				const rotated2 = tf.add(tf.mul(x1, sinTensor), tf.mul(x2, cosTensor));
+
+				return tf.concat([rotated1, rotated2], -1);
+			});
+	}
+}
+tf.serialization.registerClass(RoPELayer);
+// ========== END CUSTOM RoPE LAYER ==========
+
+// ========== Data Preparation ==========
+function prepareTrainingData() {
+	const rawText = els.sampleText.value.trim();
+	const lines = rawText.split('\n').filter(l => l.trim());
+	els.sampleCount.textContent = lines.length;
+	const sequences = [];
+	const seqLen = parseInt(els.seqLen.value);
+
+	for (const line of lines) {
+		const tokenIds = safeEncode(line);
+		if (tokenIds.length < 2) continue;
+		for (let i = 0; i < tokenIds.length - 1; i++) {
+			const start = Math.max(0, i - seqLen + 1);
+			const inputSeq = tokenIds.slice(start, i + 1);
+			const targetId = tokenIds[i + 1];
+			if (inputSeq.length <= seqLen) {
+				const padded = inputSeq.length < seqLen
+				? Array(seqLen - inputSeq.length).fill(0).concat(inputSeq)
+				: inputSeq;
+				sequences.push({ input: padded, target: targetId });
+			}
+		}
+	}
+	log(`Prepared ${sequences.length} sequences from ${lines.length} samples`);
+	return sequences;
+}
+
+// ========== SwiGLU Model Creation ==========
+function createSwiGLUModel(vocabSize, hiddenDim, seqLen, learningRate, applyRoPE = true) {
+	const input = tf.input({ shape: [seqLen], dtype: 'int32' });
+
+	// Embedding: +1 for unknown token (id=0)
+	let x = tf.layers.embedding({
+			inputDim: vocabSize + 1,
+			outputDim: hiddenDim,
+			inputLength: seqLen,
+			name: 'token_embedding'
+		}).apply(input);
+
+	// Apply RoPE
+	if (applyRoPE) {
+		const ropeLayer = new RoPELayer({ seqLen, hiddenDim });
+		x = ropeLayer.apply(x);
+	}
+
+	// SwiGLU Blocks
+	for (let layer = 0; layer < NUM_LAYERS; layer++) {
+		const residual = x;
+		const gate = tf.layers.dense({ units: hiddenDim, useBias: true, name: `swiglu_${layer}_gate` }).apply(x);
+		const value = tf.layers.dense({ units: hiddenDim, useBias: true, name: `swiglu_${layer}_value` }).apply(x);
+		const swishGate = tf.layers.activation({ activation: 'swish' }).apply(gate);
+		x = tf.layers.multiply().apply([swishGate, value]);
+		x = tf.layers.add().apply([x, residual]);
+	}
+
+	// Output Head: +1 for unknown token
+	x = tf.layers.globalAveragePooling1d().apply(x);
+	const logits = tf.layers.dense({ units: vocabSize + 1 }).apply(x);
+	const output = tf.layers.softmax().apply(logits);
+
+	const model = tf.model({ inputs: input, outputs: output });
+	model.compile({
+			optimizer: tf.train.adam(learningRate),
+			loss: 'categoricalCrossentropy',
+			metrics: ['accuracy']
+		});
+	return model;
+}
+
+// ========== Training ==========
+async function trainModel() {
+	if (isTraining) return;
+	if (!customTokenizer || !vocab?.length) {
+		showStatus(els.trainStatus, '❌ Tokenizer not ready', 'error');
+		return;
+	}
+
+	const epochs = parseInt(els.epochs.value);
+	const lr = parseFloat(els.lr.value);
+	const seqLen = parseInt(els.seqLen.value);
+
+	els.trainBtn.disabled = true;
+	els.predictBtn.disabled = true;
+	isTraining = true;
+	lossHistory = [];
+	els.trainLog.innerHTML = '';
+
+	showStatus(els.trainStatus, 'Preparing data...', 'training');
+	log(`Training: ${epochs} epochs, LR=${lr}, seq=${seqLen}, RoPE=${useRoPE?'ON':'OFF'}, vocab=${vocab.length}`);
+
+	try {
+		const sequences = prepareTrainingData();
+		if (!sequences.length) throw new Error('No training sequences');
+
+		const xs = tf.tensor2d(sequences.map(s => s.input), [sequences.length, seqLen], 'int32');
+		const ys = tf.oneHot(
+			tf.tensor1d(sequences.map(s => s.target), 'int32'),
+			vocab.length + 1
+		);
+
+		showStatus(els.trainStatus, 'Building model...', 'training');
+		model = createSwiGLUModel(vocab.length, HIDDEN_DIM, seqLen, lr, useRoPE);
+
+		showStatus(els.trainStatus, 'Training...', 'training');
+		log('Starting training...');
+
+		await model.fit(xs, ys, {
+				epochs, batchSize: 8,
+				callbacks: {
+					onEpochEnd: async (epoch, logs) => {
+						lossHistory.push(logs.loss);
+						updateLossChart();
+						if (epoch % 5 === 0 || epoch === epochs - 1) {
+							const acc = logs.acc ? `| Acc: ${(logs.acc*100).toFixed(1)}%` : '';
+							log(`Epoch ${epoch+1}/${epochs} - Loss: ${logs.loss.toFixed(4)} ${acc}`);
+							showStatus(els.trainStatus, `${Math.round((epoch+1)/epochs*100)}% complete`, 'training');
+						}
+						await tf.nextFrame();
+					}
+				}
+			});
+
+		xs.dispose(); ys.dispose();
+		showStatus(els.trainStatus, '✅ Training complete!', 'success');
+		log('🎉 Model trained successfully!');
+		els.predictBtn.disabled = false;
+		els.exportBtn.disabled = false;
+	} catch (e) {
+		showStatus(els.trainStatus, `❌ Error: ${e.message}`, 'error');
+		log(`Training error: ${e.message}`, 'error');
+		console.error(e);
+	} finally {
+		isTraining = false;
+		els.trainBtn.disabled = false;
+	}
+}
+
+// ========== Prediction ==========
+async function predictNext() {
+	if (!model || !customTokenizer) {
+		showStatus(els.predictStatus, '⚠️ Train first!', 'error');
+		return;
+	}
+	const prompt = els.promptInput.value.trim();
+	if (!prompt) {
+		showStatus(els.predictStatus, '⚠️ Enter prompt', 'error');
+		return;
+	}
+
+	showStatus(els.predictStatus, 'Generating...', 'training');
+	els.resultBox.classList.add('ready');
+	els.displayPrompt.textContent = `"${prompt}" →`;
+
+	try {
+		const seqLen = parseInt(els.seqLen.value);
+		let inputSeq = safeEncode(prompt);
+		if (inputSeq.length > seqLen) inputSeq = inputSeq.slice(-seqLen);
+		else if (inputSeq.length < seqLen) inputSeq = Array(seqLen - inputSeq.length).fill(0).concat(inputSeq);
+
+		const inputTensor = tf.tensor2d([inputSeq], [1, seqLen], 'int32');
+		const predictions = model.predict(inputTensor);
+		const probs = await predictions.data();
+
+		const topN = 5;
+		const indices = Array.from({length: probs.length}, (_,i) => i)
+		.sort((a,b) => probs[b] - probs[a])
+		.slice(0, topN);
+
+		els.topPredictions.innerHTML = '';
+		indices.forEach((id, rank) => {
+				const token = (id > 0 && idToToken[id]) ? idToToken[id] : '<unk>';
+				const prob = (probs[id]*100).toFixed(1);
+				const item = document.createElement('div');
+				item.className = 'prediction-item';
+				item.innerHTML = `
+				<span class="rank">#${rank+1}</span>
+				<span class="token">${token.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</span>
+				<span class="prob">${prob}%</span>
+				`;
+				els.topPredictions.appendChild(item);
+			});
+
+		const topId = indices[0];
+		const topText = (topId > 0 && idToToken[topId]) ? idToToken[topId] : '<unk>';
+		els.topSuggestion.textContent = topText;
+		els.fullSuggestion.textContent = `${prompt}${topText}`;
+		showStatus(els.predictStatus, '✓ Done!', 'success');
+
+		inputTensor.dispose(); predictions.dispose();
+	} catch (e) {
+		showStatus(els.predictStatus, `❌ Error: ${e.message}`, 'error');
+		console.error(e);
+	}
+}
+
+// ========== Live Prediction ==========
+let liveDebounce;
+async function livePredict() {
+	if (!model || !customTokenizer) return;
+	clearTimeout(liveDebounce);
+	liveDebounce = setTimeout(async () => {
+			const prompt = els.livePrompt.value.trim();
+			if (!prompt) {
+				els.livePredictions.innerHTML = '<div style="color:var(--text-dim);padding:0.5rem">Start typing...</div>';
+				return;
+			}
+			try {
+				const seqLen = parseInt(els.seqLen.value);
+				let inputSeq = safeEncode(prompt);
+				if (inputSeq.length > seqLen) inputSeq = inputSeq.slice(-seqLen);
+				else if (inputSeq.length < seqLen) inputSeq = Array(seqLen - inputSeq.length).fill(0).concat(inputSeq);
+
+				const inputTensor = tf.tensor2d([inputSeq], [1, seqLen], 'int32');
+				const predictions = model.predict(inputTensor);
+				const probs = await predictions.data();
+
+				const topN = 3;
+				const indices = Array.from({length: probs.length}, (_,i) => i)
+				.sort((a,b) => probs[b] - probs[a])
+				.slice(0, topN);
+
+				els.livePredictions.innerHTML = '';
+				indices.forEach((id, rank) => {
+						const token = (id > 0 && idToToken[id]) ? idToToken[id] : '<unk>';
+						const prob = (probs[id]*100).toFixed(0);
+						const item = document.createElement('div');
+						item.className = 'prediction-item';
+						item.style.borderLeftColor = rank === 0 ? 'var(--success)' : 'var(--primary)';
+						item.innerHTML = `
+						<span class="rank">#${rank+1}</span>
+						<span class="token">${token.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</span>
+						<span class="prob">${prob}%</span>
+						`;
+						els.livePredictions.appendChild(item);
+					});
+				inputTensor.dispose(); predictions.dispose();
+			} catch (e) {
+				els.livePredictions.innerHTML = `<div style="color:var(--error)">Error: ${e.message}</div>`;
+			}
+		}, 150);
+}
+
+// ========== Utilities ==========
+function updateLossChart() {
+	const chart = els.lossChart;
+	chart.innerHTML = '';
+	if (!lossHistory.length) return;
+	const maxLoss = Math.max(...lossHistory, 0.001);
+	const barWidth = Math.max(2, Math.floor(chart.clientWidth / Math.max(lossHistory.length, 30)));
+	lossHistory.forEach((loss, i) => {
+			const bar = document.createElement('div');
+			bar.className = 'loss-bar';
+			bar.style.left = `${i * barWidth}px`;
+			bar.style.height = `${Math.min(100, (loss / maxLoss) * 100)}%`;
+			bar.title = `Epoch ${i+1}: ${loss.toFixed(4)}`;
+			chart.appendChild(bar);
+		});
+}
+
+function resetAll() {
+	if (model) { model.dispose(); model = null; }
+	customTokenizer = null;
+	vocab = null;
+	idToToken = {};
+
+	['trainStatus','predictStatus','liveStatus'].forEach(id => {
+			const el = document.getElementById(id);
+			if (el) { el.className = 'status'; el.textContent = ''; }
+		});
+
+	els.trainLog.innerHTML = 'Ready to train...';
+	els.lossChart.innerHTML = '';
+	els.topPredictions.innerHTML = '';
+	els.livePredictions.innerHTML = '<div style="color:var(--text-dim);padding:0.5rem">Start typing...</div>';
+	els.topSuggestion.textContent = '—';
+	els.fullSuggestion.textContent = '';
+	els.resultBox.classList.remove('ready');
+	els.predictBtn.disabled = true;
+	els.exportBtn.disabled = true;
+	lossHistory = [];
+	isTraining = false;
+
+	initTokenizer();
+	log('🔄 Reset complete');
+}
+
+async function exportModel() {
+	if (!model) return;
+	try {
+		showStatus(els.liveStatus, 'Exporting...', 'training');
+		await model.save('downloads://nextword-swiglu-rope-custom');
+		showStatus(els.liveStatus, '✅ Model exported!', 'success');
+	} catch (e) {
+		showStatus(els.liveStatus, `Export failed: ${e.message}`, 'error');
+	}
+}
+
+// ========== Events ==========
+els.seqLen.addEventListener('change', e => els.archSeq.textContent = e.target.value);
+document.addEventListener('DOMContentLoaded', () => {
+		document.getElementById('trainBtn')?.addEventListener('click', trainModel);
+		document.getElementById('predictBtn')?.addEventListener('click', predictNext);
+		document.getElementById('livePrompt')?.addEventListener('input', livePredict);
+	});
+document.addEventListener('keydown', e => {
+		if ((e.ctrlKey||e.metaKey) && e.key==='Enter' && !isTraining && !els.trainBtn.disabled) {
+			e.preventDefault(); trainModel();
+		}
+		if (e.key==='Enter' && e.target===els.promptInput && !els.predictBtn.disabled) {
+			e.preventDefault(); predictNext();
+		}
+	});
+
+// ========== Init ==========
+log('🚀 Initializing Next-Word Predictor (Custom Tokenizer)...');
+initTokenizer();
+
+window.addEventListener('beforeunload', () => {
+		if (model) model.dispose();
+	});
+</script>
+</body>
+</html>

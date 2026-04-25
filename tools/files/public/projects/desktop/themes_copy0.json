@@ -68,31 +68,7 @@
 		"canvas": true,
 		"author": "Your Name",
 		"version": "1.0.0"
-	},
-
-
-
-	"zelda-legend": {
-		"name": "Legend of Zelda",
-		"description": "Hyrule-inspired theme with Triforce accents and magical glowing hearts",
-		"css": "themes/zelda-legend/zeldastyles.css",
-		"script": "themes/zelda-legend/zeldascript.js",
-		"canvas": true,
-		"preview": "themes/zelda-legend/preview.jpg",
-		"author": "Your Name",
-		"version": "2.8.0",
-		"settings": {
-			"particles": true,
-			"particleType": "heart",
-			"particleCount": 30,
-			"glowIntensity": 0.8
-		}
 	}
-
-
-
-
-
 
 
 }

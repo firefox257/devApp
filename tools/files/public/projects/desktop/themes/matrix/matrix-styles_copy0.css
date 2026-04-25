@@ -2,7 +2,6 @@
    Matrix Theme - v3.4 (MOBILE-FIRST COMPLIANT)
    Material Icons OS - Theme Development Guide v2.7+
    ALL HOVER STYLES REMOVED - Touch/Active/Focus Only
-   ICON GROUPING SYSTEM ADDED - Functional Color Coding
    ======================================== */
 
 :root {
@@ -54,25 +53,6 @@
   /* Animation Effects */
   --system-glow: 0 0 20px rgba(0, 255, 65, 0.4);
   --system-glow-intense: 0 0 30px rgba(0, 255, 65, 0.6), 0 0 60px rgba(0, 255, 65, 0.3);
-
-  /* ========================================
-     ICON GROUP VARIABLES [NEW v2.7+]
-     Functional Color Coding for App Icons
-     ======================================== */
-  --system-icon-group-navigation: var(--system-accent);
-  --system-icon-group-action-primary: var(--system-accent);
-  --system-icon-group-action-destructive: var(--system-danger);
-  --system-icon-group-action-confirmation: var(--system-success);
-  --system-icon-group-media: var(--system-info);
-  --system-icon-group-communication: var(--system-highlight);
-  --system-icon-group-status-info: var(--system-info);
-  --system-icon-group-status-warning: var(--system-warning);
-  --system-icon-group-status-error: var(--system-danger);
-  --system-icon-group-status-success: var(--system-success);
-  --system-icon-group-file: var(--system-text-dim);
-  --system-icon-group-user: var(--system-accent);
-  --system-icon-group-system: var(--system-text-dim);
-  --system-icon-group-default: var(--system-text);
 }
 
 /* ========================================
@@ -305,88 +285,6 @@ body::before {
 .system-btn, .system-btn-icon, .system-card, .system-desktop-icon, .system-desktop-window, .system-desktop-taskbar__item {
   will-change: transform, box-shadow, filter;
   transform: translateZ(0);
-}
-
-/* ========================================
-   ICON GROUP STYLING [NEW v2.7+]
-   Functional Color Coding for App Icons
-   ======================================== */
-.mat-icon[data-icon-group] {
-  color: var(--system-icon-group-default, var(--system-text));
-  transition: color var(--system-transition-fast);
-}
-
-.mat-icon[data-icon-group="navigation"] {
-  color: var(--system-icon-group-navigation);
-  text-shadow: 0 0 8px rgba(0, 255, 65, 0.5);
-}
-
-.mat-icon[data-icon-group="action-primary"] {
-  color: var(--system-icon-group-action-primary);
-  text-shadow: 0 0 8px rgba(0, 255, 65, 0.5);
-}
-
-.mat-icon[data-icon-group="action-destructive"] {
-  color: var(--system-icon-group-action-destructive);
-  text-shadow: 0 0 8px rgba(255, 51, 51, 0.5);
-}
-
-.mat-icon[data-icon-group="action-confirmation"] {
-  color: var(--system-icon-group-action-confirmation);
-  text-shadow: 0 0 8px rgba(0, 255, 65, 0.5);
-}
-
-.mat-icon[data-icon-group="media"] {
-  color: var(--system-icon-group-media);
-  text-shadow: 0 0 8px rgba(0, 153, 255, 0.5);
-}
-
-.mat-icon[data-icon-group="communication"] {
-  color: var(--system-icon-group-communication);
-  text-shadow: 0 0 8px rgba(0, 255, 102, 0.5);
-}
-
-.mat-icon[data-icon-group="status-info"] {
-  color: var(--system-icon-group-status-info);
-  text-shadow: 0 0 8px rgba(0, 153, 255, 0.5);
-}
-
-.mat-icon[data-icon-group="status-warning"] {
-  color: var(--system-icon-group-status-warning);
-  text-shadow: 0 0 8px rgba(255, 170, 0, 0.5);
-}
-
-.mat-icon[data-icon-group="status-error"] {
-  color: var(--system-icon-group-status-error);
-  text-shadow: 0 0 8px rgba(255, 51, 51, 0.5);
-}
-
-.mat-icon[data-icon-group="status-success"] {
-  color: var(--system-icon-group-status-success);
-  text-shadow: 0 0 8px rgba(0, 255, 65, 0.5);
-}
-
-.mat-icon[data-icon-group="file"] {
-  color: var(--system-icon-group-file);
-  text-shadow: 0 0 8px rgba(0, 143, 17, 0.4);
-}
-
-.mat-icon[data-icon-group="user"] {
-  color: var(--system-icon-group-user);
-  text-shadow: 0 0 8px rgba(0, 255, 65, 0.5);
-}
-
-.mat-icon[data-icon-group="system"] {
-  color: var(--system-icon-group-system);
-  text-shadow: 0 0 8px rgba(0, 143, 17, 0.4);
-}
-
-/* Icon group active/focus states (REPLACES HOVER) */
-.mat-icon[data-icon-group]:active,
-.mat-icon[data-icon-group]:focus {
-  filter: drop-shadow(0 0 10px currentColor);
-  transform: scale(1.05);
-  transition: filter var(--system-transition-fast), transform var(--system-transition-fast);
 }
 
 /* ========================================
@@ -1362,10 +1260,8 @@ body::before {
     transition-duration: 0.01ms !important; animation-delay: 0s !important;
   }
   .system-card, .system-desktop-icon, .system-desktop-window, .system-alert,
-  .system-avatar, .system-desktop-start-menu__avatar, .system-btn-icon,
-  .mat-icon[data-icon-group] {
+  .system-avatar, .system-desktop-start-menu__avatar, .system-btn-icon {
     opacity: 1 !important; transform: none !important; animation: none !important;
-    transition: none !important;
   }
   .system-glitch, .system-glitch-text, .system-glitch-ambient, .system-glitch-heavy,
   .system-glitch-scanline, .system-glitch-window, .system-glitch-scramble,
@@ -1414,7 +1310,7 @@ body::before {
     border-width: 2px !important;
   }
   .system-btn .material-icons, .system-btn-icon .material-icons,
-  .system-desktop-icon__icon, .mat-icon[data-icon-group] {
+  .system-desktop-icon__icon {
     text-shadow: 0 0 12px rgba(0, 255, 65, 1) !important;
   }
 }

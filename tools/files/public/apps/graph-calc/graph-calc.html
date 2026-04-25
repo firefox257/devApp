@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<title>Graphing Calculator</title>
+
+<!-- REQUIRED: Bridge CSS (MUST be first per Guide v2.7+) -->
+<link rel="stylesheet" href="/projects/desktop/os-theme-bridge.css" />
+<!-- REQUIRED: Bridge JS (MUST be after CSS per Guide v2.7+) -->
+<script src="/projects/desktop/os-theme-bridge.js"></script>
+
+<!-- REQUIRED: Local Material Icons Font -->
+<style>
+@font-face {
+  font-family: 'Material Icons';
+  src: url('/system/fonts/MaterialIcons-Regular.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: block;
+}
+.mat-icon {
+  font-family: 'Material Icons', sans-serif !important;
+  font-feature-settings: 'liga';
+  font-size: 24px;
+  vertical-align: middle;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+</style>
+
+<!-- APP CUSTOM CSS -->
+<style>
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--system-bg);
+  color: var(--system-text);
+  font-family: var(--system-font);
+  overflow: hidden;
+  height: 100dvh;
+  width: 100vw;
+  display: flex;
+  flex-direction: column;
+}
+
+.system-app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  padding: 12px;
+  box-sizing: border-box;
+  gap: 8px;
+  overflow: hidden;
+}
+
+/* Header */
+.calc-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex: 0 0 auto;
+}
+
+.calc-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0;
+}
+
+/* Mode Badges */
+.mode-bar {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.mode-badge {
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: 12px;
+  background: var(--system-border);
+  color: var(--system-text);
+  font-weight: 600;
+  opacity: 0.7;
+}
+
+.mode-badge.active {
+  background: var(--system-accent);
+  color: var(--system-text-on-accent);
+  opacity: 1;
+}
+
+/* Display Screen */
+.calc-display {
+  background: var(--system-window-bg);
+  border: 1px solid var(--system-border);
+  border-radius: var(--system-radius);
+  padding: 12px;
+  flex: 0 0 auto;
+  min-height: 100px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: flex-end;
+  box-shadow: var(--system-shadow);
+}
+
+.calc-expression {
+  color: var(--system-text-dim);
+  font-size: 14px;
+  text-align: right;
+  min-height: 20px;
+  width: 100%;
+  overflow-x: auto;
+  white-space: nowrap;
+  margin-bottom: 4px;
+}
+
+.calc-result {
+  color: var(--system-text);
+  font-size: 32px;
+  font-weight: 600;
+  text-align: right;
+  width: 100%;
+  overflow-x: auto;
+  white-space: nowrap;
+  margin: 0;
+}
+
+#graphCanvas {
+  width: 100%;
+  height: 120px;
+  background: rgba(0,0,0,0.05);
+  border-radius: 4px;
+  margin-top: 8px;
+  display: none;
+  border: 1px solid var(--system-border);
+}
+
+#graphCanvas.active {
+  display: block;
+}
+
+/* Scientific Keys */
+.sci-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  flex: 0 0 auto;
+}
+
+.sci-grid .system-btn {
+  height: 40px;
+  font-size: 14px;
+  padding: 0;
+}
+
+/* Main Keypad - Fixed Grid */
+.calc-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-template-rows: repeat(5, 1fr);
+  gap: 6px;
+  flex: 1 1 auto;
+  min-height: 0; /* Prevent overflow */
+}
+
+.calc-grid .system-btn {
+  height: 100%;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  font-weight: 500;
+  border-radius: var(--system-radius);
+  /* Prevent stretching */
+  aspect-ratio: 1 / 1; 
+  max-height: 60px; /* Cap height on large screens */
+}
+
+/* Button Active State (Mobile First - No Hover) */
+.system-btn:active {
+  transform: scale(0.96);
+  opacity: 0.8;
+  transition: transform 0.1s;
+}
+
+/* Variable Modal */
+.var-modal {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: var(--system-bg);
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  box-sizing: border-box;
+  transform: translateY(100%);
+  transition: transform 0.3s ease;
+}
+
+.var-modal.open {
+  transform: translateY(0);
+}
+
+/* Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  .var-modal, .system-btn {
+    transition: none !important;
+    transform: none !important;
+  }
+}
+</style>
+</head>
+
+<body data-os-app="true">
+  <div class="system-app">
+    
+    <!-- Header -->
+    <header class="calc-header">
+      <h1 class="calc-title">Calc Pro</h1>
+      <div class="system-flex" style="gap: 8px;">
+        <button class="system-btn-icon" id="btn-vars" aria-label="Variables">
+          <span class="mat-icon" data-icon-group="system">storage</span>
+        </button>
+        <button class="system-btn-icon" id="btn-mode" aria-label="Toggle Mode">
+          <span class="mat-icon" data-icon-group="navigation">swap_horiz</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Mode Indicators -->
+    <div class="mode-bar">
+      <span id="mode-indicator" class="mode-badge active">DEG</span>
+      <span id="base-indicator" class="mode-badge">DEC</span>
+    </div>
+
+    <!-- Display -->
+    <div class="calc-display">
+      <div id="calc-expression" class="calc-expression"></div>
+      <div id="calc-result" class="calc-result">0</div>
+      <canvas id="graphCanvas"></canvas>
+    </div>
+
+    <!-- Scientific Keys -->
+    <div class="sci-grid" id="sci-keys">
+      <button class="system-btn system-btn-secondary" data-key="sin">sin</button>
+      <button class="system-btn system-btn-secondary" data-key="cos">cos</button>
+      <button class="system-btn system-btn-secondary" data-key="tan">tan</button>
+      <button class="system-btn system-btn-secondary" data-key="log">log</button>
+      <button class="system-btn system-btn-secondary" data-key="ln">ln</button>
+      <button class="system-btn system-btn-secondary" data-key="sqrt">√</button>
+      <button class="system-btn system-btn-secondary" data-key="pow">^</button>
+      <button class="system-btn system-btn-secondary" data-key="pi">π</button>
+    </div>
+
+    <!-- Main Keypad -->
+    <div class="calc-grid">
+      <!-- Row 1 -->
+      <button class="system-btn system-btn-secondary" data-key="clear">
+        <span class="mat-icon" data-icon-group="action-destructive">close</span>
+      </button>
+      <button class="system-btn system-btn-secondary" data-key="backspace">
+        <span class="mat-icon" data-icon-group="action-destructive">backspace</span>
+      </button>
+      <button class="system-btn system-btn-secondary" data-key="%">%</button>
+      <button class="system-btn system-btn-secondary" data-key="/">
+        <span class="mat-icon" data-icon-group="media">divide</span>
+      </button>
+      
+      <!-- Row 2 -->
+      <button class="system-btn" data-key="7">7</button>
+      <button class="system-btn" data-key="8">8</button>
+      <button class="system-btn" data-key="9">9</button>
+      <button class="system-btn system-btn-secondary" data-key="*">
+        <span class="mat-icon" data-icon-group="media">close</span>
+      </button>
+      
+      <!-- Row 3 -->
+      <button class="system-btn" data-key="4">4</button>
+      <button class="system-btn" data-key="5">5</button>
+      <button class="system-btn" data-key="6">6</button>
+      <button class="system-btn system-btn-secondary" data-key="-">
+        <span class="mat-icon" data-icon-group="media">remove</span>
+      </button>
+      
+      <!-- Row 4 -->
+      <button class="system-btn" data-key="1">1</button>
+      <button class="system-btn" data-key="2">2</button>
+      <button class="system-btn" data-key="3">3</button>
+      <button class="system-btn system-btn-secondary" data-key="+">
+        <span class="mat-icon" data-icon-group="media">add</span>
+      </button>
+      
+      <!-- Row 5 -->
+      <button class="system-btn" data-key="0">0</button>
+      <button class="system-btn" data-key=".">.</button>
+      <!-- EQUALS BUTTON FIXED -->
+      <button class="system-btn" data-key="=">=</button>
+      <button class="system-btn system-btn-secondary" data-key="graph">
+        <span class="mat-icon" data-icon-group="media">show_chart</span>
+      </button>
+    </div>
+
+    <!-- Variable Modal -->
+    <div id="var-modal" class="var-modal">
+      <div class="system-card system-flex-item" style="display:flex; flex-direction:column; height:100%;">
+        <div class="system-card-header system-flex" style="justify-content: space-between;">
+          <span class="system-heading">Variables</span>
+          <button class="system-btn-icon" id="close-vars">
+            <span class="mat-icon" data-icon-group="action-destructive">close</span>
+          </button>
+        </div>
+        <div class="system-card-body system-flex-item system-overflow-auto">
+          <div class="system-form-group">
+            <label class="system-label">Store (Value → Var)</label>
+            <div class="system-flex" style="gap: 6px;">
+              <input type="text" id="var-name" class="system-input system-input-sm" placeholder="A-Z" maxlength="1" style="text-transform:uppercase;">
+              <button class="system-btn system-btn-sm" id="btn-sto">STO</button>
+            </div>
+          </div>
+          <div class="system-form-group">
+            <label class="system-label">Recall (Var → Value)</label>
+            <div class="system-flex" style="gap: 6px;">
+              <select id="var-select" class="system-select system-input-sm" style="flex:1;">
+                <option value="">Select...</option>
+              </select>
+              <button class="system-btn system-btn-sm" id="btn-rcl">RCL</button>
+            </div>
+          </div>
+          <div class="system-divider system-mt-3 system-mb-3"></div>
+          <div id="var-list" class="system-list"></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+  (function() {
+    'use strict';
+
+    // State
+    let currentInput = '';
+    let result = '0';
+    let variables = {};
+    let isGraphMode = false;
+    let angleMode = 'DEG';
+    let baseMode = 'DEC';
+
+    // DOM
+    const elExpression = document.getElementById('calc-expression');
+    const elResult = document.getElementById('calc-result');
+    const elCanvas = document.getElementById('graphCanvas');
+    const ctx = elCanvas.getContext('2d');
+    const elMode = document.getElementById('mode-indicator');
+    const elBase = document.getElementById('base-indicator');
+    const elVarModal = document.getElementById('var-modal');
+    const elVarList = document.getElementById('var-list');
+    const elVarName = document.getElementById('var-name');
+    const elVarSelect = document.getElementById('var-select');
+    const elSciKeys = document.getElementById('sci-keys');
+
+    // Evaluate
+    function evaluateExpression(expr) {
+      try {
+        if (!expr) return '0';
+        
+        let safeExpr = expr
+          .replace(/×/g, '*')
+          .replace(/÷/g, '/')
+          .replace(/π/g, 'Math.PI')
+          .replace(/sin/g, 'Math.sin')
+          .replace(/cos/g, 'Math.cos')
+          .replace(/tan/g, 'Math.tan')
+          .replace(/log/g, 'Math.log10')
+          .replace(/ln/g, 'Math.log')
+          .replace(/sqrt/g, 'Math.sqrt')
+          .replace(/\^/g, '**');
+
+        Object.keys(variables).forEach(key => {
+          const regex = new RegExp(`\\b${key}\\b`, 'g');
+          safeExpr = safeExpr.replace(regex, variables[key]);
+        });
+
+        if (angleMode === 'DEG') {
+          safeExpr = safeExpr.replace(/Math.sin\(([^)]+)\)/g, 'Math.sin(($1) * Math.PI / 180)');
+          safeExpr = safeExpr.replace(/Math.cos\(([^)]+)\)/g, 'Math.cos(($1) * Math.PI / 180)');
+          safeExpr = safeExpr.replace(/Math.tan\(([^)]+)\)/g, 'Math.tan(($1) * Math.PI / 180)');
+        }
+
+        if (/[^0-9+\-*/().MathPIE\s,**A-Z]/.test(safeExpr)) {
+           throw new Error("Invalid Char");
+        }
+
+        const func = new Function(`return ${safeExpr}`);
+        const val = func();
+        
+        if (baseMode !== 'DEC' && Number.isInteger(val)) {
+          return val.toString(baseMode === 'HEX' ? 16 : 2).toUpperCase();
+        }
+
+        return Number.isFinite(val) ? parseFloat(val.toFixed(8)).toString() : 'Error';
+      } catch (e) {
+        return 'Error';
+      }
+    }
+
+    function updateDisplay() {
+      elExpression.textContent = currentInput;
+      elResult.textContent = result;
+    }
+
+    function handleInput(key) {
+      if (isGraphMode && key !== 'graph') return;
+
+      if (key === 'clear') {
+        currentInput = '';
+        result = '0';
+      } else if (key === 'backspace') {
+        currentInput = currentInput.slice(0, -1);
+        if (currentInput === '') result = '0';
+      } else if (key === '=') {
+        if (currentInput) {
+          result = evaluateExpression(currentInput);
+        }
+      } else if (key === 'graph') {
+        toggleGraphMode();
+      } else {
+        currentInput += key;
+        const preview = evaluateExpression(currentInput);
+        if (preview !== 'Error') result = preview;
+      }
+      updateDisplay();
+    }
+
+    // Graphing
+    function toggleGraphMode() {
+      isGraphMode = !isGraphMode;
+      
+      if (isGraphMode) {
+        elSciKeys.classList.add('system-hidden');
+        elCanvas.classList.add('active');
+        setTimeout(drawGraph, 50);
+      } else {
+        elSciKeys.classList.remove('system-hidden');
+        elCanvas.classList.remove('active');
+        ctx.clearRect(0, 0, elCanvas.width, elCanvas.height);
+      }
+    }
+
+    function drawGraph() {
+      const dpr = window.devicePixelRatio || 1;
+      const rect = elCanvas.getBoundingClientRect();
+      elCanvas.width = rect.width * dpr;
+      elCanvas.height = rect.height * dpr;
+      ctx.scale(dpr, dpr);
+
+      const width = rect.width;
+      const height = rect.height;
+      const centerX = width / 2;
+      const centerY = height / 2;
+      const scale = 20;
+
+      const styles = getComputedStyle(document.documentElement);
+      const gridColor = styles.getPropertyValue('--system-border').trim();
+      const axisColor = styles.getPropertyValue('--system-accent').trim();
+      const lineColor = styles.getPropertyValue('--system-text').trim();
+
+      ctx.clearRect(0, 0, width, height);
+      
+      ctx.strokeStyle = gridColor;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (let x = centerX % scale; x < width; x += scale) { ctx.moveTo(x, 0); ctx.lineTo(x, height); }
+      for (let y = centerY % scale; y < height; y += scale) { ctx.moveTo(0, y); ctx.lineTo(width, y); }
+      ctx.stroke();
+
+      ctx.strokeStyle = axisColor;
+      ctx.beginPath();
+      ctx.moveTo(0, centerY); ctx.lineTo(width, centerY);
+      ctx.moveTo(centerX, 0); ctx.lineTo(centerX, height);
+      ctx.stroke();
+
+      if (!currentInput) return;
+      ctx.strokeStyle = lineColor;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      let started = false;
+
+      for (let px = 0; px < width; px++) {
+        const x = (px - centerX) / scale;
+        const exprWithX = currentInput.replace(/x/g, `(${x})`);
+        const y = evaluateExpression(exprWithX);
+        
+        if (y !== 'Error' && isFinite(y)) {
+          const py = centerY - (y * scale);
+          if (!started) { ctx.moveTo(px, py); started = true; }
+          else { ctx.lineTo(px, py); }
+        } else {
+          started = false;
+        }
+      }
+      ctx.stroke();
+    }
+
+    // Variables
+    function updateVarList() {
+      elVarList.innerHTML = '';
+      elVarSelect.innerHTML = '<option value="">Select...</option>';
+      
+      Object.keys(variables).forEach(key => {
+        const item = document.createElement('li');
+        item.className = 'system-list-item system-flex';
+        item.innerHTML = `<span class="system-text">${key} = ${variables[key]}</span>`;
+        elVarList.appendChild(item);
+
+        const opt = document.createElement('option');
+        opt.value = key;
+        opt.textContent = key;
+        elVarSelect.appendChild(opt);
+      });
+    }
+
+    function storeVariable() {
+      const name = elVarName.value.toUpperCase();
+      if (name.match(/[A-Z]/) && result !== 'Error') {
+        variables[name] = result;
+        updateVarList();
+        elVarName.value = '';
+      }
+    }
+
+    function recallVariable() {
+      const name = elVarSelect.value;
+      if (name && variables[name]) {
+        currentInput += name;
+        updateDisplay();
+        elVarModal.classList.remove('open');
+      }
+    }
+
+    // Events
+    document.querySelectorAll('button[data-key]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault(); 
+        handleInput(btn.dataset.key);
+      });
+    });
+
+    document.getElementById('btn-mode').addEventListener('click', () => {
+      angleMode = angleMode === 'DEG' ? 'RAD' : 'DEG';
+      elMode.textContent = angleMode;
+    });
+
+    document.getElementById('btn-vars').addEventListener('click', () => {
+      updateVarList();
+      elVarModal.classList.add('open');
+    });
+
+    document.getElementById('close-vars').addEventListener('click', () => {
+      elVarModal.classList.remove('open');
+    });
+
+    document.getElementById('btn-sto').addEventListener('click', storeVariable);
+    document.getElementById('btn-rcl').addEventListener('click', recallVariable);
+
+    window.addEventListener('resize', () => {
+      if (isGraphMode) drawGraph();
+    });
+
+    // Theme Sync
+    window.addEventListener('osThemeChanged', (e) => {
+      if (isGraphMode) drawGraph();
+    });
+
+    window.addEventListener('osBridgeReady', () => {
+      console.log('Calculator Bridge Ready');
+    });
+
+  })();
+  </script>
+</body>
+</html>

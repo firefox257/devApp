@@ -1,0 +1,769 @@
+/* =====================================================
+   MYSTIC REALM - Underground Tavern Theme
+   Version: 2.7+ Compliant (Mobile-First Edition)
+   Colors: Warm amber, deep teal, rich browns, vibrant accents
+   Inspired by: Cozy underground tavern with lantern light
+   ===================================================== */
+
+/* =====================================================
+   1. CSS VARIABLE OVERRIDES (REQUIRED v2.7+)
+   ===================================================== */
+:root {
+	/* Core Theme Colors - Underground Tavern Palette */
+	--system-bg: #1a2f3a;                    /* Deep teal-blue cave walls */
+	--system-window-bg: rgba(44, 62, 80, 0.85);  /* Blue-gray stone */
+	--system-header-bg: rgba(26, 47, 58, 0.9);     /* Darker teal */
+	--system-accent: #ff8c42;                /* Warm amber lantern glow */
+	--system-accent-dim: #cc7035;            /* Dimmed amber */
+	--system-highlight: rgba(255, 140, 66, 0.2);  /* Amber highlight */
+	--system-text: #f4e4c1;                  /* Warm cream/beige */
+	--system-text-dim: #b8a888;              /* Muted beige */
+	--system-text-on-accent: #2c1810;        /* Dark brown on amber */
+	--system-border: rgba(255, 140, 66, 0.35);    /* Amber border */
+
+	/* Layout & Spacing */
+	--system-radius: 10px;
+	--system-radius-lg: 18px;
+	--system-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+	--system-font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+	--system-font-mono: 'Fira Code', 'Courier New', monospace;
+
+	/* State Colors - Inspired by tavern elements */
+	--system-success: #4ade80;               /* Green foliage */
+	--system-warning: #fbbf24;               /* Golden lantern */
+	--system-danger: #dc143c;                /* Vibrant red plant */
+	--system-info: #1a9988;                  /* Teal water */
+
+	/* Menu Background */
+	--system-menu-bg: rgba(26, 35, 45, 0.95);
+
+	/* REQUIRED: Icon Variables (v2.7+ Static Only) */
+	--system-icon-bg: rgba(44, 62, 80, 0.7);
+	--system-icon-border: 1px solid rgba(255, 140, 66, 0.4);
+
+	/* REQUIRED: Icon Group Variables (v2.7+ Functional Color Coding) */
+	--system-icon-group-navigation: #1a9988;       /* Teal - Navigation */
+	--system-icon-group-action-primary: #ff8c42;   /* Amber - Primary Actions */
+	--system-icon-group-action-destructive: #dc143c; /* Red - Destructive */
+	--system-icon-group-action-confirmation: #4ade80; /* Green - Confirmation */
+	--system-icon-group-media: #9b59b6;            /* Purple - Media (stained glass) */
+	--system-icon-group-communication: #ff6b9d;     /* Pink - Communication */
+	--system-icon-group-status-info: #1a9988;       /* Teal - Info */
+	--system-icon-group-status-warning: #fbbf24;    /* Gold - Warning */
+	--system-icon-group-status-error: #dc143c;      /* Red - Error */
+	--system-icon-group-status-success: #4ade80;    /* Green - Success */
+	--system-icon-group-file: #8b7355;              /* Brown - Files (wood) */
+	--system-icon-group-user: #ff8c42;              /* Amber - Accounts */
+	--system-icon-group-system: #1a9988;            /* Teal - Utilities */
+
+	/* Desktop Enhancement Variables (v2.7+) */
+	--system-taskbar-glow: 0 0 25px rgba(255, 140, 66, 0.35);
+	--system-window-glow: 0 0 35px rgba(26, 153, 136, 0.2);
+	--system-icon-glow: 0 0 18px rgba(255, 140, 66, 0.45);
+	--system-taskbar-blur: 20px;
+	--system-start-menu-blur: 22px;
+}
+
+/* =====================================================
+   2. BACKGROUND & CANVAS (REQUIRED)
+   ===================================================== */
+html, html body, body {
+	background-color: #1a2f3a !important;
+	background-image: url('background.png') !important;
+	background-repeat: no-repeat !important;
+	background-position: center center !important;
+	background-attachment: fixed !important;
+	background-size: cover !important;
+	min-height: 100dvh !important;
+	min-width: 100vw !important;
+}
+
+#themeCanvas {
+	display: block !important;
+	background: transparent !important;
+	pointer-events: none !important;
+	z-index: 0 !important;
+}
+
+/* =====================================================
+   3. SYSTEM COMPONENT CLASSES (.system-*) - VISUAL ONLY
+   NO position/z-index/pointer-events overrides
+   ===================================================== */
+
+/* Cards & Containers */
+.system-card {
+	background: var(--system-window-bg);
+	border: 1px solid var(--system-border);
+	border-radius: var(--system-radius);
+	backdrop-filter: blur(12px);
+	-webkit-backdrop-filter: blur(12px);
+	box-shadow: var(--system-shadow);
+	color: var(--system-text);
+}
+
+.system-card-header {
+	background: var(--system-header-bg);
+	border-bottom: 1px solid var(--system-border);
+	color: var(--system-text);
+}
+
+.system-card-body {
+	color: var(--system-text);
+}
+
+/* Buttons - Mobile-First (Active/Focus States) */
+.system-btn {
+	background: linear-gradient(135deg, #ff8c42 0%, #cc7035 100%);
+	border: none;
+	color: var(--system-text-on-accent);
+	border-radius: var(--system-radius);
+	padding: 10px 20px;
+	font-size: 14px;
+	cursor: pointer;
+	transition: all 0.2s ease;
+	box-shadow: 0 4px 15px rgba(255, 140, 66, 0.3);
+}
+
+.system-btn:active {
+	background: linear-gradient(135deg, #cc7035 0%, #aa5a2d 100%);
+	box-shadow: 0 2px 8px rgba(255, 140, 66, 0.4);
+	transform: scale(0.98);
+}
+
+.system-btn:focus-visible {
+	outline: 2px solid var(--system-accent);
+	outline-offset: 2px;
+}
+
+.system-btn-secondary {
+	background: transparent;
+	border: 1px solid rgba(26, 153, 136, 0.5);
+	color: #1a9988;
+}
+
+.system-btn-secondary:active {
+	background: rgba(26, 153, 136, 0.15);
+	border-color: #1a9988;
+}
+
+.system-btn-danger {
+	background: linear-gradient(135deg, #dc143c 0%, #b01030 100%);
+	color: #ffffff;
+}
+
+.system-btn-danger:active {
+	filter: brightness(1.1);
+}
+
+/* Forms & Inputs */
+.system-input,
+.system-select,
+.system-textarea {
+	background: rgba(44, 62, 80, 0.5);
+	border: 1px solid rgba(255, 140, 66, 0.3);
+	color: var(--system-text);
+	border-radius: var(--system-radius);
+	padding: 10px 14px;
+	font-size: 14px;
+}
+
+.system-input:focus,
+.system-select:focus,
+.system-textarea:focus {
+	border-color: #ff8c42;
+	box-shadow: 0 0 0 2px rgba(255, 140, 66, 0.2);
+	outline: none;
+}
+
+.system-input::placeholder {
+	color: var(--system-text-dim);
+}
+
+/* MENUS - Visual styling ONLY (NO position/z-index/pointer-events) */
+.system-menu {
+	background: var(--system-menu-bg);
+	border: 1px solid var(--system-border);
+	border-radius: var(--system-radius-lg);
+	backdrop-filter: blur(16px);
+	-webkit-backdrop-filter: blur(16px);
+	box-shadow: var(--system-shadow);
+}
+
+.system-menu-item {
+	color: var(--system-text);
+	border-radius: var(--system-radius);
+	padding: 10px 14px;
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	min-height: 44px;
+	cursor: pointer;
+	transition: background 0.15s ease;
+}
+
+.system-menu-item:active {
+	background: rgba(255, 140, 66, 0.2);
+}
+
+.system-menu-item:focus-visible {
+	outline: 2px solid var(--system-accent);
+}
+
+.system-menu-item .mat-icon,
+.system-menu-item .material-icons {
+	color: var(--system-accent);
+	font-size: 18px;
+}
+
+.system-menu-divider {
+	height: 1px;
+	margin: 4px 8px;
+	background: var(--system-border);
+	border: none;
+}
+
+/* CONTEXT MENUS ONLY - Long-press menus */
+.desktop-context-menu {
+	position: fixed !important;
+	z-index: 9999 !important;
+	min-width: 200px !important;
+	animation: menuFadeIn 0.12s ease-out !important;
+	transform-origin: top left !important;
+	pointer-events: auto !important;
+	box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6), 0 0 20px rgba(255, 140, 66, 0.2) !important;
+	border: 1px solid rgba(255, 140, 66, 0.3) !important;
+}
+
+@keyframes menuFadeIn {
+	from { opacity: 0; transform: scale(0.96) translateY(-4px); }
+	to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* Navigation & Menus */
+.system-nav-item {
+	color: var(--system-text);
+	border-radius: var(--system-radius);
+	transition: background 0.2s ease;
+}
+
+.system-nav-item:active {
+	background: var(--system-highlight);
+}
+
+.system-nav-item-active {
+	background: var(--system-highlight);
+	border-left: 3px solid var(--system-accent);
+	color: var(--system-accent);
+}
+
+/* Data Display */
+.system-table {
+	color: var(--system-text);
+	width: 100%;
+	border-collapse: collapse;
+}
+
+.system-table th {
+	background: var(--system-header-bg);
+	color: var(--system-text);
+	border-bottom: 1px solid var(--system-border);
+	padding: 12px;
+	text-align: left;
+}
+
+.system-table td {
+	border-bottom: 1px solid var(--system-border);
+	padding: 12px;
+}
+
+.system-table tr:active {
+	background: var(--system-highlight);
+}
+
+.system-badge {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	padding: 4px 10px;
+	border-radius: 12px;
+	font-size: 12px;
+	font-weight: 500;
+	border: 1px solid var(--system-border);
+	background: rgba(155, 89, 182, 0.2);
+	border-color: rgba(155, 89, 182, 0.4);
+	color: #b784c7;
+}
+
+.system-badge-success {
+	background: rgba(74, 222, 128, 0.2);
+	border-color: var(--system-success);
+	color: var(--system-success);
+}
+
+.system-badge-warning {
+	background: rgba(251, 191, 36, 0.2);
+	border-color: var(--system-warning);
+	color: var(--system-warning);
+}
+
+.system-badge-danger {
+	background: rgba(220, 20, 60, 0.2);
+	border-color: var(--system-danger);
+	color: var(--system-danger);
+}
+
+/* Feedback & Status */
+.system-alert {
+	background: rgba(26, 153, 136, 0.15);
+	border: 1px solid var(--system-border);
+	border-left: 4px solid #1a9988;
+	color: var(--system-text);
+	padding: 12px 16px;
+	border-radius: var(--system-radius);
+	display: flex;
+	align-items: center;
+	gap: 10px;
+}
+
+.system-alert-success { 
+	border-left-color: #4ade80;
+	background: rgba(74, 222, 128, 0.15);
+}
+
+.system-alert-warning { 
+	border-left-color: #fbbf24;
+	background: rgba(251, 191, 36, 0.15);
+}
+
+.system-alert-danger { 
+	border-left-color: #dc143c;
+	background: rgba(220, 20, 60, 0.15);
+}
+
+/* Typography */
+.system-text { color: var(--system-text); font-size: 14px; line-height: 1.5; }
+.system-text-dim { color: var(--system-text-dim); }
+.system-text-small { font-size: 12px; }
+.system-title { color: var(--system-text); font-size: 24px; font-weight: 700; margin-bottom: 16px; }
+.system-heading { color: var(--system-text); font-size: 16px; font-weight: 600; margin-bottom: 12px; }
+.system-label { color: var(--system-text); font-size: 14px; font-weight: 500; display: block; margin-bottom: 8px; }
+
+/* =====================================================
+   4. ICON GROUP STYLING [NEW v2.7+]
+   ===================================================== */
+.mat-icon[data-icon-group] {
+	color: var(--system-icon-group-default, var(--system-text));
+	transition: color 0.2s ease;
+}
+
+.mat-icon[data-icon-group="navigation"] { 
+	color: var(--system-icon-group-navigation);
+	text-shadow: 0 0 8px rgba(26, 153, 136, 0.4);
+}
+
+.mat-icon[data-icon-group="action-primary"] { 
+	color: var(--system-icon-group-action-primary);
+	text-shadow: 0 0 8px rgba(255, 140, 66, 0.4);
+}
+
+.mat-icon[data-icon-group="action-destructive"] { 
+	color: var(--system-icon-group-action-destructive);
+	text-shadow: 0 0 8px rgba(220, 20, 60, 0.4);
+}
+
+.mat-icon[data-icon-group="action-confirmation"] { 
+	color: var(--system-icon-group-action-confirmation);
+	text-shadow: 0 0 8px rgba(74, 222, 128, 0.4);
+}
+
+.mat-icon[data-icon-group="media"] { 
+	color: var(--system-icon-group-media);
+	text-shadow: 0 0 8px rgba(155, 89, 182, 0.4);
+}
+
+.mat-icon[data-icon-group="communication"] { 
+	color: var(--system-icon-group-communication);
+	text-shadow: 0 0 8px rgba(255, 107, 157, 0.4);
+}
+
+.mat-icon[data-icon-group="status-info"] { 
+	color: var(--system-icon-group-status-info);
+}
+
+.mat-icon[data-icon-group="status-warning"] { 
+	color: var(--system-icon-group-status-warning);
+}
+
+.mat-icon[data-icon-group="status-error"] { 
+	color: var(--system-icon-group-status-error);
+}
+
+.mat-icon[data-icon-group="status-success"] { 
+	color: var(--system-icon-group-status-success);
+}
+
+.mat-icon[data-icon-group="file"] { 
+	color: var(--system-icon-group-file);
+}
+
+.mat-icon[data-icon-group="user"] { 
+	color: var(--system-icon-group-user);
+}
+
+.mat-icon[data-icon-group="system"] { 
+	color: var(--system-icon-group-system);
+}
+
+/* =====================================================
+   5. DESKTOP SHELL SYSTEM CLASSES (.system-desktop-*)
+   VISUAL ENHANCEMENTS ONLY - NO INTERACTION OVERRIDES
+   ===================================================== */
+
+/* Taskbar */
+.system-desktop-taskbar {
+	background: rgba(20, 20, 35, 0.8) !important;
+	border-top: 1px solid var(--system-border);
+	backdrop-filter: blur(var(--system-taskbar-blur)) !important;
+	-webkit-backdrop-filter: blur(var(--system-taskbar-blur)) !important;
+	box-shadow: var(--system-taskbar-glow), 0 -2px 20px rgba(255, 140, 66, 0.25);
+}
+
+.system-desktop-taskbar__item {
+	background: var(--system-icon-bg);
+	border: 1px solid var(--system-border);
+	border-radius: var(--system-radius);
+	transition: all 0.2s ease;
+	min-width: 44px;
+	min-height: 44px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	cursor: pointer;
+}
+
+.system-desktop-taskbar__item:active {
+	background: var(--system-highlight);
+	border-color: var(--system-accent);
+	box-shadow: 0 4px 16px rgba(255, 140, 66, 0.3);
+	transform: scale(0.95);
+}
+
+.system-desktop-taskbar__item--active {
+	background: var(--system-highlight);
+	border-color: var(--system-accent);
+}
+
+.system-desktop-taskbar__item--active::after {
+	background: var(--system-accent);
+	box-shadow: 0 0 8px var(--system-accent);
+}
+
+/* Windows */
+.system-desktop-window {
+	background: var(--system-window-bg);
+	border: 1px solid var(--system-border);
+	border-radius: var(--system-radius-lg);
+	backdrop-filter: blur(12px);
+	-webkit-backdrop-filter: blur(12px);
+	box-shadow: var(--system-window-glow), var(--system-shadow);
+}
+
+.system-desktop-window__header {
+	background: var(--system-header-bg);
+	border-bottom: 1px solid var(--system-border);
+}
+
+.system-desktop-window__title { color: var(--system-text); }
+
+.system-desktop-window__control--close:active {
+	background: var(--system-danger);
+}
+
+.system-desktop-window__control--close:active .mat-icon {
+	color: white;
+}
+
+/* Desktop Icons */
+.system-desktop-icon {
+	background: var(--system-icon-bg);
+	border: var(--system-icon-border);
+	border-radius: var(--system-radius);
+	backdrop-filter: blur(8px);
+	-webkit-backdrop-filter: blur(8px);
+	box-shadow: var(--system-shadow);
+	transition: all 0.2s ease;
+}
+
+.system-desktop-icon:active {
+	background: var(--system-highlight);
+	border-color: var(--system-accent);
+	box-shadow: var(--system-icon-glow), var(--system-shadow);
+	transform: translateY(-2px) scale(0.98);
+}
+
+.system-desktop-icon__label {
+	color: var(--system-text);
+	text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+	font-size: 11px;
+	text-align: center;
+}
+
+.system-desktop-icon--selected {
+	border-color: #ff8c42;
+	box-shadow: var(--system-icon-glow), 0 0 0 2px rgba(255, 140, 66, 0.3);
+}
+
+/* Long-press holding state */
+.system-desktop-icon[data-longpress="holding"] {
+	transform: scale(0.95);
+	box-shadow: var(--system-icon-glow), 0 0 0 2px #ff8c42;
+	animation: tavernPulse 0.3s ease-in-out infinite;
+}
+
+@keyframes tavernPulse {
+	0%, 100% { 
+		box-shadow: var(--system-icon-glow), 0 0 0 2px rgba(255, 140, 66, 0.3);
+	}
+	50% { 
+		box-shadow: var(--system-icon-glow), 0 0 0 3px #ff8c42;
+	}
+}
+
+/* START MENU - VISUAL STYLING ONLY */
+.system-desktop-start-menu {
+	background: var(--system-menu-bg) !important;
+	border: 1px solid var(--system-border) !important;
+	border-radius: var(--system-radius-lg) !important;
+	backdrop-filter: blur(var(--system-start-menu-blur)) !important;
+	-webkit-backdrop-filter: blur(var(--system-start-menu-blur)) !important;
+	box-shadow: var(--system-shadow);
+}
+
+/* Category Items - VISUAL ONLY */
+.system-desktop-start-menu__category,
+.start-menu-category {
+	color: var(--system-text) !important;
+	border-radius: var(--system-radius) !important;
+	transition: background 0.2s ease !important;
+}
+
+.system-desktop-start-menu__category:active,
+.start-menu-category:active {
+	background: var(--system-highlight) !important;
+}
+
+.system-desktop-start-menu__category .material-icons,
+.start-menu-category .material-icons {
+	color: var(--system-accent) !important;
+	font-size: 24px !important;
+}
+
+.system-desktop-start-menu__category-name,
+.start-menu-category-name { color: var(--system-text) !important; font-weight: 600 !important; }
+
+.system-desktop-start-menu__category-desc,
+.start-menu-category-desc { color: var(--system-text-dim) !important; }
+
+.system-desktop-start-menu__category-count,
+.start-menu-category-count {
+	color: var(--system-text-dim) !important;
+	background: rgba(255, 255, 255, 0.1) !important;
+	border-radius: 10px !important;
+	padding: 2px 8px !important;
+}
+
+/* App Items - VISUAL ONLY */
+.system-desktop-start-menu__item,
+.start-menu-app {
+	color: var(--system-text) !important;
+	border-radius: var(--system-radius) !important;
+	transition: background 0.2s ease !important;
+	min-height: 44px !important;
+}
+
+.system-desktop-start-menu__item:active,
+.start-menu-app:active {
+	background: var(--system-highlight) !important;
+}
+
+.system-desktop-start-menu__item .material-icons,
+.start-menu-app .material-icons {
+	color: var(--system-text-dim) !important;
+	font-size: 20px !important;
+}
+
+.system-desktop-start-menu__item-name,
+.start-menu-app-name { color: var(--system-text) !important; }
+
+/* Header & Navigation */
+.system-desktop-start-menu__header,
+.start-menu-header {
+	background: var(--system-header-bg) !important;
+	border-bottom: 1px solid var(--system-border) !important;
+}
+
+/* Avatar */
+.system-desktop-start-menu__avatar,
+.start-menu-avatar {
+	background: var(--system-icon-bg) !important;
+	border: 1px solid var(--system-border) !important;
+	color: var(--system-accent) !important;
+	border-radius: 50% !important;
+	width: 48px !important;
+	height: 48px !important;
+	display: flex !important;
+	align-items: center !important;
+	justify-content: center !important;
+}
+
+/* Content Area */
+.system-desktop-start-menu__content,
+.start-menu-content {
+	max-height: calc(70vh - 60px) !important;
+	overflow-y: auto !important;
+	padding: 8px !important;
+}
+
+/* Browser Components */
+.system-desktop-browser__toolbar {
+	background: rgba(255, 255, 255, 0.05);
+	border-bottom: 1px solid var(--system-border);
+	backdrop-filter: blur(8px);
+	-webkit-backdrop-filter: blur(8px);
+}
+
+.system-desktop-browser__address {
+	background: rgba(255, 255, 255, 0.1);
+	border: 1px solid var(--system-border);
+	color: var(--system-text);
+	border-radius: var(--system-radius);
+	padding: 8px 12px;
+}
+
+.system-desktop-browser__address:focus {
+	border-color: var(--system-accent);
+	box-shadow: 0 0 0 2px var(--system-highlight);
+	outline: none;
+}
+
+.system-desktop-browser__btn {
+	background: var(--system-icon-bg);
+	border: 1px solid var(--system-border);
+	color: var(--system-text);
+	border-radius: var(--system-radius);
+	width: 32px;
+	height: 32px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	cursor: pointer;
+}
+
+.system-desktop-browser__btn:active {
+	background: var(--system-highlight);
+}
+
+/* =====================================================
+   6. MYSTIC REALM - DOM Sparkle Animation (Decorative)
+   ===================================================== */
+@keyframes sparkleFade {
+	0% { opacity: 0; transform: scale(0.3) rotate(0deg) translateY(0); }
+	20% { opacity: 1; transform: scale(1.2) rotate(45deg) translateY(-5px); }
+	100% { opacity: 0; transform: scale(0.8) rotate(180deg) translateY(-25px); }
+}
+
+.rune-sparkle {
+	position: fixed;
+	z-index: 50; /* Below icons (100), above canvas (0) */
+	pointer-events: none; /* Never block clicks */
+	font-size: 18px;
+	color: hsla(280, 90%, 75%, 0.9);
+	text-shadow: 0 0 10px hsla(280, 90%, 70%, 0.8);
+	user-select: none;
+	animation: sparkleFade 1.5s ease-out forwards;
+	will-change: transform, opacity;
+}
+
+/* =====================================================
+   7. ACCESSIBILITY & FALLBACKS
+   ===================================================== */
+
+/* Reduced Motion Support */
+@media (prefers-reduced-motion: reduce) {
+	*, *::before, *::after {
+		animation-duration: 0.01ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.01ms !important;
+	}
+
+	.system-desktop-icon:active,
+	.system-desktop-taskbar__item:active,
+	.system-btn:active {
+		transform: none !important;
+	}
+
+	.rune-sparkle, .desktop-context-menu {
+		animation: none !important;
+	}
+
+	.rune-sparkle { opacity: 0.5 !important; }
+}
+
+/* No Backdrop-Filter Fallback */
+@supports not (backdrop-filter: blur(10px)) {
+	.system-card,
+	.system-btn,
+	.system-input,
+	.system-menu,
+	.system-desktop-taskbar,
+	.system-desktop-window,
+	.system-desktop-start-menu,
+	.system-desktop-icon {
+		background: rgba(30, 30, 46, 0.95) !important;
+		backdrop-filter: none !important;
+		-webkit-backdrop-filter: none !important;
+	}
+}
+
+/* =====================================================
+   8. UTILITY CLASSES
+   ===================================================== */
+.system-hidden { display: none !important; }
+.system-text-center { text-align: center !important; }
+.system-flex { display: flex !important; gap: 12px !important; flex-wrap: wrap !important; }
+.system-grid { display: grid !important; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)) !important; gap: 16px !important; }
+
+.system-mt-1 { margin-top: 4px !important; }
+.system-mt-2 { margin-top: 8px !important; }
+.system-mt-3 { margin-top: 12px !important; }
+.system-mt-4 { margin-top: 16px !important; }
+.system-mb-1 { margin-bottom: 4px !important; }
+.system-mb-2 { margin-bottom: 8px !important; }
+.system-mb-3 { margin-bottom: 12px !important; }
+.system-mb-4 { margin-bottom: 16px !important; }
+.system-p-1 { padding: 4px !important; }
+.system-p-2 { padding: 8px !important; }
+.system-p-3 { padding: 12px !important; }
+.system-p-4 { padding: 16px !important; }
+
+/* =====================================================
+   9. SCROLLBARS - THEME-AWARE
+   ===================================================== */
+::-webkit-scrollbar-track {
+	background: rgba(255, 255, 255, 0.05);
+}
+
+::-webkit-scrollbar-thumb {
+	background: linear-gradient(135deg, #ff8c42, #cc7035);
+	border-radius: 6px;
+}
+
+::-webkit-scrollbar-thumb:active {
+	background: linear-gradient(135deg, #cc7035, #aa5a2d);
+}
+
+/* Selection color with teal */
+::selection {
+	background: rgba(26, 153, 136, 0.4);
+	color: #f4e4c1;
+}

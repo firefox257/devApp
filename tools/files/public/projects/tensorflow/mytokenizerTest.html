@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Tokenizer Tester</title>
+  <style>
+    :root {
+      --bg: #0f0f12;
+      --panel: #1a1a22;
+      --border: #333;
+      --text: #e0e0ff;
+      --muted: #888;
+      --accent: #6d9dff;
+      --success: #4ade80;
+      --warning: #fbbf24;
+      --error: #f87171;
+      --code-bg: #0a0a0f;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      padding: 20px;
+      line-height: 1.5;
+    }
+    h1 { margin: 0 0 10px; font-size: 1.5rem; }
+    .subtitle { color: var(--muted); margin-bottom: 20px; font-size: 0.9rem; }
+    
+    .container {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+    @media (max-width: 900px) {
+      .container { grid-template-columns: 1fr; }
+    }
+    
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+    }
+    .panel h3 {
+      margin: 0 0 12px;
+      font-size: 1.1rem;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 8px;
+    }
+    
+    label {
+      display: block;
+      margin: 10px 0 6px;
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+    textarea, input[type="text"] {
+      width: 100%;
+      padding: 10px;
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-family: 'Consolas', 'Monaco', monospace;
+      font-size: 0.9rem;
+      resize: vertical;
+    }
+    textarea { min-height: 100px; }
+    
+    .row { display: flex; gap: 10px; flex-wrap: wrap; }
+    .row > * { flex: 1; min-width: 200px; }
+    
+    button {
+      background: var(--accent);
+      color: #000;
+      border: none;
+      padding: 10px 18px;
+      border-radius: 6px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    button:hover { opacity: 0.9; }
+    button.secondary {
+      background: var(--border);
+      color: var(--text);
+    }
+    
+    .output {
+      background: var(--code-bg);
+      border-radius: 6px;
+      padding: 12px;
+      font-family: monospace;
+      font-size: 0.85rem;
+      white-space: pre-wrap;
+      word-break: break-all;
+      max-height: 300px;
+      overflow-y: auto;
+      border: 1px solid var(--border);
+    }
+    
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .stat {
+      background: rgba(109, 157, 255, 0.1);
+      padding: 8px 12px;
+      border-radius: 6px;
+      text-align: center;
+    }
+    .stat .value { font-size: 1.3rem; font-weight: bold; color: var(--accent); }
+    .stat .label { font-size: 0.75rem; color: var(--muted); }
+    
+    .token-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      max-height: 200px;
+      overflow-y: auto;
+      padding: 4px;
+    }
+    .token {
+      background: rgba(109, 157, 255, 0.15);
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 0.8rem;
+      font-family: monospace;
+      border: 1px solid var(--border);
+    }
+    .token.special {
+      background: rgba(251, 191, 36, 0.2);
+      border-color: var(--warning);
+    }
+    
+    .decode-preview {
+      margin-top: 8px;
+      padding: 8px;
+      background: rgba(74, 222, 128, 0.1);
+      border-left: 3px solid var(--success);
+      border-radius: 0 6px 6px 0;
+      font-family: monospace;
+      font-size: 0.9rem;
+    }
+    
+    .error {
+      color: var(--error);
+      background: rgba(248, 113, 113, 0.1);
+      padding: 10px;
+      border-radius: 6px;
+      border-left: 3px solid var(--error);
+      margin: 10px 0;
+    }
+  </style>
+</head>
+<body>
+  <h1>🔤 Tokenizer Tester</h1>
+  <div class="subtitle">Test your regex-based custom tokenizer with special token support</div>
+
+  <div class="container">
+    <!-- Configuration Panel -->
+    <div class="panel">
+      <h3>⚙️ Configuration</h3>
+      
+      <label for="corpus">Training Corpus (for vocabulary building)</label>
+      <textarea id="corpus" placeholder="Enter sample text to build vocabulary...">The quick brown fox jumps over the lazy dog. Hello world! AI, machine-learning &amp; NLP are amazing. 123 test@token.com</textarea>
+      
+      <label for="specialTokens">Special Tokens (comma-separated)</label>
+      <input type="text" id="specialTokens" placeholder="e.g., [CLS], [SEP], &lt;pad&gt;, &lt;unk&gt;" value="[CLS],[SEP],&lt;pad&gt;,&lt;unk&gt;"/>
+      
+      <div class="row" style="margin-top:14px">
+        <button id="buildBtn">🔨 Build Tokenizer</button>
+        <button id="resetBtn" class="secondary">↺ Reset</button>
+      </div>
+      
+      <div id="stats" class="stats" style="display:none">
+        <div class="stat"><div class="value" id="vocabSize">0</div><div class="label">Vocab Size</div></div>
+        <div class="stat"><div class="value" id="specialCount">0</div><div class="label">Special Tokens</div></div>
+        <div class="stat"><div class="value" id="baseCount">0</div><div class="label">Base Tokens</div></div>
+      </div>
+    </div>
+
+    <!-- Vocabulary Panel -->
+    <div class="panel">
+      <h3>📚 Vocabulary</h3>
+      <div id="tokenList" class="token-list">
+        <span style="color:var(--muted);font-style:italic">Build tokenizer to see vocabulary...</span>
+      </div>
+      <div style="margin-top:10px;font-size:0.8rem;color:var(--muted)">
+        <span class="token special">■ Special</span>
+        <span class="token">■ Base</span>
+        <span style="margin-left:10px">Sorted: ASCII order, case-sensitive</span>
+      </div>
+    </div>
+
+    <!-- Encode Panel -->
+    <div class="panel">
+      <h3>🔢 Encode Text</h3>
+      <label for="inputText">Input Text</label>
+      <textarea id="inputText" placeholder="Type text to encode...">Hello [CLS] world! Testing &lt;unk&gt; token.</textarea>
+      
+      <div class="row" style="margin:10px 0">
+        <button id="encodeBtn">▶ Encode</button>
+        <button id="copyIdsBtn" class="secondary">📋 Copy IDs</button>
+      </div>
+      
+      <label>Token IDs</label>
+      <div id="encodedOutput" class="output">[ ]</div>
+      
+      <div id="decodePreview" class="decode-preview" style="display:none">
+        <strong>Decoded:</strong> <span id="decodedText"></span>
+      </div>
+    </div>
+
+    <!-- Decode Panel -->
+    <div class="panel">
+      <h3>🔤 Decode IDs</h3>
+      <label for="inputIds">Token IDs (comma or space separated)</label>
+      <input type="text" id="inputIds" placeholder="e.g., 1, 5, 23, 2"/>
+      
+      <div class="row" style="margin:10px 0">
+        <button id="decodeBtn">▶ Decode</button>
+        <button id="copyTextBtn" class="secondary">📋 Copy Text</button>
+      </div>
+      
+      <label>Decoded Text</label>
+      <div id="decodedOutput" class="output"></div>
+    </div>
+  </div>
+
+  <div id="errorBox" class="error" style="display:none;margin:20px auto;max-width:1400px"></div>
+
+  <script>
+    // ============ YOUR TOKENIZER FUNCTION ============
+    function buildChatTokenizer(corpus, specialTokens = []) {
+      const tokenRegex = /[a-zA-Z0-9]+|[^a-zA-Z0-9\s]/g;
+      const baseTokens = corpus.match(tokenRegex) || [];
+      const specialSet = new Set(specialTokens);
+      const uniqueBase = [...new Set(baseTokens)].filter(t => !specialSet.has(t));
+      uniqueBase.sort((a, b) => { 
+        for(let i=0; i<Math.max(a.length, b.length); i++) { 
+          const ca = i<a.length ? a.charCodeAt(i) : -1, 
+                cb = i<b.length ? b.charCodeAt(i) : -1; 
+          if(ca!==cb) return ca-cb; 
+        } 
+        return 0; 
+      });
+      const vocabulary = [...specialTokens, ...uniqueBase];
+      const decoder = {}; 
+      vocabulary.forEach((t, i) => decoder[t] = i + 1);
+      
+      const encode = text => {
+        const ids = []; 
+        const escaped = specialTokens.map(t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+        const parts = text.split(new RegExp(`(${escaped.join('|')})`, 'g')).filter(p => p.trim());
+        for (const p of parts) { 
+          if(specialSet.has(p)) {
+            ids.push(decoder[p]); 
+          } else {
+            const subTokens = p.match(tokenRegex) || [];
+            for(const t of subTokens) {
+              ids.push(decoder[t] || 0); // 0 = unknown
+            }
+          }
+        }
+        return ids;
+      };
+      
+      return { 
+        vocabulary, 
+        decoder, 
+        encode, 
+        decode: ids => ids.map(id => id===0 ? '' : (vocabulary[id-1] || '')).join(''), 
+        specialTokens 
+      };
+    }
+
+    // ============ UI LOGIC ============
+    let tokenizer = null;
+
+    const $ = id => document.getElementById(id);
+    const escapeHtml = str => str.replace(/[&<>"']/g, m => 
+      ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+
+    function showError(msg) {
+      const el = $('errorBox');
+      el.textContent = msg;
+      el.style.display = 'block';
+      setTimeout(() => el.style.display = 'none', 5000);
+    }
+
+    function renderVocabulary() {
+      const list = $('tokenList');
+      list.innerHTML = '';
+      if (!tokenizer) {
+        list.innerHTML = '<span style="color:var(--muted);font-style:italic">Build tokenizer to see vocabulary...</span>';
+        return;
+      }
+      
+      const specialSet = new Set(tokenizer.specialTokens);
+      tokenizer.vocabulary.forEach((token, idx) => {
+        const span = document.createElement('span');
+        span.className = 'token' + (specialSet.has(token) ? ' special' : '');
+        span.title = `ID: ${idx + 1}`;
+        span.textContent = token;
+        list.appendChild(span);
+      });
+    }
+
+    function updateStats() {
+      if (!tokenizer) {
+        $('stats').style.display = 'none';
+        return;
+      }
+      $('vocabSize').textContent = tokenizer.vocabulary.length;
+      $('specialCount').textContent = tokenizer.specialTokens.length;
+      $('baseCount').textContent = tokenizer.vocabulary.length - tokenizer.specialTokens.length;
+      $('stats').style.display = 'grid';
+    }
+
+    function buildTokenizer() {
+      try {
+        const corpus = $('corpus').value;
+        const specialInput = $('specialTokens').value;
+        const specialTokens = specialInput.split(',')
+          .map(s => s.trim())
+          .filter(s => s.length > 0);
+        
+        if (!corpus.trim()) {
+          throw new Error('Corpus cannot be empty');
+        }
+        
+        tokenizer = buildChatTokenizer(corpus, specialTokens);
+        renderVocabulary();
+        updateStats();
+        $('encodedOutput').textContent = '[ ]';
+        $('decodedOutput').textContent = '';
+        $('decodePreview').style.display = 'none';
+        showError('✅ Tokenizer built successfully!');
+      } catch (e) {
+        showError('❌ ' + e.message);
+        tokenizer = null;
+        updateStats();
+      }
+    }
+
+    function encodeText() {
+      if (!tokenizer) return showError('❌ Build tokenizer first');
+      const text = $('inputText').value;
+      try {
+        const ids = tokenizer.encode(text);
+        $('encodedOutput').textContent = '[' + ids.join(', ') + ']';
+        
+        // Preview decode
+        const decoded = tokenizer.decode(ids);
+        $('decodedText').textContent = escapeHtml(decoded) || '(empty)';
+        $('decodePreview').style.display = decoded ? 'block' : 'none';
+      } catch (e) {
+        showError('❌ Encode error: ' + e.message);
+      }
+    }
+
+    function decodeIds() {
+      if (!tokenizer) return showError('❌ Build tokenizer first');
+      const input = $('inputIds').value;
+      try {
+        const ids = input.split(/[\s,]+/)
+          .map(s => s.trim())
+          .filter(s => s)
+          .map(s => parseInt(s, 10))
+          .filter(n => !isNaN(n) && n >= 0);
+        
+        if (ids.length === 0) {
+          $('decodedOutput').textContent = '(no valid IDs)';
+          return;
+        }
+        
+        const text = tokenizer.decode(ids);
+        $('decodedOutput').textContent = text || '(empty / unknown tokens)';
+      } catch (e) {
+        showError('❌ Decode error: ' + e.message);
+      }
+    }
+
+    function copyToClipboard(text) {
+      navigator.clipboard.writeText(text).then(
+        () => showError('📋 Copied to clipboard!'),
+        () => showError('❌ Copy failed')
+      );
+    }
+
+    function resetAll() {
+      $('corpus').value = 'The quick brown fox jumps over the lazy dog. Hello world! AI, machine-learning & NLP are amazing. 123 test@token.com';
+      $('specialTokens').value = '[CLS],[SEP],<pad>,<unk>';
+      $('inputText').value = 'Hello [CLS] world! Testing <unk> token.';
+      $('inputIds').value = '';
+      $('encodedOutput').textContent = '[ ]';
+      $('decodedOutput').textContent = '';
+      $('decodePreview').style.display = 'none';
+      $('tokenList').innerHTML = '<span style="color:var(--muted);font-style:italic">Build tokenizer to see vocabulary...</span>';
+      $('stats').style.display = 'none';
+      tokenizer = null;
+      showError('↺ Reset complete');
+    }
+
+    // Event Listeners
+    $('buildBtn').addEventListener('click', buildTokenizer);
+    $('resetBtn').addEventListener('click', resetAll);
+    $('encodeBtn').addEventListener('click', encodeText);
+    $('decodeBtn').addEventListener('click', decodeIds);
+    $('copyIdsBtn').addEventListener('click', () => {
+      const text = $('encodedOutput').textContent;
+      if (text !== '[ ]') copyToClipboard(text);
+    });
+    $('copyTextBtn').addEventListener('click', () => {
+      const text = $('decodedOutput').textContent;
+      if (text && text !== '(empty / unknown tokens)') copyToClipboard(text);
+    });
+
+    // Allow Enter key in specialTokens input to build
+    $('specialTokens').addEventListener('keypress', e => {
+      if (e.key === 'Enter') buildTokenizer();
+    });
+    $('inputText').addEventListener('keypress', e => {
+      if (e.key === 'Enter' && e.ctrlKey) encodeText();
+    });
+
+    // Auto-build on load for demo
+    window.addEventListener('load', buildTokenizer);
+  </script>
+</body>
+</html>

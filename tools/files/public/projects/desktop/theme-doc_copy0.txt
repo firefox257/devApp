@@ -5,8 +5,6 @@ ARCHITECTURE UPDATE: OS Shell Separation + Icon Variables + Desktop System Class
 LONG-PRESS INTERACTION MODEL + CONTEXT MENU SYSTEM [NEW v2.7+]
 APP REGISTRY INTEGRATION: apps.json v2.0 [NEW]
 MOBILE SUPPORT UPDATE: HOVER STYLES DISABLED [NEW v2.7+]
-ICON GROUPING SYSTEM: Functional Color Coding for App Icons [NEW v2.7+]
-IFRAME APP BRIDGE: os-theme-bridge.css + os-theme-bridge.js [NEW v2.7+]
 ================================================================================
 IMPORTANT NOTICE: MOBILE SUPPORT UPDATE
 --------------------------------------------------------------------------------
@@ -18,46 +16,18 @@ IMPORTANT NOTICE: MOBILE SUPPORT UPDATE
 > *   Do not implement hover styles in theme CSS. Touch devices do not support
 >     hover states, and relying on them creates inconsistent experiences.
 ================================================================================
-IMPORTANT NOTICE: IFRAME APP BRIDGE FILES [NEW v2.7+]
---------------------------------------------------------------------------------
-> 📦 TWO BRIDGE FILES REQUIRED FOR IFRAME APPS
->
-> File: /os-theme-bridge.css
-> - Contains all .system-* component class definitions
-> - Provides CSS reset/normalize for .system-app container
-> - Includes utility classes (spacing, typography, layout)
-> - Defines icon group styles for data-icon-group support
-> - Uses CSS variables (var(--system-*)) for all colors
-> - Mobile-first: No :hover states, uses :active/:focus
->
-> File: /os-theme-bridge.js
-> - Establishes postMessage communication with parent OS
-> - Requests current theme on app initialization
-> - Listens for theme change broadcasts from parent
-> - Applies CSS variables to iframe document root
-> - Dispatches 'osThemeChanged' event for app reactions
-> - Exposes OsThemeBridge API for programmatic access
->
-> LOAD ORDER IN IFRAME APPS (CRITICAL):
-> 1. <link rel="stylesheet" href="/os-theme-bridge.css" />
-> 2. <script src="/os-theme-bridge.js"></script>
-> 3. Custom <style> blocks
-> 4. Custom <script> blocks
->
-> CSS MUST load before JS for theme variables to apply correctly.
-================================================================================
 TABLE OF CONTENTS
 --------------------------------------------------------------------------------
 1.  Overview
 2.  Critical Rules (Read First!) [UPDATED]
-3.  File Structure [UPDATED]
+3.  File Structure
 4.  Theme Configuration (themes.json)
 5.  CSS: Complete Override System [UPDATED]
 6.  CSS Variables & Design Tokens [UPDATED]
 7.  System Component Classes (.system-*) [FULL REFERENCE] [UPDATED]
 8.  Desktop Shell System Classes (.system-desktop-*) [NEW v2.7+] [UPDATED]
 9.  System Class Override Groups
-10. System App Container (.system-app) [UPDATED]
+10. System App Container (.system-app)
 11. Long-Press Interaction Model [NEW v2.7+]
 12. JavaScript & Canvas Animations
 13. Cleanup System
@@ -71,9 +41,7 @@ TABLE OF CONTENTS
 21. Appendix: Desktop.html Integration Notes [UPDATED]
 22. Appendix: Updated System Classes (v2.7+) [UPDATED]
 23. Appendix: Architecture Changes (v2.7+)
-24. Appendix: Icon Grouping & Functional Color Coding System [NEW v2.7+]
-25. APP REGISTRY: apps.json STRUCTURE (v2.0) [NEW]
-26. IFRAME APP DEVELOPMENT GUIDE [NEW v2.7+]
+24. APP REGISTRY: apps.json STRUCTURE (v2.0) [NEW]
 ================================================================================
 1. OVERVIEW
 ================================================================================
@@ -93,8 +61,6 @@ ARCHITECTURE CHANGE (v2.7+):
 - NEW: Desktop Shell System Classes (.system-desktop-*) for enhanced theming
 - NEW: Long-press interaction model with ContextMenu API for desktop icons
 - NEW: apps.json registry for centralized app management (v2.0)
-- NEW: Icon Grouping System for functional color coding across apps
-- NEW: os-theme-bridge.css + os-theme-bridge.js for iframe app theme sync
 - UPDATED: Mobile-First Support (Hover styles removed)
 KEY FEATURES:
 - Dynamic Loading: Themes apply without page reload
@@ -107,15 +73,13 @@ KEY FEATURES:
 - Component Library: 90+ .system-* classes for consistent UI theming
 - Desktop Classes: 40+ .system-desktop-* classes for OS shell theming [NEW]
 - App Container: .system-app for zero-config HTML element styling
-- Iframe Sync: Apps in iframes automatically sync with OS theme changes [NEW]
-- Bridge Files: os-theme-bridge.css + .js for iframe app integration [NEW]
+- Iframe Sync: Apps in iframes automatically sync with OS theme changes
 - Separation of Concerns: OS shell styled in desktop.html, themes override variables
 - Icon Theming: Desktop icons fully themeable via CSS variables
 - Long-Press System: Touch-first context menus with setupLongPress() utility [NEW]
 - Context Menu API: Unified menu system with keyboard/touch support [NEW]
 - App Registry: Centralized apps.json for categories, permissions, sandboxing [NEW]
 - Mobile-First: No hover dependencies, touch-optimized interactions [NEW]
-- Icon Grouping: Functional icon categorization with granular color control [NEW]
 ================================================================================
 2. CRITICAL RULES (READ FIRST!) [UPDATED]
 ================================================================================
@@ -157,34 +121,6 @@ KEY FEATURES:
 - Iframe apps must declare sandbox/permissions matching apps.json
 - Apps should use os-theme-bridge.js for theme sync
 - App windows respect allowMultipleInstances setting
-17. ICON GROUPING: Use data-icon-group for functional color coding [NEW]
-- Add data-icon-group="group-name" to .mat-icon elements in apps
-- Themes override --system-icon-group-* variables for granular control
-- Popular icons are pre-mapped to functional groups for consistency
-- Apps should use semantic grouping for accessibility and theming
-18. IFRAME APPS MUST INCLUDE BOTH BRIDGE FILES [NEW]
-- <link rel="stylesheet" href="/os-theme-bridge.css" /> (CSS first)
-- <script src="/os-theme-bridge.js"></script> (JS second)
-- Load order matters: CSS before JS before custom scripts
-19. IFRAME APPS MUST USE .system-app CONTAINER [NEW]
-- Wrap all app content in <div class="system-app">
-- Enables zero-config styling for child elements
-- Required for theme variable inheritance
-20. IFRAME APPS MUST ADD data-os-app ATTRIBUTE ON BOTH ENDS [NEW]
-- Add data-os-app="true" to <body> or root element OF THE APP
-- Add data-os-app="true" to the <iframe> tag IN desktop.html
-- The bridge script checks window.frameElement for this attribute
-- Missing this attribute on the iframe tag will prevent bridge initialization
-21. DESKTOP.HTML MUST IMPLEMENT MESSAGE LISTENER [NEW]
-- desktop.html MUST have a window.addEventListener('message', ...) handler
-- It must listen for 'themeRequest' and 'appReady' from iframes
-- It must respond with 'themeUpdate' and 'themeAck' messages
-- Without this listener, iframe apps will not receive theme variables
-22. IFRAME APPS MUST RESPECT apps.json SANDBOX [NEW]
-- Match sandbox attributes to apps.json configuration
-- allow-scripts required for bridge JS to function
-- allow-same-origin required for localStorage access
-- Don't request permissions not declared in apps.json
 PRO TIP: Test cleanup early
 Apply your theme, then immediately switch to another theme. If animations
 continue or styles persist, your cleanup is broken. Fix it before adding features.
@@ -197,9 +133,6 @@ ARCHITECTURE REMINDER:
 |  - All OS-level UI elements                                                |
 |  - Uses CSS variables (--system-*) for theming                             |
 |  - setupLongPress() utility + ContextMenu API (NEW v2.7+)                  |
-|  - data-icon-group support for functional icon coloring [NEW]              |
-|  - MUST implement postMessage listener for iframe bridge [NEW]             |
-|  - MUST add data-os-app="true" to iframe tags [NEW]                        |
 +-----------------------------------------------------------------------------+
 |
 CSS Variables (--system-*)
@@ -208,33 +141,13 @@ CSS Variables (--system-*)
 |                  themes/*/styles.css (Theme)                                |
 |  - :root { --system-bg: #color; ... }                                      |
 |  - :root { --system-icon-bg: ... } (REQUIRED)                              |
-|  - :root { --system-icon-group-*: ... } (OPTIONAL - granular control)      |
 |  - .system-* classes for iframe apps                                       |
 |  - .system-desktop-* classes for OS shell enhancement (OPTIONAL)           |
 |  - Background image                                                        |
 |  - #themeCanvas display settings                                           |
 +-----------------------------------------------------------------------------+
-|
-+-----------------------------------------------------------------------------+
-|              /os-theme-bridge.css (Iframe App Base Styles) [NEW]           |
-|  - All .system-* component class definitions                               |
-|  - CSS reset/normalize for .system-app container                           |
-|  - Utility classes (spacing, typography, layout)                           |
-|  - Icon group styles for data-icon-group support                           |
-|  - Mobile-first interactions (:active/:focus, NO :hover)                   |
-|  - All styles use CSS variables (var(--system-*)) for theming              |
-+-----------------------------------------------------------------------------+
-|
-+-----------------------------------------------------------------------------+
-|              /os-theme-bridge.js (Iframe App Theme Sync) [NEW]             |
-|  - postMessage communication with parent OS                                |
-|  - Theme request/response handling                                         |
-|  - CSS variable application to iframe document                             |
-|  - osThemeChanged event dispatching                                        |
-|  - OsThemeBridge API exposure                                              |
-+-----------------------------------------------------------------------------+
 ================================================================================
-3. FILE STRUCTURE [UPDATED]
+3. FILE STRUCTURE
 ================================================================================
 RECOMMENDED ORGANIZATION:
 /webos/
@@ -242,8 +155,7 @@ RECOMMENDED ORGANIZATION:
 |-- themes.json           [Theme registry - REQUIRED]
 |-- apps.json             [App registry - REQUIRED v2.0]
 |-- theme-doc.txt         [This documentation file]
-|-- os-theme-bridge.css   [SDK CSS for iframe apps - REQUIRED for apps]
-|-- os-theme-bridge.js    [SDK JS for iframe apps - REQUIRED for apps]
+|-- os-theme-bridge.js    [SDK for iframe apps - REQUIRED for apps]
 +-- themes/
 +-- your-theme/
 |-- styles.css          [CSS variables + .system-* + .system-desktop-*]
@@ -254,7 +166,7 @@ RECOMMENDED ORGANIZATION:
 +-- fonts/
 +-- apps/
 +-- notes/
-|-- index.html          [App entry point with bridge files]
+|-- index.html          [App entry point]
 |-- styles.css          [App-specific styles]
 |-- script.js           [App logic]
 +-- terminal/
@@ -268,16 +180,16 @@ apps.json                         | Yes      | App registry/metadata       | Val
 themes/your-theme/styles.css      | Yes      | Visual styling              | CSS variables + .system-* only
 themes/your-theme/script.js       | Optional | Canvas animations           | Must set window.ThemeCleanup
 themes/your-theme/preview.jpg     | Optional | Theme thumbnail in Settings | Recommended: 300x200px
-os-theme-bridge.css               | Yes*     | Iframe app base styles      | *Required if using iframe apps
 os-theme-bridge.js                | Yes*     | Iframe app theme sync       | *Required if using iframe apps
-desktop.html                      | Yes      | OS Shell + System CSS       | Contains all shell styling + Bridge Listener
-Font Assets (Required):
+desktop.html                      | Yes      | OS Shell + System CSS       | Contains all shell styling
+Font Assets (Optional but Recommended):
 -------------------------------------------------------------------------------
-/system/fonts/MaterialIcons-Regular.ttf   | REQUIRED | Local icon font    | Must match @font-face src
+/system/fonts/MaterialIcons-Regular.ttf   | Recommended | Local icon font    | Must match @font-face src
+/system/fonts/MaterialIcons-Regular.woff2 | Optional    | Compressed variant | Smaller size, same quality
 -------------------------------------------------------------------------------
 NOTE: The @font-face declaration in desktop.html MUST reference the exact
-path and filename of your font file: /system/fonts/MaterialIcons-Regular.ttf
-Mismatched paths will cause icons to render as plain text instead of glyphs.
+path and filename of your font file. Mismatched paths will cause icons
+to render as plain text instead of glyphs.
 NOTE: File names can be customized but must match the paths specified in
 themes.json exactly. Paths are relative to desktop.html.
 THEME CSS SHOULD NOT CONTAIN:
@@ -294,7 +206,6 @@ THEME CSS SHOULD CONTAIN:
 + :root { --system-*: ... }
 + :root { --system-icon-bg: ... }
 + :root { --system-icon-border: ... }
-+ :root { --system-icon-group-*: ... } [OPTIONAL - functional color coding]
 + .system-btn { ... }
 + .system-btn:active { ... } [REPLACES HOVER]
 + .system-card { ... }
@@ -304,15 +215,6 @@ THEME CSS SHOULD CONTAIN:
 + .system-desktop-icon { ... } (OPTIONAL - for enhanced theming)
 + body { background: ... }
 + #themeCanvas { display: ... }
-IFRAME APP HTML SHOULD CONTAIN:
-+ <link rel="stylesheet" href="/os-theme-bridge.css" />
-+ <script src="/os-theme-bridge.js"></script>
-+ <div class="system-app">...</div>
-+ data-icon-group attributes on .mat-icon elements
-+ data-os-app="true" on body or root element
-DESKTOP.HTML IFRAME TAGS SHOULD CONTAIN:
-+ <iframe src="..." data-os-app="true" ...></iframe>
-+ Parent window must have message event listener for bridge
 ================================================================================
 4. THEME CONFIGURATION (themes.json)
 ================================================================================
@@ -359,6 +261,7 @@ Theme scripts can access it via window.ThemeConfig (set by ThemeManager).
 Theme CSS overrides base styles through CSS custom properties. OS shell elements
 in desktop.html reference these variables, so themes only need to override :root.
 **MOBILE NOTE: No hover states are supported. Use :active or :focus for interaction feedback.**
+
 CORRECT - Variable Overrides (Static & Focus/Active):
 :root {
 --system-bg: linear-gradient(135deg, #1a1a2e, #0f3460);
@@ -366,77 +269,78 @@ CORRECT - Variable Overrides (Static & Focus/Active):
 --system-accent: #7ec8e3;
 --system-icon-bg: rgba(30, 30, 46, 0.8);
 --system-icon-border: 1px solid rgba(126, 200, 80, 0.3);
-/* Icon group variables for functional color coding [NEW] */
---system-icon-group-action-destructive: #ff5252;
---system-icon-group-action-confirmation: #4caf50;
---system-icon-group-navigation: var(--system-accent);
 /* Hover variables removed for mobile support */
 }
+
 INCORRECT - Direct Shell Styling (DO NOT DO THIS):
 .icon { ... }           /* Styled in desktop.html */
 .window { ... }         /* Styled in desktop.html */
 .taskbar { ... }        /* Styled in desktop.html */
 .start-menu { ... }     /* Styled in desktop.html */
+
 INCORRECT - Hover Styles (DO NOT DO THIS):
 .system-btn:hover { ... }     /* Not supported on touch devices */
 .system-desktop-icon:hover { ... } /* Not supported on touch devices */
+
 OPTIONAL - Desktop System Class Enhancements (v2.7+ Static Only):
 /* These are safe because they use the .system-desktop-* namespace */
 .system-desktop-taskbar {
-backdrop-filter: blur(20px);
-box-shadow: 0 0 20px rgba(0, 120, 212, 0.3);
+	backdrop-filter: blur(20px);
+	box-shadow: 0 0 20px rgba(0, 120, 212, 0.3);
 }
 .system-desktop-icon {
-backdrop-filter: blur(10px);
-/* Transition removed to prevent ghost hover states */
+	backdrop-filter: blur(10px);
+	/* Transition removed to prevent ghost hover states */
 }
+
 BACKGROUND IMAGE SUPPORT:
 /* Use relative path from CSS file location */
 html, html body, body {
-background-color: #fallback-color !important;
-background-image: url('background.png') !important;
-background-repeat: no-repeat !important;
-background-position: center center !important;
-background-attachment: fixed !important;
-background-size: cover !important;
-min-height: 100dvh !important;
-min-width: 100vw !important;
+	background-color: #fallback-color !important;
+	background-image: url('background.png') !important;
+	background-repeat: no-repeat !important;
+	background-position: center center !important;
+	background-attachment: fixed !important;
+	background-size: cover !important;
+	min-height: 100dvh !important;
+	min-width: 100vw !important;
 }
 /* Or use absolute path from web root */
 html, html body, body {
-background: #fallback-color url('/themes/your-theme/background.png') no-repeat center center fixed !important;
-background-size: cover !important;
+	background: #fallback-color url('/themes/your-theme/background.png') no-repeat center center fixed !important;
+	background-size: cover !important;
 }
 ACCESSIBILITY: REDUCED MOTION
 @media (prefers-reduced-motion: reduce) {
-body {
-animation: none !important;
-}
-.system-btn,
-.system-card,
-.system-app *,
-.system-desktop-icon,
-.system-desktop-window {
-transition: none !important;
-animation: none !important;
-transform: none !important;
-}
+	body {
+		animation: none !important;
+	}
+	.system-btn,
+	.system-card,
+	.system-app *,
+	.system-desktop-icon,
+	.system-desktop-window {
+		transition: none !important;
+		animation: none !important;
+		transform: none !important;
+	}
 }
 FALLBACK FOR NO BACKDROP-FILTER SUPPORT:
 @supports not (backdrop-filter: blur(10px)) {
-.system-card,
-.system-app .card,
-.system-desktop-taskbar,
-.system-desktop-start-menu {
-background: rgba(30, 30, 46, 0.95) !important;
-backdrop-filter: none !important;
-}
+	.system-card,
+	.system-app .card,
+	.system-desktop-taskbar,
+	.system-desktop-start-menu {
+		background: rgba(30, 30, 46, 0.95) !important;
+		backdrop-filter: none !important;
+	}
 }
 ================================================================================
 6. CSS VARIABLES & DESIGN TOKENS [UPDATED]
 ================================================================================
 CORE SYSTEM VARIABLES (Define in :root, override in theme):
 **NOTE: Hover-related variables have been removed for mobile compatibility.**
+
 Variable                    | Default Value          | Purpose                  | Example Override
 ----------------------------|------------------------|--------------------------|------------------------
 --system-bg                 | #004e92                | Body, cards background   | #000 (Matrix)
@@ -465,22 +369,7 @@ Variable                    | Default Value          | Purpose                  
 --system-icon-border        | none                   | Icon border              | 1px solid rgba(126, 200, 80, 0.3)
 /* --system-icon-bg-hover REMOVED */
 /* --system-icon-border-hover REMOVED */
-ICON GROUP VARIABLES [NEW v2.7+] (Optional - for functional color coding):
-Variable                                | Default Value          | Purpose                          | Example Override
-----------------------------------------|------------------------|----------------------------------|------------------------
---system-icon-group-navigation          | var(--system-text)     | Navigation icons (home, menu)    | var(--system-accent)
---system-icon-group-action-primary      | var(--system-accent)   | Primary actions (add, save)      | #00ff41
---system-icon-group-action-destructive  | var(--system-danger)   | Destructive actions (delete)     | #ff3333
---system-icon-group-action-confirmation | var(--system-success)  | Confirmation actions (check)     | #00ff66
---system-icon-group-media               | var(--system-info)     | Media controls (play, volume)    | #4da3ff
---system-icon-group-communication       | var(--system-highlight)| Communication (chat, share)      | #7ec8e3
---system-icon-group-status-info         | var(--system-info)     | Info status icons                | #2196f3
---system-icon-group-status-warning      | var(--system-warning)  | Warning status icons             | #ffc107
---system-icon-group-status-error        | var(--system-danger)   | Error status icons               | #f44336
---system-icon-group-status-success      | var(--system-success)  | Success status icons             | #4caf50
---system-icon-group-file                | var(--system-text-dim) | File management icons            | #666666
---system-icon-group-user                | var(--system-accent)   | User/account icons               | #0078d4
---system-icon-group-system              | var(--system-text-dim) | System/utility icons             | #666666
+
 OPTIONAL DESKTOP VARIABLES (v2.7+ - Add to desktop.html for advanced theming):
 Variable                    | Default Value          | Purpose                  | Example Override
 ----------------------------|------------------------|--------------------------|------------------------
@@ -489,72 +378,55 @@ Variable                    | Default Value          | Purpose                  
 --system-icon-glow          | none                   | Icon glow (Static)       | 0 0 15px rgba(0,120,212,0.4)
 --system-start-menu-blur    | 15px                   | Start menu blur amount   | 25px
 --system-taskbar-blur       | 15px                   | Taskbar blur amount      | 25px
+
 THEME OVERRIDE EXAMPLE (themes/matrix/styles.css):
 :root {
---system-bg: #000;
---system-window-bg: #0a0a0a;
---system-header-bg: #1a1a1a;
---system-accent: #00ff41;
---system-accent-dim: #008f11;
---system-highlight: #00ff66;
---system-text: #00ff41;
---system-text-dim: #008f11;
---system-text-on-accent: #000;
---system-border: #003300;
---system-font: 'Courier New', Courier, monospace;
---system-font-mono: 'Fira Code', monospace;
---system-shadow: 0 0 40px rgba(0, 255, 65, 0.2);
---system-success: #00ff41;
---system-warning: #ffaa00;
---system-danger: #ff3333;
---system-info: #0099ff;
-/* Icon styling (REQUIRED - Static Only) */
---system-icon-bg: rgba(0, 20, 0, 0.6);
---system-icon-border: 1px solid rgba(0, 255, 65, 0.3);
-/* Icon group variables [NEW - OPTIONAL] */
---system-icon-group-action-destructive: #ff3333;
---system-icon-group-action-confirmation: #00ff66;
---system-icon-group-navigation: #00ff41;
---system-icon-group-status-warning: #ffaa00;
-/* Desktop enhancements (OPTIONAL v2.7+ - Static Only) */
---system-taskbar-glow: 0 0 20px rgba(0, 255, 65, 0.3);
---system-window-glow: 0 0 30px rgba(0, 255, 65, 0.15);
+	--system-bg: #000;
+	--system-window-bg: #0a0a0a;
+	--system-header-bg: #1a1a1a;
+	--system-accent: #00ff41;
+	--system-accent-dim: #008f11;
+	--system-highlight: #00ff66;
+	--system-text: #00ff41;
+	--system-text-dim: #008f11;
+	--system-text-on-accent: #000;
+	--system-border: #003300;
+	--system-font: 'Courier New', Courier, monospace;
+	--system-font-mono: 'Fira Code', monospace;
+	--system-shadow: 0 0 40px rgba(0, 255, 65, 0.2);
+	--system-success: #00ff41;
+	--system-warning: #ffaa00;
+	--system-danger: #ff3333;
+	--system-info: #0099ff;
+	/* Icon styling (REQUIRED - Static Only) */
+	--system-icon-bg: rgba(0, 20, 0, 0.6);
+	--system-icon-border: 1px solid rgba(0, 255, 65, 0.3);
+	/* Desktop enhancements (OPTIONAL v2.7+ - Static Only) */
+	--system-taskbar-glow: 0 0 20px rgba(0, 255, 65, 0.3);
+	--system-window-glow: 0 0 30px rgba(0, 255, 65, 0.15);
 }
 /* Background image support */
 html, html body, body {
-background-color: #000 !important;
-background-image: url('background.png') !important;
-background-repeat: no-repeat !important;
-background-position: center center !important;
-background-attachment: fixed !important;
-background-size: cover !important;
-min-height: 100dvh !important;
-min-width: 100vw !important;
+	background-color: #000 !important;
+	background-image: url('background.png') !important;
+	background-repeat: no-repeat !important;
+	background-position: center center !important;
+	background-attachment: fixed !important;
+	background-size: cover !important;
+	min-height: 100dvh !important;
+	min-width: 100vw !important;
 }
 /* Canvas display for rain/particle effects */
 #themeCanvas {
-display: block !important;
+	display: block !important;
 }
 /* Optional desktop class enhancements (Static Only) */
 .system-desktop-taskbar {
-box-shadow: var(--system-taskbar-glow);
-backdrop-filter: blur(20px);
+	box-shadow: var(--system-taskbar-glow);
+	backdrop-filter: blur(20px);
 }
 .system-desktop-window {
-box-shadow: var(--system-window-glow), var(--system-shadow);
-}
-/* Icon group styling [NEW] */
-.mat-icon[data-icon-group] {
-color: var(--system-icon-group-default, var(--system-text));
-}
-.mat-icon[data-icon-group="action-destructive"] {
-color: var(--system-icon-group-action-destructive);
-}
-.mat-icon[data-icon-group="action-confirmation"] {
-color: var(--system-icon-group-action-confirmation);
-}
-.mat-icon[data-icon-group="navigation"] {
-color: var(--system-icon-group-navigation);
+	box-shadow: var(--system-window-glow), var(--system-shadow);
 }
 /* Hover styles removed for mobile support */
 ACCESSING VARIABLES IN JAVASCRIPT:
@@ -795,147 +667,143 @@ Class                              | Description                           | Var
 /* Add to desktop.html <style id="system-components"> or new <style id="system-desktop"> */
 /* Taskbar */
 .system-desktop-taskbar {
-background: var(--system-bg);
-border-top: 1px solid var(--system-border);
-height: var(--system-taskbar-height);
-display: flex;
-align-items: center;
-justify-content: space-between;
-padding: 0 10px;
-z-index: 3000;
+	background: var(--system-bg);
+	border-top: 1px solid var(--system-border);
+	height: var(--system-taskbar-height);
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 0 10px;
+	z-index: 3000;
 }
 .system-desktop-taskbar__item {
-min-width: 44px;
-height: 44px;
-display: flex;
-align-items: center;
-justify-content: center;
-border-radius: var(--system-radius);
-background: rgba(255,255,255,0.05);
-border: 1px solid var(--system-border);
-color: var(--system-text);
-cursor: pointer;
-transition: all 0.2s ease;
+	min-width: 44px;
+	height: 44px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: var(--system-radius);
+	background: rgba(255,255,255,0.05);
+	border: 1px solid var(--system-border);
+	color: var(--system-text);
+	cursor: pointer;
+	transition: all 0.2s ease;
 }
 .system-desktop-taskbar__item:active {
-background: rgba(255,255,255,0.15);
-border-color: var(--system-border);
+	background: rgba(255,255,255,0.15);
+	border-color: var(--system-border);
 }
 .system-desktop-taskbar__item--active {
-background: rgba(255,255,255,0.25);
-border-color: var(--system-accent);
+	background: rgba(255,255,255,0.25);
+	border-color: var(--system-accent);
 }
 .system-desktop-taskbar__item--active::after {
-content: '';
-position: absolute;
-bottom: 4px;
-width: 16px;
-height: 4px;
-background: var(--system-accent);
-border-radius: 2px;
+	content: '';
+	position: absolute;
+	bottom: 4px;
+	width: 16px;
+	height: 4px;
+	background: var(--system-accent);
+	border-radius: 2px;
 }
 /* Desktop Icons */
 .system-desktop-icon {
-background: var(--system-icon-bg);
-border: var(--system-icon-border);
-border-radius: var(--system-radius);
-transition: all 0.2s ease;
+	background: var(--system-icon-bg);
+	border: var(--system-icon-border);
+	border-radius: var(--system-radius);
+	transition: all 0.2s ease;
 }
 /* .system-desktop-icon:hover REMOVED */
 .system-desktop-icon__label {
-color: var(--system-text);
-font-size: 11px;
-text-align: center;
-overflow: hidden;
-text-overflow: ellipsis;
-white-space: nowrap;
+	color: var(--system-text);
+	font-size: 11px;
+	text-align: center;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 /* Windows */
 .system-desktop-window {
-background: var(--system-window-bg);
-border: 1px solid var(--system-border);
-border-radius: var(--system-radius-lg);
-box-shadow: var(--system-shadow);
-display: flex;
-flex-direction: column;
-overflow: hidden;
+	background: var(--system-window-bg);
+	border: 1px solid var(--system-border);
+	border-radius: var(--system-radius-lg);
+	box-shadow: var(--system-shadow);
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
 }
 .system-desktop-window__header {
-background: var(--system-header-bg);
-border-bottom: 1px solid var(--system-border);
-display: flex;
-align-items: center;
-justify-content: space-between;
-padding: 0 10px;
-height: 40px;
-cursor: grab;
+	background: var(--system-header-bg);
+	border-bottom: 1px solid var(--system-border);
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 0 10px;
+	height: 40px;
+	cursor: grab;
 }
 .system-desktop-window__title {
-color: var(--system-text);
-font-size: 13px;
-font-weight: 600;
-white-space: nowrap;
-overflow: hidden;
-text-overflow: ellipsis;
+	color: var(--system-text);
+	font-size: 13px;
+	font-weight: 600;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
 }
 .system-desktop-window__control--close:active {
-background: var(--system-danger);
+	background: var(--system-danger);
 }
 .system-desktop-window__control--close:active .mat-icon {
-color: var(--system-text-on-accent);
+	color: var(--system-text-on-accent);
 }
 /* Start Menu */
 .system-desktop-start-menu {
-background: var(--system-menu-bg);
-backdrop-filter: blur(15px);
--webkit-backdrop-filter: blur(15px);
-border-radius: var(--system-radius-lg);
-border: 1px solid rgba(255,255,255,0.1);
-box-shadow: var(--system-shadow);
-padding: 10px;
-animation: slideUp 0.2s ease-out;
+	background: var(--system-menu-bg);
+	backdrop-filter: blur(15px);
+	-webkit-backdrop-filter: blur(15px);
+	border-radius: var(--system-radius-lg);
+	border: 1px solid rgba(255,255,255,0.1);
+	box-shadow: var(--system-shadow);
+	padding: 10px;
+	animation: slideUp 0.2s ease-out;
 }
 .system-desktop-start-menu__item {
-display: flex;
-align-items: center;
-padding: 12px;
-border-radius: var(--system-radius);
-color: var(--system-text);
-cursor: pointer;
-transition: background 0.2s ease;
+	display: flex;
+	align-items: center;
+	padding: 12px;
+	border-radius: var(--system-radius);
+	color: var(--system-text);
+	cursor: pointer;
+	transition: background 0.2s ease;
 }
 .system-desktop-start-menu__item:active {
-background: rgba(255,255,255,0.1);
+	background: rgba(255,255,255,0.1);
 }
 --- THEME OVERRIDE EXAMPLE ---
 /* themes/cyberpunk/styles.css */
 :root {
-/* Base variable overrides */
---system-bg: #0a0a12;
---system-border: rgba(100, 200, 255, 0.3);
---system-accent: #00f3ff;
---system-icon-bg: rgba(0, 243, 255, 0.1);
---system-icon-border: 1px solid rgba(0, 243, 255, 0.4);
-/* Icon group variables [NEW] */
---system-icon-group-action-destructive: #ff5252;
---system-icon-group-action-confirmation: #4caf50;
---system-icon-group-navigation: #00f3ff;
-/* Desktop-specific variables */
---system-taskbar-glow: 0 0 20px rgba(0, 243, 255, 0.3);
---system-window-glow: 0 0 30px rgba(0, 243, 255, 0.15);
+	/* Base variable overrides */
+	--system-bg: #0a0a12;
+	--system-border: rgba(100, 200, 255, 0.3);
+	--system-accent: #00f3ff;
+	--system-icon-bg: rgba(0, 243, 255, 0.1);
+	--system-icon-border: 1px solid rgba(0, 243, 255, 0.4);
+	/* Desktop-specific variables */
+	--system-taskbar-glow: 0 0 20px rgba(0, 243, 255, 0.3);
+	--system-window-glow: 0 0 30px rgba(0, 243, 255, 0.15);
 }
 /* Optional: Direct class enhancements for complex effects */
 .system-desktop-taskbar {
-box-shadow: var(--system-taskbar-glow);
-backdrop-filter: blur(20px) !important;
+	box-shadow: var(--system-taskbar-glow);
+	backdrop-filter: blur(20px) !important;
 }
 .system-desktop-window {
-box-shadow: var(--system-window-glow), var(--system-shadow);
-border-color: var(--system-icon-border);
+	box-shadow: var(--system-window-glow), var(--system-shadow);
+	border-color: var(--system-icon-border);
 }
 .system-desktop-icon {
-backdrop-filter: blur(10px);
-border-radius: 12px;
+	backdrop-filter: blur(10px);
+	border-radius: 12px;
 }
 /* Hover styles removed for mobile support */
 --- BACKWARD COMPATIBILITY ---
@@ -960,7 +828,6 @@ Data Display             | .system-table, .system-list*, .system-badge*, .system
 Feedback                 | .system-alert*, .system-spinner, .system-skeleton | Status messages and loading states
 Utilities                | .system-hidden, .system-text-*, .system-m[tp]-*, .system-rounded | Quick layout helpers
 Desktop Shell [NEW]      | .system-desktop-*                         | OS shell element theming (taskbar, windows, icons)
-Icon Groups [NEW]        | .mat-icon[data-icon-group]                | Functional icon color coding by category
 PRO TIP: Combine utility classes for rapid layout
 <div class="system-card system-mb-3">
 <div class="system-card-body system-p-4">
@@ -973,7 +840,7 @@ PRO TIP: Combine utility classes for rapid layout
 </div>
 </div>
 ================================================================================
-10. SYSTEM APP CONTAINER (.system-app) [UPDATED]
+10. SYSTEM APP CONTAINER (.system-app)
 ================================================================================
 *** ZERO-CONFIG AUTO-STYLING FOR IFRAME APPS ***
 The .system-app class is a special container that provides automatic,
@@ -981,115 +848,69 @@ theme-aware styling for all standard HTML elements within iframe-based
 applications. When you wrap your app content in .system-app, you get
 consistent typography, form styling, buttons, tables, and more--without
 writing custom CSS.
-REQUIRED SETUP FOR IFRAME APPS:
--------------------------------------------------------------------------------
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<!-- REQUIRED: Bridge CSS for .system-* classes (MUST be first) -->
-<link rel="stylesheet" href="/os-theme-bridge.css" />
-<!-- REQUIRED: Bridge JS for theme synchronization (MUST be after CSS) -->
-<script src="/os-theme-bridge.js"></script>
-<!-- REQUIRED: Material Icons Font (if using icons) -->
-<style>
-@font-face {
-font-family: 'Material Icons';
-src: url('/system/fonts/MaterialIcons-Regular.ttf') format('truetype');
-font-weight: normal;
-font-style: normal;
-font-display: block;
-}
-.mat-icon {
-font-family: 'Material Icons', sans-serif !important;
-font-feature-settings: 'liga';
-}
-</style>
-</head>
-<body data-os-app="true">
-<!-- REQUIRED: Wrap all content in .system-app -->
-<div class="system-app">
-<h1 class="system-title">My App</h1>
-<p class="system-text">Content auto-styles with theme colors.</p>
-<button class="system-btn">
-<span class="mat-icon" data-icon-group="action-confirmation">check</span>
-Submit
-</button>
-</div>
-</body>
-</html>
--------------------------------------------------------------------------------
-LOAD ORDER MATTERS:
-1. <link rel="stylesheet" href="/os-theme-bridge.css" />  (CSS first)
-2. <script src="/os-theme-bridge.js"></script>            (JS second)
-3. Custom <style> blocks                                  (App styles last)
-Why This Order?
-- CSS must load before JS applies theme variables
-- JS needs CSS variables to exist before syncing theme
-- App styles should override bridge styles if needed
-KEY FEATURES:
+Key Features:
 - Automatic inheritance: All child elements inherit theme CSS variables
 - Reset & normalize: Removes browser defaults for consistent appearance
 - Responsive typography: Scales appropriately for window size
 - Form consistency: Inputs, selects, buttons match OS design language
 - Zero configuration: Just add the class--no additional setup required
-- Icon Group Support: data-icon-group attributes enable functional color coding
-- Theme Sync: Automatically updates when OS theme changes (via bridge JS)
-WHAT .system-app STYLES AUTOMATICALLY:
+Usage Example:
+-------------------------------------------------------------------------------
+<!-- In your iframe app HTML -->
+<!DOCTYPE html>
+<html>
+<head>
+<link rel="stylesheet" href="/os-theme-bridge.css">
+<script src="/os-theme-bridge.js"></script>
+</head>
+<body>
+<div class="system-app">
+<h1>My App Title</h1>
+<p class="system-text">This paragraph auto-styles with theme colors.</p>
+<div class="system-card">
+<div class="system-card-body">
+<label class="system-label">Username</label>
+<input type="text" class="system-input" placeholder="Enter username">
+<div class="system-btn-group system-mt-3">
+<button class="system-btn">Submit</button>
+<button class="system-btn-secondary">Cancel</button>
+</div>
+</div>
+</div>
+<table class="system-table">
+<thead><tr><th>Name</th><th>Status</th></tr></thead>
+<tbody>
+<tr><td>Project A</td><td><span class="system-badge-success">Active</span></td></tr>
+</tbody>
+</table>
+</div>
+</body>
+</html>
+-------------------------------------------------------------------------------
+What .system-app Styles Automatically:
 -------------------------------------------------------------------------------
 .system-app {
-/* Typography */
-h1-h6, p, a { /* Theme-aware colors, margins, fonts */ }
-/* Forms */
-input, textarea, select { /* Full-width, themed borders, focus rings */ }
-/* Buttons */
-button { /* Accent background, active effects, disabled states */ }
-/* Tables */
-table, th, td { /* Collapsed borders, header bg, row active */ }
-/* Layout helpers */
-.card, .panel, .alert, .badge { /* Pre-styled components */ }
-/* Spacing utilities */
-.mt-1 to .mt-4, .text-center, etc. { /* Quick layout helpers */ }
-/* Icon Groups [NEW] */
-.mat-icon[data-icon-group] {
-color: var(--system-icon-group-default, var(--system-text));
-}
-.mat-icon[data-icon-group="action-destructive"] {
-color: var(--system-icon-group-action-destructive);
-}
-/* ... etc for all 13 icon groups */
+	/* Typography */
+	h1-h6, p, a { /* Theme-aware colors, margins, fonts */ }
+	/* Forms */
+	input, textarea, select { /* Full-width, themed borders, focus rings */ }
+	/* Buttons */
+	button { /* Accent background, active effects, disabled states */ }
+	/* Tables */
+	table, th, td { /* Collapsed borders, header bg, row active */ }
+	/* Layout helpers */
+	.card, .panel, .alert, .badge { /* Pre-styled components */ }
+	/* Spacing utilities */
+	.mt-1 to .mt-4, .text-center, etc. { /* Quick layout helpers */ }
 }
 -------------------------------------------------------------------------------
-BRIDGE JS THEME SYNC:
--------------------------------------------------------------------------------
-The os-theme-bridge.js script handles:
-1. Requesting current theme from parent OS on app load
-2. Listening for theme change messages via postMessage
-3. Applying CSS variables to iframe document root
-4. Dispatching 'osThemeChanged' custom events for app reactions
-Listen for theme changes in your app JS:
-window.addEventListener('osThemeChanged', (e) => {
-console.log('Theme updated:', e.detail.themeId);
-console.log('Variables:', e.detail.variables);
-// App-specific reactions (update charts, canvas, etc.)
-});
-Bridge API (exposed as window.OsThemeBridge):
-- OsThemeBridge.refresh() - Manually request theme update
-- OsThemeBridge.onChange(callback) - Listen for changes (returns unsubscribe fn)
-- OsThemeBridge.getVariables() - Get current theme variables as object
--------------------------------------------------------------------------------
-BEST PRACTICES:
+Best Practices:
 1. Wrap entire app content in .system-app for maximum consistency
-2. Include BOTH bridge CSS and JS in <head> (order matters)
-3. Combine with .system-* classes for fine-grained control where needed
-4. Use data-icon-group attributes on .mat-icon elements for functional color coding
-5. Avoid custom CSS overrides unless absolutely necessary--leverage variables
-6. Test theme switching to ensure your app adapts correctly
-7. Use semantic HTML inside .system-app for best accessibility
-8. Add data-os-app="true" attribute to body or root element (helps bridge detect app)
-9. ENSURE PARENT IFRAME TAG HAS data-os-app="true" (Critical for bridge init)
-PRO TIP: For rapid prototyping, you can build entire functional apps using
+2. Combine with .system-* classes for fine-grained control where needed
+3. Avoid custom CSS overrides unless absolutely necessary--leverage variables
+4. Test theme switching to ensure your app adapts correctly
+5. Use semantic HTML inside .system-app for best accessibility
+Pro Tip: For rapid prototyping, you can build entire functional apps using
 only .system-app + .system-* classes--no custom CSS required. The theme
 system handles all visual adaptation automatically.
 All .system-* classes use CSS variables (var(--system-*)) for colors,
@@ -1131,33 +952,32 @@ icon.className = 'icon system-desktop-icon';
 icon.dataset.appId = 'my-app';
 const launchApp = () => { /* open app logic */ };
 const onLongPress = (e) => {
-e.preventDefault();
-const point = e.type.includes('touch') ? e.touches[0] : e;
-ContextMenu.show(
-point.clientX,
-point.clientY,
-[
-{
-label: 'Remove from Desktop',
-icon: 'delete_outline',
-value: 'remove',
-danger: true
-}
-],
-(action) => {
-if (action === 'remove') {
-DesktopManager.removeFromDesktop('my-app');
-icon.remove();
-}
-}
-);
+	e.preventDefault();
+	const point = e.type.includes('touch') ? e.touches[0] : e;
+	ContextMenu.show(
+		point.clientX,
+		point.clientY,
+		[
+			{
+				label: 'Remove from Desktop',
+				icon: 'delete_outline',
+				value: 'remove',
+				danger: true
+			}
+		],
+		(action) => {
+			if (action === 'remove') {
+				DesktopManager.removeFromDesktop('my-app');
+				icon.remove();
+			}
+		}
+	);
 };
 setupLongPress(icon, {
-onLongPress,
-onShortPress: launchApp,
-preventContextMenu: true
-});
--------------------------------------------------------------------------------
+		onLongPress,
+		onShortPress: launchApp,
+		preventContextMenu: true
+	});
 KEY FEATURES:
 * Cross-platform: Works with mouse, touch, pen input
 * Movement detection: Cancels if user drags during press
@@ -1180,24 +1000,23 @@ Returns: Reference to created menu DOM element
 Usage Example:
 -------------------------------------------------------------------------------
 ContextMenu.show(
-200,  // x coordinate
-150,  // y coordinate
-[
-{ label: 'Open', icon: 'launch', value: 'open' },
-{ label: 'Add to Desktop', icon: 'add_to_home_screen', value: 'add' },
-{ label: 'Remove', icon: 'delete', value: 'remove', danger: true }
-],
-(action, item) => {
-console.log('Selected:', action);
-// Handle action logic
-},
-() => {
-console.log('Menu closed');
-// Optional cleanup
-}
+	200,  // x coordinate
+	150,  // y coordinate
+	[
+		{ label: 'Open', icon: 'launch', value: 'open' },
+		{ label: 'Add to Desktop', icon: 'add_to_home_screen', value: 'add' },
+		{ label: 'Remove', icon: 'delete', value: 'remove', danger: true }
+	],
+	(action, item) => {
+		console.log('Selected:', action);
+		// Handle action logic
+	},
+	() => {
+		console.log('Menu closed');
+		// Optional cleanup
+	}
 );
 ContextMenu.hide()  // Programmatically dismiss open menu
--------------------------------------------------------------------------------
 DESKTOPMANAGER INTEGRATION:
 // Persistence API for desktop icon state
 DesktopManager.addToDesktop(appId)    // Add app to desktop, save to localStorage
@@ -1226,18 +1045,17 @@ ACCESSIBILITY CONSIDERATIONS:
 - Context menu items minimum 44px height
 - Adequate spacing between interactive elements
 BEST PRACTICES:
-- Use setupLongPress for all desktop icon interactions
-- Always call e.preventDefault() in onLongPress to suppress native menu
-- Provide both onShortPress AND keyboard onkeydown handler
-- Keep context menus concise (3-5 items max)
-- Use danger: true for destructive actions (visual warning)
-- Test on actual touch devices (not just mouse simulation)
-- Verify haptic feedback doesn't interfere with UX
-DON'T:
-- Don't use setupLongPress for non-interactive elements
-- Don't forget to prevent default on contextmenu event
-- Don't create context menus with only one item (use direct action instead)
-- Don't rely solely on visual feedback for long-press confirmation
+Use setupLongPress for all desktop icon interactions
+Always call e.preventDefault() in onLongPress to suppress native menu
+Provide both onShortPress AND keyboard onkeydown handler
+Keep context menus concise (3-5 items max)
+Use danger: true for destructive actions (visual warning)
+Test on actual touch devices (not just mouse simulation)
+Verify haptic feedback doesn't interfere with UX
+Don't use setupLongPress for non-interactive elements
+Don't forget to prevent default on contextmenu event
+Don't create context menus with only one item (use direct action instead)
+Don't rely solely on visual feedback for long-press confirmation
 ================================================================================
 12. JAVASCRIPT & CANVAS ANIMATIONS
 ================================================================================
@@ -1249,7 +1067,6 @@ DON'T:
 5. Cancel all requestAnimationFrame, setInterval, setTimeout
 6. Use proper canvas variable scoping (local const or this.canvas)
 MINIMUM VIABLE SCRIPT TEMPLATE:
--------------------------------------------------------------------------------
 (function() {
 'use strict';
 const canvas = document.getElementById('themeCanvas');
@@ -1294,7 +1111,6 @@ ctx.clearRect(0, 0, canvas.width, canvas.height);
 };
 if (ThemeManager?.registerCleanup) ThemeManager.registerCleanup(() => {});
 })();
--------------------------------------------------------------------------------
 ================================================================================
 13. CLEANUP SYSTEM
 ================================================================================
@@ -1372,69 +1188,49 @@ background: #ffffff; /* Won't adapt to theme */
 <h1>Title</h1>
 <button>Click</button>
 </div>
-4. USE data-icon-group FOR FUNCTIONAL ICON COLORING [NEW]
-/* GOOD: Semantic icon grouping */
-<span class="mat-icon" data-icon-group="action-destructive">delete</span>
-<span class="mat-icon" data-icon-group="navigation">home</span>
-/* Themes can then color-code by function */
-5. USE .system-desktop-* FOR SHELL ENHANCEMENTS [NEW v2.7+]
+4. USE .system-desktop-* FOR SHELL ENHANCEMENTS [NEW v2.7+]
 /* GOOD: Optional desktop class enhancements */
 .system-desktop-taskbar {
-backdrop-filter: blur(20px);
-box-shadow: var(--system-taskbar-glow);
+	backdrop-filter: blur(20px);
+	box-shadow: var(--system-taskbar-glow);
 }
 /* BAD: Direct element styling */
 .taskbar {
-background: red !important; /* Breaks variable system */
+	background: red !important; /* Breaks variable system */
 }
-6. DO NOT STYLE OS SHELL ELEMENTS IN THEME CSS
+5. DO NOT STYLE OS SHELL ELEMENTS IN THEME CSS
 /* BAD: OS shell styling in theme (DO NOT DO) */
 .icon { background: red; }
 .window { border-color: blue; }
 /* GOOD: Variable overrides only */
 :root {
---system-bg: #color;
---system-accent: #color;
---system-icon-bg: rgba(0,0,0,0.5);
+	--system-bg: #color;
+	--system-accent: #color;
+	--system-icon-bg: rgba(0,0,0,0.5);
 }
-7. TEST CLEANUP THOROUGHLY
+6. TEST CLEANUP THOROUGHLY
 - Switch themes 10x rapidly
 - Check console for errors
 - Verify no memory growth
 - Confirm animations stop
-8. RESPECT ACCESSIBILITY
+7. RESPECT ACCESSIBILITY
 - Support prefers-reduced-motion
 - Maintain contrast ratios
 - Test with screen readers
 - Provide fallbacks for backdrop-filter
-9. IMPLEMENT LONG-PRESS PROPERLY [NEW v2.7+]
+8. IMPLEMENT LONG-PRESS PROPERLY [NEW v2.7+]
 - Use setupLongPress() utility for all desktop icon interactions
 - Always pair onShortPress with keyboard onkeydown handler
 - Call e.preventDefault() in onLongPress to suppress native context menu
 - Keep context menus concise (3-5 items) with clear visual hierarchy
 - Test on real touch devices, not just mouse simulation
-10. RESPECT apps.json STRUCTURE [NEW v2.0]
+9. RESPECT apps.json STRUCTURE [NEW v2.0]
 - Verify app IDs match between apps.json and desktop icon data-app-id
 - Respect sandbox permissions in iframe apps
 - Use os-theme-bridge.js for theme sync in all iframe apps
-11. NO HOVER STYLES [MOBILE-FIRST]
+10. NO HOVER STYLES [MOBILE-FIRST]
 - Do not use :hover in CSS
 - Use :active, :focus, or .selected states
-12. USE ICON GROUPS FOR INCLUSIVE DESIGN [NEW]
-- Map popular icons to functional groups for consistency
-- Allow themes to override group colors for accessibility
-- Ensure sufficient contrast for color-coded icons
-13. INCLUDE BOTH BRIDGE FILES IN IFRAME APPS [NEW]
-- <link rel="stylesheet" href="/os-theme-bridge.css" /> (CSS first)
-- <script src="/os-theme-bridge.js"></script> (JS second)
-- Load order matters for theme variable application
-14. ENSURE BIDIRECTIONAL data-os-app ATTRIBUTE [NEW]
-- Add to iframe app <body>
-- Add to desktop.html <iframe> tag
-- Required for bridge initialization check
-15. IMPLEMENT PARENT MESSAGE LISTENER [NEW]
-- desktop.html must listen for 'themeRequest' from iframes
-- desktop.html must respond with 'themeUpdate'
 ================================================================================
 16. COMMON PITFALLS [UPDATED]
 ================================================================================
@@ -1463,19 +1259,12 @@ Solution: Ensure desktop.html includes the class definitions in system-component
 Problem: Icon names like "home" or "settings" display as words, not icons
 Solutions:
 1. Verify @font-face is declared in desktop.html <head> BEFORE .material-icons CSS
-2. Check font file path: /system/fonts/MaterialIcons-Regular.ttf exists (REQUIRED)
+2. Check font file path: /system/fonts/MaterialIcons-Regular.ttf exists
 3. Ensure .material-icons class includes font-feature-settings: 'liga'
 4. Verify server serves .ttf with MIME type: font/ttf
 5. Hard refresh browser (Ctrl+F5) to clear font cache
 6. Check DevTools Console for font load errors (404, CORS, MIME type)
 7. Confirm no Google Fonts CDN link is present (conflicts with local font)
-*** ICON GROUPS NOT COLORING ***
-Problem: data-icon-group attributes not applying colors
-Solutions:
-1. Verify theme CSS includes --system-icon-group-* variable overrides
-2. Check CSS selector specificity for .mat-icon[data-icon-group] rules
-3. Ensure desktop.html includes the icon group CSS rules
-4. Test with browser DevTools to inspect computed styles
 *** LONG-PRESS NOT TRIGGERING ON TOUCH [NEW v2.7+] ***
 Problem: Holding icon doesn't show context menu on mobile
 Solutions:
@@ -1518,45 +1307,7 @@ Solutions:
 1. Ensure os-theme-bridge.js is loaded in iframe app
 2. Verify data-os-app attribute on body or root element
 3. Check postMessage isn't blocked by sandbox settings
-4. Test with console.log in bridge to confirm message receipt
-*** IFRAME APP BRIDGE CSS NOT LOADED [NEW v2.7+] ***
-Problem: .system-* classes have no styles in iframe app
-Solutions:
-1. Verify <link rel="stylesheet" href="/os-theme-bridge.css" /> in <head>
-2. Check CSS loads BEFORE bridge JS (order matters)
-3. Verify path is correct (check Network tab for 404)
-4. Ensure .system-app container wraps app content
-*** IFRAME APP BRIDGE JS NOT SYNCING [NEW v2.7+] ***
-Problem: App doesn't update when OS theme changes
-Solutions:
-1. Verify <script src="/os-theme-bridge.js"></script> in <head>
-2. Check JS loads AFTER bridge CSS
-3. Verify data-os-app="true" on body or root element
-4. Check console for postMessage errors
-5. Ensure iframe sandbox allows scripts: allow-scripts
-6. Test with console.log in bridge to confirm message receipt
-*** BRIDGE LOAD ORDER WRONG [NEW v2.7+] ***
-Problem: Theme variables not applied correctly
-Solutions:
-1. CSS MUST load before JS: <link> then <script>
-2. Bridge JS MUST load before custom app scripts
-3. Custom <style> blocks should come after bridge files
-4. Use defer attribute on custom scripts if needed
-*** IFRAME BRIDGE NOT INITIALIZING [NEW v2.7+] ***
-Problem: Bridge script loads but does not sync theme
-Solutions:
-1. Verify data-os-app="true" is on the <iframe> tag in desktop.html
-2. Verify data-os-app="true" is on the <body> tag in the app
-3. Check desktop.html has a window.addEventListener('message', ...) handler
-4. Ensure desktop.html responds to 'themeRequest' with 'themeUpdate'
-5. Check console for "Bridge initialized" logs in both parent and iframe
-*** POSTMESSAGE SECURITY ERRORS [NEW v2.7+] ***
-Problem: Console shows "Blocked a frame with origin..."
-Solutions:
-1. Ensure desktop.html and iframe apps are served from the same origin
-2. If using different ports/subdomains, configure CORS headers properly
-3. Check event.origin in desktop.html message listener before responding
-4. Avoid using file:// protocol; use a local server (localhost)
+4. Test with console.log in bridge script to confirm message receipt
 ================================================================================
 17. PRE-DEPLOYMENT TESTING CHECKLIST [UPDATED]
 ================================================================================
@@ -1564,7 +1315,6 @@ Test                      | How to Test                              | Expected 
 --------------------------|------------------------------------------|------------------
 CSS Variables Only        | Check theme CSS for OS shell selectors   | No .icon, .window, .taskbar, etc.
 Icon Variables            | Check :root for --system-icon-*          | All icon variables present (Static)
-Icon Group Variables      | Check :root for --system-icon-group-*    | Group variables defined (if using)
 Background Image          | Apply theme -> Check if image loads      | Image visible, no 404 errors
 Background Initial Load   | Hard refresh (Ctrl+F5)                   | Image visible from start
 Canvas Transparency       | Apply theme with canvas -> Check bg      | CSS background visible through canvas
@@ -1584,11 +1334,9 @@ Variable Overrides        | Inspect :root in DevTools                | --system-
 Icon Background           | Load theme -> Check desktop icons        | Icons have theme background
 Icon Border               | Load theme -> Check icon borders         | Borders visible, match theme
 Icon Active State         | Tap/Click icons                          | Background + border brighten (Active)
-Icon Group Coloring       | Use data-icon-group -> Switch themes     | Icon colors update by functional group
 .system-desktop-* Classes | Inspect taskbar/windows in DevTools      | Classes present, styles apply
 Desktop Theme Override    | Add .system-desktop-taskbar rule in theme| Taskbar styling updates
 Local Font Loading        | Check Network tab for font file          | 200 OK, font/ttf MIME type
-Font File Path            | Verify /system/fonts/MaterialIcons-Regular.ttf exists | File loads without 404
 Icon Glyph Rendering      | Inspect .material-icons element          | Displays glyph, not text "home"
 Font Fallback Behavior    | Temporarily rename font file -> refresh  | Graceful degradation (text fallback)
 CDN Link Removed          | Search desktop.html for fonts.googleapis | No external font links found
@@ -1613,19 +1361,10 @@ Iframe App Theme Sync     | Open app -> Switch theme                 | App color
 Sandbox Permissions       | Check iframe attributes in DevTools      | Match apps.json sandbox config
 Multiple Instances        | Open app twice (if allowed)              | Two windows appear (or one if disabled)
 No Hover Styles           | Search CSS for :hover                    | None found (Mobile-First)
-Icon Group Inclusivity    | Test with color-blind simulator          | Icons distinguishable by shape + color
-Bridge CSS Loaded         | Check Network tab in iframe app          | 200 OK for /os-theme-bridge.css
-Bridge JS Loaded          | Check Network tab in iframe app          | 200 OK for /os-theme-bridge.js
-Load Order Correct        | Inspect iframe <head> in DevTools        | CSS before JS
-data-os-app Attribute     | Inspect iframe body in DevTools          | data-os-app="true" present
-data-os-app Iframe Tag    | Inspect desktop.html iframe tag          | data-os-app="true" present
-Parent Message Listener   | Check desktop.html script                | window.addEventListener('message') exists
-osThemeChanged Fires      | Check console in iframe app              | Event logged on theme change
-Bridge API Works          | Call OsThemeBridge.getVariables()        | Returns theme variables object
-Origin Security           | Check console for postMessage errors     | No origin blocking warnings
 ================================================================================
 18. EXAMPLES [UPDATED]
 ================================================================================
+
 EXAMPLE 1: MATRIX THEME (themes/matrix/styles.css)
 -------------------------------------------------------------------------------
 :root {
@@ -1649,11 +1388,6 @@ EXAMPLE 1: MATRIX THEME (themes/matrix/styles.css)
 /* Icon variables (REQUIRED - Static Only) */
 --system-icon-bg: rgba(0, 20, 0, 0.6);
 --system-icon-border: 1px solid rgba(0, 255, 65, 0.3);
-/* Icon group variables [NEW - OPTIONAL] */
---system-icon-group-action-destructive: #ff3333;
---system-icon-group-action-confirmation: #00ff66;
---system-icon-group-navigation: #00ff41;
---system-icon-group-status-warning: #ffaa00;
 /* Desktop enhancements (OPTIONAL v2.7+ - Static Only) */
 --system-taskbar-glow: 0 0 20px rgba(0, 255, 65, 0.3);
 --system-window-glow: 0 0 30px rgba(0, 255, 65, 0.15);
@@ -1679,18 +1413,9 @@ backdrop-filter: blur(20px);
 .system-desktop-window {
 box-shadow: var(--system-window-glow), var(--system-shadow);
 }
-/* Icon group styling [NEW] */
-.mat-icon[data-icon-group] {
-color: var(--system-icon-group-default, var(--system-text));
-}
-.mat-icon[data-icon-group="action-destructive"] {
-color: var(--system-icon-group-action-destructive);
-}
-.mat-icon[data-icon-group="action-confirmation"] {
-color: var(--system-icon-group-action-confirmation);
-}
 /* Hover styles removed for mobile support */
 -------------------------------------------------------------------------------
+
 EXAMPLE 2: FROSTED GLASS THEME (themes/frosted-glass/styles.css)
 -------------------------------------------------------------------------------
 :root {
@@ -1716,10 +1441,6 @@ EXAMPLE 2: FROSTED GLASS THEME (themes/frosted-glass/styles.css)
 /* Icon variables (REQUIRED - Static Only) */
 --system-icon-bg: rgba(255, 255, 255, 0.15);
 --system-icon-border: 1px solid rgba(255, 255, 255, 0.3);
-/* Icon group variables [NEW - OPTIONAL] */
---system-icon-group-action-destructive: #ff5252;
---system-icon-group-action-confirmation: #4caf50;
---system-icon-group-navigation: #ffffff;
 /* Desktop enhancements (OPTIONAL v2.7+ - Static Only) */
 --system-taskbar-blur: 25px;
 --system-start-menu-blur: 25px;
@@ -1749,15 +1470,9 @@ backdrop-filter: blur(15px);
 backdrop-filter: blur(10px);
 -webkit-backdrop-filter: blur(10px);
 }
-/* Icon group styling [NEW] */
-.mat-icon[data-icon-group] {
-color: var(--system-icon-group-default, var(--system-text));
-}
-.mat-icon[data-icon-group="action-destructive"] {
-color: var(--system-icon-group-action-destructive);
-}
 /* Hover styles removed for mobile support */
 -------------------------------------------------------------------------------
+
 EXAMPLE 3: themes.json ENTRY
 -------------------------------------------------------------------------------
 {
@@ -1787,6 +1502,7 @@ EXAMPLE 3: themes.json ENTRY
 }
 }
 -------------------------------------------------------------------------------
+
 EXAMPLE 4: apps.json v2.0 (COMPLETE)
 -------------------------------------------------------------------------------
 {
@@ -1908,82 +1624,6 @@ EXAMPLE 4: apps.json v2.0 (COMPLETE)
 ]
 }
 -------------------------------------------------------------------------------
-EXAMPLE 5: IFRAME APP WITH BRIDGE FILES (apps/notes/index.html)
--------------------------------------------------------------------------------
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Notes App</title>
-<!-- REQUIRED: Bridge CSS for .system-* classes (MUST be first) -->
-<link rel="stylesheet" href="/os-theme-bridge.css" />
-<!-- REQUIRED: Bridge JS for theme sync (MUST be after CSS) -->
-<script src="/os-theme-bridge.js"></script>
-<!-- REQUIRED: Material Icons Font -->
-<style>
-@font-face {
-font-family: 'Material Icons';
-src: url('/system/fonts/MaterialIcons-Regular.ttf') format('truetype');
-font-weight: normal;
-font-style: normal;
-font-display: block;
-}
-.mat-icon {
-font-family: 'Material Icons', sans-serif !important;
-font-feature-settings: 'liga';
-}
-</style>
-<!-- App-specific styles -->
-<style>
-body {
-margin: 0;
-padding: 16px;
-background: var(--system-bg);
-color: var(--system-text);
-}
-</style>
-</head>
-<body data-os-app="true">
-<div class="system-app">
-<header class="system-card system-mb-3">
-<div class="system-card-body">
-<h1 class="system-title">Notes</h1>
-<p class="system-text system-text-dim">Take notes with theme sync</p>
-</div>
-</header>
-<div class="system-form-group">
-<label class="system-label">Note Title</label>
-<input type="text" class="system-input" placeholder="Enter title...">
-</div>
-<div class="system-form-group system-mt-3">
-<label class="system-label">Content</label>
-<textarea class="system-textarea" rows="5" placeholder="Write your note..."></textarea>
-</div>
-<div class="system-flex system-mt-3" style="gap: 8px;">
-<button class="system-btn">
-<span class="mat-icon" data-icon-group="action-confirmation">check</span>
-Save
-</button>
-<button class="system-btn-secondary">
-<span class="mat-icon" data-icon-group="action-destructive">close</span>
-Cancel
-</button>
-</div>
-</div>
-<script>
-// Listen for theme changes
-window.addEventListener('osThemeChanged', (e) => {
-console.log('Theme updated:', e.detail.themeId);
-});
-// Wait for bridge to be ready
-window.addEventListener('osBridgeReady', () => {
-console.log('Theme bridge ready');
-});
-</script>
-</body>
-</html>
--------------------------------------------------------------------------------
 ================================================================================
 19. TROUBLESHOOTING [UPDATED]
 ================================================================================
@@ -2035,20 +1675,12 @@ Solutions:
 Problem: Icon names like "home" or "settings" display as words, not icons
 Solutions:
 1. Verify @font-face is declared in desktop.html <head> BEFORE .material-icons CSS
-2. Check font file path: /system/fonts/MaterialIcons-Regular.ttf exists (REQUIRED)
+2. Check font file path: /system/fonts/MaterialIcons-Regular.ttf exists
 3. Ensure .material-icons class includes font-feature-settings: 'liga'
 4. Verify server serves .ttf with MIME type: font/ttf
 5. Hard refresh browser (Ctrl+F5) to clear font cache
 6. Check DevTools Console for font load errors (404, CORS, MIME type)
 7. Confirm no Google Fonts CDN link is present (conflicts with local font)
-*** ICON GROUPS NOT COLORING ***
-Problem: data-icon-group attributes not applying theme colors
-Solutions:
-1. Verify theme CSS includes --system-icon-group-* variable overrides
-2. Check CSS selector specificity for .mat-icon[data-icon-group] rules
-3. Ensure desktop.html includes the icon group CSS rules in #system-variables
-4. Test with browser DevTools to inspect computed color values
-5. Verify app HTML uses correct data-icon-group attribute values
 *** LONG-PRESS NOT TRIGGERING [NEW v2.7+] ***
 Problem: Holding icon doesn't show context menu
 Solutions:
@@ -2080,64 +1712,14 @@ Solutions:
 3. Check postMessage isn't blocked by sandbox settings
 4. Test with console.log in bridge script to confirm message receipt
 5. Verify ThemeManager.broadcastThemeToApps() is called on window load
-*** IFRAME APP BRIDGE CSS NOT LOADED [NEW v2.7+] ***
-Problem: .system-* classes have no styles in iframe app
-Solutions:
-1. Verify <link rel="stylesheet" href="/os-theme-bridge.css" /> in <head>
-2. Check CSS loads BEFORE bridge JS (order matters)
-3. Verify path is correct (check Network tab for 404)
-4. Ensure .system-app container wraps app content
-*** IFRAME APP BRIDGE JS NOT SYNCING [NEW v2.7+] ***
-Problem: App doesn't update when OS theme changes
-Solutions:
-1. Verify <script src="/os-theme-bridge.js"></script> in <head>
-2. Check JS loads AFTER bridge CSS
-3. Verify data-os-app="true" on body or root element
-4. Check console for postMessage errors
-5. Ensure iframe sandbox allows scripts: allow-scripts
-6. Test with console.log in bridge to confirm message receipt
-*** BRIDGE LOAD ORDER WRONG [NEW v2.7+] ***
-Problem: Theme variables not applied correctly
-Solutions:
-1. CSS MUST load before JS: <link> then <script>
-2. Bridge JS MUST load before custom app scripts
-3. Custom <style> blocks should come after bridge files
-4. Use defer attribute on custom scripts if needed
-*** IFRAME BRIDGE NOT INITIALIZING [NEW v2.7+] ***
-Problem: Bridge script loads but does not sync theme or initialize API
-Solutions:
-1. Verify data-os-app="true" is on the <iframe> tag in desktop.html
-2. Verify data-os-app="true" is on the <body> tag in the app
-3. Check desktop.html has a window.addEventListener('message', ...) handler
-4. Ensure desktop.html responds to 'themeRequest' with 'themeUpdate'
-5. Check console for "Bridge initialized" logs in both parent and iframe
-6. Inspect window.frameElement in iframe console (should not be null)
-*** POSTMESSAGE SECURITY ERRORS [NEW v2.7+] ***
-Problem: Console shows "Blocked a frame with origin..." or messages not received
-Solutions:
-1. Ensure desktop.html and iframe apps are served from the same origin
-2. If using different ports/subdomains, configure CORS headers properly
-3. Check event.origin in desktop.html message listener before responding
-4. Avoid using file:// protocol; use a local server (localhost)
-5. Verify sandbox attributes allow scripts and same-origin
-*** DEBUGGING BRIDGE COMMUNICATION [NEW v2.7+] ***
-Problem: Unsure if messages are being sent/received
-Solutions:
-1. Add console.log to os-theme-bridge.js send/receive functions
-2. In desktop.html, log all incoming message events:
-   window.addEventListener('message', (e) => console.log('Parent received:', e.data));
-3. In iframe app, log outgoing messages:
-   window.parent.postMessage(...) -> log before sending
-4. Check Network tab for bridge file 404s
-5. Verify ThemeManager.broadcastThemeToApps() is triggered on theme change
 ================================================================================
 20. QUICK START TEMPLATE [UPDATED]
 ================================================================================
 IMPORTANT: MATERIAL ICONS FONT SETUP
 Ensure desktop.html includes the local @font-face declaration for
-MaterialIcons-Regular.ttf at /system/fonts/MaterialIcons-Regular.ttf.
-Do NOT include the Google Fonts CDN link. Icons will not render correctly
-if the local font is missing or the CDN is used instead.
+MaterialIcons-Regular.ttf (see Section 21). Do NOT include the Google
+Fonts CDN link. Icons will not render correctly if the local font is
+missing or the CDN is used instead.
 Required in desktop.html <head>:
 <style id="material-icons-font">
 @font-face {
@@ -2173,20 +1755,6 @@ FILE: themes/your-theme/styles.css
 /* Icon variables (REQUIRED - Static Only) */
 --system-icon-bg: rgba(0, 0, 0, 0.3);
 --system-icon-border: 1px solid rgba(255, 255, 255, 0.2);
-/* Icon group variables [NEW - OPTIONAL for functional color coding] */
---system-icon-group-navigation: var(--system-accent);
---system-icon-group-action-primary: var(--system-accent);
---system-icon-group-action-destructive: var(--system-danger);
---system-icon-group-action-confirmation: var(--system-success);
---system-icon-group-media: var(--system-info);
---system-icon-group-communication: var(--system-highlight);
---system-icon-group-status-info: var(--system-info);
---system-icon-group-status-warning: var(--system-warning);
---system-icon-group-status-error: var(--system-danger);
---system-icon-group-status-success: var(--system-success);
---system-icon-group-file: var(--system-text-dim);
---system-icon-group-user: var(--system-accent);
---system-icon-group-system: var(--system-text-dim);
 /* Desktop enhancements (OPTIONAL v2.7+ - Static Only) */
 --system-taskbar-glow: none;
 --system-window-glow: none;
@@ -2216,23 +1784,6 @@ box-shadow: var(--system-shadow);
 background: var(--system-accent);
 color: var(--system-text-on-accent, #fff);
 }
-/* Icon group styling [NEW] */
-.mat-icon[data-icon-group] {
-color: var(--system-icon-group-default, var(--system-text));
-transition: color 0.2s ease;
-}
-.mat-icon[data-icon-group="action-destructive"] {
-color: var(--system-icon-group-action-destructive);
-}
-.mat-icon[data-icon-group="action-confirmation"] {
-color: var(--system-icon-group-action-confirmation);
-}
-.mat-icon[data-icon-group="navigation"] {
-color: var(--system-icon-group-navigation);
-}
-.mat-icon[data-icon-group="status-warning"] {
-color: var(--system-icon-group-status-warning);
-}
 /* Context menu enhancements for desktop (Static) */
 .desktop-context-menu {
 animation: fadeIn 0.1s ease-out;
@@ -2258,8 +1809,7 @@ box-shadow: var(--system-window-glow), var(--system-shadow);
 .system-card,
 .system-app *,
 .system-desktop-icon,
-.system-desktop-window,
-.mat-icon[data-icon-group] {
+.system-desktop-window {
 transition: none !important;
 animation: none !important;
 }
@@ -2276,6 +1826,7 @@ backdrop-filter: none !important;
 /* DO NOT INCLUDE: :hover styles, .icon, .window, .taskbar, .start-menu, etc. */
 /* These are styled in desktop.html */
 -------------------------------------------------------------------------------
+
 FILE: themes/your-theme/script.js
 -------------------------------------------------------------------------------
 (function() {
@@ -2323,6 +1874,7 @@ ctx.clearRect(0, 0, canvas.width, canvas.height);
 if (ThemeManager?.registerCleanup) ThemeManager.registerCleanup(() => {});
 })();
 -------------------------------------------------------------------------------
+
 FILE: Update themes.json
 -------------------------------------------------------------------------------
 {
@@ -2338,6 +1890,7 @@ FILE: Update themes.json
 }
 }
 -------------------------------------------------------------------------------
+
 FILE: apps.json (REQUIRED v2.0)
 -------------------------------------------------------------------------------
 {
@@ -2388,90 +1941,14 @@ FILE: apps.json (REQUIRED v2.0)
 ]
 }
 -------------------------------------------------------------------------------
-FILE: apps/your-app/index.html (IFRAME APP TEMPLATE)
--------------------------------------------------------------------------------
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Your App</title>
-<!-- REQUIRED: Bridge CSS for .system-* classes (MUST be first) -->
-<link rel="stylesheet" href="/os-theme-bridge.css" />
-<!-- REQUIRED: Bridge JS for theme sync (MUST be after CSS) -->
-<script src="/os-theme-bridge.js"></script>
-<!-- REQUIRED: Material Icons Font -->
-<style>
-@font-face {
-font-family: 'Material Icons';
-src: url('/system/fonts/MaterialIcons-Regular.ttf') format('truetype');
-font-weight: normal;
-font-style: normal;
-font-display: block;
-}
-.mat-icon {
-font-family: 'Material Icons', sans-serif !important;
-font-feature-settings: 'liga';
-}
-</style>
-<!-- App-specific styles -->
-<style>
-body {
-margin: 0;
-padding: 16px;
-background: var(--system-bg);
-color: var(--system-text);
-}
-</style>
-</head>
-<body data-os-app="true">
-<div class="system-app">
-<header class="system-card system-mb-3">
-<div class="system-card-body">
-<h1 class="system-title">Your App</h1>
-<p class="system-text system-text-dim">Description here</p>
-</div>
-</header>
-<div class="system-form-group">
-<label class="system-label">Input</label>
-<input type="text" class="system-input" placeholder="Enter text...">
-</div>
-<div class="system-flex system-mt-3" style="gap: 8px;">
-<button class="system-btn">
-<span class="mat-icon" data-icon-group="action-confirmation">check</span>
-Submit
-</button>
-<button class="system-btn-secondary">
-<span class="mat-icon" data-icon-group="action-destructive">close</span>
-Cancel
-</button>
-</div>
-</div>
-<script>
-// Listen for theme changes
-window.addEventListener('osThemeChanged', (e) => {
-console.log('Theme updated:', e.detail.themeId);
-});
-// Wait for bridge to be ready
-window.addEventListener('osBridgeReady', () => {
-console.log('Theme bridge ready');
-});
-</script>
-</body>
-</html>
--------------------------------------------------------------------------------
 ================================================================================
 21. APPENDIX: DESKTOP.HTML INTEGRATION NOTES [UPDATED]
 ================================================================================
-=== MATERIAL ICONS FONT SETUP (LOCAL FILE - REQUIRED) ===
+=== MATERIAL ICONS FONT SETUP (LOCAL FILE) ===
 CRITICAL: DO NOT USE GOOGLE FONTS CDN
 The OS is configured to use a local Material Icons font file for offline
 compatibility and performance. Using the CDN will cause icons to fail when
 offline and adds unnecessary external dependencies.
-REQUIRED FONT FILE PATH:
--------------------------------------------------------------------------------
-/system/fonts/MaterialIcons-Regular.ttf
--------------------------------------------------------------------------------
 REQUIRED SETUP IN desktop.html <head>:
 -------------------------------------------------------------------------------
 REMOVE THIS LINE (Google Fonts CDN):
@@ -2489,7 +1966,7 @@ font-display: block;
 -------------------------------------------------------------------------------
 FILE REQUIREMENTS:
 -------------------------------------------------------------------------------
-Path: /system/fonts/MaterialIcons-Regular.ttf (EXACT PATH REQUIRED)
+Path: /system/fonts/MaterialIcons-Regular.ttf
 Format: TrueType Font (.ttf)
 Source: https://github.com/google/material-design-icons/blob/master/font/MaterialIcons-Regular.ttf
 Size: ~180KB (uncompressed)
@@ -2505,7 +1982,7 @@ TROUBLESHOOTING:
 Problem: Icons show as text ("home") instead of glyphs
 Solutions:
 1. Verify @font-face is declared BEFORE .material-icons CSS rules
-2. Check font file path is EXACT: /system/fonts/MaterialIcons-Regular.ttf (case-sensitive)
+2. Check font file path is correct (case-sensitive on Linux servers)
 3. Ensure font-feature-settings: 'liga' is present in .material-icons class
 4. Hard refresh browser (Ctrl+F5) to clear font cache
 5. Check Console for "Failed to load resource" errors
@@ -2517,7 +1994,6 @@ types { font/ttf ttf; } (Nginx)
 3. For cross-origin serving, add CORS header:
 Access-Control-Allow-Origin: *
 4. Consider converting to WOFF2 for better compression + broader support
--------------------------------------------------------------------------------
 OPTIONAL: FONT FALLBACK STRATEGY
 -------------------------------------------------------------------------------
 For maximum reliability, add a ligature-based text fallback:
@@ -2526,7 +2002,6 @@ font-family: 'Material Icons', 'Material Icons Outlined', sans-serif !important;
 font-feature-settings: 'liga';
 -webkit-font-feature-settings: 'liga';
 }
--------------------------------------------------------------------------------
 PERFORMANCE TIP: Convert TTF to WOFF2
 -------------------------------------------------------------------------------
 WOFF2 offers ~30% smaller file size with identical quality:
@@ -2584,40 +2059,6 @@ style="width:100%;height:100%;border:none;background:transparent;"
 - Apps must include <script src="/os-theme-bridge.js">
 - Apps should use .system-app or .system-* classes for automatic theming
 - Theme sync via postMessage: parent -> iframe
-- Apps should use data-icon-group attributes for functional icon coloring
-- CRITICAL: data-os-app="true" MUST be on the <iframe> tag for bridge init
-- CRITICAL: desktop.html MUST listen for 'message' events from iframes
-PARENT WINDOW COMMUNICATION PROTOCOL [NEW v2.7+]:
--------------------------------------------------------------------------------
-desktop.html MUST implement a message listener to support iframe apps:
-window.addEventListener('message', (event) => {
-// Security: Check origin if not same-origin
-// if (event.origin !== window.location.origin) return;
-
-const data = event.data;
-if (!data) return;
-
-// Handle Theme Request from Iframe
-if (data.type === 'themeRequest' || data.type === 'appReady') {
-const themeId = ThemeManager.currentTheme;
-const variables = ThemeManager.getSystemVariables();
-event.source.postMessage({
-type: 'themeUpdate',
-themeId: themeId,
-variables: variables
-}, event.origin);
-}
-
-// Handle Acknowledge
-if (data.type === 'themeAck') {
-console.log('Iframe acknowledged theme update');
-}
-});
--------------------------------------------------------------------------------
-- This listener is REQUIRED for os-theme-bridge.js to function
-- It responds to 'themeRequest' with current theme variables
-- It listens for 'appReady' to trigger initial sync
-- Use event.source.postMessage to reply to the specific iframe
 LONG-PRESS UTILITY (in desktop.html):
 -------------------------------------------------------------------------------
 setupLongPress(element, callbacks, options = {})
@@ -2650,7 +2091,7 @@ DesktopManager.clear()
 - Format: JSON array of app ID strings
 OS SHELL ELEMENTS (Styled in desktop.html #system-variables):
 -------------------------------------------------------------------------------
-.mat-icon          - Material Icons styling (uses data-icon-group support)
+.mat-icon          - Material Icons styling
 .icon              - Desktop icons (uses --system-icon-* variables)
 /* .icon:hover REMOVED */
 .start-menu        - Start menu panel
@@ -2706,24 +2147,7 @@ min-height: 100dvh !important;
 --system-icon-border        - Icon border (default: none)
 /* --system-icon-bg-hover REMOVED */
 /* --system-icon-border-hover REMOVED */
--------------------------------------------------------------------------------
-=== ICON GROUP VARIABLES [NEW v2.7+] ===
-**Functional color coding variables for granular icon control**
--------------------------------------------------------------------------------
---system-icon-group-navigation          - Navigation icons (home, menu, arrow_*)
---system-icon-group-action-primary      - Primary actions (add, create, save)
---system-icon-group-action-destructive  - Destructive actions (delete, remove)
---system-icon-group-action-confirmation - Confirmation actions (check, done)
---system-icon-group-media               - Media controls (play, pause, volume)
---system-icon-group-communication       - Communication (chat, email, share)
---system-icon-group-status-info         - Info status (info, help)
---system-icon-group-status-warning      - Warning status (warning, alert)
---system-icon-group-status-error        - Error status (error, block)
---system-icon-group-status-success      - Success status (check_circle, done)
---system-icon-group-file                - File management (folder, file_*)
---system-icon-group-user                - User/account (person, account_*)
---system-icon-group-system              - System/utility (settings, refresh)
--------------------------------------------------------------------------------
+
 === ICON STYLING ARCHITECTURE (v2.7+ Mobile-First) ===
 Desktop icons now use CSS variables instead of hardcoded styles:
 -------------------------------------------------------------------------------
@@ -2732,24 +2156,7 @@ background: var(--system-icon-bg);
 border: var(--system-icon-border);
 }
 /* .icon:hover REMOVED */
--------------------------------------------------------------------------------
-=== ICON GROUP STYLING (v2.7+ NEW) ===
-Apps should use data-icon-group attributes for functional color coding:
--------------------------------------------------------------------------------
-<!-- In app HTML -->
-<span class="mat-icon" data-icon-group="action-destructive">delete</span>
-<span class="mat-icon" data-icon-group="navigation">home</span>
-<span class="mat-icon" data-icon-group="status-success">check_circle</span>
-<!-- In desktop.html CSS (included in #system-variables) -->
-.mat-icon[data-icon-group] {
-color: var(--system-icon-group-default, var(--system-text));
-}
-.mat-icon[data-icon-group="action-destructive"] {
-color: var(--system-icon-group-action-destructive);
-}
-/* ... etc for all groups */
-/* Themes override these variables in :root for custom color schemes */
--------------------------------------------------------------------------------
+
 === CONTEXT MENU CLASSES (v2.7+ NEW) ===
 New .system-menu and .desktop-context-menu classes for long-press menus:
 -------------------------------------------------------------------------------
@@ -2759,7 +2166,7 @@ New .system-menu and .desktop-context-menu classes for long-press menus:
 .system-menu-divider            - Horizontal separator
 .desktop-context-menu           - Desktop-specific menu enhancements
 .desktop-context-menu .system-menu-item:active - Enhanced press feedback
--------------------------------------------------------------------------------
+
 === IFRAME APP THEME SYNC ===
 Apps running in iframes can automatically sync with the OS theme using the
 os-theme-bridge.js SDK. The bridge handles:
@@ -2780,23 +2187,6 @@ Listen for theme changes in your app JS:
 window.addEventListener('osThemeChanged', (e) => {
 console.log('Theme updated:', e.detail.themeId);
 });
--------------------------------------------------------------------------------
-=== OS-THEME-BRIDGE.CSS REFERENCE ===
-The bridge CSS file (included in iframe apps) provides:
-- All .system-* component class definitions
-- CSS reset/normalize for .system-app container
-- Utility classes (spacing, typography, layout)
-- Icon group styles for data-icon-group support
-- Mobile-first interactions (:active/:focus, NO :hover)
-- All styles use CSS variables (var(--system-*)) for theming
-Usage in iframe app:
--------------------------------------------------------------------------------
-Include in iframe app <head> BEFORE bridge JS:
-<link rel="stylesheet" href="/os-theme-bridge.css" />
-Wrap app content in .system-app:
-<div class="system-app">
-<!-- All content auto-styles with theme variables -->
-</div>
 -------------------------------------------------------------------------------
 ================================================================================
 23. APPENDIX: ARCHITECTURE CHANGES (v2.7+)
@@ -2829,22 +2219,6 @@ Variable-First Theming:
 - Automatic positioning and boundary clamping
 - Escape key and click-outside dismissal
 - Proper event listener cleanup
-4. Icon Grouping & Functional Color Coding [NEW]:
-- data-icon-group attributes for semantic icon categorization
-- 13 functional groups covering common app icon use cases
-- Theme-overridable CSS variables for granular color control
-- Inclusive design: color + shape redundancy for accessibility
-- Popular icons pre-mapped to groups for consistency
-5. Iframe App Bridge Files [NEW]:
-- os-theme-bridge.css for base .system-* styles
-- os-theme-bridge.js for theme synchronization
-- postMessage communication between parent OS and iframe apps
-- osThemeChanged event dispatching for app reactions
-- OsThemeBridge API for programmatic theme access
-6. Bidirectional Iframe Communication [NEW]:
-- data-os-app="true" required on BOTH iframe tag and app body
-- desktop.html MUST implement message listener for bridge
-- Secure postMessage handling with origin checks
 === BUG FIXES (v2.7+) ===
 1. THEME MANAGER CLEANUP - CANVAS REFERENCE ERROR
 -------------------------------------------------------------------------------
@@ -2852,14 +2226,12 @@ Problem: ReferenceError: canvas is not defined when switching themes
 Location: desktop.html ThemeManager.cleanup() method (~line 370)
 Fix: Changed canvas.height to this.canvas.height
 Impact: Themes now switch without crashing
--------------------------------------------------------------------------------
 2. CSS LOADING - UNRELIABLE ONLOAD
 -------------------------------------------------------------------------------
 Problem: CSS onload doesn't fire reliably when reusing <link> element
 Location: desktop.html ThemeManager.loadCSS() method
 Fix: Create NEW <link> element instead of reusing existing one
 Impact: Theme CSS applies correctly on initial load
--------------------------------------------------------------------------------
 3. BACKGROUND IMAGE - INITIAL LOAD FAILURE
 -------------------------------------------------------------------------------
 Problem: Background shows after Settings apply, but not on page load
@@ -2869,14 +2241,12 @@ Fix:
 - Theme CSS uses full background shorthand with !important
 - Added min-height: 100dvh to theme body styles
 Impact: Background visible from initial page load
--------------------------------------------------------------------------------
 4. ICON STYLING - NO THEME SUPPORT
 -------------------------------------------------------------------------------
 Problem: Desktop icons had no theme support (hardcoded styles)
 Location: desktop.html .icon class
 Fix: Added --system-icon-* CSS variables
 Impact: Icons fully themeable via CSS variables
--------------------------------------------------------------------------------
 === MIGRATION GUIDE (v2.6 to v2.7) ===
 If you have existing themes from v2.6:
 STEP 1: Add Icon Variables to :root
@@ -2885,39 +2255,28 @@ ADD to your theme CSS :root block:
 --system-icon-bg: rgba(0, 0, 0, 0.3);
 --system-icon-border: 1px solid rgba(255, 255, 255, 0.2);
 /* Hover variables removed */
--------------------------------------------------------------------------------
 STEP 2: Update Background Body Styles
 -------------------------------------------------------------------------------
 CHANGE your body background to:
 html, html body, body {
-background-color: #fallback !important;
-background-image: url('background.png') !important;
-background-repeat: no-repeat !important;
-background-position: center center !important;
-background-attachment: fixed !important;
-background-size: cover !important;
-min-height: 100dvh !important;
-min-width: 100vw !important;
+	background-color: #fallback !important;
+	background-image: url('background.png') !important;
+	background-repeat: no-repeat !important;
+	background-position: center center !important;
+	background-attachment: fixed !important;
+	background-size: cover !important;
+	min-height: 100dvh !important;
+	min-width: 100vw !important;
 }
--------------------------------------------------------------------------------
-STEP 3: (OPTIONAL) Add Icon Group Variables
--------------------------------------------------------------------------------
-ADD to your theme CSS :root for functional color coding:
---system-icon-group-action-destructive: #ff5252;
---system-icon-group-action-confirmation: #4caf50;
---system-icon-group-navigation: var(--system-accent);
-/* ... etc for groups you want to customize */
--------------------------------------------------------------------------------
-STEP 4: (OPTIONAL) Add Desktop Class Enhancements
+STEP 3: (OPTIONAL) Add Desktop Class Enhancements
 -------------------------------------------------------------------------------
 ADD to your theme CSS for advanced effects:
 .system-desktop-taskbar {
-box-shadow: var(--system-taskbar-glow);
-backdrop-filter: blur(20px);
+	box-shadow: var(--system-taskbar-glow);
+	backdrop-filter: blur(20px);
 }
 /* Hover styles removed */
--------------------------------------------------------------------------------
-STEP 5: (OPTIONAL) Implement Long-Press for Desktop Icons
+STEP 4: (OPTIONAL) Implement Long-Press for Desktop Icons
 -------------------------------------------------------------------------------
 In your app's desktop icon creation code:
 setupLongPress(icon, {
@@ -2925,47 +2284,13 @@ onLongPress: (e) => { /* show context menu */ },
 onShortPress: () => { /* launch app */ },
 preventContextMenu: true
 });
--------------------------------------------------------------------------------
-STEP 6: (REQUIRED FOR IFRAME APPS) Add Bridge Files
--------------------------------------------------------------------------------
-ADD to your iframe app <head>:
-<link rel="stylesheet" href="/os-theme-bridge.css" />
-<script src="/os-theme-bridge.js"></script>
-WRAP app content in .system-app:
-<div class="system-app">
-<!-- Your app content -->
-</div>
-ADD data-os-app="true" to body:
-<body data-os-app="true">
--------------------------------------------------------------------------------
-STEP 7: (REQUIRED FOR DESKTOP.HTML) Add Message Listener
--------------------------------------------------------------------------------
-ADD to desktop.html <script>:
-window.addEventListener('message', (event) => {
-if (event.data.type === 'themeRequest') {
-event.source.postMessage({
-type: 'themeUpdate',
-themeId: ThemeManager.currentTheme,
-variables: ThemeManager.getSystemVariables()
-}, event.origin);
-}
-});
--------------------------------------------------------------------------------
-STEP 8: (REQUIRED FOR DESKTOP.HTML) Add Iframe Attribute
--------------------------------------------------------------------------------
-UPDATE iframe tags in desktop.html:
-<iframe src="..." data-os-app="true" ...></iframe>
--------------------------------------------------------------------------------
-STEP 9: Test Theme Switching
+STEP 5: Test Theme Switching
 -------------------------------------------------------------------------------
 - Switch themes 10x rapidly
 - Check console for ReferenceError
 - Verify no memory leaks
 - Confirm canvas clears properly
 - Test long-press on touch device
-- Verify icon groups color correctly
-- Verify iframe apps sync with theme changes
--------------------------------------------------------------------------------
 === TESTING CHECKLIST FOR V2.7 THEMES ===
 [ ] All --system-icon-* variables present in :root (Static)
 [ ] Background uses full shorthand with !important
@@ -2975,8 +2300,6 @@ STEP 9: Test Theme Switching
 [ ] Canvas cleanup works (no lingering animations)
 [ ] Icons have background and border
 [ ] Icons brighten on active/tap (No hover)
-[ ] Icon group variables defined (if using functional color coding)
-[ ] data-icon-group attributes apply colors in apps
 [ ] .system-desktop-* classes present in desktop.html (if using)
 [ ] Desktop class overrides work in theme CSS (if using)
 [ ] setupLongPress attached to desktop icons (if implementing long-press)
@@ -2985,157 +2308,8 @@ STEP 9: Test Theme Switching
 [ ] aria-label present on desktop icons
 [ ] All v2.6 checklist items pass
 [ ] NO :hover styles present in CSS
-[ ] Font file loads from /system/fonts/MaterialIcons-Regular.ttf
-[ ] Icons render as glyphs, not text
-[ ] os-theme-bridge.css loaded in iframe apps
-[ ] os-theme-bridge.js loaded in iframe apps
-[ ] Bridge CSS loads before bridge JS (order matters)
-[ ] .system-app container wraps iframe app content
-[ ] data-os-app="true" attribute present on iframe app body
-[ ] data-os-app="true" attribute present on desktop.html iframe tag
-[ ] desktop.html has message event listener for bridge
-[ ] osThemeChanged event fires in iframe apps on theme change
 ================================================================================
-24. APPENDIX: ICON GROUPING & FUNCTIONAL COLOR CODING SYSTEM [NEW v2.7+]
-================================================================================
-=== OVERVIEW ===
-The Icon Grouping System enables themes to apply functional color coding to
-icons across all apps, improving usability and accessibility. By categorizing
-icons by their purpose (navigation, actions, status, etc.), themes can provide
-consistent visual language while maintaining flexibility for customization.
-=== DESIGN PRINCIPLES ===
-1. Semantic Grouping: Icons are grouped by function, not appearance
-2. Granular Control: Each group has its own CSS variable for theming
-3. Inclusive by Default: Color + shape redundancy for color-blind users
-4. Backward Compatible: Apps without data-icon-group still work with default colors
-5. Popular Icons Mapped: Common icons pre-assigned to groups for consistency
-=== FUNCTIONAL ICON GROUPS ===
--------------------------------------------------------------------------------
-Group Name                  | CSS Variable                          | Purpose & Example Icons
-----------------------------|---------------------------------------|--------------------------
-navigation                  | --system-icon-group-navigation        | Navigation: home, menu, arrow_back, arrow_forward, search, settings
-action-primary              | --system-icon-group-action-primary    | Primary actions: add, create, edit, save, send, upload, download
-action-destructive          | --system-icon-group-action-destructive| Destructive actions: delete, remove, close, cancel, block, clear
-action-confirmation         | --system-icon-group-action-confirmation| Confirmation: check, done, approve, accept, verify
-media                       | --system-icon-group-media             | Media controls: play_arrow, pause, stop, volume_up, volume_off, image, video
-communication               | --system-icon-group-communication     | Communication: chat, email, phone, share, link, message, forum
-status-info                 | --system-icon-group-status-info       | Info status: info, help, lightbulb, question_mark
-status-warning              | --system-icon-group-status-warning    | Warning status: warning, alert, report, notification_important
-status-error                | --system-icon-group-status-error      | Error status: error, error_outline, block, not_interested
-status-success              | --system-icon-group-status-success    | Success status: check_circle, done_all, verified, task_alt
-file                        | --system-icon-group-file              | File management: folder, folder_open, file_copy, attach_file, description
-user                        | --system-icon-group-user              | User/account: person, account_circle, group, login, logout, profile
-system                      | --system-icon-group-system            | System/utility: refresh, update, bug_report, build, tune, power_settings_new
--------------------------------------------------------------------------------
-=== POPULAR ICON MAPPINGS (Pre-defined for consistency) ===
--------------------------------------------------------------------------------
-Icon Name           | Group                  | Common Use Cases
---------------------|------------------------|----------------------------------
-home                | navigation             | Home button, dashboard
-menu                | navigation             | Hamburger menu, navigation drawer
-arrow_back          | navigation             | Back button, undo
-arrow_forward       | navigation             | Next, forward navigation
-search              | navigation             | Search button, find
-settings            | navigation/system      | Settings, configuration
-add                 | action-primary         | Create new, add item
-edit                | action-primary         | Edit content, modify
-save                | action-primary         | Save changes, confirm
-delete              | action-destructive     | Remove item, delete file
-close               | action-destructive     | Close window, dismiss
-cancel              | action-destructive     | Cancel operation, abort
-check               | action-confirmation    | Confirm action, mark complete
-play_arrow          | media                  | Play media, start
-pause               | media                  | Pause media, stop temporarily
-volume_up           | media                  | Increase volume, unmute
-chat                | communication          | Open chat, messaging
-email               | communication          | Send email, contact
-share               | communication          | Share content, export
-info                | status-info            | Information tooltip, help
-warning             | status-warning         | Caution, attention needed
-error               | status-error           | Error message, failure
-check_circle        | status-success         | Success confirmation, completed
-folder              | file                   | Open folder, file browser
-person              | user                   | User profile, account
-refresh             | system                 | Reload, sync, update
--------------------------------------------------------------------------------
-=== IMPLEMENTATION IN APPS ===
-Step 1: Add data-icon-group to .mat-icon elements
--------------------------------------------------------------------------------
-<!-- Example: Notes app toolbar -->
-<div class="toolbar">
-<button class="system-btn-icon">
-<span class="mat-icon" data-icon-group="action-primary">add</span>
-</button>
-<button class="system-btn-icon">
-<span class="mat-icon" data-icon-group="action-destructive">delete</span>
-</button>
-<button class="system-btn-icon">
-<span class="mat-icon" data-icon-group="navigation">search</span>
-</button>
-</div>
--------------------------------------------------------------------------------
-Step 2: Theme CSS overrides (optional - for custom color schemes)
--------------------------------------------------------------------------------
-/* themes/matrix/styles.css */
-:root {
-/* Base icon groups use theme colors by default */
---system-icon-group-navigation: var(--system-accent); /* #00ff41 */
---system-icon-group-action-destructive: #ff3333; /* Custom red */
---system-icon-group-status-warning: #ffaa00; /* Custom amber */
-}
--------------------------------------------------------------------------------
-Step 3: Desktop.html CSS (included in #system-variables)
--------------------------------------------------------------------------------
-/* Base icon group styling - included in desktop.html */
-.mat-icon[data-icon-group] {
-color: var(--system-icon-group-default, var(--system-text));
-transition: color 0.2s ease;
-}
-.mat-icon[data-icon-group="navigation"] {
-color: var(--system-icon-group-navigation);
-}
-.mat-icon[data-icon-group="action-primary"] {
-color: var(--system-icon-group-action-primary);
-}
-.mat-icon[data-icon-group="action-destructive"] {
-color: var(--system-icon-group-action-destructive);
-}
-/* ... etc for all 13 groups */
--------------------------------------------------------------------------------
-=== ACCESSIBILITY CONSIDERATIONS ===
-1. Color + Shape Redundancy: Icons should be distinguishable by shape alone
-2. Sufficient Contrast: Ensure icon colors meet WCAG 2.1 AA contrast ratios
-3. Reduced Motion: Icon color transitions respect prefers-reduced-motion
-4. Screen Readers: data-icon-group is decorative; use aria-label for semantics
-5. High Contrast Modes: Test themes with Windows High Contrast enabled
-=== THEME DEVELOPER BEST PRACTICES ===
-1. Override only groups you need: Default values use system colors
-2. Test with color-blind simulators: Ensure distinguishability without color
-3. Maintain consistency: Use similar hues for related groups across themes
-4. Document your choices: Note why you customized specific groups
-5. Provide fallbacks: Ensure icons work if group variables aren't defined
-=== APP DEVELOPER BEST PRACTICES ===
-1. Use semantic groups: Assign icons to the most accurate functional group
-2. Include aria-labels: For screen reader accessibility
-3. Test without color: Verify icons are usable in grayscale
-4. Follow mappings: Use pre-defined icon-to-group mappings for consistency
-5. Document custom icons: If using icons not in the popular mappings table
-=== EXTENDING THE SYSTEM ===
-To add a new icon group:
-1. Add CSS variable: --system-icon-group-{your-group-name} to :root defaults
-2. Add CSS rule: .mat-icon[data-icon-group="{your-group-name"] { color: var(...) }
-3. Update documentation: Add to functional groups table and popular mappings
-4. Test: Verify theming works and accessibility is maintained
-=== TROUBLESHOOTING ICON GROUPS ===
-| Issue                          | Solution                                    |
-|--------------------------------|---------------------------------------------|
-| Icons not colored by group     | Check data-icon-group attribute spelling    |
-| Custom group color not applied | Verify CSS variable name matches exactly    |
-| Low contrast in some themes    | Test with contrast checker; adjust variables|
-| Icon not in popular mappings   | Assign to closest functional group          |
-| Group variable not defined     | Use fallback: var(--system-icon-group-default, var(--system-text)) |
-================================================================================
-25. APP REGISTRY: apps.json STRUCTURE (v2.0) [NEW]
+24. APP REGISTRY: apps.json STRUCTURE (v2.0) [NEW]
 ================================================================================
 The OS now uses a centralized `apps.json` registry to manage application
 metadata, categories, permissions, and sandboxing. This enables dynamic app
@@ -3157,7 +2331,6 @@ name         | String  | Yes      | Display name             | "System"
 icon         | String  | Yes      | Material Icons glyph     | "tune"
 order        | Number  | Yes      | Sort order (ascending)   | 1
 description  | String  | Optional | Tooltip text             | "OS utilities"
--------------------------------------------------------------------------------
 APP OBJECT (CORE):
 -------------------------------------------------------------------------------
 Property     | Type    | Required | Description              | Example
@@ -3170,7 +2343,6 @@ categoryId   | String  | Yes      | References category.id   | "productivity"
 description  | String  | Optional | Tooltip/help text        | "Note-taking app"
 order        | Number  | Yes      | Sort within category     | 1
 enabled      | Boolean | Yes      | Show/hide in UI          | true
--------------------------------------------------------------------------------
 APP OBJECT (IFRAME TYPE):
 -------------------------------------------------------------------------------
 Property     | Type    | Required | Description              | Example
@@ -3178,13 +2350,11 @@ Property     | Type    | Required | Description              | Example
 url          | String  | Yes      | Path to app entry point  | "/apps/notes/index.html"
 sandbox      | String  | Rec.     | iframe sandbox attrs     | "allow-scripts allow-same-origin"
 permissions  | Array   | Optional | Granted capabilities     | ["localStorage", "clipboard"]
--------------------------------------------------------------------------------
 APP OBJECT (TEMPLATE TYPE):
 -------------------------------------------------------------------------------
 Property     | Type    | Required | Description              | Example
 -------------|---------|----------|--------------------------|------------------
 template     | String  | Yes      | Internal template ID     | "settings"
--------------------------------------------------------------------------------
 ADVANCED PROPERTIES:
 -------------------------------------------------------------------------------
 Property                 | Type    | Default    | Description
@@ -3192,7 +2362,6 @@ Property                 | Type    | Default    | Description
 allowMultipleInstances   | Boolean | false      | Allow multiple windows
 minWidth/minHeight       | Number  | 300/200    | Minimum window dimensions
 defaultWidth/Height      | Number  | 600/400    | Initial window size
--------------------------------------------------------------------------------
 SANDBOX ATTRIBUTES REFERENCE:
 -------------------------------------------------------------------------------
 Attribute              | Purpose                      | Recommended For
@@ -3203,7 +2372,6 @@ allow-forms            | Submit forms                 | Apps with input fields
 allow-modals           | Show alert/confirm/prompt    | Use sparingly
 allow-popups           | Open new windows/tabs        | Browser apps only
 allow-top-navigation   | Navigate parent window       | Avoid (security risk)
--------------------------------------------------------------------------------
 PERMISSIONS ARRAY:
 -------------------------------------------------------------------------------
 Permission    | Capability                  | App Access Pattern
@@ -3214,7 +2382,6 @@ indexedDB     | Use IndexedDB database      | window.indexedDB
 clipboard     | Read/write clipboard        | navigator.clipboard
 geolocation   | Access device location      | navigator.geolocation
 camera/mic    | Media device access         | navigator.mediaDevices
--------------------------------------------------------------------------------
 > Security Note: Permissions are declarative only in v2.0. Actual
 > enforcement requires iframe sandbox configuration + app-level checks.
 COMPLETE apps.json EXAMPLE:
@@ -3348,7 +2515,6 @@ THEME DEVELOPER NOTES:
 - Apps can access metadata via window.OSAppConfig after bridge init
 - Theme variables auto-sync to iframe apps via postMessage
 - Use CSS variables for all styling to ensure theme compatibility
-- Icon groups enable functional color coding across all apps
 MIGRATION: v1.0 -> v2.0
 1. Wrap apps in "apps" array property
 2. Add "version": "2.0" at root
@@ -3365,305 +2531,23 @@ TROUBLESHOOTING apps.json:
 | localStorage undefined   | Add permission + allow-same-origin         |
 | Multiple windows fail    | Set allowMultipleInstances: true           |
 ================================================================================
-26. IFRAME APP DEVELOPMENT GUIDE [NEW v2.7+]
-================================================================================
-=== OVERVIEW ===
-Iframe apps in Material Icons OS run in sandboxed iframes within OS windows.
-They automatically sync with the active theme via the os-theme-bridge files.
-This guide covers everything needed to build compliant iframe apps.
-=== MINIMUM VIABLE IFRAME APP ===
-FILE: /apps/hello-world/index.html
--------------------------------------------------------------------------------
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Hello World</title>
-<!-- REQUIRED: Bridge files (in this order) -->
-<link rel="stylesheet" href="/os-theme-bridge.css" />
-<script src="/os-theme-bridge.js"></script>
-</head>
-<body data-os-app="true">
-<div class="system-app">
-<h1 class="system-title">Hello World</h1>
-<p class="system-text">This app syncs with OS themes.</p>
-<button class="system-btn">Click Me</button>
-</div>
-</body>
-</html>
--------------------------------------------------------------------------------
-FILE: /apps.json (add app entry)
--------------------------------------------------------------------------------
-{
-"id": "hello-world",
-"name": "Hello World",
-"icon": "hello",
-"type": "iframe",
-"url": "/apps/hello-world/index.html",
-"categoryId": "developer",
-"order": 1,
-"enabled": true,
-"sandbox": "allow-scripts allow-same-origin",
-"allowMultipleInstances": true
-}
--------------------------------------------------------------------------------
-=== BRIDGE FILES EXPLAINED ===
-os-theme-bridge.css:
-- Contains all .system-* component class definitions
-- Provides CSS reset/normalize for .system-app container
-- Includes utility classes (spacing, typography, layout)
-- Defines icon group styles for data-icon-group support
-- Uses CSS variables (var(--system-*)) for all colors
-- Mobile-first: No :hover states, uses :active/:focus
-os-theme-bridge.js:
-- Establishes postMessage communication with parent OS
-- Requests current theme on app initialization
-- Listens for theme change broadcasts from parent
-- Applies CSS variables to iframe document root
-- Dispatches 'osThemeChanged' event for app reactions
-- Exposes OsThemeBridge API for programmatic access
-=== THEME SYNCHRONIZATION FLOW ===
-1. App loads -> os-theme-bridge.js initializes
-2. Bridge sends {type: 'themeRequest', appId: '...'} to parent
-3. Parent ThemeManager receives -> responds with {type: 'themeUpdate', variables: {...}}
-4. Bridge applies variables to document.documentElement.style
-5. Bridge dispatches window event: 'osThemeChanged'
-6. App can react via event listener or OsThemeBridge.onChange()
-When user switches themes in Settings:
-1. Parent OS loads new theme CSS
-2. ThemeManager.broadcastThemeToApps(newThemeId)
-3. All iframe bridges receive 'themeUpdate' message
-4. All apps apply new variables automatically
-=== APP STRUCTURE BEST PRACTICES ===
-RECOMMENDED FILE ORGANIZATION:
-/apps/your-app/
-index.html          (Entry point with bridge files)
-styles.css          (App-specific layout styles only)
-script.js           (App logic, event handlers)
-/assets/            (App-specific images, icons)
-/components/        (Reusable UI components)
-HTML STRUCTURE:
-<body data-os-app="true">
-<div class="system-app">
-<header class="system-card">...</header>
-<main class="system-container">...</main>
-<footer>...</footer>
-</div>
-<script src="script.js"></script>
-</body>
-CSS STRUCTURE:
-/* styles.css - App-specific only */
-.app-header { /* Layout only, no colors */ }
-.app-grid { /* Use CSS variables for colors */ }
-/* DON'T redefine .system-btn, .system-card, etc. */
-/* Bridge CSS provides these already */
-JAVASCRIPT STRUCTURE:
-// script.js
-window.addEventListener('osBridgeReady', () => {
-console.log('Bridge ready');
-});
-window.addEventListener('osThemeChanged', (e) => {
-console.log('Theme:', e.detail.themeId);
-// React to theme changes (update canvas, charts, etc.)
-});
-// Use Bridge API
-const vars = OsThemeBridge.getVariables();
-const unsubscribe = OsThemeBridge.onChange((vars) => {
-console.log('Variables updated');
-});
-=== ICON USAGE IN IFRAME APPS ===
-REQUIRED SETUP:
-<style>
-@font-face {
-font-family: 'Material Icons';
-src: url('/system/fonts/MaterialIcons-Regular.ttf') format('truetype');
-}
-.mat-icon {
-font-family: 'Material Icons', sans-serif !important;
-font-feature-settings: 'liga';
-}
-</style>
-USAGE WITH ICON GROUPS:
-<button class="system-btn-icon">
-<span class="mat-icon" data-icon-group="action-primary">add</span>
-</button>
-<button class="system-btn-icon system-btn-danger">
-<span class="mat-icon" data-icon-group="action-destructive">delete</span>
-</button>
-<span class="mat-icon" data-icon-group="status-success">check_circle</span>
-POPULAR ICON MAPPINGS:
-| Icon | Group | Use Case |
-|------|-------|----------|
-| home | navigation | Home button |
-| add | action-primary | Create new |
-| delete | action-destructive | Remove item |
-| check | action-confirmation | Confirm action |
-| settings | navigation/system | Settings |
-| search | navigation | Search |
-| info | status-info | Information |
-| warning | status-warning | Warning |
-| error | status-error | Error |
-=== SANDBOX & PERMISSIONS ===
-RECOMMENDED SANDBOX VALUES:
-| App Type | Sandbox Attributes |
-|----------|-------------------|
-| Basic app | allow-scripts allow-same-origin |
-| Form app | allow-scripts allow-same-origin allow-forms |
-| Modal app | allow-scripts allow-same-origin allow-forms allow-modals |
-| Browser app | allow-scripts allow-same-origin allow-forms allow-popups |
-PERMISSIONS ARRAY (declarative in apps.json):
-| Permission | Capability |
-|------------|------------|
-| localStorage | window.localStorage access |
-| sessionStorage | window.sessionStorage access |
-| indexedDB | window.indexedDB access |
-| clipboard | navigator.clipboard access |
-| geolocation | navigator.geolocation access |
-NOTE: Permissions are declarative in v2.0. Actual access depends on
-sandbox attributes and browser security policies.
-=== TESTING IFRAME APPS ===
-MANUAL TESTING CHECKLIST:
-[ ] App loads without console errors
-[ ] Bridge CSS and JS load successfully (Network tab)
-[ ] .system-* classes render correctly
-[ ] Theme switch updates app colors instantly
-[ ] osThemeChanged event fires on theme change
-[ ] Icons render as glyphs (not text)
-[ ] Icon groups color correctly by function
-[ ] No :hover styles (test on touch device)
-[ ] Forms work with sandbox permissions
-[ ] localStorage works (if allow-same-origin)
-[ ] App appears in Start Menu (apps.json correct)
-[ ] Multiple instances work (if allowed)
-AUTOMATED TESTING:
-// Test bridge API
-console.assert(OsThemeBridge, 'Bridge API not available');
-console.assert(OsThemeBridge.getVariables(), 'No theme variables');
-// Test theme sync
-let themeChanged = false;
-window.addEventListener('osThemeChanged', () => { themeChanged = true; });
-console.assert(themeChanged, 'Theme change event not firing');
-// Test .system-app container
-console.assert(document.querySelector('.system-app'), 'No .system-app container');
-=== COMMON MISTAKES TO AVOID ===
-❌ Loading bridge JS before bridge CSS
-✅ Load CSS first, then JS
-❌ Missing .system-app container
-✅ Wrap all content in <div class="system-app">
-❌ Using :hover in app CSS
-✅ Use :active, :focus, or .selected states
-❌ Hardcoding colors instead of variables
-✅ Use var(--system-*) for all colors
-❌ Missing data-icon-group on icons
-✅ Add semantic group to all .mat-icon elements
-❌ Not testing theme switching
-✅ Switch themes 10x to verify sync works
-❌ Ignoring sandbox permissions
-✅ Match apps.json sandbox config exactly
-❌ Loading Google Fonts CDN for icons
-✅ Use local font: /system/fonts/MaterialIcons-Regular.ttf
-❌ Missing data-os-app on iframe tag in desktop.html
-✅ Add data-os-app="true" to <iframe> in desktop.html
-❌ Missing message listener in desktop.html
-✅ Add window.addEventListener('message', ...) in desktop.html
-=== DEBUGGING TOOLS ===
-BRIDGE DEBUG MODE:
-Add to your app script:
-window.addEventListener('osBridgeReady', () => {
-console.log('Bridge Ready:', {
-appId: OsThemeBridge.appId,
-variables: OsThemeBridge.getVariables(),
-themeId: document.documentElement.getAttribute('data-theme')
-});
-});
-CONSOLE COMMANDS:
-// Get current theme variables
-OsThemeBridge.getVariables()
-// Force theme re-sync
-OsThemeBridge.refresh()
-// Listen for changes
-OsThemeBridge.onChange(vars => console.log('Updated:', vars))
-// Check bridge status
-window.OsThemeBridge
-DEVTOOLS INSPECTION:
-1. Open iframe in DevTools (right-click -> Inspect)
-2. Check <head> for bridge CSS and JS
-3. Inspect document.documentElement for --system-* variables
-4. Check Console for bridge messages
-5. Monitor Network tab for bridge file loads
-6. Inspect window.frameElement (should not be null)
-=== PERFORMANCE CONSIDERATIONS ===
-- Bridge CSS is ~15KB gzipped - cache aggressively
-- Bridge JS is ~3KB gzipped - minimal overhead
-- Theme sync via postMessage is asynchronous (non-blocking)
-- Avoid heavy computations in osThemeChanged handlers
-- Use CSS variables for animations (GPU-accelerated)
-- Lazy-load app-specific assets after bridge init
-=== SECURITY CONSIDERATIONS ===
-- Iframe sandbox limits app capabilities by design
-- Bridge validates message source === window.parent
-- No sensitive data transmitted (CSS variables only)
-- Apps cannot access parent DOM (same-origin policy)
-- Use HTTPS in production for postMessage security
-- Validate all user input (sandbox doesn't prevent XSS)
-=== MIGRATION GUIDE (Existing Apps) ===
-IF YOUR APP ALREADY EXISTS:
-STEP 1: Add bridge files to <head>
-<link rel="stylesheet" href="/os-theme-bridge.css" />
-<script src="/os-theme-bridge.js"></script>
-STEP 2: Wrap content in .system-app
-<div class="system-app">
-<!-- Your existing content -->
-</div>
-STEP 3: Replace hardcoded colors with variables
-/* Before */
-.btn { background: #0078d4; }
-/* After */
-.btn { background: var(--system-accent); }
-STEP 4: Add data-icon-group to icons
-<span class="mat-icon" data-icon-group="action-primary">add</span>
-STEP 5: Remove :hover styles
-/* Before */
-.btn:hover { background: #005a9e; }
-/* After */
-.btn:active { background: #005a9e; }
-STEP 6: Add theme change listener
-window.addEventListener('osThemeChanged', (e) => {
-// React to theme changes
-});
-STEP 7: Update apps.json with sandbox/permissions
-{
-"sandbox": "allow-scripts allow-same-origin",
-"permissions": ["localStorage"]
-}
-STEP 8: Test theme switching thoroughly
-================================================================================
 END OF DOCUMENTATION (Mobile-First Edition)
 ================================================================================
 Material Icons OS - Theme Development Guide v2.7+
 App Registry Integration v2.0
-Icon Grouping & Functional Color Coding System [NEW v2.7+]
-Iframe App Bridge Files (os-theme-bridge.css + .js) [NEW v2.7+]
 Verified against desktop.html and Rainy Forest theme example
 Includes 90+ .system-* classes with full reference tables
 Includes 40+ .system-desktop-* classes for OS shell theming [NEW]
 Includes setupLongPress() + ContextMenu API for long-press interactions [NEW]
 Includes apps.json v2.0 registry for app management [NEW]
-Includes Icon Grouping System with 13 functional groups [NEW]
-Includes os-theme-bridge.css + .js for iframe app integration [NEW]
 Uses CSS Variable Override System (No direct OS shell styling in themes)
 OS Shell styled in desktop.html #system-variables
 Icon Styling via CSS Variables (--system-icon-*)
-Icon Group Styling via data-icon-group attributes + CSS variables
 Desktop Shell Classes via .system-desktop-* namespace [NEW]
 Long-Press System via setupLongPress() + ContextMenu API [NEW]
 App Registry via apps.json v2.0 with categories, permissions, sandbox [NEW]
 ThemeManager Bugs Fixed (canvas reference, CSS loading, background apply)
-Material Icons: Local font file REQUIRED at /system/fonts/MaterialIcons-Regular.ttf
+Material Icons: Local font file required (/system/fonts/MaterialIcons-Regular.ttf)
 MOBILE SUPPORT: Hover styles disabled, touch-optimized interactions
-ICON GROUPING: 13 functional groups for inclusive, themeable icon color coding
-IFRAME APPS: Bridge CSS + JS required for theme sync
-PARENT WINDOW: Message listener + data-os-app on iframe tag required
 For support, check browser console logs or ThemeManager API
 ================================================================================

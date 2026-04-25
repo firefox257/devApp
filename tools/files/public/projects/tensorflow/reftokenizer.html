@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>🧩 Tokenizer Viewer</title>
+<style>
+:root {
+	--bg: #0f172a; --card: #1e293b; --text: #f1f5f9; --dim: #94a3b8;
+	--primary: #6366f1; --border: #334155; --code-bg: #020617;
+	--success: #22c55e; --warning: #f59e0b; --error: #ef4444;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+	font-family: 'Segoe UI', system-ui, sans-serif;
+	background: var(--bg); color: var(--text);
+	padding: 2rem; line-height: 1.6;
+}
+.container { max-width: 1000px; margin: 0 auto; }
+header { margin-bottom: 2rem; text-align: center; }
+h1 { color: var(--primary); margin-bottom: 0.5rem; }
+.subtitle { color: var(--dim); font-size: 0.95rem; }
+
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+@media (max-width: 768px) { .grid { grid-template-columns: 1fr; } }
+
+.card {
+	background: var(--card); border-radius: 12px;
+	padding: 1.5rem; border: 1px solid var(--border);
+	box-shadow: 0 4px 6px -1px rgba(0,0,0,0.3);
+}
+.card h3 { margin-bottom: 1rem; color: var(--primary); display: flex; align-items: center; gap: 0.5rem; }
+
+textarea {
+	width: 100%; height: 200px;
+	background: var(--code-bg); color: #a5b4fc;
+	border: 1px solid var(--border); border-radius: 8px;
+	padding: 1rem; font-family: 'Consolas', monospace;
+	font-size: 1rem; resize: vertical;
+}
+textarea:focus { outline: none; border-color: var(--primary); }
+
+.output-area {
+	background: var(--code-bg); border-radius: 8px;
+	padding: 1rem; font-family: 'Consolas', monospace;
+	font-size: 0.85rem; max-height: 400px; overflow-y: auto;
+	border: 1px solid var(--border); white-space: pre-wrap;
+}
+.token-chip {
+	display: inline-block; padding: 2px 6px; margin: 2px;
+	border-radius: 4px; font-size: 0.8rem;
+	background: #334155; color: #f1f5f9; border: 1px solid #475569;
+	cursor: default;
+}
+.token-id { color: var(--primary); font-weight: bold; margin-right: 4px; }
+.token-text { color: #a5b4fc; }
+.token-text.special { color: #f43f5e; font-style: italic; }
+
+.stats {
+	display: flex; gap: 1rem; margin-top: 1rem; padding-top: 1rem;
+	border-top: 1px solid var(--border); color: var(--dim); font-size: 0.9rem;
+}
+.stat-item strong { color: var(--text); }
+
+#loading, #debugLog {
+	text-align: center; padding: 1rem; color: var(--dim);
+	font-size: 0.9rem; display: none;
+}
+#debugLog { 
+	text-align: left; font-family: monospace; 
+	background: var(--code-bg); border-radius: 8px;
+	max-height: 200px; overflow-y: auto; padding: 1rem;
+	border: 1px solid var(--border);
+}
+.error-box {
+	background: rgba(239,68,68,0.2); border: 1px solid var(--error);
+	color: #fca5a5; padding: 1rem; border-radius: 8px; margin-top: 1rem;
+	display: none; cursor: pointer;
+}
+.status {
+	display: flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem;
+	font-size: 0.85rem; color: var(--dim);
+}
+.status-dot {
+	width: 8px; height: 8px; border-radius: 50%;
+	background: var(--warning); display: inline-block;
+}
+.status-dot.success { background: var(--success); }
+.status-dot.error { background: var(--error); }
+</style>
+</head>
+<body>
+
+<div class="container">
+<header>
+<h1>🧩 Tokenizer Viewer</h1>
+<p class="subtitle">Real-time tokenization • Browser-based</p>
+</header>
+
+<div id="loading">🔄 Loading tokenizer...</div>
+<div id="debugLog"></div>
+<div id="errorBox" class="error-box">❌ Click to retry</div>
+
+<div class="grid">
+<div class="card">
+<h3>📝 Input Text</h3>
+<textarea id="inputText" placeholder="Type or paste text..."></textarea>
+<div class="stats">
+<div class="stat-item">Chars: <strong id="charCount">0</strong></div>
+<div class="stat-item">Tokens: <strong id="tokenCount">0</strong></div>
+</div>
+<div class="status">
+<span class="status-dot" id="statusDot"></span>
+<span id="statusText">Initializing...</span>
+</div>
+</div>
+
+<div class="card">
+<h3>🧬 Token Output</h3>
+<div class="output-area" id="jsonOutput">Waiting...</div>
+</div>
+</div>
+
+<div class="card" style="margin-top: 1.5rem;">
+<h3>🔍 Visual Tokens</h3>
+<div class="output-area" id="visualOutput" style="max-height:150px"></div>
+</div>
+</div>
+
+<script type="module">
+// ========== CONFIG ==========
+const TOKENIZER_ID = 'Xenova/Qwen1.5-0.5B-Chat';
+// ============================
+
+let tokenizer = null;
+let transformers = null;
+
+const els = {
+	input: document.getElementById('inputText'),
+	json: document.getElementById('jsonOutput'),
+	visual: document.getElementById('visualOutput'),
+	loading: document.getElementById('loading'),
+	debug: document.getElementById('debugLog'),
+	error: document.getElementById('errorBox'),
+	charCount: document.getElementById('charCount'),
+	tokenCount: document.getElementById('tokenCount'),
+	statusDot: document.getElementById('statusDot'),
+	statusText: document.getElementById('statusText')
+};
+
+function log(msg, type = 'info') {
+	const time = new Date().toLocaleTimeString();
+	els.debug.style.display = 'block';
+	els.debug.innerHTML += `<div style="color:var(--${type==='error'?'error':type==='warn'?'warning':'dim'})">[${time}] ${msg}</div>`;
+	els.debug.scrollTop = els.debug.scrollHeight;
+	console.log(`[Tokenizer] ${msg}`);
+}
+
+function updateStatus(state, msg) {
+	const states = {
+		loading: { dot: '', text: 'Loading...' },
+		ready: { dot: 'success', text: 'Ready' },
+		error: { dot: 'error', text: msg || 'Error' }
+	};
+	const cfg = states[state] || states.loading;
+	els.statusDot.className = `status-dot${cfg.dot ? ' ' + cfg.dot : ''}`;
+	els.statusText.textContent = cfg.text;
+}
+
+// ========== Tensor Helpers ==========
+function flattenTokenArray(tensor) {
+	if (!tensor) return [];
+	
+	let arr = [];
+	if (Array.isArray(tensor)) {
+		arr = tensor;
+	} else if (typeof tensor?.tolist === 'function') {
+		arr = tensor.tolist();
+	} else if (tensor?.data) {
+		arr = Array.from(tensor.data);
+	}
+	
+	const flat = arr.flat(2).map(v => typeof v === 'bigint' ? Number(v) : Number(v));
+	return flat;
+}
+
+function safeJSON(obj) {
+	return JSON.stringify(obj, (_, v) => typeof v === 'bigint' ? Number(v) : v, 2);
+}
+
+// ========== Load Tokenizer ==========
+async function loadTokenizer() {
+	els.loading.style.display = 'block';
+	els.error.style.display = 'none';
+	els.debug.innerHTML = '';
+	updateStatus('loading');
+	
+	log(`Loading tokenizer: ${TOKENIZER_ID}`);
+	
+	try {
+		if (!transformers) {
+			log('Loading @huggingface/transformers library...');
+			const mod = await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1/+esm');
+			transformers = mod;
+			log('✓ Library loaded');
+		}
+		
+		log(`Fetching tokenizer files from Hugging Face...`);
+		tokenizer = await transformers.AutoTokenizer.from_pretrained(TOKENIZER_ID);
+		log(`✓ Tokenizer loaded (vocab: ~${tokenizer.vocab_size?.toLocaleString?.() || 'unknown'})`);
+		
+		const test = await tokenizer('Hello');
+		const ids = flattenTokenArray(test.input_ids);
+		if (!ids.length) throw new Error('Tokenizer returned empty result');
+		log(`✓ Test: "Hello" → [${ids.join(', ')}]`);
+		
+		els.loading.style.display = 'none';
+		updateStatus('ready');
+		process();
+		
+	} catch (e) {
+		log(`✗ Failed: ${e.message}`, 'error');
+		console.error(e);
+		
+		els.loading.style.display = 'none';
+		els.error.style.display = 'block';
+		els.error.textContent = `❌ Load failed: ${e.message}\n\nClick to retry`;
+		updateStatus('error', e.message.slice(0, 20));
+	}
+}
+
+// ========== Process Input ==========
+async function process() {
+	if (!tokenizer) return;
+	
+	const text = els.input.value;
+	els.charCount.textContent = text.length.toString();
+	
+	if (!text.trim()) {
+		els.json.textContent = '{}';
+		els.visual.innerHTML = '<span style="color:var(--dim)">Enter text to tokenize...</span>';
+		els.tokenCount.textContent = '0';
+		return;
+	}
+	
+	try {
+		const result = await tokenizer(text, { add_special_tokens: true });
+		
+		const input_ids = flattenTokenArray(result.input_ids);
+		const mask = flattenTokenArray(result.attention_mask);
+		
+		if (!input_ids || input_ids.length === 0) {
+			throw new Error('No tokens generated');
+		}
+		
+		const count = input_ids.length;
+		els.tokenCount.textContent = count.toString();
+		log(`Tokenized: ${text.length} chars → ${count} tokens`);
+		
+		// Decode each token individually
+		let tokens = [];
+		if (result.decoded && Array.isArray(result.decoded)) {
+			tokens = result.decoded.flat().slice(0, count);
+		} else if (tokenizer.decode) {
+			for (const id of input_ids) {
+				try {
+					const decoded = tokenizer.decode([id], { skip_special_tokens: false });
+					tokens.push(decoded || `⟨${id}⟩`);
+				} catch {
+					tokens.push(`⟨${id}⟩`);
+				}
+			}
+		} else {
+			tokens = input_ids.map(id => `⟨${id}⟩`);
+		}
+		
+		els.json.textContent = safeJSON({
+			input_ids,
+			attention_mask: mask || input_ids.map(()=>1),
+			tokens,
+			length: count
+		});
+		
+		// Visual chips
+		els.visual.innerHTML = '';
+		const vocabSize = tokenizer.vocab_size || 150000;
+		
+		input_ids.forEach((id, i) => {
+			const txt = (tokens[i] || '?').replace(/\n/g,'\\n').replace(/\t/g,'\\t').replace(/\s+/g,'·');
+			const special = id < 10 || id > vocabSize - 50;
+			const chip = document.createElement('span');
+			chip.className = 'token-chip';
+			chip.innerHTML = `<span class="token-id">${id}</span><span class="token-text ${special?'special':''}">${txt}</span>`;
+			chip.title = `Idx:${i} | ID:${id} | Text:"${tokens[i]||'?'}"`;
+			els.visual.appendChild(chip);
+		});
+		
+	} catch (e) {
+		log(`Tokenization error: ${e.message}`, 'error');
+		els.json.textContent = `Error: ${e.message}`;
+		els.visual.innerHTML = `<span style="color:var(--error)">❌ ${e.message}</span>`;
+		els.tokenCount.textContent = '0';
+		updateStatus('error', e.message.slice(0,15));
+	}
+}
+
+// ========== Events ==========
+let debounce;
+els.input.addEventListener('input', () => {
+	clearTimeout(debounce);
+	debounce = setTimeout(process, 50);
+});
+
+els.error.addEventListener('click', () => loadTokenizer());
+
+// ========== Start ==========
+log('Initializing...');
+loadTokenizer();
+</script>
+</body>
+</html>

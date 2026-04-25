@@ -1,0 +1,481 @@
+/* ==========================================================================
+   LEGEND OF ZELDA GLASS THEME - styles.css
+   Material Icons OS v2.7+ | Mobile-First | Frosted Glass Effect
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   CORE SYSTEM VARIABLES (Override in :root)
+   -------------------------------------------------------------------------- */
+:root {
+  /* COLOR PALETTE - Classic Zelda Colors */
+  --system-bg: linear-gradient(135deg, #1a2f1a 0%, #0d1f0d 100%); /* Deep forest green */
+  
+  /* GLASS EFFECT - Semi-transparent backgrounds with backdrop filters */
+  --system-window-bg: rgba(28, 52, 28, 0.65); /* Hyrule green glass */
+  --system-header-bg: rgba(36, 62, 36, 0.7); /* Slightly lighter glass for headers */
+  --system-menu-bg: rgba(20, 40, 20, 0.75); /* Darker glass for menus */
+  
+  /* ACCENTS - Link & Triforce inspired */
+  --system-accent: #00a95e; /* Link's tunic green */
+  --system-accent-dim: #007a42; /* Dimmed accent variant */
+  --system-highlight: #ffd700; /* Triforce gold */
+  
+  /* TEXT COLORS - High contrast for readability on glass */
+  --system-text: #f5e6c8; /* Parchment white */
+  --system-text-dim: #c9b896; /* Faded parchment */
+  --system-text-on-accent: #ffffff; /* White on bright accents */
+  
+  /* BORDERS - Subtle golden edges for glass appearance */
+  --system-border: rgba(255, 215, 0, 0.25); /* Gold-tinted borders */
+  --system-border-light: rgba(255, 255, 255, 0.15); /* Subtle white highlights */
+  
+  /* SHAPING & SPACING */
+  --system-radius: 12px; /* More rounded for glass aesthetic */
+  --system-radius-lg: 20px; /* Larger rounded corners for glass panels */
+  --system-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.3); /* Multi-layer shadows for depth */
+  
+  /* TYPOGRAPHY */
+  --system-font: 'Times New Roman', Georgia, serif; /* Classical RPG font */
+  --system-font-mono: 'Courier New', monospace; /* Terminal/code */
+  
+  /* STATUS COLORS */
+  --system-success: #00a95e; /* Life recovery/healing */
+  --system-warning: #ffaa00; /* Low health amber */
+  --system-danger: #cc3333; /* Damage/enemy red */
+  --system-info: #7ec8e3; /* Quest info/sky blue */
+  
+  /* ----------------------------------------------------------------------
+     DESKTOP ICON VARIABLES (REQUIRED - Static Only, No Hover)
+     ---------------------------------------------------------------------- */
+  --system-icon-bg: rgba(30, 50, 30, 0.45); /* Transparent glass icon bg */
+  --system-icon-border: 1px solid rgba(255, 215, 0, 0.35); /* Gold border */
+  /* --system-icon-bg-hover REMOVED - Mobile First */
+  /* --system-icon-border-hover REMOVED - Mobile First */
+  
+  /* ----------------------------------------------------------------------
+     ICON GROUP VARIABLES (Functional Color Coding - v2.7+)
+     ---------------------------------------------------------------------- */
+  --system-icon-group-navigation: var(--system-accent);
+  --system-icon-group-action-primary: var(--system-highlight);
+  --system-icon-group-action-destructive: var(--system-danger);
+  --system-icon-group-action-confirmation: var(--system-success);
+  --system-icon-group-media: #7ec8e3;
+  --system-icon-group-communication: var(--system-highlight);
+  --system-icon-group-status-info: #7ec8e3;
+  --system-icon-group-status-warning: var(--system-warning);
+  --system-icon-group-status-error: var(--system-danger);
+  --system-icon-group-status-success: var(--system-success);
+  --system-icon-group-file: var(--system-text-dim);
+  --system-icon-group-user: var(--system-accent);
+  --system-icon-group-system: var(--system-text-dim);
+  
+  /* ----------------------------------------------------------------------
+     DESKTOP SHELL ENHANCEMENTS (Optional v2.7+)
+     ---------------------------------------------------------------------- */
+  --system-taskbar-glow: 0 0 25px rgba(0, 169, 94, 0.15); /* Subtle green glow */
+  --system-window-glow: 0 0 30px rgba(255, 215, 0, 0.1); /* Gold rim glow */
+  --system-taskbar-blur: 20px; /* Blur amount for taskbar */
+  --system-start-menu-blur: 25px; /* Blur amount for start menu */
+  --system-window-blur: 15px; /* Blur amount for windows */
+}
+
+/* ----------------------------------------------------------------------
+   BACKGROUND IMAGE SUPPORT (Full Shorthand with !important)
+   ---------------------------------------------------------------------- */
+html, html body, body {
+  background-color: #1a2f1a !important; /* Fallback deep forest */
+  background-image: url('background.png') !important; /* Hyrule texture */
+  background-repeat: no-repeat !important;
+  background-position: center center !important;
+  background-attachment: fixed !important;
+  background-size: cover !important;
+  min-height: 100dvh !important;
+  min-width: 100vw !important;
+}
+
+/* Canvas display for heart/particle animations */
+#themeCanvas {
+  display: block !important;
+  pointer-events: none !important;
+  z-index: 0 !important;
+}
+
+/* ----------------------------------------------------------------------
+   SYSTEM COMPONENT OVERRIDES (.system-* Classes)
+   ---------------------------------------------------------------------- */
+
+/* Cards with Frosted Glass Appearance */
+.system-card {
+  background: var(--system-window-bg);
+  backdrop-filter: blur(15px) saturate(180%); /* Key glass effect */
+  -webkit-backdrop-filter: blur(15px) saturate(180%); /* Safari support */
+  border: 1px solid var(--system-border-light);
+  box-shadow: var(--system-shadow);
+  border-radius: var(--system-radius);
+}
+
+/* Buttons with Glass Press Effect */
+.system-btn {
+  background: linear-gradient(
+    135deg, 
+    rgba(0, 169, 94, 0.7) 0%, 
+    rgba(0, 122, 66, 0.7) 100%
+  );
+  backdrop-filter: blur(10px) saturate(180%);
+  -webkit-backdrop-filter: blur(10px) saturate(180%);
+  color: var(--system-text-on-accent);
+  border: 1px solid rgba(255, 215, 0, 0.3);
+  transition: transform 0.1s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.system-btn:active {
+  transform: scale(0.97); /* Press feedback - NO HOVER */
+  box-shadow: 0 4px 15px rgba(0, 169, 94, 0.5);
+  background: linear-gradient(
+    135deg, 
+    rgba(0, 169, 94, 0.9) 0%, 
+    rgba(0, 122, 66, 0.9) 100%
+  );
+}
+
+.system-btn:disabled {
+  opacity: 0.5 !important;
+  cursor: not-allowed !important;
+  backdrop-filter: none !important;
+}
+
+/* Secondary button (cancel/close) */
+.system-btn-secondary {
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--system-border-light);
+  color: var(--system-text);
+}
+
+.system-btn-secondary:active {
+  background: rgba(255, 215, 0, 0.2);
+  border-color: var(--system-highlight);
+}
+
+/* Danger button (destruction actions) */
+.system-btn-danger {
+  background: linear-gradient(
+    135deg, 
+    rgba(204, 51, 51, 0.7) 0%, 
+    rgba(153, 34, 34, 0.7) 100%
+  );
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 0, 0, 0.3);
+}
+
+/* Input fields with glass feel */
+.system-input {
+  background: rgba(30, 50, 30, 0.5);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--system-border-light);
+  color: var(--system-text);
+  padding: 10px 12px;
+  border-radius: var(--system-radius);
+}
+
+.system-input:focus {
+  border-color: var(--system-highlight);
+  box-shadow: 0 0 15px rgba(255, 215, 0, 0.3);
+  outline: none;
+  background: rgba(30, 50, 30, 0.65);
+}
+
+/* Alert boxes (damage/treasure notifications) */
+.system-alert {
+  backdrop-filter: blur(10px) saturate(150%);
+  -webkit-backdrop-filter: blur(10px) saturate(150%);
+  border-left: 3px solid;
+  padding: 12px 16px;
+  margin: 16px 0;
+  border-radius: var(--system-radius);
+  border-right: 1px solid var(--system-border-light);
+  border-top: 1px solid var(--system-border-light);
+  border-bottom: 1px solid var(--system-border-light);
+}
+
+.system-alert-success {
+  border-left-color: var(--system-success);
+  background: rgba(0, 169, 94, 0.15);
+}
+
+.system-alert-warning {
+  border-left-color: var(--system-warning);
+  background: rgba(255, 170, 0, 0.15);
+}
+
+.system-alert-danger {
+  border-left-color: var(--system-danger);
+  background: rgba(204, 51, 51, 0.15);
+}
+
+.system-alert-info {
+  border-left-color: var(--system-info);
+  background: rgba(126, 200, 227, 0.15);
+}
+
+/* Progress bars (health/experience) */
+.system-progress {
+  background: rgba(30, 50, 30, 0.5);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid var(--system-border-light);
+  border-radius: 4px;
+  height: 8px;
+  overflow: hidden;
+}
+
+.system-progress-bar {
+  background: linear-gradient(
+    90deg, 
+    var(--system-success), 
+    var(--system-highlight)
+  );
+  box-shadow: 0 0 10px rgba(0, 169, 94, 0.5);
+  height: 100%;
+  transition: width 0.3s ease;
+}
+
+/* Badges (Rupee values, Heart containers) */
+.system-badge {
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.system-badge-success {
+  border-color: var(--system-success);
+  background: rgba(0, 169, 94, 0.2);
+  color: var(--system-success);
+}
+
+.system-badge-warning {
+  border-color: var(--system-warning);
+  background: rgba(255, 170, 0, 0.2);
+  color: var(--system-warning);
+}
+
+.system-badge-danger {
+  border-color: var(--system-danger);
+  background: rgba(204, 51, 51, 0.2);
+  color: var(--system-danger);
+}
+
+/* Icon group styling (functional color coding) */
+.mat-icon[data-icon-group] {
+  color: var(--system-icon-group-default, var(--system-text));
+  filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.2)); /* Subtle glow on icons */
+  transition: color 0.2s ease, filter 0.2s ease;
+}
+
+.mat-icon[data-icon-group="action-destructive"] {
+  color: var(--system-icon-group-action-destructive);
+}
+
+.mat-icon[data-icon-group="action-confirmation"] {
+  color: var(--system-icon-group-action-confirmation);
+}
+
+.mat-icon[data-icon-group="navigation"] {
+  color: var(--system-icon-group-navigation);
+}
+
+.mat-icon[data-icon-group="status-warning"] {
+  color: var(--system-icon-group-status-warning);
+}
+
+.mat-icon[data-icon-group="status-success"] {
+  color: var(--system-icon-group-status-success);
+}
+
+/* ----------------------------------------------------------------------
+   DESKTOP SHELL ENHANCEMENTS (.system-desktop-* Classes - Optional v2.7+)
+   ---------------------------------------------------------------------- */
+
+/* Taskbar with Golden Trim + Glass Blur */
+.system-desktop-taskbar {
+  background: var(--system-window-bg);
+  backdrop-filter: blur(var(--system-taskbar-blur));
+  -webkit-backdrop-filter: blur(var(--system-taskbar-blur));
+  border-top: 1px solid var(--system-border-light);
+  box-shadow: var(--system-taskbar-glow), 0 -4px 20px rgba(0, 0, 0, 0.3);
+}
+
+/* Window frames with RPG aesthetics + Glass Effect */
+.system-desktop-window {
+  background: var(--system-window-bg);
+  backdrop-filter: blur(var(--system-window-blur)) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--system-window-blur)) saturate(180%);
+  border: 2px solid var(--system-border);
+  box-shadow: var(--system-window-glow), var(--system-shadow);
+  border-radius: var(--system-radius-lg);
+}
+
+.system-desktop-window__header {
+  background: linear-gradient(
+    90deg, 
+    rgba(36, 62, 36, 0.85) 0%, 
+    rgba(28, 52, 28, 0.85) 100%
+  );
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
+  border-bottom: 2px solid rgba(255, 215, 0, 0.2);
+}
+
+/* Desktop icons with stone texture + Glass */
+.system-desktop-icon {
+  background: var(--system-icon-bg);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: var(--system-icon-border);
+  border-radius: 10px;
+  transition: transform 0.15s ease, background 0.2s ease;
+}
+
+.system-desktop-icon:active {
+  transform: scale(0.95);
+  background: rgba(30, 50, 30, 0.6);
+  border-color: rgba(255, 215, 0, 0.6);
+}
+
+/* Start menu with magical appearance + Glass */
+.system-desktop-start-menu {
+  background: var(--system-menu-bg);
+  backdrop-filter: blur(var(--system-start-menu-blur)) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--system-start-menu-blur)) saturate(180%);
+  border: 2px solid rgba(255, 215, 0, 0.4);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6), var(--system-window-glow);
+  border-radius: var(--system-radius-lg);
+}
+
+/* Context menu for long-press */
+.desktop-context-menu {
+  background: var(--system-menu-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  animation: fadeIn 0.15s ease-out;
+  box-shadow: 0 10px 35px rgba(0, 0, 0, 0.7) !important;
+  border: 1px solid rgba(255, 215, 0, 0.2) !important;
+  border-radius: var(--system-radius);
+}
+
+.desktop-context-menu .system-menu-item:active {
+  background: rgba(255, 215, 0, 0.25) !important;
+  border-radius: 4px;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* Scrollbars with RPG styling + Glass */
+::-webkit-scrollbar {
+  width: 12px;
+  background: rgba(30, 50, 30, 0.4);
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(30, 50, 30, 0.3);
+  border-left: 1px solid rgba(255, 215, 0, 0.15);
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(
+    180deg, 
+    rgba(0, 169, 94, 0.6), 
+    rgba(0, 122, 66, 0.6)
+  );
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-radius: 6px;
+  border: 1px solid rgba(255, 215, 0, 0.25);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(
+    180deg, 
+    rgba(0, 169, 94, 0.8), 
+    rgba(0, 122, 66, 0.8)
+  );
+}
+
+/* ----------------------------------------------------------------------
+   ACCESSIBILITY: REDUCED MOTION
+   ---------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  body,
+  .system-btn,
+  .system-card,
+  .system-app *,
+  .system-desktop-icon,
+  .system-desktop-window,
+  .mat-icon[data-icon-group],
+  .desktop-context-menu {
+    transition: none !important;
+    animation: none !important;
+    transform: none !important;
+  }
+  
+  #themeCanvas {
+    display: none !important; /* Disable canvas animations */
+  }
+}
+
+/* ----------------------------------------------------------------------
+   FALLBACK FOR NO BACKDROP-FILTER SUPPORT
+   ---------------------------------------------------------------------- */
+@supports not (backdrop-filter: blur(10px)) {
+  .system-card,
+  .system-app .card,
+  .system-desktop-taskbar,
+  .system-desktop-start-menu,
+  .system-desktop-window,
+  .system-btn,
+  .system-input,
+  .system-alert,
+  .system-badge,
+  .system-desktop-icon {
+    background: rgba(20, 40, 20, 0.95) !important;
+    backdrop-filter: none !important;
+  }
+}
+
+/* ----------------------------------------------------------------------
+   RESPONSIVE MOBILE TWEAKS
+   ---------------------------------------------------------------------- */
+@media (max-width: 768px) {
+  .system-card,
+  .system-desktop-window {
+    border-radius: 10px;
+  }
+  
+  .system-btn {
+    padding: 12px 16px;
+    font-size: 16px; /* Touch-friendly size */
+  }
+  
+  .system-desktop-icon {
+    min-width: 56px; /* WCAG touch target minimum */
+    min-height: 56px;
+  }
+}
+
+/* ==========================================================================
+   ⚠️ NO :HOVER STYLES - MOBILE-FIRST APPROACH
+   ==========================================================================
+   All interactions use :active, :focus, or class-based states.
+   This ensures consistent experience across touch and mouse devices.
+   ========================================================================== */

@@ -1,0 +1,33 @@
+/themes/mystic-realm/
+├── styles.css              (the complete CSS above)
+├── script.js               (canvas animation with cleanup)
+├── preview.jpg             (300x200px theme thumbnail)
+├── background.png          (main desktop background)
+└── assets/
+    └── textures/
+        ├── mystic-panel.png    (256x256 seamless tile)
+        ├── mystic-button.png   (128x128 seamless tile)
+        ├── mystic-header.png   (512x64 seamless tile)
+        └── mystic-input.png    (256x256 seamless tile)
+
+
+
+mystic-panel.png (256×256) - Seamless tileable texture for windows, cards, panels:
+Seamless tileable texture, dark purple mystical panel background (#0a0514 to #1e1932 gradient), subtle glowing rune symbols scattered at 15% opacity, ethereal mist and fog effects, magical particles, fantasy UI panel texture, low contrast, seamless pattern, 256x256 pixels
+
+---
+
+mystic-button.png (128×128) - Seamless tileable texture for buttons, taskbar items:
+Seamless tileable button texture, dark purple background with fine grain noise, micro glowing edges with cyan/purple accent (#9d7eff), subtle shimmer effect at 20% opacity, magical particle sparks, fantasy game button texture, seamless pattern, 128x128 pixels
+
+---
+
+mystic-header.png (512×64) - Seamless tileable texture for window headers, toolbars:
+Wide horizontal header texture, dark purple gradient background (#1e1932), faint glowing horizontal line details in cyan/purple (#9d7eff), ethereal light streaks, 20% opacity shimmer, magical UI header bar, seamless tileable, 512x64 pixels, wide format
+
+---
+
+mystic-input.png (256×256) - Seamless tileable texture for input fields, address bars:
+Seamless tileable input field texture, dark purple background (#1e1932), smooth noise texture with soft inner shadow, subtle glowing particles at 10-15% opacity, mystical input field background, fantasy UI element, seamless pattern, 256x256 pixels
+
+

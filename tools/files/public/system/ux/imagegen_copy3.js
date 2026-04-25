@@ -31,9 +31,6 @@ class ImageGenerator extends HTMLElement {
 		this.negativePrompt = '';
 		this.safe = true;
 		this.transparent = false;
-		this.filePickerInstance = null; // Store picker instance
-		this.backdropElement = null;    // Store backdrop element
-		this.initFilePickerCalled = false; // Prevent double init
 		this.render();
 	}
 
@@ -55,174 +52,6 @@ class ImageGenerator extends HTMLElement {
 		this.updateModelSel();
 		this.applyVals();
 		this.status('');
-		
-		// Initialize file picker ONCE per component lifetime
-		if (!this.initFilePickerCalled) {
-			this.initFilePickerCalled = true;
-			this.initFilePicker();
-		}
-	}
-
-	disconnectedCallback() {
-		// Cleanup ONLY when component is destroyed
-		if (this.filePickerInstance && this.filePickerInstance.parentNode) {
-			this.filePickerInstance.parentNode.removeChild(this.filePickerInstance);
-		}
-		if (this.backdropElement && this.backdropElement.parentNode) {
-			this.backdropElement.parentNode.removeChild(this.backdropElement);
-		}
-		this.filePickerInstance = null;
-		this.backdropElement = null;
-	}
-
-	initFilePicker() {
-		// Create picker ONE TIME
-		const picker = createfilePicker();
-		const wrapper = picker.querySelector('.file-picker-container-wrapper');
-		
-		if (!wrapper) {
-			console.error('File picker init failed');
-			return;
-		}
-		
-		this.filePickerInstance = wrapper;
-		
-		// Minimal positioning styles - DO NOT interfere with internal CSS
-		this.filePickerInstance.style.cssText = `
-			position: fixed;
-			top: 50%;
-			left: 50%;
-			transform: translate(-50%, -50%);
-			z-index: 999999;
-			display: none;
-		`;
-		
-		// Create backdrop element
-		this.backdropElement = document.createElement('div');
-		this.backdropElement.id = 'image-gen-filepicker-backdrop';
-		this.backdropElement.style.cssText = `
-			position: fixed;
-			top: 0;
-			left: 0;
-			width: 100vw;
-			height: 100vh;
-			background: rgba(0, 0, 0, 0.7);
-			z-index: 999998;
-			display: none;
-			cursor: pointer;
-		`;
-		
-		// Set up event listeners ONCE
-		this.filePickerInstance.addEventListener('filepick', async (e) => {
-			this.handleFilePick(e.detail.filePath);
-		});
-		
-		this.filePickerInstance.addEventListener('cancel', () => {
-			this.hideFilePicker();
-			this.status('Save cancelled', 'info');
-		});
-		
-		this.filePickerInstance.addEventListener('close', () => {
-			this.hideFilePicker();
-			this.status('Save cancelled', 'info');
-		});
-		
-		// Backdrop click also hides (but doesn't destroy)
-		this.backdropElement.onclick = () => {
-			this.hideFilePicker();
-			this.status('Save cancelled', 'info');
-		};
-		
-		// Append to body ONCE
-		document.body.appendChild(this.backdropElement);
-		document.body.appendChild(this.filePickerInstance);
-		
-		console.log('✅ File picker initialized successfully');
-	}
-
-	showFilePicker() {
-		if (!this.filePickerInstance || !this.backdropElement) return;
-		
-		// JUST SHOW THE PICKER - NO PATH MANIPULATION
-		this.backdropElement.style.display = 'block';
-		this.filePickerInstance.style.display = 'block';
-		
-		console.log('📁 Showing file picker (state preserved)');
-	}
-
-	hideFilePicker() {
-		if (this.filePickerInstance && this.backdropElement) {
-			// JUST HIDE THE PICKER - NO STATE RESET
-			this.backdropElement.style.display = 'none';
-			this.filePickerInstance.style.display = 'none';
-			
-			console.log('🔒 File picker hidden (state preserved)');
-		}
-	}
-
-	handleFilePick(filePath) {
-		this.hideFilePicker();
-		
-		console.log(`💾 File selected: ${filePath}`);
-		
-		const img = this.shadowRoot.getElementById('i');
-		if (!img || !img.src || img.src === window.location.href) {
-			this.status('No image to save', 'error');
-			return;
-		}
-		
-		const extMatch = filePath.toLowerCase().match(/\.(png|jpe?g|webp)$/);
-		const ext = extMatch ? extMatch[1] : 'png';
-		
-		this.status(`Saving to ${filePath}...`, 'load');
-		
-		fetch(img.src)
-			.then(res => res.blob())
-			.then(blob => {
-				if (ext === 'jpg' || ext === 'jpeg') {
-					return this.convertPngToJpg(blob, 0.9);
-				}
-				return blob;
-			})
-			.then(blob => {
-				const fileName = filePath.split('/').pop();
-				const formData = new FormData();
-				formData.append('file', blob, fileName);
-				formData.append('path', filePath);
-				
-				const xhr = new XMLHttpRequest();
-				
-				xhr.upload.addEventListener('progress', (event) => {
-					if (event.lengthComputable) {
-						const percentComplete = Math.round((event.loaded / event.total) * 100);
-						this.status(`Uploading: ${percentComplete}%`, 'load');
-					}
-				});
-				
-				xhr.addEventListener('load', () => {
-					if (xhr.status === 200) {
-						this.status(`✓ Saved: ${fileName}`, 'success');
-					} else {
-						const errorText = xhr.responseText || 'Unknown error';
-						this.status(`Save failed: ${errorText}`, 'error');
-					}
-				});
-				
-				xhr.addEventListener('error', () => {
-					this.status('Network error during save', 'error');
-				});
-				
-				xhr.addEventListener('abort', () => {
-					this.status('Save cancelled', 'info');
-				});
-				
-				xhr.open('POST', '/upload', true);
-				xhr.send(formData);
-			})
-			.catch(err => {
-				console.error('Save failed:', err);
-				this.status(`Save error: ${err.message}`, 'error');
-			});
 	}
 
 	async fetchModels() {
@@ -528,8 +357,91 @@ class ImageGenerator extends HTMLElement {
 	}
 
 	async saveImage() {
-		// Simply show the existing picker - NO path manipulation
-		this.showFilePicker();
+		const img = this.shadowRoot.getElementById('i');
+		if (!img || !img.src || img.src === window.location.href) {
+			this.status('No image to save', 'error');
+			return;
+		}
+
+		const picker = createfilePicker();
+		const pickerInstance = picker.querySelector('.file-picker-container-wrapper');
+		
+		if (!pickerInstance) {
+			this.status('File picker init failed', 'error');
+			return;
+		}
+		
+		pickerInstance['dom.buttonText'] = 'Use';
+		pickerInstance.filePath = `/image_${Date.now()}.png`;
+
+		pickerInstance.addEventListener('filepick', async (e) => {
+			const filePath = e.detail.filePath;
+			
+			try {
+				const extMatch = filePath.toLowerCase().match(/\.(png|jpe?g|webp)$/);
+				const ext = extMatch ? extMatch[1] : 'png';
+				
+				this.status(`Saving to ${filePath}...`, 'load');
+				
+				const response = await fetch(img.src);
+				let blob = await response.blob();
+				
+				if (ext === 'jpg' || ext === 'jpeg') {
+					blob = await this.convertPngToJpg(blob, 0.9);
+				}
+				
+				const fileName = filePath.split('/').pop();
+				const formData = new FormData();
+				formData.append('file', blob, fileName);
+				formData.append('path', filePath);
+				
+				const xhr = new XMLHttpRequest();
+				
+				xhr.upload.addEventListener('progress', (event) => {
+					if (event.lengthComputable) {
+						const percentComplete = Math.round((event.loaded / event.total) * 100);
+						this.status(`Uploading: ${percentComplete}%`, 'load');
+					}
+				});
+				
+				xhr.addEventListener('load', () => {
+					if (xhr.status === 200) {
+						this.status(`✓ Saved: ${fileName}`, 'success');
+					} else {
+						const errorText = xhr.responseText || 'Unknown error';
+						this.status(`Save failed: ${errorText}`, 'error');
+					}
+				});
+				
+				xhr.addEventListener('error', () => {
+					this.status('Network error during save', 'error');
+				});
+				
+				xhr.addEventListener('abort', () => {
+					this.status('Save cancelled', 'error');
+				});
+				
+				xhr.open('POST', '/upload', true);
+				xhr.send(formData);
+				
+			} catch (err) {
+				console.error('Save failed:', err);
+				this.status(`Save error: ${err.message}`, 'error');
+			} finally {
+				if (picker.parentNode) {
+					picker.parentNode.removeChild(picker);
+				}
+			}
+		});
+		
+		pickerInstance.addEventListener('cancel', () => {
+			if (picker.parentNode) {
+				picker.parentNode.removeChild(picker);
+			}
+			this.status('Save cancelled', 'error');
+		});
+		
+		document.body.appendChild(picker);
 	}
 
 	render() {
@@ -546,7 +458,6 @@ class ImageGenerator extends HTMLElement {
 			overflow: hidden;
 			font-size: 11px;
 			border: 1px solid #ccc;
-			position: relative;
 		}
 		#ct {
 			display: flex;
@@ -735,7 +646,6 @@ class ImageGenerator extends HTMLElement {
 		.s.success { background: #d4edda; color: #155724; }
 		.s.error { background: #f8d7da; color: #721c24; }
 		.s.load { background: #d1ecf1; color: #0c5460; }
-		.s.info { background: #d1ecf1; color: #0c5460; }
 		#imgContainer {
 			flex-grow: 1;
 			min-height: 10px;

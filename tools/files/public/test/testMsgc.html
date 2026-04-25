@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>$msgc - Message Center Test</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      margin: 0;
+      padding: 20px;
+      color: #333;
+    }
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+      overflow: hidden;
+    }
+    .header {
+      background: linear-gradient(135deg, #556cd6 0%, #6f42c1 100%);
+      color: white;
+      padding: 20px;
+      text-align: center;
+    }
+    .header h1 {
+      margin: 0;
+      font-size: 28px;
+    }
+    .header p {
+      margin: 8px 0 0;
+      opacity: 0.9;
+      font-size: 14px;
+    }
+    .content {
+      padding: 20px;
+    }
+    .section {
+      margin-bottom: 24px;
+      padding: 16px;
+      background: #f8f9fa;
+      border-radius: 12px;
+      border-left: 4px solid #667eea;
+    }
+    .section h2 {
+      margin: 0 0 12px;
+      font-size: 18px;
+      color: #444;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .section h2::before {
+      content: '📬';
+    }
+    .btn {
+      display: inline-block;
+      padding: 12px 20px;
+      margin: 8px 8px 8px 0;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.1s, box-shadow 0.1s;
+    }
+    .btn:active {
+      transform: scale(0.97);
+    }
+    .btn:hover {
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+    .btn-green {
+      background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+    }
+    .btn-red {
+      background: linear-gradient(135deg, #eb3349 0%, #f45c43 100%);
+    }
+    .btn-yellow {
+      background: linear-gradient(135deg, #fceabb 0%, #f8b500 100%);
+      color: #333;
+    }
+    .log-container {
+      background: #1a1a2e;
+      border-radius: 8px;
+      padding: 12px;
+      max-height: 200px;
+      overflow-y: auto;
+      font-family: 'Monaco', 'Menlo', monospace;
+      font-size: 13px;
+      margin-top: 12px;
+    }
+    .log-entry {
+      padding: 6px 0;
+      border-bottom: 1px solid #333;
+    }
+    .log-entry:last-child {
+      border-bottom: none;
+    }
+    .log-time {
+      color: #6f42c1;
+      font-size: 11px;
+    }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+      margin-top: 12px;
+    }
+    .stat-card {
+      background: white;
+      border-radius: 8px;
+      padding: 12px;
+      text-align: center;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .stat-value {
+      font-size: 28px;
+      font-weight: bold;
+      color: #667eea;
+    }
+    .stat-label {
+      font-size: 12px;
+      color: #888;
+      margin-top: 4px;
+    }
+    .badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: bold;
+      margin: 4px;
+    }
+    .badge-normal { background: #e3f2fd; color: #1976d2; }
+    .badge-high { background: #ffebee; color: #c62828; }
+    .badge-low { background: #fff3e0; color: #ef6c00; }
+    .status {
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .status-active { background: #e8f5e9; color: #2e7d32; }
+    .status-inactive { background: #ffebee; color: #c62828; }
+    hr {
+      border: none;
+      border-top: 1px solid #eee;
+      margin: 16px 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>📨 $msgc</h1>
+      <p>Message Center Test Suite v<span id="version"></span></p>
+    </div>
+
+    <div class="content">
+      <!-- Status Section -->
+      <div class="section">
+        <h2>Status & Stats</h2>
+        <div class="stats">
+          <div class="stat-card">
+            <div class="stat-value" id="subCount">0</div>
+            <div class="stat-label">Total Subscribers</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" id="msgIds">0</div>
+            <div class="stat-label">Message IDs</div>
+          </div>
+        </div>
+        <div style="margin-top: 12px;">
+          <strong>Active IDs:</strong>
+          <div id="activeIds" style="margin-top: 8px;"></div>
+        </div>
+        <div style="margin-top: 12px;">
+          <strong>Debug Mode:</strong>
+          <span id="debugStatus" class="status status-inactive">Off</span>
+        </div>
+        <button class="btn btn-yellow" onclick="toggleDebug()">Toggle Debug</button>
+        <button class="btn btn-red" onclick="clearAll()">Clear All</button>
+      </div>
+
+      <!-- Basic Subscription Tests -->
+      <div class="section">
+        <h2>Basic Subscription</h2>
+        <p style="font-size: 13px; color: #666;">Test standard publish/subscribe</p>
+        <button class="btn" onclick="addLoginHandler()">Add Handler</button>
+        <button class="btn btn-green" onclick="publishLogin()">Publish Login</button>
+        <button class="btn btn-red" onclick="removeLoginHandler()">Remove Handler</button>
+      </div>
+
+      <!-- Priority Tests -->
+      <div class="section">
+        <h2>Priority Subscriptions</h2>
+        <p style="font-size: 13px; color: #666;">Higher numbers run first</p>
+        <button class="btn badge-high" onclick="addHighPriority()">+ High (100)</button>
+        <button class="btn badge-normal" onclick="addNormal()">+ Normal (0)</button>
+        <button class="btn badge-low" onclick="addLowPriority()">+ Low (-50)</button>
+        <button class="btn btn-green" onclick="publishOrder()">Publish Order</button>
+      </div>
+
+      <!-- One-Time Tests -->
+      <div class="section">
+        <h2>One-Time Listener</h2>
+        <p style="font-size: 13px; color: #666;">Auto-unsubscribes after first call</p>
+        <button class="btn" onclick="addOnceListener()">Add Once Listener</button>
+        <button class="btn btn-green" onclick="publishInit()">Publish Init</button>
+      </div>
+
+      <!-- Async Tests -->
+      <div class="section">
+        <h2>Async Handler</h2>
+        <p style="font-size: 13px; color: #666;">Simulates async fetch operation</p>
+        <button class="btn" onclick="addAsyncHandler()">Add Async Handler</button>
+        <button class="btn btn-green" onclick="publishAsync()">Fetch Data</button>
+      </div>
+
+      <!-- Duplicate Prevention -->
+      <div class="section">
+        <h2>Duplicate Prevention</h2>
+        <p style="font-size: 13px; color: #666;">Try subscribing the same handler twice</p>
+        <button class="btn" onclick="addDuplicateHandler1()">Add Handler #1</button>
+        <button class="btn" onclick="addDuplicateHandler2()">Add Handler #2 (Same Fn)</button>
+        <button class="btn btn-green" onclick="publishDupTest()">Publish Test</button>
+      </div>
+
+      <!-- Logs -->
+      <div class="section">
+        <h2>📋 Message Logs</h2>
+        <div class="log-container" id="logContainer"></div>
+        <button class="btn btn-red" style="margin-top: 12px;" onclick="clearLogs()">Clear Logs</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================
+       LOAD EXTERNAL MSGC LIBRARY
+       ======================================== -->
+  <script src="/system/js/msgc.js"></script>
+
+  <script>
+    // ============================================
+    // TEST PAGE FUNCTIONS
+    // ============================================
+
+    document.addEventListener('DOMContentLoaded', function() {
+      // Verify $msgc loaded correctly
+      if (typeof $msgc !== 'function') {
+        alert('❌ ERROR: $msgc did not load properly! Check /system/js/msgc.js');
+        return;
+      }
+
+      document.getElementById('version').textContent = $msgc.VERSION || 'Unknown';
+      updateStats();
+      logToUI('✅ $msgc library loaded successfully!');
+    });
+
+    // --- Logging Functions ---
+    function getTime() {
+      const now = new Date();
+      return now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    }
+
+    function logToUI(msg, type = 'info') {
+      const container = document.getElementById('logContainer');
+      const div = document.createElement('div');
+      div.className = 'log-entry';
+      
+      let prefix = '';
+      switch(type) {
+        case 'publish': prefix = '📤 '; break;
+        case 'success': prefix = '✅ '; break;
+        case 'warn': prefix = '⚠️ '; break;
+        case 'error': prefix = '❌ '; break;
+        default: prefix = 'ℹ️ ';
+      }
+
+      div.innerHTML = `<span class="log-time">[${getTime()}]</span> ${prefix}${msg}`;
+      container.prepend(div);
+    }
+
+    function clearLogs() {
+      document.getElementById('logContainer').innerHTML = '';
+    }
+
+    function updateStats() {
+      const ids = $msgc.getAllIds();
+      let count = 0;
+      ids.forEach(id => {
+        count += $msgc.getCount(id);
+      });
+
+      document.getElementById('subCount').textContent = count;
+      document.getElementById('msgIds').textContent = ids.length;
+
+      const idsContainer = document.getElementById('activeIds');
+      if (ids.length === 0) {
+        idsContainer.innerHTML = '<span style="color: #999;">No active message IDs</span>';
+      } else {
+        idsContainer.innerHTML = ids.map(id => 
+          `<span class="badge badge-normal">${id} <small>(${$msgc.getCount(id)})</small></span>`
+        ).join('');
+      }
+    }
+
+    function toggleDebug() {
+      const debugMode = !document.getElementById('debugStatus').classList.contains('status-active');
+      $msgc.debug(debugMode);
+      
+      const statusEl = document.getElementById('debugStatus');
+      if (debugMode) {
+        statusEl.textContent = 'On';
+        statusEl.classList.remove('status-inactive');
+        statusEl.classList.add('status-active');
+        logToUI('🔍 Debug mode enabled');
+      } else {
+        statusEl.textContent = 'Off';
+        statusEl.classList.remove('status-active');
+        statusEl.classList.add('status-inactive');
+        logToUI('🔍 Debug mode disabled');
+      }
+    }
+
+    function clearAll() {
+      $msgc.clearAll();
+    }
+
+    // --- Test Handlers ---
+    let loginHandlerRef = null;
+    let onceHandlerAdded = false;
+    let asyncHandlerAdded = false;
+
+    // Login Test
+    function addLoginHandler() {
+      const handler = (userId, username) => {
+        logToUI(`User ${username} (${userId}) logged in! 🎉`, 'success');
+        return 'logged_in_' + userId;
+      };
+      loginHandlerRef = $msgc.subscribe('user/login', handler);
+    }
+
+    function publishLogin() {
+      logToUI(`📤 Publishing: user/login ('john123', 'John Doe')`, 'publish');
+      $msgc('user/login', 'john123', 'John Doe');
+      updateStats();
+    }
+
+    function removeLoginHandler() {
+      if (loginHandlerRef) {
+        loginHandlerRef();
+        loginHandlerRef = null;
+      }
+    }
+
+    // Priority Test
+    function addHighPriority() {
+      const handler = (orderId) => {
+        logToUI(`[HIGH PRIORITY] Recording order creation: ${orderId}`, 'success');
+      };
+      $msgc.subscribePriority('order/create', handler, 100);
+    }
+
+    function addNormal() {
+      const handler = (orderId) => {
+        logToUI(`[NORMAL PRIORITY] Processing order: ${orderId}`, 'success');
+      };
+      $msgc.subscribe('order/create', handler);
+    }
+
+    function addLowPriority() {
+      const handler = (orderId) => {
+        logToUI(`[LOW PRIORITY] Sending notification: ${orderId}`, 'success');
+      };
+      $msgc.subscribePriority('order/create', handler, -50);
+    }
+
+    function publishOrder() {
+      logToUI(`📤 Publishing: order/create ('ORD-12345')`, 'publish');
+      $msgc('order/create', 'ORD-12345');
+      updateStats();
+    }
+
+    // One-Time Test
+    function addOnceListener() {
+      if (onceHandlerAdded) {
+        logToUI('Already added once listener!', 'warn');
+        return;
+      }
+      onceHandlerAdded = true;
+      const handler = () => {
+        logToUI('✨ App initialized! (one-time listener fired)', 'success');
+      };
+      $msgc.once('app/init', handler);
+    }
+
+    function publishInit() {
+      logToUI(`📤 Publishing: app/init`, 'publish');
+      $msgc('app/init');
+      updateStats();
+    }
+
+    // Async Test
+    function addAsyncHandler() {
+      if (asyncHandlerAdded) {
+        logToUI('Async handler already added!', 'warn');
+        return;
+      }
+      const handler = async (url) => {
+        logToUI(`Fetching data from ${url}...`, 'info');
+        await new Promise(resolve => setTimeout(resolve, 500)); // Simulate network delay
+        logToUI(`✅ Received data from ${url}: {"status": "ok"}`, 'success');
+        return { status: 'ok', url };
+      };
+      $msgc.subscribeAsync('fetch/data', handler);
+      asyncHandlerAdded = true;
+    }
+
+    function publishAsync() {
+      logToUI(`📤 Publishing: fetch/data ('https://api.example.com/data')`, 'publish');
+      $msgc('fetch/data', 'https://api.example.com/data');
+      updateStats();
+    }
+
+    // Duplicate Prevention Test
+    let duplicateHandlerFn = null;
+    function createDuplicateHandler(name) {
+      return (testId) => {
+        logToUI(`Duplicate handler "${name}" received: ${testId}`, 'success');
+      };
+    }
+
+    function addDuplicateHandler1() {
+      duplicateHandlerFn = createDuplicateHandler('#1');
+      $msgc.subscribe('dup/test', duplicateHandlerFn);
+    }
+
+    function addDuplicateHandler2() {
+      $msgc.subscribe('dup/test', duplicateHandlerFn); // Should be prevented
+    }
+
+    function publishDupTest() {
+      logToUI(`📤 Publishing: dup/test ('TEST-123')`, 'publish');
+      $msgc('dup/test', 'TEST-123');
+      updateStats();
+    }
+  </script>
+</body>
+</html>
