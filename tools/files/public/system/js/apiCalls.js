@@ -1,7 +1,7 @@
 
 /*
 do not remove!!!
-location is at ./js/apiCalls.js
+location is at ./system/js/apiCalls.js
 */
 
 /** @typedef {Object} FileInfo

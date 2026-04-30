@@ -1,0 +1,102 @@
+{
+	"default": {
+		"name": "Default Blue",
+		"description": "Clean modern blue gradient interface",
+		"css": "themes/default/default-styles.css",
+		"script": "themes/default/default-script.js",
+		"canvas": false,
+		"author": "WebOS Team",
+		"version": "1.0"
+	},
+	"matrix": {
+		"name": "Matrix Green",
+		"description": "Cyberpunk terminal with falling code rain",
+		"css": "themes/matrix/matrix-styles.css",
+		"script": "themes/matrix/matrix-script.js",
+		"canvas": true,
+		"author": "WebOS Team",
+		"version": "1.0"
+	},
+	"rainy-forest": {
+		"name": "Rainy Forest",
+		"description": "Serene forest scene with animated rain drops",
+		"css": "themes/rainy-forest/rainyforest-styles.css",
+		"script": "themes/rainy-forest/rainyforest-script.js",
+		"canvas": true,
+		"author": "WebOS Team",
+		"version": "1.0"
+	},
+	"frosted-glass": {
+		"name": "Frosted Glass",
+		"description": "Elegant translucent theme with backdrop blur effects",
+		"css": "themes/frosted-glass/frostedglass-styles.css",
+		"script": "themes/frosted-glass/frostedglass-script.js",
+		"canvas": true,
+		"author": "Your Name",
+		"version": "1.0.0"
+	},
+	"heaven": {
+		"name": "Transparent Blur Heaven",
+		"description": "Ethereal glassmorphism with soft pastel gradients, celestial blur effects, and floating light particles",
+		"css": "themes/heaven/heaven-styles.css",
+		"script": "themes/heaven/heaven-script.js",
+		"canvas": true,
+		"preview": "themes/heaven/preview.jpg",
+		"author": "Your Name",
+		"version": "1.0.0",
+		"settings": {
+			"particleCount": 30,
+			"floatSpeed": 0.8,
+			"glowIntensity": 0.6
+		}
+	},
+	"futuristic": {
+		"name": "Futuristic",
+		"description": "White and warm orange technology aesthetic with particle effects",
+		"css": "themes/futuristic/futuristic.css",
+		"script": "themes/futuristic/futuristic.js",
+		"canvas": true,
+		"preview": "themes/futuristic/preview.jpg",
+		"author": "Your Name",
+		"version": "1.0.0"
+	},
+	"Mustic": {
+		"name": "Mystic",
+		"description": "Elegant translucent theme with backdrop blur effects",
+		"css": "themes/mystic/mystic-styles.css",
+		"script": "themes/mystic/mystic-script.js",
+		"canvas": true,
+		"author": "Your Name",
+		"version": "1.0.0"
+	},
+
+
+
+	"zelda-legend": {
+		"name": "Legend of Zelda",
+		"description": "Hyrule-inspired theme with Triforce accents and magical glowing hearts",
+		"css": "themes/zelda-legend/zeldastyles.css",
+		"script": "themes/zelda-legend/zeldascript.js",
+		"canvas": true,
+		"preview": "themes/zelda-legend/preview.jpg",
+		"author": "Your Name",
+		"version": "2.8.0",
+		"settings": {
+			"particles": true,
+			"particleType": "heart",
+			"particleCount": 30,
+			"glowIntensity": 0.8
+		}
+	}
+
+
+
+
+
+
+
+}
+
+
+
+

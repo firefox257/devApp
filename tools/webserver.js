@@ -29,6 +29,7 @@ const _mimetype = {
     '.png': 'image/png',
     '.mp3': 'audio/mpeg',
     '.mp4': 'video/mp4',
+	'.m3u': 'text/plain', 
     '.svg': 'image/svg+xml',
     '.gltf': 'model/gltf+json',
     '.bin': 'application/octet-stream',
@@ -83,6 +84,26 @@ const _mimetype = {
     '.wat': 'text/plain',
     '.pdf': 'application/pdf',
 };
+
+// ==========================================================
+// 🔧 DECODE CHANGE: Safe URI path decoder (segment-wise)
+/**
+ * Decodes URI-encoded path segments while preserving path structure.
+ * Prevents %2F from becoming a literal slash that could break path logic.
+ * @param {string} pathname - URI-encoded path (e.g., "/files/hello%20world.txt")
+ * @returns {string} Decoded path with segments safely decoded
+ */
+function decodePathSegments(pathname) {
+    if (!pathname) return pathname;
+    return pathname.split('/').map(segment => {
+        try {
+            return decodeURIComponent(segment);
+        } catch (e) {
+            // If decoding fails (malformed %XX), keep original segment
+            return segment;
+        }
+    }).join('/');
+}
 
 // ==========================================================
 // ===== LAN ACCESS VALIDATION (RFC 1918 + Loopback + Link-Local) =====
@@ -291,6 +312,7 @@ function handleFileRequest(req, res, filePath) {
     fs.stat(filePath, (err, stats) => {
         if (err) {
             if (err.code === 'ENOENT') {
+				console.log("404 error")
                 sendPlainTextResponse(res, '404 Not Found', 404);
             } else {
                 sendPlainTextResponse(res, '500 Internal Server Error', 500);
@@ -425,7 +447,8 @@ async function handleFileUpload(req, res) {
         if (!parsed.fields.path) {
             return sendPlainTextResponse(res, 'Missing path parameter', 400);
         }
-        const filePathHeader = parsed.fields.path;
+        // 🔧 DECODE CHANGE: Decode the path from form field
+        const filePathHeader = decodePathSegments(parsed.fields.path);
         if (!isPathInsideRoot(FILES_ROOT, filePathHeader)) {
             return sendPlainTextResponse(res, 'Access Denied', 403);
         }
@@ -470,7 +493,10 @@ function handleWsUpgrade(serverType, req, socket, head) {
         }
         // Extract handler name with strict sanitization
         const url = new URL(req.url, `http://${req.headers.host}`);
-        const handlerName = path.basename(url.pathname);
+        // 🔧 DECODE CHANGE: Decode pathname segments for WebSocket handler name
+        const rawPathname = url.pathname;
+        const decodedPathname = decodePathSegments(rawPathname);
+        const handlerName = path.basename(decodedPathname);
         // SECURITY: Block path traversal/suspicious characters
         if (!handlerName ||
             handlerName.includes('.') ||
@@ -851,14 +877,19 @@ async function handleMv(res, mvSourceHeader, mvDestinationHeader) {
                                 return sendPlainTextResponse(res, 'Access Denied', 403);
                             }
                             const sourceStats = await stat(sourceFullPath);
+                            // ✅ FIX: Allow directory → new directory name (destination doesn't exist yet)
                             if (sourceStats.isDirectory()) {
-                                return sendPlainTextResponse(res, 'Cannot move directory to a file path', 400);
+                                // Destination will be created as the moved directory name
+                                actualDestinationDir = path.dirname(destinationFullPath);
+                            } else {
+                                // Source is a file, destination is a new file path
+                                await rename(sourceFullPath, destinationFullPath);
+                                return sendPlainTextResponse(res, `Moved: ${path.relative(FILES_ROOT, sourceFullPath)} to ${path.relative(FILES_ROOT, destinationFullPath)}`, 200);
                             }
-                            await rename(sourceFullPath, destinationFullPath);
-                            return sendPlainTextResponse(res, `Moved: ${path.relative(FILES_ROOT, sourceFullPath)} to ${path.relative(FILES_ROOT, destinationFullPath)}`, 200);
                         }
                     } catch (parentErr) { }
                 }
+                // Create destination directory if it doesn't exist
                 await mkdir(destinationFullPath, { recursive: true });
             } else {
                 throw err;
@@ -992,14 +1023,19 @@ async function handleCopy(res, copySourceHeader, copyDestinationHeader) {
                                 return sendPlainTextResponse(res, 'Access Denied', 403);
                             }
                             const sourceStats = await stat(sourceFullPath);
+                            // ✅ FIX: Allow directory → new directory name (destination doesn't exist yet)
                             if (sourceStats.isDirectory()) {
-                                return sendPlainTextResponse(res, 'Cannot copy directory to a file path', 400);
+                                // Destination will be created as the copied directory name
+                                actualDestinationDir = path.dirname(destinationFullPath);
+                            } else {
+                                // Source is a file, destination is a new file path
+                                await copyFile(sourceFullPath, destinationFullPath);
+                                return sendPlainTextResponse(res, `Copied: ${path.relative(FILES_ROOT, sourceFullPath)} to ${path.relative(FILES_ROOT, destinationFullPath)}`, 200);
                             }
-                            await copyFile(sourceFullPath, destinationFullPath);
-                            return sendPlainTextResponse(res, `Copied: ${path.relative(FILES_ROOT, sourceFullPath)} to ${path.relative(FILES_ROOT, destinationFullPath)}`, 200);
                         }
                     } catch (parentErr) { }
                 }
+                // Create destination directory if it doesn't exist
                 await mkdir(destinationFullPath, { recursive: true });
             } else {
                 throw err;
@@ -1166,8 +1202,13 @@ function webHandler(req, res) {
         res.end();
         return;
     }
+    
     const requestedUrl = new URL(req.url, `http://${req.headers.host}`);
-    const pathname = requestedUrl.pathname;
+    
+    // 🔧 DECODE CHANGE: Decode pathname segments safely
+    const pathname = decodePathSegments(requestedUrl.pathname);
+    
+    console.log(pathname);
     
     // ===== FILE UPLOAD ENDPOINT =====
     if (pathname === '/upload' && req.method === 'POST') {
@@ -1177,54 +1218,58 @@ function webHandler(req, res) {
     
     const xcmd = req.headers['x-cmd'];
     if (xcmd) {
+        // 🔧 DECODE CHANGE: Decode header paths before use
+        const xSrc = decodePathSegments(req.headers['x-src'] || '');
+        const xDst = decodePathSegments(req.headers['x-dst'] || '');
+        
         switch (xcmd) {
             case "ls":
-                handleLs(res, req.headers['x-src']);
+                handleLs(res, xSrc);
                 return;
             case "fread":
-                handleReadFile(res, req.headers['x-src']);
+                handleReadFile(res, xSrc);
                 return;
             case "freadb":
-                handleReadFileBinary(req, res, req.headers['x-src']);
+                handleReadFileBinary(req, res, xSrc);
                 return;
             case "fwrite":
                 if (req.method === 'POST' || req.method === 'PUT') {
-                    handleSaveFile(req, res, req.headers['x-src']);
+                    handleSaveFile(req, res, xSrc);
                 } else {
                     sendPlainTextResponse(res, 'SAVEFILE requires POST or PUT method.', 405);
                 }
                 return;
             case "mkdir":
                 if (req.method === 'POST' || req.method === 'PUT') {
-                    handleMkpath(res, req.headers['x-src']);
+                    handleMkpath(res, xSrc);
                 } else {
                     sendPlainTextResponse(res, 'MKPATH requires POST or PUT method.', 405);
                 }
                 return;
             case "mv":
                 if (req.method === 'POST' || req.method === 'PUT') {
-                    handleMv(res, req.headers['x-src'], req.headers['x-dst']);
+                    handleMv(res, xSrc, xDst);
                 } else {
                     sendPlainTextResponse(res, 'MV requires POST or PUT method.', 405);
                 }
                 return;
             case "cp":
                 if (req.method === 'POST' || req.method === 'PUT') {
-                    handleCopy(res, req.headers['x-src'], req.headers['x-dst']);
+                    handleCopy(res, xSrc, xDst);
                 } else {
                     sendPlainTextResponse(res, 'COPY requires POST or PUT method.', 405);
                 }
                 return;
             case "rn":
                 if (req.method === 'POST' || req.method === 'PUT') {
-                    handleRn(res, req.headers['x-src'], req.headers['x-dst']);
+                    handleRn(res, xSrc, xDst);
                 } else {
                     sendPlainTextResponse(res, 'RN requires POST or PUT method.', 405);
                 }
                 return;
             case "rm":
                 if (req.method === 'DELETE') {
-                    handleDel(res, req.headers['x-src']);
+                    handleDel(res, xSrc);
                 } else {
                     sendPlainTextResponse(res, 'DEL requires DELETE method.', 405);
                 }

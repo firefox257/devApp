@@ -64,7 +64,7 @@
             height:20px;
             min-width:120px;
             appearance:none;
-            background-image:url("image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='%23888' d='M4 6l4 4 4-4z'/%3E%3C/svg%3E");
+            background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='%23888' d='M4 6l4 4 4-4z'/%3E%3C/svg%3E");
             background-repeat:no-repeat;
             background-position:right 4px center;
             background-size:10px;
@@ -189,7 +189,7 @@
             display: block;
         }
         
-        /* Content area */
+        /* Content area - FIXED: visibility-based hiding to prevent iframe reloads */
         .content { 
             flex-grow:1; 
             position:relative; 
@@ -201,10 +201,18 @@
             left:0; 
             width:100%; 
             height:100%; 
-            display:none;
+            /* ✅ Use visibility/opacity instead of display:none to preserve iframe state */
+            visibility: hidden;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.1s ease;
+            z-index: 0;
         }
         .page.active { 
-            display:block;
+            visibility: visible;
+            pointer-events: auto;
+            opacity: 1;
+            z-index: 1;
         }
         
         /* Object/Viewer containers */
@@ -214,11 +222,12 @@
             position:relative;
             background:#000;
         }
-        iframe, object { 
+        iframe { 
             width:100%; 
             height:100%; 
             border:none; 
             display:block;
+            background:#fff;
         }
         .iframe-fallback {
             position:absolute;
@@ -319,7 +328,7 @@
             min-width: 80px;
         }
         
-        /* PDF Canvas Container - FIXED for proper scaling */
+        /* PDF Canvas Container */
         .pdf-canvas-container {
             width:100%;
             height: calc(100% - 40px);
@@ -481,7 +490,7 @@
         }
         .viewer-btn:hover { background: #10890c; }
         
-        /* AIChat Component Theme - Match DevApp Dark Theme */
+        /* AIChat Component Theme */
         ai-chat {
             --ai-chat-bg: #1e1e1e;
             --ai-chat-text: #ccc;
@@ -502,7 +511,7 @@
             --ai-chat-warning-text: #000;
         }
         
-        /* Override AIChat internal styles for perfect theme matching */
+        /* Override AIChat internal styles */
         ai-chat .section {
             border-bottom: 1px solid #3e3e42 !important;
         }
@@ -599,7 +608,7 @@
         </div>
         
         <div class="content">
-            <!-- Chat Page - REPLACED WITH AIChat Component -->
+            <!-- Chat Page -->
             <div id="chatPage" class="page active">
                 <ai-chat 
                     title="Dev AI Assistant" 
@@ -608,7 +617,7 @@
                 ></ai-chat>
             </div>
             
-            <!-- Settings Page (SIMPLIFIED) -->
+            <!-- Settings Page -->
             <div id="settingsPage" class="page">
                 <div class="settings-page">
                     <div class="settings-section">
@@ -895,7 +904,7 @@
             return Math.round(scale * 100) + '%';
         }
         
-        // PDF Viewer with FIXED zoom functionality
+        // PDF Viewer
         async function createPDFViewer(tabId, url, fileName) {
             const page = document.createElement('div');
             page.className = 'page';
@@ -947,7 +956,6 @@
                 zoomSelect: zoomSelect
             };
             
-            // Update zoom dropdown to match current scale
             function updateZoomSelect() {
                 const scaleStr = pdfState.scale.toString();
                 const options = Array.from(zoomSelect.options);
@@ -956,7 +964,6 @@
                 if (matchingOption) {
                     zoomSelect.value = scaleStr;
                 } else {
-                    // For custom scales, show the percentage
                     const customOption = document.createElement('option');
                     customOption.value = scaleStr;
                     customOption.textContent = formatScale(pdfState.scale);
@@ -965,7 +972,6 @@
                 }
             }
             
-            // Calculate proper scale for fit width
             async function getFitWidthScale() {
                 const containerWidth = container.clientWidth - 40;
                 if (!pdfState.pdfDoc || containerWidth <= 0) return 1.0;
@@ -976,7 +982,6 @@
                 return Math.min(fitScale, 2.0);
             }
             
-            // Render page with proper scaling
             async function renderPage(num) {
                 if (pdfState.pageRendering) {
                     pdfState.pageNumPending = num;
@@ -1041,7 +1046,6 @@
                 queueRenderPage(pdfState.pageNum);
             }
             
-            // FIXED: Zoom In function
             function onZoomIn() {
                 const newScale = Math.min(pdfState.scale + 0.25, 3.0);
                 if (newScale !== pdfState.scale) {
@@ -1052,7 +1056,6 @@
                 }
             }
             
-            // FIXED: Zoom Out function
             function onZoomOut() {
                 const newScale = Math.max(pdfState.scale - 0.25, 0.5);
                 if (newScale !== pdfState.scale) {
@@ -1063,7 +1066,6 @@
                 }
             }
             
-            // FIXED: Zoom Change from dropdown
             async function onZoomChange(e) {
                 const value = e.target.value;
                 
@@ -1090,7 +1092,6 @@
                 loadPDF(url);
             }
             
-            // Handle window resize for fit width
             let resizeTimeout;
             function onResize() {
                 clearTimeout(resizeTimeout);
@@ -1103,7 +1104,6 @@
             
             window.addEventListener('resize', onResize);
             
-            // Load PDF document
             async function loadPDF(pdfUrl) {
                 try {
                     showToast('📄 Loading PDF...', 'info');
@@ -1116,7 +1116,6 @@
                     showToast(`✅ PDF loaded: ${pdfState.pdfDoc.numPages} pages`, 'success');
                     updateStatus(`PDF: ${fileName} (${pdfState.pdfDoc.numPages} pages)`);
                     
-                    // Start with fit width scale
                     const fitScale = await getFitWidthScale();
                     pdfState.scale = fitScale;
                     zoomSelect.value = 'fit';
@@ -1130,7 +1129,6 @@
                 }
             }
             
-            // Attach event listeners
             document.getElementById(`pdfPrev-${tabId}`).addEventListener('click', onPrevPage);
             document.getElementById(`pdfNext-${tabId}`).addEventListener('click', onNextPage);
             document.getElementById(`pdfZoomIn-${tabId}`).addEventListener('click', onZoomIn);
@@ -1139,7 +1137,6 @@
             document.getElementById(`pdfPageInput-${tabId}`).addEventListener('change', onPageInputChange);
             document.getElementById(`pdfRefresh-${tabId}`).addEventListener('click', onRefresh);
             
-            // Keyboard navigation
             page.addEventListener('keydown', (e) => {
                 if (e.key === 'ArrowLeft') onPrevPage();
                 if (e.key === 'ArrowRight') onNextPage();
@@ -1154,7 +1151,7 @@
             return { page, pdfState };
         }
         
-        // Viewer tab creator
+        // Viewer tab creator - FIXED: uses iframe + visibility CSS to prevent reloads
         async function openFileInViewer(filePath) {
             try {
                 const url = convertFilePathToUrl(filePath);
@@ -1179,6 +1176,7 @@
                     page = pdfViewer.page;
                     viewerElement = pdfViewer.pdfState;
                 } else {
+                    // ✅ Use iframe instead of object for better persistence
                     page = document.createElement('div');
                     page.className = 'page';
                     page.innerHTML = `
@@ -1191,29 +1189,31 @@
                                 </div>
                             </div>
                             <div class="iframe-container" style="flex-grow:1;position:relative;">
-                                <object 
-                                    id="viewerObject-${tabId}"
-                                    data="${url}" 
-                                    type="text/html"
+                                <iframe 
+                                    id="viewerFrame-${tabId}"
+                                    src="${url}"
                                     style="width:100%;height:100%;border:none;display:block;"
                                     allowfullscreen
+                                    loading="lazy"
+                                    sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-modals"
                                 >
-                                    <div class="iframe-fallback" id="viewerFallback-${tabId}">
-                                        <h3>⚠️ Preview Unavailable</h3>
-                                        <p>Could not load preview for:</p>
-                                        <p style="color:#007acc;margin:8px 0;font-size:13px;">${fileName}</p>
-                                        <p id="viewerError-${tabId}" style="color:#c50f1f;margin:8px 0;font-size:12px;">Object embed not supported</p>
-                                        <button class="go-btn" id="viewerRetry-${tabId}" style="margin-top:12px;width:auto;padding:5px 15px;">Retry</button>
-                                        <a href="${url}" target="_blank" style="display:inline-block;margin-top:10px;padding:5px 12px;background:#007acc;color:#fff;text-decoration:none;border-radius:3px;font-size:12px;">Open in new tab ↗</a>
-                                    </div>
-                                </object>
+                                </iframe>
+                                <div class="iframe-fallback" id="viewerFallback-${tabId}" style="display:none;">
+                                    <h3>⚠️ Preview Unavailable</h3>
+                                    <p>Could not load preview for:</p>
+                                    <p style="color:#007acc;margin:8px 0;font-size:13px;">${fileName}</p>
+                                    <p id="viewerError-${tabId}" style="color:#c50f1f;margin:8px 0;font-size:12px;">Iframe load failed</p>
+                                    <button class="go-btn" id="viewerRetry-${tabId}" style="margin-top:12px;width:auto;padding:5px 15px;">Retry</button>
+                                    <a href="${url}" target="_blank" style="display:inline-block;margin-top:10px;padding:5px 12px;background:#007acc;color:#fff;text-decoration:none;border-radius:3px;font-size:12px;">Open in new tab ↗</a>
+                                </div>
                             </div>
                         </div>
                     `;
                     contentArea.appendChild(page);
                     
+                    // ✅ Updated references: frameEl instead of objectEl
                     viewerElement = {
-                        objectEl: document.getElementById(`viewerObject-${tabId}`),
+                        frameEl: document.getElementById(`viewerFrame-${tabId}`),
                         fallback: document.getElementById(`viewerFallback-${tabId}`),
                         errorEl: document.getElementById(`viewerError-${tabId}`),
                         retryBtn: document.getElementById(`viewerRetry-${tabId}`),
@@ -1235,25 +1235,44 @@
                         updateStatus(`Preview error: ${msg}`);
                     };
                     
-                    if (viewerElement.objectEl) {
-                        viewerElement.objectEl.addEventListener('load', () => {
+                    // ✅ iframe load/error handlers
+                    if (viewerElement.frameEl) {
+                        viewerElement.frameEl.addEventListener('load', () => {
                             clearTimeout(loadTimeout);
                             if (viewerElement.fallback) viewerElement.fallback.style.display = 'none';
                             updateStatus(`Preview loaded: ${fileName}`);
+                        });
+                        
+                        viewerElement.frameEl.addEventListener('error', () => {
+                            clearTimeout(loadTimeout);
+                            if (viewerElement.fallback) {
+                                viewerElement.fallback.style.display = 'flex';
+                                showError('Failed to load content');
+                            }
                         });
                     }
                     
                     if (viewerElement.retryBtn) {
                         viewerElement.retryBtn.addEventListener('click', (e) => {
                             e.stopPropagation();
-                            if (viewerElement.objectEl) viewerElement.objectEl.data = url;
+                            if (viewerElement.frameEl) {
+                                // ✅ Refresh by reassigning src (triggers reload)
+                                const currentSrc = viewerElement.frameEl.src;
+                                viewerElement.frameEl.src = '';
+                                setTimeout(() => { viewerElement.frameEl.src = currentSrc; }, 50);
+                            }
                             resetTimeout();
                         });
                     }
                     
                     if (viewerElement.refreshBtn) {
                         viewerElement.refreshBtn.addEventListener('click', () => {
-                            if (viewerElement.objectEl) viewerElement.objectEl.data = viewerElement.objectEl.data;
+                            if (viewerElement.frameEl) {
+                                // ✅ Explicit refresh: reassign src to force reload
+                                const currentSrc = viewerElement.frameEl.src;
+                                viewerElement.frameEl.src = '';
+                                setTimeout(() => { viewerElement.frameEl.src = currentSrc; }, 50);
+                            }
                             resetTimeout();
                             showToast('🔄 Refreshing...', 'info');
                         });

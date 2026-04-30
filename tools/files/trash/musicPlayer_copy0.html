@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Music Player</title>
+  
+  <!-- REQUIRED: Bridge CSS (MUST be first) -->
+  <link rel="stylesheet" href="/os-theme-bridge.css" />
+  <!-- REQUIRED: Bridge JS (MUST be second) -->
+  <script src="/os-theme-bridge.js"></script>
+  
+  <!-- REQUIRED: Local Material Icons Font -->
+  <style>
+    @font-face {
+      font-family: 'Material Icons';
+      src: url('/system/fonts/MaterialIcons-Regular.ttf') format('truetype');
+      font-weight: normal;
+      font-style: normal;
+      font-display: block;
+    }
+    .mat-icon {
+      font-family: 'Material Icons', sans-serif !important;
+      font-feature-settings: 'liga';
+      -webkit-font-feature-settings: 'liga';
+      line-height: 1;
+      letter-spacing: normal;
+      text-transform: none;
+      display: inline-block;
+      white-space: nowrap;
+      word-wrap: normal;
+      direction: ltr;
+      vertical-align: middle;
+      -webkit-font-smoothing: antialiased;
+      user-select: none;
+    }
+  </style>
+
+  <!-- APP-SPECIFIC STYLES (Mobile-First, Uses CSS Variables) -->
+  <style>
+    /* === DEFAULT STYLES USING THEME VARIABLES === */
+    :root {
+      /* Fallbacks if theme variables aren't loaded yet */
+      --mp-card-bg: var(--system-window-bg, rgba(255,255,255,0.9));
+      --mp-text: var(--system-text, #333);
+      --mp-text-dim: var(--system-text-dim, #666);
+      --mp-accent: var(--system-accent, #0078d4);
+      --mp-border: var(--system-border, #ccc);
+      --mp-highlight: var(--system-highlight, #4da3ff);
+      --mp-radius: var(--system-radius, 8px);
+    }
+
+    /* Playlist item base styles */
+    .playlist-item { 
+      display: flex; 
+      align-items: center; 
+      padding: 10px 12px; 
+      border-bottom: 1px solid var(--mp-border); 
+      cursor: pointer; 
+      transition: background 0.15s ease, transform 0.1s ease;
+      background: transparent;
+      color: var(--mp-text);
+    }
+    .playlist-item:last-child { border-bottom: none; }
+    .playlist-item:active { 
+      background: var(--mp-highlight); 
+      transform: scale(0.99);
+    }
+    .playlist-item:focus-within {
+      outline: 2px solid var(--mp-accent);
+      outline-offset: -2px;
+    }
+    
+    .playlist-item.playing { 
+      background: var(--mp-accent); 
+      color: var(--system-text-on-accent, #fff); 
+    }
+    .playlist-item.playing .mat-icon { 
+      color: var(--system-text-on-accent, #fff) !important; 
+    }
+    .playlist-item.playing .track-index,
+    .playlist-item.playing .track-path {
+      color: var(--system-text-on-accent, #fff);
+      opacity: 0.9;
+    }
+    
+    .playlist-item .track-index { 
+      width: 28px; 
+      text-align: center; 
+      font-size: 0.9em; 
+      color: var(--mp-text-dim); 
+      flex-shrink: 0;
+      font-weight: 500;
+    }
+    
+    .track-info { 
+      flex: 1; 
+      min-width: 0; 
+      margin: 0 10px; 
+    }
+    .track-name { 
+      font-size: 0.95em; 
+      font-weight: 500; 
+      color: var(--mp-text);
+      overflow: hidden; 
+      text-overflow: ellipsis; 
+      white-space: nowrap; 
+    }
+    .track-path { 
+      margin-top: 3px; 
+      font-size: 0.75em; 
+      color: var(--mp-text-dim);
+      overflow: hidden; 
+      text-overflow: ellipsis; 
+      white-space: nowrap;
+      font-family: var(--system-font-mono, monospace);
+      opacity: 0.85;
+    }
+    
+    .playlist-item .track-actions { 
+      display: flex; 
+      gap: 4px; 
+      opacity: 0; 
+      transition: opacity 0.15s ease; 
+      flex-shrink: 0;
+    }
+    .playlist-item:active .track-actions, 
+    .playlist-item:focus-within .track-actions { 
+      opacity: 1; 
+    }
+    
+    .playlist-item .track-actions .system-btn-icon { 
+      width: 30px; 
+      height: 30px; 
+      padding: 0; 
+      min-width: 30px;
+    }
+    
+    /* Progress bar styling */
+    #progress-bar {
+      width: 100%;
+      height: 6px;
+      cursor: pointer;
+      accent-color: var(--mp-accent);
+    }
+    
+    /* Volume slider */
+    #volume-slider {
+      width: 120px;
+      height: 4px;
+      cursor: pointer;
+      accent-color: var(--mp-accent);
+    }
+    
+    /* Button active states */
+    #btn-shuffle.active { 
+      background: var(--mp-accent) !important; 
+      color: var(--system-text-on-accent, #fff) !important; 
+    }
+    #btn-shuffle.active .mat-icon {
+      color: var(--system-text-on-accent, #fff) !important;
+    }
+    
+    /* Empty state */
+    #playlist-empty {
+      text-align: center;
+      padding: 24px 16px !important;
+    }
+    
+    /* Responsive adjustments */
+    @media (max-width: 480px) {
+      .system-card-body { padding: 12px !important; }
+      .playlist-item .track-actions { opacity: 1; }
+      .track-path { display: none; } /* Hide path on small screens */
+      #volume-slider { width: 80px; }
+    }
+    
+    @media (prefers-reduced-motion: reduce) {
+      .playlist-item, 
+      .playlist-item .track-actions,
+      .playlist-item:active {
+        transition: none !important;
+        transform: none !important;
+      }
+    }
+    
+    /* Fallback for no backdrop-filter support */
+    @supports not (backdrop-filter: blur(10px)) {
+      .system-card {
+        background: var(--system-window-bg, #fff) !important;
+      }
+    }
+  </style>
+</head>
+
+<body data-os-app="true">
+  <div class="system-app">
+    
+    <!-- Header -->
+    <header class="system-card system-mb-2">
+      <div class="system-card-body system-flex">
+        <h1 class="system-title system-mb-0" style="margin-right: auto;">🎵 Music Player</h1>
+        <div class="system-flex" style="gap: 8px;">
+          <button id="btn-shuffle" class="system-btn system-btn-icon" title="Toggle Shuffle" tabindex="0">
+            <span class="mat-icon" data-icon-group="media">shuffle</span>
+          </button>
+          <button id="btn-save" class="system-btn system-btn-icon" title="Save Playlist" tabindex="0">
+            <span class="mat-icon" data-icon-group="action-primary">save</span>
+          </button>
+          <button id="btn-load" class="system-btn system-btn-icon" title="Load Playlist" tabindex="0">
+            <span class="mat-icon" data-icon-group="navigation">folder_open</span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Now Playing -->
+    <section class="system-card system-mb-2">
+      <div class="system-card-body">
+        <div class="now-playing system-text-center">
+          <div id="now-playing-title" class="system-subtitle system-mb-1">No track selected</div>
+          <div id="now-playing-path" class="system-text system-text-dim system-text-small system-truncate"></div>
+          
+          <div class="system-mt-2">
+            <input type="range" id="progress-bar" class="system-input" min="0" max="100" value="0" disabled />
+            <div class="system-flex system-text-small system-text-dim">
+              <span id="current-time">0:00</span>
+              <span style="flex: 1;"></span>
+              <span id="duration">0:00</span>
+            </div>
+          </div>
+          
+          <div class="system-flex system-mt-2" style="justify-content: center; gap: 12px;">
+            <button id="btn-prev" class="system-btn system-btn-icon" title="Previous" disabled tabindex="0">
+              <span class="mat-icon" data-icon-group="media">skip_previous</span>
+            </button>
+            <button id="btn-play" class="system-btn system-btn-icon system-btn-lg" title="Play/Pause" disabled tabindex="0">
+              <span id="play-icon" class="mat-icon" data-icon-group="action-confirmation">play_arrow</span>
+            </button>
+            <button id="btn-next" class="system-btn system-btn-icon" title="Next" disabled tabindex="0">
+              <span class="mat-icon" data-icon-group="media">skip_next</span>
+            </button>
+          </div>
+          
+          <div class="system-flex system-mt-2" style="align-items: center; gap: 8px; justify-content: center;">
+            <span class="mat-icon" data-icon-group="media" style="font-size: 1.2em;">volume_up</span>
+            <input type="range" id="volume-slider" class="system-input" min="0" max="1" step="0.01" value="1" style="max-width: 150px;" />
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Playlist Controls -->
+    <section class="system-card system-mb-2">
+      <div class="system-card-body">
+        <div class="system-flex system-mb-2" style="gap: 8px; flex-wrap: wrap;">
+          <button id="btn-add-files" class="system-btn system-btn-sm" tabindex="0">
+            <span class="mat-icon" data-icon-group="action-primary" style="font-size: 0.9em; margin-right: 4px;">add</span> Add File
+          </button>
+          <button id="btn-add-folder" class="system-btn system-btn-sm system-btn-secondary" tabindex="0">
+            <span class="mat-icon" data-icon-group="navigation" style="font-size: 0.9em; margin-right: 4px;">folder</span> Add Folder
+          </button>
+          <button id="btn-clear" class="system-btn system-btn-sm system-btn-danger" title="Clear Playlist" tabindex="0">
+            <span class="mat-icon" data-icon-group="action-destructive" style="font-size: 0.9em;">clear_all</span>
+          </button>
+          <span id="track-count" class="system-badge" style="margin-left: 8px;">0 tracks</span>
+        </div>
+        <p class="system-text system-text-dim system-text-small system-mb-0" style="font-style: italic;">💡 Tip: Check the box next to a file/folder, then click the ✅ "Use Path" button in the picker.</p>
+      </div>
+    </section>
+
+    <!-- Playlist -->
+    <section class="system-card">
+      <div class="system-card-header system-flex">
+        <span class="system-heading">Playlist</span>
+        <span style="flex: 1;"></span>
+        <span class="system-text-small system-text-dim" id="playlist-mode">Order: Sequential</span>
+      </div>
+      <div class="system-card-body system-p-0">
+        <div id="playlist-container" class="system-overflow-auto" style="max-height: 300px;">
+          <div id="playlist-empty" class="system-empty system-p-3">
+            <span class="mat-icon" data-icon-group="media" style="font-size: 3em; opacity: 0.5;">music_note</span>
+            <p class="system-text system-text-dim system-mt-2">Add audio files to start playing</p>
+          </div>
+          <ul id="playlist-list" class="system-list system-hidden"></ul>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- Hidden Audio Element -->
+  <audio id="audio-element" preload="metadata"></audio>
+
+  <!-- APP LOGIC -->
+  <script>
+  (function() {
+    'use strict';
+
+    const els = {
+      btnAddFiles: document.getElementById('btn-add-files'),
+      btnAddFolder: document.getElementById('btn-add-folder'),
+      btnClear: document.getElementById('btn-clear'),
+      btnSave: document.getElementById('btn-save'),
+      btnLoad: document.getElementById('btn-load'),
+      btnShuffle: document.getElementById('btn-shuffle'),
+      btnPlay: document.getElementById('btn-play'),
+      btnPrev: document.getElementById('btn-prev'),
+      btnNext: document.getElementById('btn-next'),
+      nowPlayingTitle: document.getElementById('now-playing-title'),
+      nowPlayingPath: document.getElementById('now-playing-path'),
+      trackCount: document.getElementById('track-count'),
+      playlistEmpty: document.getElementById('playlist-empty'),
+      playlistList: document.getElementById('playlist-list'),
+      playlistMode: document.getElementById('playlist-mode'),
+      audio: document.getElementById('audio-element'),
+      progressBar: document.getElementById('progress-bar'),
+      currentTime: document.getElementById('current-time'),
+      duration: document.getElementById('duration'),
+      volumeSlider: document.getElementById('volume-slider'),
+      playIcon: document.getElementById('play-icon')
+    };
+
+    let playlist = [], currentIndex = -1, isShuffle = false, isPlaying = false, shuffledIndices = [];
+    const AUDIO_EXT = ['.mp3', '.wav', '.ogg', '.oga', '.m4a', '.aac', '.flac', '.webm', '.opus'];
+
+    function init() {
+      setupEvents();
+      setupBridge();
+      updateUI();
+      loadFromStorage('default');
+    }
+
+    function setupEvents() {
+      els.btnAddFiles.addEventListener('click', () => openPicker('file'));
+      els.btnAddFolder.addEventListener('click', () => openPicker('folder'));
+      els.btnClear.addEventListener('click', clearPlaylist);
+      els.btnSave.addEventListener('click', savePlaylistDialog);
+      els.btnLoad.addEventListener('click', loadPlaylistDialog);
+      els.btnShuffle.addEventListener('click', toggleShuffle);
+      els.btnPlay.addEventListener('click', togglePlay);
+      els.btnPrev.addEventListener('click', playPrevious);
+      els.btnNext.addEventListener('click', playNext);
+      
+      els.audio.addEventListener('timeupdate', updateProgress);
+      els.audio.addEventListener('loadedmetadata', updateDuration);
+      els.audio.addEventListener('ended', () => (isShuffle && shuffledIndices.length === 0 ? generateShuffledIndices() : null) || playNext());
+      els.audio.addEventListener('error', () => { 
+        console.error('🎵 Audio element error:', els.audio.error); 
+        if (els.audio.error && els.audio.error.code === 4) showPopup('Media resource not found (404). Check path stripping.', true);
+      });
+      
+      els.progressBar.addEventListener('input', e => { if(els.audio.duration) els.audio.currentTime = (e.target.value/100)*els.audio.duration; });
+      els.volumeSlider.addEventListener('input', e => els.audio.volume = parseFloat(e.target.value));
+      els.playlistList.addEventListener('click', handlePlaylistClick);
+      
+      // Keyboard support for buttons
+      document.querySelectorAll('.system-btn').forEach(btn => {
+        btn.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            btn.click();
+          }
+        });
+      });
+    }
+
+    function setupBridge() {
+      window.addEventListener('osBridgeReady', () => console.log('🎵 Bridge ready'));
+      window.addEventListener('osThemeChanged', e => {
+        console.log('🎵 Theme sync:', e.detail.themeId);
+        // Re-apply any dynamic styles if needed
+      });
+    }
+
+    // === FILE PICKER INTEGRATION ===
+    async function openPicker(mode) {
+      if (!window.api) { try { const { api } = await import('/system/js/apiCalls.js'); window.api = api; } catch(e) { showPopup('API missing', true); return; } }
+      if (!window.createfilePicker) { try { const { createfilePicker } = await import('/system/ux/filePicker.js'); window.createfilePicker = createfilePicker; } catch(e) { showPopup('Picker missing', true); return; } }
+
+      const pickerWrapper = window.createfilePicker();
+      const pickerInstance = pickerWrapper.firstChild; 
+      pickerInstance['dom.buttonText'] = mode === 'file' ? '✅ Add Track' : '✅ Select Folder';
+
+      pickerInstance.onfilepick = async (e, selectedPath) => {
+        if (!selectedPath) return;
+        try {
+          if (mode === 'file') {
+            if (!AUDIO_EXT.some(ext => selectedPath.toLowerCase().endsWith(ext))) {
+              showPopup('Please select a valid audio file', true); return;
+            }
+            addToPlaylist(selectedPath.split('/').pop(), selectedPath);
+            renderPlaylist();
+            showPopup('Track added');
+          } else {
+            const lsPath = selectedPath.endsWith('/') ? selectedPath + '*' : selectedPath + '/*';
+            const files = await window.api.ls(lsPath);
+            const audioFiles = files.filter(f => f.type === 'file' && AUDIO_EXT.some(ext => f.name.toLowerCase().endsWith(ext)));
+            if (!audioFiles.length) { showPopup('No audio files found in folder', true); return; }
+            const base = selectedPath.endsWith('/') ? selectedPath : selectedPath + '/';
+            audioFiles.forEach(f => addToPlaylist(f.name, base + f.name));
+            renderPlaylist();
+            showPopup(`Added ${audioFiles.length} tracks`);
+          }
+        } catch (err) { showPopup('Error: ' + err.message, true); }
+        pickerWrapper.remove();
+      };
+
+      pickerInstance.oncancel = () => pickerWrapper.remove();
+      document.body.appendChild(pickerWrapper);
+    }
+
+    // === PATH HANDLING: Decode for Display, Encode for Source ===
+    
+    // Decode path for UI display (human-readable)
+    function decodePathForDisplay(path) {
+      if (!path) return '';
+      try {
+        // Decode URI components, but keep the path structure
+        let decoded = decodeURIComponent(path);
+        // Remove 'public/' prefix if present for cleaner display
+        if (decoded.startsWith('/public/')) {
+          decoded = decoded.replace('/public/', '/');
+        } else if (decoded.toLowerCase().startsWith('/public')) {
+          decoded = decoded.substring(7); // Remove '/public'
+        }
+        return decoded;
+      } catch (e) {
+        console.warn('Failed to decode path:', path, e);
+        return path;
+      }
+    }
+    
+    // Prepare source URL for audio element (encoded for browser)
+    function prepareSource(path) {
+      if (!path) return '';
+      // 1. Decode to handle %20 etc first
+      let decoded = decodeURIComponent(path);
+      // 2. Split by slash, remove empty segments
+      let parts = decoded.split('/').filter(p => p.length > 0);
+      // 3. If first segment is 'public' (case-insensitive), remove it
+      if (parts.length > 0 && parts[0].toLowerCase() === 'public') {
+        parts.shift();
+      }
+      // 4. Reconstruct with leading slash
+      let clean = '/' + parts.join('/');
+      // 5. Encode URI for browser compatibility (spaces -> %20)
+      return encodeURI(clean);
+    }
+
+    function addToPlaylist(name, path, isTemp = false) {
+      if (playlist.some(t => t.path === path)) return;
+      const cleanPath = prepareSource(path);
+      console.log(`📝 Added: ${name} | Raw: ${path} -> Clean: ${cleanPath}`);
+      playlist.push({ 
+        name, 
+        path,           // Original path
+        src: cleanPath, // Encoded for audio src
+        displayPath: decodePathForDisplay(path), // Decoded for UI
+        isTemp 
+      });
+      updateTrackCount();
+    }
+
+    function removeFromPlaylist(idx) {
+      if (idx < 0 || idx >= playlist.length) return;
+      if (idx === currentIndex) { els.audio.pause(); els.audio.src = ''; currentIndex = -1; isPlaying = false; updateNowPlaying(); updatePlayButton(); }
+      playlist.splice(idx, 1);
+      if (idx < currentIndex) currentIndex--;
+      else if (idx === currentIndex && currentIndex >= playlist.length) currentIndex = playlist.length - 1;
+      updateTrackCount(); renderPlaylist();
+    }
+
+    function clearPlaylist() {
+      if (!playlist.length || !confirm('Clear all tracks from playlist?')) return;
+      els.audio.pause(); els.audio.src = ''; playlist = []; currentIndex = -1; isPlaying = false; shuffledIndices = [];
+      updateUI(); renderPlaylist(); showPopup('Playlist cleared');
+    }
+
+    function renderPlaylist() {
+      const empty = !playlist.length;
+      els.playlistEmpty.classList.toggle('system-hidden', !empty);
+      els.playlistList.classList.toggle('system-hidden', empty);
+      if (empty) return;
+      els.playlistList.innerHTML = '';
+      playlist.forEach((t, i) => {
+        const li = document.createElement('li');
+        li.className = 'playlist-item' + (i === currentIndex ? ' playing' : '');
+        li.dataset.index = i;
+        li.tabIndex = 0; // Make focusable
+        li.innerHTML = `
+          <span class="track-index">${i+1}</span>
+          <div class="track-info">
+            <div class="track-name" title="${esc(t.name)}">${esc(t.name)}</div>
+            <div class="track-path system-truncate" title="${esc(t.displayPath)}">${esc(t.displayPath)}</div>
+          </div>
+          <div class="track-actions">
+            <button class="system-btn system-btn-icon btn-play-track" title="Play" tabindex="0">
+              <span class="mat-icon" data-icon-group="action-confirmation" style="font-size:0.9em">play_arrow</span>
+            </button>
+            <button class="system-btn system-btn-icon btn-remove-track" title="Remove" tabindex="0">
+              <span class="mat-icon" data-icon-group="action-destructive" style="font-size:0.9em">close</span>
+            </button>
+          </div>
+        `;
+        els.playlistList.appendChild(li);
+      });
+    }
+
+    function handlePlaylistClick(e) {
+      const item = e.target.closest('.playlist-item');
+      if (!item) return;
+      const idx = parseInt(item.dataset.index, 10);
+      if (e.target.closest('.btn-remove-track')) { e.stopPropagation(); removeFromPlaylist(idx); return; }
+      if (e.target.closest('.btn-play-track')) { e.stopPropagation(); playTrack(idx); return; }
+      playTrack(idx);
+    }
+
+    function updateTrackCount() { els.trackCount.textContent = `${playlist.length} track${playlist.length !== 1 ? 's' : ''}`; }
+
+    // === PLAYBACK CONTROL ===
+    async function playTrack(idx) {
+      if (idx < 0 || idx >= playlist.length) return;
+      currentIndex = idx;
+      const track = playlist[idx];
+      
+      const url = track.src; // Use encoded src for audio
+      
+      console.log('🎵 Attempting play:', track.name);
+      console.log('🔗 EXACT REQUEST URL:', url);
+
+      // Pre-flight check to catch 404 immediately
+      try {
+        const res = await fetch(url, { method: 'HEAD' });
+        if (!res.ok) {
+          showPopup(`File not found (${res.status}). Server routing issue.`, true);
+          return;
+        }
+      } catch (e) {
+        console.warn('⚠️ Pre-flight skipped (CORS/Network):', e);
+      }
+
+      els.audio.src = url;
+      els.audio.load();
+
+      els.audio.play().then(() => {
+        isPlaying = true;
+        updateNowPlaying();
+        updatePlayButton();
+        renderPlaylist();
+      }).catch(err => {
+        console.error('❌ Playback failed:', err);
+        let msg = 'Failed to play track';
+        if (err.name === 'NotSupportedError') msg = 'Unsupported format or wrong server MIME type';
+        else if (err.name === 'NotAllowedError') msg = 'Tap play button to enable audio';
+        else if (err.code === 4) msg = 'File not found (404)';
+        showPopup(msg, true);
+        if (err.name !== 'NotAllowedError') playNext();
+      });
+    }
+
+    function togglePlay() {
+      if (!playlist.length) { showPopup('Add tracks to playlist first', true); return; }
+      if (currentIndex === -1) playTrack(isShuffle ? Math.floor(Math.random() * playlist.length) : 0);
+      else { isPlaying ? els.audio.pause() : els.audio.play(); isPlaying = !isPlaying; updatePlayButton(); }
+    }
+
+    function playPrevious() {
+      if (!playlist.length) return;
+      if (els.audio.currentTime > 3) { els.audio.currentTime = 0; return; }
+      let next = isShuffle ? shuffledIndices[(shuffledIndices.indexOf(currentIndex) - 1 + shuffledIndices.length) % shuffledIndices.length] : (currentIndex > 0 ? currentIndex - 1 : playlist.length - 1);
+      playTrack(next);
+    }
+
+    function playNext() {
+      if (!playlist.length) return;
+      let next = isShuffle ? shuffledIndices[(shuffledIndices.indexOf(currentIndex) + 1) % shuffledIndices.length] : (currentIndex < playlist.length - 1 ? currentIndex + 1 : 0);
+      playTrack(next);
+    }
+
+    function toggleShuffle() {
+      isShuffle = !isShuffle;
+      els.btnShuffle.classList.toggle('active', isShuffle);
+      els.playlistMode.textContent = `Order: ${isShuffle ? 'Shuffle' : 'Sequential'}`;
+      if (isShuffle && playlist.length) generateShuffledIndices();
+      showPopup(isShuffle ? 'Shuffle enabled' : 'Shuffle disabled');
+    }
+
+    function generateShuffledIndices() {
+      shuffledIndices = [...Array(playlist.length).keys()];
+      for (let i = shuffledIndices.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [shuffledIndices[i], shuffledIndices[j]] = [shuffledIndices[j], shuffledIndices[i]]; }
+      if (currentIndex >= 0 && !shuffledIndices.includes(currentIndex)) shuffledIndices.unshift(currentIndex);
+    }
+
+    // === UI UPDATES ===
+    function updateNowPlaying() {
+      if (currentIndex >= 0) {
+        const track = playlist[currentIndex];
+        els.nowPlayingTitle.textContent = track.name;
+        // Use decoded path for display
+        els.nowPlayingPath.textContent = track.displayPath;
+        els.nowPlayingPath.title = track.displayPath; // Full path on hover
+        els.btnPrev.disabled = els.btnNext.disabled = els.btnPlay.disabled = false;
+      } else {
+        els.nowPlayingTitle.textContent = 'No track selected';
+        els.nowPlayingPath.textContent = '';
+        els.btnPrev.disabled = els.btnNext.disabled = true;
+        els.btnPlay.disabled = !playlist.length;
+      }
+    }
+
+    function updatePlayButton() { els.playIcon.textContent = isPlaying ? 'pause' : 'play_arrow'; els.playIcon.setAttribute('data-icon-group', isPlaying ? 'media' : 'action-confirmation'); }
+    function updateProgress() { if (els.audio.duration) { els.progressBar.value = (els.audio.currentTime / els.audio.duration) * 100; els.currentTime.textContent = fmtTime(els.audio.currentTime); } }
+    function updateDuration() { els.duration.textContent = fmtTime(els.audio.duration); els.progressBar.disabled = false; }
+    function fmtTime(s) { if (!s || isNaN(s)) return '0:00'; return `${Math.floor(s / 60)}:${Math.floor(s % 60).toString().padStart(2, '0')}`; }
+    function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+    // === SAVE/LOAD VIA API + FILE PICKER ===
+    async function savePlaylistDialog() {
+      if (!playlist.length) { showPopup('Playlist is empty', true); return; }
+      try {
+        if (!window.createfilePicker) { const { createfilePicker } = await import('/system/ux/filePicker.js'); window.createfilePicker = createfilePicker; }
+        const pickerWrapper = window.createfilePicker();
+        const pickerInstance = pickerWrapper.firstChild; 
+        pickerInstance['dom.buttonText'] = '✅ Save Here';
+        pickerInstance.onfilepick = async (e, path) => {
+          if (!path) return;
+          try {
+            let savePath = path.toLowerCase().endsWith('.m3u') || path.toLowerCase().endsWith('.m3u8') ? path : (path.endsWith('/') ? path + 'playlist.m3u' : path + '.m3u');
+            await window.api.saveFile(savePath, generateM3U());
+            showPopup('Saved: ' + decodePathForDisplay(savePath).split('/').pop());
+          } catch (err) { showPopup('Save failed: ' + err.message, true); }
+          pickerWrapper.remove();
+        };
+        pickerInstance.oncancel = () => pickerWrapper.remove();
+        document.body.appendChild(pickerWrapper);
+      } catch (err) { showPopup('Picker unavailable', true); }
+    }
+
+    async function loadPlaylistDialog() {
+      try {
+        if (!window.createfilePicker) { const { createfilePicker } = await import('/system/ux/filePicker.js'); window.createfilePicker = createfilePicker; }
+        const pickerWrapper = window.createfilePicker();
+        const pickerInstance = pickerWrapper.firstChild; 
+        pickerInstance['dom.buttonText'] = '✅ Load';
+        pickerInstance.onfilepick = async (e, path) => {
+          if (!path) return;
+          try {
+            const content = await window.api.readFile(path);
+            const tracks = parseM3U(content, path);
+            if (!tracks.length) { showPopup('No valid tracks found', true); return; }
+            tracks.forEach(t => addToPlaylist(t.name, t.path));
+            renderPlaylist();
+            showPopup(`Loaded ${tracks.length} tracks`);
+          } catch (err) { showPopup('Load failed: ' + err.message, true); }
+          pickerWrapper.remove();
+        };
+        pickerInstance.oncancel = () => pickerWrapper.remove();
+        document.body.appendChild(pickerWrapper);
+      } catch (err) { showPopup('Picker unavailable', true); }
+    }
+
+    function generateM3U() {
+      let m = '#EXTM3U\n# Generated: ' + new Date().toISOString() + '\n';
+      playlist.forEach(t => { m += `#EXTINF:-1,${t.name}\n${t.path}\n`; }); // Save original path
+      return m;
+    }
+
+    function parseM3U(content, basePath) {
+      const lines = content.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('#EXTM3U'));
+      const tracks = []; let name = '';
+      for (const line of lines) {
+        if (line.startsWith('#EXTINF:')) { const m = line.match(/,#EXTINF:-1,(.+)$/); if (m) name = m[1]; }
+        else if (!line.startsWith('#')) {
+          let path = line.startsWith('/') ? line : basePath.substring(0, basePath.lastIndexOf('/') + 1) + line;
+          if (AUDIO_EXT.some(ext => path.toLowerCase().endsWith(ext))) { tracks.push({ name: name || path.split('/').pop(), path }); name = ''; }
+        }
+      }
+      return tracks;
+    }
+
+    // === STORAGE & UTILS ===
+    function saveToStorage(n = 'default') { 
+      try { 
+        localStorage.setItem(`mp-${n}`, JSON.stringify({ 
+          playlist: playlist.map(t => ({ name: t.name, path: t.path })), // Store original path
+          currentIndex, 
+          isShuffle 
+        })); 
+      } catch (e) {} 
+    }
+    
+    function loadFromStorage(n = 'default') {
+      try {
+        const d = JSON.parse(localStorage.getItem(`mp-${n}`));
+        if (!d?.playlist) return;
+        // Rebuild playlist with decoded display paths
+        playlist = d.playlist.map(t => {
+          const src = prepareSource(t.path);
+          return { 
+            ...t, 
+            src, 
+            displayPath: decodePathForDisplay(t.path) 
+          };
+        });
+        currentIndex = d.currentIndex ?? -1; 
+        isShuffle = d.isShuffle ?? false;
+        updateTrackCount(); 
+        renderPlaylist(); 
+        updateNowPlaying(); 
+        updatePlayButton();
+        els.btnShuffle.classList.toggle('active', isShuffle);
+        els.playlistMode.textContent = `Order: ${isShuffle ? 'Shuffle' : 'Sequential'}`;
+        if (playlist.length) showPopup(`Restored ${playlist.length} tracks`);
+      } catch (e) {}
+    }
+
+    function updateUI() { updateTrackCount(); updateNowPlaying(); updatePlayButton(); renderPlaylist(); els.progressBar.disabled = true; }
+    
+    function showPopup(msg, err = false) {
+      if (window.showPopupMessage) { window.showPopupMessage(msg, err); return; }
+      const p = document.createElement('div');
+      p.className = `system-alert system-mb-2${err ? ' system-alert-danger' : ' system-alert-success'}`;
+      p.innerHTML = `<span class="mat-icon" data-icon-group="${err ? 'status-error' : 'status-success'}" style="font-size:0.9em;vertical-align:middle">${err ? 'error' : 'check_circle'}</span> ${esc(msg)}`;
+      const app = document.querySelector('.system-app');
+      app.insertBefore(p, app.firstChild);
+      setTimeout(() => { p.style.transition = 'opacity 0.3s'; p.style.opacity = '0'; setTimeout(() => p.remove(), 300); }, 3000);
+    }
+
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
+    window.MusicPlayer = { playlist, playTrack, saveToStorage, loadFromStorage };
+  })();
+  </script>
+</body>
+</html>

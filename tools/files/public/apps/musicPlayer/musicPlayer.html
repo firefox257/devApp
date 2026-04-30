@@ -1,0 +1,999 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Music Player</title>
+  
+  <!-- REQUIRED: Bridge CSS (MUST be first) -->
+  <link rel="stylesheet" href="/os-theme-bridge.css" />
+  <!-- REQUIRED: Bridge JS (MUST be second) -->
+  <script src="/os-theme-bridge.js"></script>
+  
+  <!-- REQUIRED: Local Material Icons Font -->
+  <style>
+    @font-face {
+      font-family: 'Material Icons';
+      src: url('/system/fonts/MaterialIcons-Regular.ttf') format('truetype');
+      font-weight: normal;
+      font-style: normal;
+      font-display: block;
+    }
+    .mat-icon {
+      font-family: 'Material Icons', sans-serif !important;
+      font-feature-settings: 'liga';
+      -webkit-font-feature-settings: 'liga';
+      line-height: 1;
+      letter-spacing: normal;
+      text-transform: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      white-space: nowrap;
+      word-wrap: normal;
+      direction: ltr;
+      vertical-align: middle;
+      -webkit-font-smoothing: antialiased;
+      user-select: none;
+      color: inherit;
+    }
+  </style>
+
+  <!-- APP-SPECIFIC STYLES (THEME-COMPLIANT) -->
+  <style>
+    .h-stack {
+      display: flex !important;
+      flex-direction: row !important;
+      flex-wrap: nowrap !important;
+      align-items: center !important;
+      gap: 8px !important;
+    }
+    .h-stack.center { justify-content: center !important; }
+    .h-stack.spread { justify-content: space-between !important; }
+    
+    .system-list-item.playing {
+      background: var(--system-accent);
+      color: var(--system-text-on-accent, #fff);
+    }
+    .system-list-item.playing .system-text,
+    .system-list-item.playing .system-text-small,
+    .system-list-item.playing .system-text-dim,
+    .system-list-item.playing .mat-icon {
+      color: var(--system-text-on-accent, #fff) !important;
+    }
+    
+    .system-list-item:active { background: var(--system-highlight); }
+    .system-list-item:focus-within {
+      outline: 2px solid var(--system-accent);
+      outline-offset: -2px;
+    }
+    #btn-shuffle.active {
+      background: var(--system-accent) !important;
+    }
+    #btn-shuffle.active .mat-icon {
+      color: var(--system-text-on-accent, #fff) !important;
+    }
+    
+    .system-btn-icon .mat-icon {
+      font-size: 1.25rem;
+      width: 1.25rem;
+      height: 1.25rem;
+    }
+    
+    .empty-state-icon {
+      font-size: 3rem !important;
+      color: var(--system-text-dim) !important;
+      opacity: 0.7;
+    }
+
+    /* === MODAL STYLES (THEME-COMPLIANT v2.7+) === */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.2s ease, visibility 0.2s ease;
+    }
+    .modal-overlay.visible {
+      opacity: 1;
+      visibility: visible;
+    }
+    .modal-content {
+      background: var(--system-menu-bg, rgba(30, 30, 30, 0.95));
+      border: 1px solid var(--system-border);
+      border-radius: var(--system-radius-lg, 16px);
+      padding: 24px;
+      max-width: 400px;
+      width: 90%;
+      box-shadow: var(--system-shadow, 0 8px 32px rgba(0, 0, 0, 0.3));
+      transform: scale(0.95);
+      transition: transform 0.2s ease;
+    }
+    .modal-overlay.visible .modal-content {
+      transform: scale(1);
+    }
+    .modal-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .modal-header .mat-icon {
+      font-size: 1.5rem;
+      color: var(--system-accent);
+    }
+    .modal-title {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: var(--system-text);
+      margin: 0;
+    }
+    .modal-body {
+      color: var(--system-text-dim);
+      margin-bottom: 24px;
+      line-height: 1.5;
+    }
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+    }
+    .modal-actions .system-btn {
+      min-width: 80px;
+    }
+    
+    @media (max-width: 480px) {
+      .path-mobile-hide { display: none !important; }
+      .system-card-body { padding: 12px !important; }
+      .h-stack { gap: 4px !important; }
+      .system-btn-sm { padding: 6px !important; min-width: 32px !important; }
+      .modal-content { padding: 20px !important; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .modal-overlay, .modal-content, * {
+        transition: none !important;
+        animation: none !important;
+      }
+    }
+  </style>
+</head>
+
+<body data-os-app="true">
+  <div class="system-app">
+    
+    <header class="system-card system-mb-2">
+      <div class="system-card-body h-stack spread">
+        <h1 class="system-title system-mb-0">
+          <span class="mat-icon" data-icon-group="media" style="margin-right: 8px;">music_note</span>
+          Music Player
+        </h1>
+        <div class="h-stack">
+          <button id="btn-shuffle" class="system-btn system-btn-icon" title="Toggle Shuffle" tabindex="0" aria-label="Toggle shuffle">
+            <span class="mat-icon" data-icon-group="media">shuffle</span>
+          </button>
+          <button id="btn-save" class="system-btn system-btn-icon" title="Save Playlist" tabindex="0" aria-label="Save playlist">
+            <span class="mat-icon" data-icon-group="action-primary">save</span>
+          </button>
+          <button id="btn-load" class="system-btn system-btn-icon" title="Load Playlist" tabindex="0" aria-label="Load playlist">
+            <span class="mat-icon" data-icon-group="action-primary">playlist_add</span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <section class="system-card system-mb-2">
+      <div class="system-card-body">
+        <div class="system-text-center">
+          <div id="now-playing-title" class="system-subtitle system-mb-1">No track selected</div>
+          <div id="now-playing-path" class="system-text system-text-dim system-text-small system-truncate"></div>
+          
+          <div class="system-mt-2">
+            <input type="range" id="progress-bar" class="system-input system-w-100" min="0" max="100" value="0" disabled />
+            <div class="h-stack system-text-small system-text-dim">
+              <span id="current-time">0:00</span>
+              <span style="flex: 1;"></span>
+              <span id="duration">0:00</span>
+            </div>
+          </div>
+          
+          <div class="h-stack center system-mt-2">
+            <button id="btn-prev" class="system-btn system-btn-icon" title="Previous" disabled tabindex="0" aria-label="Previous track">
+              <span class="mat-icon" data-icon-group="media">skip_previous</span>
+            </button>
+            <button id="btn-play" class="system-btn system-btn-icon system-btn-lg" title="Play/Pause" disabled tabindex="0" aria-label="Play or pause">
+              <span id="play-icon" class="mat-icon" data-icon-group="action-confirmation">play_arrow</span>
+            </button>
+            <button id="btn-next" class="system-btn system-btn-icon" title="Next" disabled tabindex="0" aria-label="Next track">
+              <span class="mat-icon" data-icon-group="media">skip_next</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="system-card system-mb-2">
+      <div class="system-card-body">
+        <div class="h-stack system-mb-2">
+          <button id="btn-add-files" class="system-btn system-btn-icon" title="Add Audio File" tabindex="0" aria-label="Add audio file">
+            <span class="mat-icon" data-icon-group="action-primary">audio_file</span>
+          </button>
+          <button id="btn-add-folder" class="system-btn system-btn-icon system-btn-secondary" title="Add Folder" tabindex="0" aria-label="Add folder of audio files">
+            <span class="mat-icon" data-icon-group="navigation">folder_open</span>
+          </button>
+          <button id="btn-clear" class="system-btn system-btn-icon system-btn-danger" title="Clear Playlist" tabindex="0" aria-label="Clear playlist">
+            <span class="mat-icon" data-icon-group="action-destructive">delete_sweep</span>
+          </button>
+          <span id="track-count" class="system-badge" style="margin-left: 4px; flex-shrink: 0;">0 tracks</span>
+        </div>
+        <p class="system-text system-text-dim system-text-small system-mb-0" style="font-style: italic;">💡 Tip: Check a file/folder, then click ✅ "Use Path" in the picker.</p>
+      </div>
+    </section>
+
+    <section class="system-card">
+      <div class="system-card-header h-stack spread">
+        <span class="system-heading">Playlist</span>
+        <span class="system-text-small system-text-dim" id="playlist-mode">Order: Sequential</span>
+      </div>
+      <div class="system-card-body system-p-0">
+        <div id="playlist-container" class="system-overflow-auto" style="max-height: 300px;">
+          <div id="playlist-empty" class="system-empty system-p-3 system-text-center">
+            <span class="mat-icon empty-state-icon" data-icon-group="media">music_note</span>
+            <p class="system-text system-text-dim system-mt-2">Add audio files to start playing</p>
+          </div>
+          <ul id="playlist-list" class="system-list system-hidden"></ul>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- ✅ MODAL OUTSIDE .system-app (direct child of body) -->
+  <div id="confirm-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="modal-content system-card">
+      <div class="modal-header">
+        <span class="mat-icon" id="modal-icon" data-icon-group="status-warning">warning</span>
+        <h2 class="modal-title" id="modal-title">Confirm Action</h2>
+      </div>
+      <div class="modal-body system-text" id="modal-message">Are you sure you want to proceed?</div>
+      <div class="modal-actions">
+        <button id="modal-cancel" class="system-btn system-btn-secondary">Cancel</button>
+        <button id="modal-confirm" class="system-btn system-btn-danger">
+          <span class="mat-icon" data-icon-group="action-destructive" style="font-size: 1rem; margin-right: 4px; vertical-align: middle;">delete</span>
+          Confirm
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <audio id="audio-element" preload="metadata"></audio>
+
+  <script>
+  (function() {
+    'use strict';
+
+    function getEl(id) {
+      const el = document.getElementById(id);
+      if (!el) console.error('❌ Missing element:', id);
+      return el;
+    }
+
+    const els = {
+      btnAddFiles: getEl('btn-add-files'),
+      btnAddFolder: getEl('btn-add-folder'),
+      btnClear: getEl('btn-clear'),
+      btnSave: getEl('btn-save'),
+      btnLoad: getEl('btn-load'),
+      btnShuffle: getEl('btn-shuffle'),
+      btnPlay: getEl('btn-play'),
+      btnPrev: getEl('btn-prev'),
+      btnNext: getEl('btn-next'),
+      nowPlayingTitle: getEl('now-playing-title'),
+      nowPlayingPath: getEl('now-playing-path'),
+      trackCount: getEl('track-count'),
+      playlistEmpty: getEl('playlist-empty'),
+      playlistList: getEl('playlist-list'),
+      playlistMode: getEl('playlist-mode'),
+      audio: getEl('audio-element'),
+      progressBar: getEl('progress-bar'),
+      currentTime: getEl('current-time'),
+      duration: getEl('duration'),
+      playIcon: getEl('play-icon'),
+      modal: getEl('confirm-modal'),
+      modalIcon: getEl('modal-icon'),
+      modalTitle: getEl('modal-title'),
+      modalMessage: getEl('modal-message'),
+      modalCancel: getEl('modal-cancel'),
+      modalConfirm: getEl('modal-confirm')
+    };
+
+    let playlist = [], currentIndex = -1, isShuffle = false, isPlaying = false, shuffledIndices = [];
+    let pendingAction = null;
+    
+    // ✅ FIXED: Retry counter with blocking flag
+    let playRetryCount = 0;
+    let isPlaybackStopped = false; // ✅ Prevents further play attempts after max retries
+    const MAX_PLAY_RETRIES = 3;
+    
+    const AUDIO_EXT = ['.mp3', '.wav', '.ogg', '.oga', '.m4a', '.aac', '.flac', '.webm', '.opus'];
+
+    function init() {
+      console.log('🎵 Music Player initializing...');
+      
+      const missing = Object.entries(els).filter(([k, v]) => !v).map(([k]) => k);
+      if (missing.length) {
+        console.error('❌ Missing DOM elements:', missing);
+        showPopup('Initialization error: Missing elements. Check console.', true);
+        return;
+      }
+      
+      try {
+        setupEvents();
+        setupBridge();
+        updateUI();
+        loadFromStorage('default');
+        els.audio.volume = 1.0;
+        console.log('✅ Music Player initialized successfully');
+      } catch (err) {
+        console.error('❌ Init error:', err);
+        showPopup('Initialization failed. Check console.', true);
+      }
+    }
+
+    function setupEvents() {
+      els.btnAddFiles.addEventListener('click', () => openPicker('file'));
+      els.btnAddFolder.addEventListener('click', () => openPicker('folder'));
+      els.btnClear.addEventListener('click', () => showClearConfirm());
+      els.btnSave.addEventListener('click', savePlaylistDialog);
+      els.btnLoad.addEventListener('click', loadPlaylistDialog);
+      els.btnShuffle.addEventListener('click', toggleShuffle);
+      els.btnPlay.addEventListener('click', togglePlay);
+      els.btnPrev.addEventListener('click', playPrevious);
+      els.btnNext.addEventListener('click', playNext);
+      
+      els.modalCancel.addEventListener('click', hideModal);
+      els.modalConfirm.addEventListener('click', () => {
+        if (pendingAction) pendingAction();
+        hideModal();
+      });
+      
+      els.modal.addEventListener('click', (e) => {
+        if (e.target === els.modal) hideModal();
+      });
+      
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && els.modal.classList.contains('visible')) {
+          hideModal();
+        }
+      });
+      
+      els.audio.addEventListener('timeupdate', updateProgress);
+      els.audio.addEventListener('loadedmetadata', updateDuration);
+      els.audio.addEventListener('ended', () => {
+        if (isPlaybackStopped) return; // ✅ Don't auto-advance if stopped
+        (isShuffle && shuffledIndices.length === 0 ? generateShuffledIndices() : null) || playNext();
+      });
+      
+      // ✅ FIXED: Error handler with single-fire protection
+      els.audio.addEventListener('error', () => { 
+        if (isPlaybackStopped) return; // ✅ Ignore errors after stopped
+        
+        console.error('❌ Audio error:', els.audio.error);
+        let msg = 'Failed to load audio file.';
+        if (els.audio.error?.code === 4) {
+          msg = 'Media resource not found (404). Check path.';
+        }
+        handlePlayError(msg);
+      });
+      
+      els.progressBar.addEventListener('input', e => { 
+        if(els.audio.duration) els.audio.currentTime = (e.target.value/100)*els.audio.duration; 
+      });
+      
+      els.playlistList.addEventListener('click', handlePlaylistClick);
+      
+      document.querySelectorAll('.system-btn, .system-list-item, .system-list-item button').forEach(el => {
+        el.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') { 
+            e.preventDefault(); 
+            el.click?.(); 
+          }
+        });
+      });
+    }
+
+    function setupBridge() {
+      window.addEventListener('osBridgeReady', () => console.log('🎵 Bridge ready'));
+      window.addEventListener('osThemeChanged', (e) => console.log('🎵 Theme sync:', e.detail?.themeId));
+    }
+
+    function showModal(title, message, onConfirm, icon = 'warning', confirmText = 'Confirm', confirmClass = 'system-btn-danger') {
+      els.modalTitle.textContent = title;
+      els.modalMessage.textContent = message;
+      els.modalIcon.textContent = icon;
+      els.modalConfirm.textContent = confirmText;
+      els.modalConfirm.className = 'system-btn ' + confirmClass;
+      pendingAction = onConfirm;
+      els.modal.classList.add('visible');
+      els.modal.setAttribute('aria-hidden', 'false');
+      els.modalConfirm.focus();
+    }
+
+    function hideModal() {
+      els.modal.classList.remove('visible');
+      els.modal.setAttribute('aria-hidden', 'true');
+      pendingAction = null;
+    }
+
+    function showClearConfirm() {
+      if (!playlist.length) { 
+        showPopup('Playlist is already empty', true); 
+        return; 
+      }
+      showModal(
+        'Clear Playlist?',
+        `This will remove all ${playlist.length} track${playlist.length !== 1 ? 's' : ''} from the playlist. This action cannot be undone.`,
+        clearPlaylist,
+        'delete_sweep',
+        'Clear All',
+        'system-btn-danger'
+      );
+    }
+
+    function showRemoveTrackConfirm(idx, trackName) {
+      showModal(
+        'Remove Track?',
+        `Are you sure you want to remove "${trackName}" from the playlist?`,
+        () => removeFromPlaylist(idx),
+        'delete',
+        'Remove',
+        'system-btn-danger'
+      );
+    }
+
+    // ✅ FIXED: Proper retry logic that actually stops after 3 attempts
+    function handlePlayError(msg) {
+      playRetryCount++;
+      console.warn(`⚠️ Play attempt ${playRetryCount}/${MAX_PLAY_RETRIES} failed:`, msg);
+      
+      if (playRetryCount >= MAX_PLAY_RETRIES) {
+        // ✅ STOP ALL PLAYBACK - don't call playNext()
+        stopAllPlayback();
+        showPopup(`Playback stopped: ${msg} (Max ${MAX_PLAY_RETRIES} retries reached)`, true);
+      } else {
+        // Try next track
+        showPopup(`Track failed (${playRetryCount}/${MAX_PLAY_RETRIES}): ${msg}`, true);
+        playNext();
+      }
+    }
+
+    // ✅ FIXED: Complete stop with state reset
+    function stopAllPlayback() {
+      console.log('🛑 Stopping all playback');
+      isPlaybackStopped = true;
+      isPlaying = false;
+      els.audio.pause();
+      els.audio.src = '';
+      els.audio.load();
+      currentIndex = -1;
+      playRetryCount = 0;
+      updateNowPlaying();
+      updatePlayButton();
+      renderPlaylist();
+    }
+
+    function resetRetryCounter() {
+      playRetryCount = 0;
+      isPlaybackStopped = false;
+      console.log('🎵 Retry counter reset');
+    }
+
+    function normalizeApiPath(path) {
+      if (!path) return path;
+      const lower = path.toLowerCase();
+      if (lower.startsWith('/public/') || lower === '/public') return path;
+      if (path.startsWith('/')) return '/public' + path;
+      return '/public/' + path;
+    }
+
+    async function openPicker(mode) {
+      if (!window.api) { 
+        try { 
+          const { api } = await import('/system/js/apiCalls.js'); 
+          window.api = api; 
+        } catch(e) { showPopup('API missing', true); return; } 
+      }
+      if (!window.createfilePicker) { 
+        try { 
+          const { createfilePicker } = await import('/system/ux/filePicker.js'); 
+          window.createfilePicker = createfilePicker; 
+        } catch(e) { showPopup('Picker missing', true); return; } 
+      }
+
+      const pickerWrapper = window.createfilePicker();
+      const pickerInstance = pickerWrapper.firstChild; 
+      pickerInstance['dom.buttonText'] = mode === 'file' ? '✅ Add Track' : '✅ Select Folder';
+
+      pickerInstance.onfilepick = async (e, selectedPath) => {
+        if (!selectedPath) return;
+        try {
+          if (mode === 'file') {
+            if (!AUDIO_EXT.some(ext => selectedPath.toLowerCase().endsWith(ext))) {
+              showPopup('Please select a valid audio file', true); return;
+            }
+            addToPlaylist(selectedPath.split('/').pop(), selectedPath);
+            renderPlaylist();
+            showPopup('Track added');
+          } else {
+            const lsPath = selectedPath.endsWith('/') ? selectedPath + '*' : selectedPath + '/*';
+            const files = await window.api.ls(lsPath);
+            const audioFiles = files.filter(f => f.type === 'file' && AUDIO_EXT.some(ext => f.name.toLowerCase().endsWith(ext)));
+            if (!audioFiles.length) { showPopup('No audio files found in folder', true); return; }
+            const base = selectedPath.endsWith('/') ? selectedPath : selectedPath + '/';
+            audioFiles.forEach(f => addToPlaylist(f.name, base + f.name));
+            renderPlaylist();
+            showPopup(`Added ${audioFiles.length} tracks`);
+          }
+        } catch (err) { showPopup('Error: ' + err.message, true); }
+        pickerWrapper.remove();
+      };
+      pickerInstance.oncancel = () => pickerWrapper.remove();
+      document.body.appendChild(pickerWrapper);
+    }
+
+    function decodePathForDisplay(path) {
+      if (!path) return '';
+      try {
+        let decoded = decodeURIComponent(path);
+        if (decoded.startsWith('/public/')) decoded = decoded.replace('/public/', '/');
+        else if (decoded.toLowerCase().startsWith('/public')) decoded = decoded.substring(7);
+        return decoded;
+      } catch (e) { return path; }
+    }
+    
+    function prepareSource(path) {
+      if (!path) return '';
+      let decoded = decodeURIComponent(path);
+      let parts = decoded.split('/').filter(p => p.length > 0);
+      if (parts.length > 0 && parts[0].toLowerCase() === 'public') parts.shift();
+      return encodeURI('/' + parts.join('/'));
+    }
+
+    function addToPlaylist(name, path, isTemp = false) {
+      const normalizedPath = normalizeApiPath(path);
+      if (playlist.some(t => t.path === normalizedPath)) return;
+      playlist.push({ 
+        name, 
+        path: normalizedPath,
+        src: prepareSource(normalizedPath),
+        displayPath: decodePathForDisplay(normalizedPath), 
+        isTemp 
+      });
+      updateTrackCount();
+    }
+
+    function removeFromPlaylist(idx) {
+      if (idx < 0 || idx >= playlist.length) return;
+      if (idx === currentIndex) { 
+        els.audio.pause(); 
+        els.audio.src = ''; 
+        els.audio.load();
+        currentIndex = -1; 
+        isPlaying = false; 
+        updateNowPlaying(); 
+        updatePlayButton(); 
+      }
+      playlist.splice(idx, 1);
+      if (idx < currentIndex) currentIndex--;
+      else if (idx === currentIndex && currentIndex >= playlist.length) currentIndex = playlist.length - 1;
+      updateTrackCount(); 
+      renderPlaylist();
+      showPopup('Track removed');
+    }
+
+    function clearPlaylist() {
+      els.audio.pause(); 
+      els.audio.src = ''; 
+      els.audio.load();
+      playlist = []; 
+      currentIndex = -1; 
+      isPlaying = false; 
+      isPlaybackStopped = false; // ✅ Reset stop flag
+      shuffledIndices = [];
+      playRetryCount = 0; // ✅ Reset retry counter
+      updateUI(); 
+      renderPlaylist(); 
+      showPopup('Playlist cleared');
+    }
+
+    function renderPlaylist() {
+      const empty = !playlist.length;
+      els.playlistEmpty.classList.toggle('system-hidden', !empty);
+      els.playlistList.classList.toggle('system-hidden', empty);
+      if (empty) return;
+      
+      els.playlistList.innerHTML = '';
+      playlist.forEach((t, i) => {
+        const li = document.createElement('li');
+        li.className = 'system-list-item h-stack' + (i === currentIndex ? ' playing' : '');
+        li.dataset.index = i;
+        li.tabIndex = 0;
+        li.style.cssText = 'padding:10px 12px; cursor:pointer;';
+        li.innerHTML = `
+          <span class="system-text-small system-text-dim" style="width:28px; text-align:center; flex-shrink:0;">${i+1}</span>
+          <div style="margin:0 8px; min-width:0; flex:1;">
+            <div class="system-text system-truncate" title="${esc(t.name)}">${esc(t.name)}</div>
+            <div class="system-text-small system-text-dim system-truncate path-mobile-hide" title="${esc(t.displayPath)}">${esc(t.displayPath)}</div>
+          </div>
+          <div class="h-stack" style="flex-shrink:0;">
+            <button class="system-btn system-btn-icon btn-play-track" title="Play" tabindex="0" aria-label="Play track">
+              <span class="mat-icon" data-icon-group="action-confirmation">play_arrow</span>
+            </button>
+            <button class="system-btn system-btn-icon btn-remove-track" title="Remove" tabindex="0" aria-label="Remove track">
+              <span class="mat-icon" data-icon-group="action-destructive">close</span>
+            </button>
+          </div>
+        `;
+        els.playlistList.appendChild(li);
+      });
+    }
+
+    function handlePlaylistClick(e) {
+      const item = e.target.closest('.system-list-item');
+      if (!item) return;
+      const idx = parseInt(item.dataset.index, 10);
+      if (e.target.closest('.btn-remove-track')) { 
+        e.stopPropagation(); 
+        const track = playlist[idx];
+        showRemoveTrackConfirm(idx, track.name);
+        return; 
+      }
+      if (e.target.closest('.btn-play-track')) { 
+        e.stopPropagation(); 
+        resetRetryCounter(); // ✅ User manually selected - reset counter
+        playTrack(idx); 
+        return; 
+      }
+      resetRetryCounter(); // ✅ User manually selected - reset counter
+      playTrack(idx);
+    }
+
+    function updateTrackCount() { 
+      els.trackCount.textContent = `${playlist.length} track${playlist.length !== 1 ? 's' : ''}`; 
+    }
+
+    // ✅ FIXED: playTrack with proper retry handling
+    async function playTrack(idx) {
+      if (idx < 0 || idx >= playlist.length) return;
+      
+      // ✅ Don't play if playback is stopped
+      if (isPlaybackStopped) {
+        console.warn('⚠️ Playback stopped - ignoring play request');
+        return;
+      }
+      
+      currentIndex = idx;
+      const track = playlist[idx];
+      console.log('🎵 Attempting play:', track.name, 'URL:', track.src, 'Retry:', playRetryCount + 1);
+
+      try {
+        const res = await fetch(track.src, { method: 'HEAD' });
+        if (!res.ok) { 
+          handlePlayError(`File not found (${res.status}).`); 
+          return; 
+        }
+      } catch (e) { 
+        console.warn('⚠️ Pre-flight skipped:', e); 
+      }
+
+      els.audio.src = track.src;
+      els.audio.load();
+
+      els.audio.play().then(() => {
+        // ✅ Success - reset retry counter
+        resetRetryCounter();
+        isPlaying = true;
+        updateNowPlaying(); 
+        updatePlayButton(); 
+        renderPlaylist();
+      }).catch(err => {
+        let msg = 'Failed to play track';
+        if (err.name === 'NotSupportedError') msg = 'Unsupported format';
+        else if (err.name === 'NotAllowedError') msg = 'Tap play to enable audio';
+        else if (err.code === 4) msg = 'File not found (404)';
+        
+        handlePlayError(msg);
+        
+        if (err.name === 'NotAllowedError') {
+          isPlaying = false;
+          updatePlayButton();
+        }
+      });
+    }
+
+    function togglePlay() {
+      if (isPlaybackStopped) {
+        showPopup('Playback stopped. Add tracks or clear playlist to resume.', true);
+        return;
+      }
+      if (!playlist.length) { showPopup('Add tracks first', true); return; }
+      if (currentIndex === -1) playTrack(isShuffle ? Math.floor(Math.random() * playlist.length) : 0);
+      else { 
+        isPlaying ? els.audio.pause() : els.audio.play(); 
+        isPlaying = !isPlaying; 
+        updatePlayButton(); 
+      }
+    }
+
+    function playPrevious() {
+      if (isPlaybackStopped) return;
+      if (!playlist.length) return;
+      if (els.audio.currentTime > 3) { els.audio.currentTime = 0; return; }
+      if (isShuffle && (!shuffledIndices.length || !shuffledIndices.includes(currentIndex))) {
+        generateShuffledIndices();
+      }
+      let next = isShuffle 
+        ? shuffledIndices[(shuffledIndices.indexOf(currentIndex) - 1 + shuffledIndices.length) % shuffledIndices.length] 
+        : (currentIndex > 0 ? currentIndex - 1 : playlist.length - 1);
+      playTrack(next);
+    }
+
+    function playNext() {
+      if (isPlaybackStopped) return; // ✅ Don't advance if stopped
+      if (!playlist.length) return;
+      if (isShuffle && (!shuffledIndices.length || !shuffledIndices.includes(currentIndex))) {
+        generateShuffledIndices();
+      }
+      let next = isShuffle 
+        ? shuffledIndices[(shuffledIndices.indexOf(currentIndex) + 1) % shuffledIndices.length] 
+        : (currentIndex < playlist.length - 1 ? currentIndex + 1 : 0);
+      playTrack(next);
+    }
+
+    function toggleShuffle() {
+      isShuffle = !isShuffle;
+      els.btnShuffle.classList.toggle('active', isShuffle);
+      els.playlistMode.textContent = `Order: ${isShuffle ? 'Shuffle' : 'Sequential'}`;
+      if (isShuffle && playlist.length) generateShuffledIndices();
+      showPopup(isShuffle ? 'Shuffle enabled' : 'Shuffle disabled');
+    }
+
+    function generateShuffledIndices() {
+      shuffledIndices = [...Array(playlist.length).keys()];
+      for (let i = shuffledIndices.length - 1; i > 0; i--) { 
+        const j = Math.floor(Math.random() * (i + 1)); 
+        [shuffledIndices[i], shuffledIndices[j]] = [shuffledIndices[j], shuffledIndices[i]]; 
+      }
+      if (currentIndex >= 0 && !shuffledIndices.includes(currentIndex)) shuffledIndices.unshift(currentIndex);
+    }
+
+    function updateNowPlaying() {
+      if (currentIndex >= 0) {
+        const track = playlist[currentIndex];
+        els.nowPlayingTitle.textContent = track.name;
+        els.nowPlayingPath.textContent = track.displayPath;
+        els.nowPlayingPath.title = track.displayPath;
+        els.btnPrev.disabled = els.btnNext.disabled = els.btnPlay.disabled = false;
+      } else {
+        els.nowPlayingTitle.textContent = 'No track selected';
+        els.nowPlayingPath.textContent = '';
+        els.btnPrev.disabled = els.btnNext.disabled = true;
+        els.btnPlay.disabled = !playlist.length;
+      }
+    }
+
+    function updatePlayButton() { 
+      els.playIcon.textContent = isPlaying ? 'pause' : 'play_arrow'; 
+      els.playIcon.setAttribute('data-icon-group', isPlaying ? 'media' : 'action-confirmation'); 
+    }
+    
+    function updateProgress() { 
+      if (els.audio.duration) { 
+        els.progressBar.value = (els.audio.currentTime / els.audio.duration) * 100; 
+        els.currentTime.textContent = fmtTime(els.audio.currentTime); 
+      } 
+    }
+    function updateDuration() { 
+      els.duration.textContent = fmtTime(els.audio.duration); 
+      els.progressBar.disabled = false; 
+    }
+    function fmtTime(s) { 
+      if (!s || isNaN(s)) return '0:00'; 
+      return `${Math.floor(s / 60)}:${Math.floor(s % 60).toString().padStart(2, '0')}`; 
+    }
+    function esc(s) { 
+      const d = document.createElement('div'); 
+      d.textContent = s; 
+      return d.innerHTML; 
+    }
+
+    async function savePlaylistDialog() {
+      if (!playlist.length) { showPopup('Playlist is empty', true); return; }
+      if (!window.api) { 
+        try { 
+          const { api } = await import('/system/js/apiCalls.js'); 
+          window.api = api; 
+        } catch(e) { showPopup('API missing', true); return; } 
+      }
+      try {
+        if (!window.createfilePicker) { 
+          const { createfilePicker } = await import('/system/ux/filePicker.js'); 
+          window.createfilePicker = createfilePicker; 
+        }
+        const pickerWrapper = window.createfilePicker();
+        const pickerInstance = pickerWrapper.firstChild; 
+        pickerInstance['dom.buttonText'] = '✅ Save Here';
+        pickerInstance.onfilepick = async (e, path) => {
+          if (!path) return;
+          try {
+            let savePath = path.toLowerCase().endsWith('.m3u') || path.toLowerCase().endsWith('.m3u8') 
+              ? path 
+              : (path.endsWith('/') ? path + 'playlist.m3u' : path + '.m3u');
+            await window.api.saveFile(savePath, generateM3U());
+            showPopup('Saved: ' + decodePathForDisplay(savePath).split('/').pop());
+          } catch (err) { showPopup('Save failed: ' + err.message, true); }
+          pickerWrapper.remove();
+        };
+        pickerInstance.oncancel = () => pickerWrapper.remove();
+        document.body.appendChild(pickerWrapper);
+      } catch (err) { showPopup('Picker unavailable', true); }
+    }
+
+    async function loadPlaylistDialog() {
+      if (!window.api) { 
+        try { 
+          const { api } = await import('/system/js/apiCalls.js'); 
+          window.api = api; 
+        } catch(e) { 
+          showPopup('API missing', true); 
+          return; 
+        } 
+      }
+      try {
+        if (!window.createfilePicker) { 
+          const { createfilePicker } = await import('/system/ux/filePicker.js'); 
+          window.createfilePicker = createfilePicker; 
+        }
+        const pickerWrapper = window.createfilePicker();
+        const pickerInstance = pickerWrapper.firstChild; 
+        pickerInstance['dom.buttonText'] = '✅ Load';
+        pickerInstance.onfilepick = async (e, path) => {
+          if (!path) return;
+          try {
+            console.log('📂 Loading playlist from:', path);
+            const content = await window.api.readFile(path);
+            console.log('📄 File content preview:', content.substring(0, 200) + '...');
+            
+            const tracks = parseM3U(content, path);
+            console.log('✅ Parsed tracks:', tracks.length);
+            
+            if (!tracks.length) { 
+              showPopup('No valid audio tracks found in playlist', true); 
+              return; 
+            }
+            
+            tracks.forEach(t => addToPlaylist(t.name, t.path));
+            renderPlaylist(); 
+            showPopup(`Loaded ${tracks.length} tracks`);
+          } catch (err) { 
+            console.error('❌ Load error:', err);
+            showPopup('Load failed: ' + err.message, true); 
+          }
+          pickerWrapper.remove();
+        };
+        pickerInstance.oncancel = () => pickerWrapper.remove();
+        document.body.appendChild(pickerWrapper);
+      } catch (err) { 
+        console.error('❌ Picker setup error:', err);
+        showPopup('Picker unavailable', true); 
+      }
+    }
+
+    function generateM3U() {
+      let m = '#EXTM3U\n# Generated: ' + new Date().toISOString() + '\n';
+      playlist.forEach(t => { m += `#EXTINF:-1,${t.name}\n${t.path}\n`; });
+      return m;
+    }
+
+    function parseM3U(content, basePath) {
+      const lines = content.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('#EXTM3U'));
+      const tracks = []; 
+      let name = '';
+      
+      for (const line of lines) {
+        if (line.startsWith('#EXTINF:')) { 
+          const m = line.match(/^#EXTINF:-?\d+,(.+)$/); 
+          if (m) name = m[1].trim(); 
+        }
+        else if (!line.startsWith('#') && line.length > 0) {
+          let path = line;
+          if (line.startsWith('file://')) {
+            path = line.slice(7);
+          } 
+          else if (!line.startsWith('/') && !line.match(/^[a-zA-Z]:/)) {
+            const dir = basePath.substring(0, basePath.lastIndexOf('/') + 1);
+            path = dir + line;
+          }
+          path = normalizeApiPath(path);
+          if (AUDIO_EXT.some(ext => path.toLowerCase().endsWith(ext))) { 
+            tracks.push({ 
+              name: name || path.split('/').pop().split('\\').pop(), 
+              path: path 
+            }); 
+            name = ''; 
+          }
+        }
+      }
+      return tracks;
+    }
+
+    function saveToStorage(n = 'default') { 
+      try { 
+        localStorage.setItem(`mp-${n}`, JSON.stringify({ 
+          playlist: playlist.map(t => ({ name: t.name, path: t.path })), 
+          currentIndex, isShuffle 
+        })); 
+      } catch (e) {} 
+    }
+    
+    function loadFromStorage(n = 'default') {
+      try {
+        const d = JSON.parse(localStorage.getItem(`mp-${n}`));
+        if (!d?.playlist) return;
+        playlist = d.playlist.map(t => ({ 
+          ...t, 
+          src: prepareSource(t.path), 
+          displayPath: decodePathForDisplay(t.path) 
+        }));
+        currentIndex = d.currentIndex ?? -1; 
+        isShuffle = d.isShuffle ?? false;
+        updateTrackCount(); 
+        renderPlaylist(); 
+        updateNowPlaying(); 
+        updatePlayButton();
+        els.btnShuffle.classList.toggle('active', isShuffle);
+        els.playlistMode.textContent = `Order: ${isShuffle ? 'Shuffle' : 'Sequential'}`;
+        if (playlist.length) showPopup(`Restored ${playlist.length} tracks`);
+      } catch (e) {}
+    }
+
+    function updateUI() { 
+      updateTrackCount(); 
+      updateNowPlaying(); 
+      updatePlayButton(); 
+      renderPlaylist(); 
+      els.progressBar.disabled = true; 
+    }
+    
+    function showPopup(msg, err = false) {
+      if (window.showPopupMessage) { 
+        window.showPopupMessage(msg, err); 
+        return; 
+      }
+      const p = document.createElement('div');
+      p.className = `system-alert system-mb-2${err ? ' system-alert-danger' : ' system-alert-success'}`;
+      p.innerHTML = `<span class="mat-icon" data-icon-group="${err ? 'status-error' : 'status-success'}" style="font-size:0.9em;vertical-align:middle;margin-right:6px">${err ? 'error' : 'check_circle'}</span>${esc(msg)}`;
+      const app = document.querySelector('.system-app');
+      app?.insertBefore(p, app.firstChild);
+      setTimeout(() => { 
+        p.style.transition = 'opacity 0.3s'; 
+        p.style.opacity = '0'; 
+        setTimeout(() => p.remove(), 300); 
+      }, 3000);
+    }
+
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
+    window.MusicPlayer = { playlist, playTrack, saveToStorage, loadFromStorage };
+  })();
+  </script>
+</body>
+</html>
