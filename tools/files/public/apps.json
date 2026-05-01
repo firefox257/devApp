@@ -193,6 +193,22 @@
 			"sandbox": "allow-scripts allow-same-origin allow-forms",
 			"allowMultipleInstances": false,
 			"consoleCapture": true
+		},
+		{
+			"id": "timers",
+			"name": "Timers",
+			"icon": "schedule",
+			"type": "iframe",
+			"url": "/apps/timers/timers.html",
+			"categoryId": "productivity",
+			"description": "Multi-task countdown timer manager",
+			"order": 4,
+			"enabled": true,
+			"permissions": ["localStorage"],
+			"sandbox": "allow-scripts allow-same-origin allow-modals",
+			"allowMultipleInstances": true,
+			"defaultWidth": 480,
+			"defaultHeight": 640
 		}
 	]
 }

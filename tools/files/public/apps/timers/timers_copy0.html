@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<title>Timers</title>
+<!-- REQUIRED: Bridge CSS for .system-* classes (MUST be first) -->
+<link rel="stylesheet" href="/os-theme-bridge.css" />
+<!-- REQUIRED: Bridge JS for theme sync (MUST be after CSS) -->
+<script src="/os-theme-bridge.js"></script>
+<!-- REQUIRED: Material Icons Font -->
+<style>
+@font-face {
+font-family: 'Material Icons';
+src: url('/system/fonts/MaterialIcons-Regular.ttf') format('truetype');
+font-weight: normal;
+font-style: normal;
+font-display: block;
+}
+.mat-icon {
+font-family: 'Material Icons', sans-serif !important;
+font-feature-settings: 'liga';
+}
+
+/* ============== TIMER APP STYLES ============== */
+body { margin: 0; padding: 16px; background: var(--system-bg); color: var(--system-text); font-family: var(--system-font); min-height: 100dvh; }
+
+.timer-item {
+background: var(--system-window-bg); border: 1px solid var(--system-border);
+border-radius: var(--system-radius); padding: 16px; margin-bottom: 12px;
+display: flex; align-items: center; justify-content: space-between; gap: 12px;
+transition: all 0.2s ease;
+}
+.timer-item.active { border-color: var(--system-accent); animation: pulseActive 2s infinite; }
+.timer-item.alarming { border-color: var(--system-danger); box-shadow: 0 0 20px rgba(244,67,54,0.5); animation: alarmPulse 0.5s infinite; }
+.timer-item.ready { border-color: var(--system-success); }
+
+.timer-time {
+font-size: 28px; font-weight: bold; color: var(--system-accent);
+font-family: var(--system-font-mono), monospace; letter-spacing: 2px;
+min-width: 110px; text-align: center; line-height: 1.2;
+}
+.timer-name {
+font-size: 14px; color: var(--system-text-dim); flex: 1; max-width: 140px;
+overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.timer-controls { display: flex; gap: 6px; flex-shrink: 0; }
+
+.timer-btn {
+padding: 8px 12px; border-radius: var(--system-radius); border: none; cursor: pointer;
+font-size: 16px; transition: all 0.2s ease; display: flex; align-items: center;
+justify-content: center; min-width: 40px; height: 40px;
+}
+.timer-btn-primary { background: var(--system-accent); color: var(--system-text-on-accent); }
+.timer-btn-danger { background: var(--system-danger); color: var(--system-text-on-accent); }
+.timer-btn-stop { background: var(--system-warning); color: var(--system-text-on-accent); }
+.timer-btn:active { transform: scale(0.95); opacity: 0.9; }
+
+.timer-form {
+margin-bottom: 16px; background: var(--system-window-bg); padding: 16px;
+border-radius: var(--system-radius); border: 1px solid var(--system-border);
+}
+.timer-list-container { flex: 1; overflow-y: auto; max-height: calc(100dvh - 240px); padding-right: 4px; }
+.empty-state { text-align: center; padding: 60px 20px; color: var(--system-text-dim); }
+.empty-state .mat-icon { font-size: 64px; opacity: 0.3; margin-bottom: 16px; display: block; }
+.timer-header-info { font-size: 12px; color: var(--system-text-dim); margin-top: 4px; display: flex; align-items: center; gap: 6px; }
+
+.form-input-row { display: flex; gap: 12px; align-items: flex-end; }
+.time-input-group { flex: 1; min-width: 0; }
+.presets-container { margin-bottom: 16px; }
+.presets-buttons { display: flex; gap: 8px; flex-wrap: wrap; }
+.preset-btn {
+background: var(--system-window-bg); border: 1px solid var(--system-border);
+color: var(--system-text); padding: 8px 16px; border-radius: var(--system-radius);
+font-size: 13px; cursor: pointer; transition: all 0.2s ease;
+}
+.preset-btn:active { background: var(--system-accent-dim); border-color: var(--system-accent); }
+
+/* Tab Overrides (Mobile-First) */
+.system-tabs { display: flex; border-bottom: 1px solid var(--system-border); margin-bottom: 12px; }
+.system-tab {
+flex: 1; padding: 12px 8px; text-align: center; cursor: pointer;
+font-weight: 500; color: var(--system-text-dim); transition: all 0.2s ease;
+border-bottom: 3px solid transparent; display: flex; align-items: center; justify-content: center; gap: 6px;
+}
+.system-tab:active { background: var(--system-accent-dim); }
+.system-tab-active { color: var(--system-accent); border-bottom-color: var(--system-accent); }
+.system-tab .system-badge { font-size: 10px; padding: 2px 6px; margin-left: 4px; }
+
+/* Modal */
+.modal-overlay {
+position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+background: rgba(0,0,0,0.7); z-index: 9999;
+display: flex; align-items: center; justify-content: center;
+opacity: 0; visibility: hidden; transition: opacity 0.2s ease, visibility 0.2s ease;
+}
+.modal-overlay.active { opacity: 1; visibility: visible; }
+.modal-content {
+background: var(--system-window-bg); border: 1px solid var(--system-border);
+border-radius: var(--system-radius-lg); box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+width: 90%; max-width: 400px; padding: 24px; text-align: center;
+transform: scale(0.9); transition: transform 0.2s ease;
+}
+.modal-overlay.active .modal-content { transform: scale(1); }
+.modal-icon {
+width: 80px; height: 80px; background: var(--system-danger);
+border-radius: 50%; display: flex; align-items: center; justify-content: center;
+margin: 0 auto 16px; animation: alarmIconPulse 0.8s infinite;
+}
+.modal-icon .mat-icon { font-size: 48px; color: var(--system-text-on-accent); }
+.modal-title { font-size: 22px; font-weight: bold; color: var(--system-text); margin-bottom: 8px; }
+.modal-timer-name { font-size: 18px; color: var(--system-accent); font-weight: 600; margin-bottom: 12px; }
+.modal-message { font-size: 14px; color: var(--system-text-dim); margin-bottom: 24px; line-height: 1.5; }
+.modal-actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+.modal-btn {
+flex: 1; min-width: 120px; padding: 14px 20px; border-radius: var(--system-radius);
+border: none; cursor: pointer; font-size: 14px; font-weight: 600;
+transition: all 0.2s ease; display: flex; align-items: center; justify-content: center; gap: 8px;
+}
+.modal-btn-dismiss { background: var(--system-warning); color: var(--system-text-on-accent); }
+.modal-btn-reset { background: var(--system-accent); color: var(--system-text-on-accent); }
+.modal-btn-delete { background: var(--system-danger); color: var(--system-text-on-accent); }
+.modal-btn:active { transform: scale(0.96); opacity: 0.9; }
+
+.alarm-progress-bar {
+width: 100%; height: 6px; background: var(--system-border);
+border-radius: 3px; margin-top: 16px; overflow: hidden;
+}
+.alarm-progress-fill {
+height: 100%; background: linear-gradient(90deg, var(--system-warning), var(--system-danger));
+width: 100%; border-radius: 3px; animation: alarmProgressShrink 60s linear forwards;
+}
+
+@keyframes pulseActive { 0%,100%{box-shadow:0 0 5px var(--system-accent)} 50%{box-shadow:0 0 15px var(--system-accent)} }
+@keyframes alarmPulse { 0%,100%{box-shadow:0 0 10px rgba(244,67,54,0.5)} 50%{box-shadow:0 0 30px rgba(244,67,54,0.9)} }
+@keyframes alarmIconPulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.1)} }
+@keyframes alarmProgressShrink { from{width:100%} to{width:0%} }
+
+@media (prefers-reduced-motion: reduce) {
+.timer-item.active, .timer-item.alarming, .modal-icon, .alarm-progress-fill { animation: none !important; }
+.timer-item.active { box-shadow: 0 0 10px var(--system-accent) !important; }
+.timer-item.alarming { box-shadow: 0 0 20px rgba(244,67,54,0.5) !important; }
+}
+@media (max-width: 480px) {
+.timer-item { flex-wrap: wrap; }
+.timer-name { max-width: 100%; min-width: 100%; order: -1; margin-bottom: 8px; }
+.timer-time { font-size: 24px; min-width: 90px; }
+.modal-content { width: 95%; padding: 20px; }
+.modal-actions { flex-direction: column; }
+.modal-btn { min-width: 100%; }
+}
+</style>
+</head>
+<body data-os-app="true">
+<div class="system-app">
+<header class="system-card system-mb-3">
+<div class="system-card-body">
+<h1 class="system-title">
+<span class="mat-icon" style="vertical-align: middle; margin-right: 8px;" data-icon-group="navigation">schedule</span>
+Timers
+</h1>
+<p class="system-text system-text-dim">Auto-resets on stop • Custom alarm sounds</p>
+<div class="timer-header-info">
+<span id="activeCount">0 active</span> • 
+<span id="alarmStatus" class="system-hidden">
+<span class="mat-icon" data-icon-group="status-warning" style="font-size: 12px;">notifications_active</span>
+Alarm ringing!
+</span>
+</div>
+</div>
+</header>
+
+<!-- TABS -->
+<div class="system-tabs" role="tablist">
+<div class="system-tab system-tab-active" data-tab="create" role="tab" aria-selected="true" tabindex="0">
+<span class="mat-icon" data-icon-group="action-primary">add</span> Create
+</div>
+<div class="system-tab" data-tab="timers" role="tab" aria-selected="false" tabindex="0">
+<span class="mat-icon" data-icon-group="navigation">play_circle</span> Run <span class="system-badge" id="totalBadge">0</span>
+</div>
+</div>
+
+<!-- TAB 1: CREATE -->
+<div id="panel-create" class="system-tab-panel system-mt-3" role="tabpanel">
+<div class="timer-form system-p-3">
+<div class="system-form-group system-mb-3">
+<label class="system-label">Timer Name</label>
+<input type="text" id="timerNameInput" class="system-input" placeholder="e.g., Focus, Break, Workout" maxlength="30">
+</div>
+<div class="form-input-row system-mb-3">
+<div class="time-input-group"><label class="system-label">H</label><input type="number" id="hoursInput" class="system-input" min="0" max="99" value="0"></div>
+<div class="time-input-group"><label class="system-label">M</label><input type="number" id="minutesInput" class="system-input" min="0" max="59" value="5"></div>
+<div class="time-input-group"><label class="system-label">S</label><input type="number" id="secondsInput" class="system-input" min="0" max="59" value="0"></div>
+</div>
+<div class="system-form-group system-mb-3">
+<label class="system-label">Alarm Sound</label>
+<select id="alarmSoundInput" class="system-select">
+<option value="classic">Classic Beep</option>
+<option value="gentle">Gentle Chime</option>
+<option value="urgent">Urgent Pulse</option>
+<option value="melody">Ascending Melody</option>
+</select>
+</div>
+<button id="addTimerBtn" class="system-btn btn-add timer-btn-primary" style="width: 100%;">
+<span class="mat-icon" style="font-size: 16px; vertical-align: middle; margin-right: 4px;" data-icon-group="action-primary">add</span>
+Create & Switch to Run Tab
+</button>
+</div>
+
+<div class="presets-container system-p-3">
+<label class="system-label system-mb-2">Quick Presets:</label>
+<div class="presets-buttons">
+<button class="preset-btn" data-hours="0" data-minutes="1" data-seconds="0" data-sound="classic">1m</button>
+<button class="preset-btn" data-hours="0" data-minutes="5" data-seconds="0" data-sound="gentle">5m</button>
+<button class="preset-btn" data-hours="0" data-minutes="15" data-seconds="0" data-sound="melody">15m</button>
+<button class="preset-btn" data-hours="0" data-minutes="25" data-seconds="0" data-sound="urgent">25m</button>
+<button class="preset-btn" data-hours="1" data-minutes="0" data-seconds="0" data-sound="classic">1h</button>
+</div>
+</div>
+</div>
+
+<!-- TAB 2: RUN -->
+<div id="panel-timers" class="system-tab-panel system-hidden system-mt-3" role="tabpanel">
+<div id="timersList" class="timer-list-container"></div>
+<div id="emptyState" class="empty-state system-hidden">
+<span class="mat-icon" data-icon-group="status-info">schedule</span>
+<h3 class="system-heading">No timers ready</h3>
+<p class="system-text">Create a timer in the Create tab to get started</p>
+</div>
+</div>
+</div>
+
+<!-- ALARM MODAL -->
+<div id="alarmModal" class="modal-overlay">
+<div class="modal-content">
+<div class="modal-icon"><span class="mat-icon" data-icon-group="status-warning">notifications_active</span></div>
+<h2 class="modal-title">Timer Complete!</h2>
+<div id="alarmTimerName" class="modal-timer-name">Timer Name</div>
+<p id="alarmMessage" class="modal-message">Auto-reset applied. Ready to run again.</p>
+<div class="modal-actions">
+<button id="btnDismissAlarm" class="modal-btn modal-btn-dismiss">
+<span class="mat-icon" data-icon-group="action-destructive">close</span>Dismiss
+</button>
+<button id="btnResetTimer" class="modal-btn modal-btn-reset">
+<span class="mat-icon" data-icon-group="system">refresh</span>Restart
+</button>
+<button id="btnDeleteTimer" class="modal-btn modal-btn-delete">
+<span class="mat-icon" data-icon-group="action-destructive">delete</span>Delete
+</button>
+</div>
+<div class="alarm-progress-bar"><div class="alarm-progress-fill" id="alarmProgressBar"></div></div>
+<p class="system-text-small system-text-center system-mt-3">Auto-dismiss in <span id="alarmCountdown">60</span>s</p>
+</div>
+</div>
+
+<script>
+class TimerManager {
+constructor() {
+this.timers = []; this.intervals = {};
+this.audioCtx = null; this.audioLoop = null;
+this.currentAlarmId = null; this.autoStopTimeout = null;
+this.activeTab = 'create';
+this.init();
+}
+
+async init() {
+this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+const saved = localStorage.getItem('os-timers-data-v5');
+if (saved) { try { this.timers = JSON.parse(saved); } catch(e) { this.timers = []; } }
+
+// Tab init
+this.initTabs();
+
+document.getElementById('addTimerBtn').addEventListener('click', () => this.addTimer());
+document.querySelectorAll('.preset-btn').forEach(btn => {
+btn.addEventListener('click', () => this.setPreset(btn.dataset.hours, btn.dataset.minutes, btn.dataset.seconds, btn.dataset.sound || 'classic'));
+});
+document.body.addEventListener('click', (e) => this.handleControlClick(e));
+
+document.getElementById('btnDismissAlarm').addEventListener('click', () => this.dismissAlarm());
+document.getElementById('btnResetTimer').addEventListener('click', () => this.restartAlarm());
+document.getElementById('btnDeleteTimer').addEventListener('click', () => this.deleteTimerFromAlarm());
+
+window.addEventListener('osThemeChanged', (e) => console.log('Theme updated:', e.detail.themeId));
+window.addEventListener('osBridgeReady', () => this.updateCounts());
+document.addEventListener('keydown', (e) => {
+if (e.key === 'Escape' && document.getElementById('alarmModal').classList.contains('active')) this.dismissAlarm();
+if ((e.ctrlKey || e.metaKey) && e.key === 'n') { e.preventDefault(); document.getElementById('timerNameInput').focus(); }
+});
+
+this.renderTimerList();
+setTimeout(() => this.startActiveTimers(), 100);
+}
+
+initTabs() {
+document.querySelectorAll('.system-tab').forEach(tab => {
+tab.addEventListener('click', () => this.switchTab(tab.dataset.tab));
+tab.addEventListener('keydown', (e) => {
+if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this.switchTab(tab.dataset.tab); }
+});
+});
+}
+
+switchTab(tabId) {
+this.activeTab = tabId;
+document.querySelectorAll('.system-tab').forEach(t => {
+const isActive = t.dataset.tab === tabId;
+t.classList.toggle('system-tab-active', isActive);
+t.setAttribute('aria-selected', isActive);
+});
+document.querySelectorAll('.system-tab-panel').forEach(p => p.classList.add('system-hidden'));
+document.getElementById(`panel-${tabId}`).classList.remove('system-hidden');
+if (tabId === 'timers') this.renderTimerList();
+}
+
+generateId() { return 'timer-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9); }
+saveTimers() { localStorage.setItem('os-timers-data-v5', JSON.stringify(this.timers)); this.updateCounts(); }
+setPreset(h, m, s, sound) {
+document.getElementById('hoursInput').value = h;
+document.getElementById('minutesInput').value = m;
+document.getElementById('secondsInput').value = s;
+document.getElementById('alarmSoundInput').value = sound || 'classic';
+}
+
+addTimer() {
+const name = document.getElementById('timerNameInput').value.trim() || `Timer ${new Date().toLocaleTimeString()}`;
+const h = parseInt(document.getElementById('hoursInput').value || 0);
+const m = parseInt(document.getElementById('minutesInput').value || 0);
+const s = parseInt(document.getElementById('secondsInput').value || 0);
+const sound = document.getElementById('alarmSoundInput').value;
+let totalSeconds = h * 3600 + m * 60 + s;
+if (totalSeconds <= 0) { alert('Please set a valid time duration'); return; }
+
+const timer = { id: this.generateId(), name, duration: totalSeconds, remaining: totalSeconds, isActive: false, createdAt: Date.now(), completedAt: null, alarmsTriggered: 0, sound };
+this.timers.unshift(timer);
+this.saveTimers();
+this.renderTimerList();
+
+// Auto-switch to Run tab
+this.switchTab('timers');
+
+document.getElementById('timerNameInput').value = '';
+document.getElementById('hoursInput').value = '0';
+document.getElementById('minutesInput').value = '5';
+document.getElementById('secondsInput').value = '0';
+}
+
+startTimer(id) {
+const timer = this.timers.find(t => t.id === id);
+if (!timer || timer.remaining <= 0) return;
+timer.isActive = true; timer.completedAt = null;
+this.saveTimers();
+this.intervals[id] = setInterval(() => {
+timer.remaining--;
+this.updateTimerDisplay(id);
+if (timer.remaining <= 0) this.completeTimer(id);
+else this.saveTimers();
+}, 1000);
+this.renderTimerList();
+this.updateCounts();
+}
+
+stopTimer(id) {
+const timer = this.timers.find(t => t.id === id);
+if (!timer) return;
+if (this.intervals[id]) { clearInterval(this.intervals[id]); delete this.intervals[id]; }
+timer.remaining = timer.duration; timer.isActive = false; timer.completedAt = null;
+this.stopAudioIfNotAlarm(id);
+this.saveTimers(); this.renderTimerList();
+}
+
+completeTimer(id) {
+const timer = this.timers.find(t => t.id === id);
+if (!timer) return;
+if (this.intervals[id]) { clearInterval(this.intervals[id]); delete this.intervals[id]; }
+timer.alarmsTriggered++; timer.remaining = timer.duration; timer.isActive = false; timer.completedAt = Date.now();
+this.saveTimers(); this.renderTimerList(); this.updateCounts();
+this.showAlarmModal(id); this.playAlarmSound(id);
+if ('Notification' in window && Notification.permission === 'granted') {
+new Notification(`${timer.name} Complete!`, { body: `Auto-reset to ${this.formatTime(timer.duration)}`, tag: timer.id });
+}
+}
+
+showAlarmModal(id) {
+this.currentAlarmId = id;
+document.getElementById('alarmTimerName').textContent = this.timers.find(t=>t.id===id).name;
+document.getElementById('alarmModal').classList.add('active');
+document.getElementById('alarmStatus').classList.remove('system-hidden');
+document.getElementById('alarmCountdown').textContent = '60';
+const pb = document.getElementById('alarmProgressBar');
+pb.style.animation = 'none'; void pb.offsetWidth; pb.style.animation = 'alarmProgressShrink 60s linear forwards';
+if (this.autoStopTimeout) clearTimeout(this.autoStopTimeout);
+this.autoStopTimeout = setTimeout(() => this.autoStopAlarm(), 60000);
+const cd = setInterval(() => { const el = document.getElementById('alarmCountdown'); const v = parseInt(el.textContent); if(v>0) el.textContent=v-1; else clearInterval(cd); }, 1000);
+document.getElementById('alarmModal').countdownInterval = cd;
+}
+
+hideAlarmModal() {
+document.getElementById('alarmModal').classList.remove('active');
+document.getElementById('alarmStatus').classList.add('system-hidden');
+const modal = document.getElementById('alarmModal');
+if (modal.countdownInterval) { clearInterval(modal.countdownInterval); modal.countdownInterval = null; }
+this.currentAlarmId = null;
+}
+
+autoStopAlarm() { this.stopAlarmSound(); this.hideAlarmModal(); }
+dismissAlarm() { this.stopAlarmSound(); this.hideAlarmModal(); if (this.autoStopTimeout) clearTimeout(this.autoStopTimeout); }
+restartAlarm() { this.stopAlarmSound(); this.hideAlarmModal(); if (this.autoStopTimeout) clearTimeout(this.autoStopTimeout); if (this.currentAlarmId) this.startTimer(this.currentAlarmId); }
+deleteTimerFromAlarm() { this.stopAlarmSound(); this.hideAlarmModal(); if (this.autoStopTimeout) clearTimeout(this.autoStopTimeout); if (this.currentAlarmId) this.deleteTimer(this.currentAlarmId); }
+
+playAlarmSound(id) {
+if (this.audioCtx.state === 'suspended') this.audioCtx.resume();
+const timer = this.timers.find(t => t.id === id);
+if (!timer) return;
+this.playSoundPattern(timer.sound || 'classic');
+this.audioLoop = setInterval(() => this.playSoundPattern(timer.sound || 'classic'), 1200);
+}
+playSoundPattern(type) {
+if (!this.audioCtx || this.audioCtx.state !== 'running') return;
+const now = this.audioCtx.currentTime; const osc = this.audioCtx.createOscillator(); const gain = this.audioCtx.createGain();
+osc.connect(gain); gain.connect(this.audioCtx.destination);
+switch(type) {
+case 'classic': osc.frequency.setValueAtTime(880, now); osc.frequency.setValueAtTime(1100, now+0.15); osc.type='square'; gain.gain.setValueAtTime(0.2, now); gain.gain.exponentialRampToValueAtTime(0.01, now+0.45); osc.start(now); osc.stop(now+0.45); break;
+case 'gentle': osc.frequency.setValueAtTime(523.25, now); osc.type='sine'; gain.gain.setValueAtTime(0.15, now); gain.gain.exponentialRampToValueAtTime(0.01, now+0.8); osc.start(now); osc.stop(now+0.8); break;
+case 'urgent': osc.frequency.setValueAtTime(1500, now); osc.frequency.setValueAtTime(1200, now+0.05); osc.type='triangle'; gain.gain.setValueAtTime(0.3, now); gain.gain.exponentialRampToValueAtTime(0.01, now+0.15); osc.start(now); osc.stop(now+0.15); break;
+case 'melody': osc.frequency.setValueAtTime(440, now); osc.frequency.setValueAtTime(554.37, now+0.15); osc.type='triangle'; gain.gain.setValueAtTime(0.15, now); gain.gain.exponentialRampToValueAtTime(0.01, now+0.5); osc.start(now); osc.stop(now+0.5); break;
+}
+}
+stopAlarmSound() { if (this.audioLoop) { clearInterval(this.audioLoop); this.audioLoop = null; } }
+stopAudioIfNotAlarm(id) { if (this.currentAlarmId !== id) this.stopAlarmSound(); }
+
+toggleTimerStatus(id) {
+const timer = this.timers.find(t => t.id === id);
+if (!timer) return;
+if (timer.isActive) this.stopTimer(id); else this.startTimer(id);
+}
+
+deleteTimer(id) {
+const idx = this.timers.findIndex(t => t.id === id);
+if (idx === -1) return;
+clearInterval(this.intervals[id]); delete this.intervals[id];
+if (id === this.currentAlarmId) { this.stopAlarmSound(); this.hideAlarmModal(); }
+this.timers.splice(idx, 1); this.saveTimers(); this.renderTimerList();
+}
+
+handleControlClick(e) {
+const btn = e.target.closest('.timer-control-btn');
+if (!btn) return;
+const action = btn.dataset.action, id = btn.dataset.timerId;
+switch(action) {
+case 'toggle': this.toggleTimerStatus(id); break;
+case 'delete': if (confirm('Delete this timer?')) this.deleteTimer(id); break;
+}
+}
+
+formatTime(seconds) {
+const h = Math.floor(seconds/3600), m = Math.floor((seconds%3600)/60), s = seconds%60;
+return h>0 ? `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}` : `${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
+}
+
+updateTimerDisplay(id) {
+const el = document.getElementById(`time-${id}`);
+const timerEl = document.getElementById(`timer-${id}`);
+const timer = this.timers.find(t => t.id === id);
+if (el && timer) {
+el.textContent = this.formatTime(timer.remaining);
+el.style.color = timer.remaining <= 30 ? 'var(--system-warning)' : timer.remaining <= 60 ? 'var(--system-highlight)' : 'var(--system-accent)';
+if (timer.remaining <= 5 && timer.remaining > 0 && timerEl) {
+timerEl.style.transform = 'translateX(2px)';
+setTimeout(()=>{ timerEl.style.transform='translateX(-2px)'; setTimeout(()=>timerEl.style.transform='',50); },50);
+}
+}
+}
+
+updateCounts() {
+const active = this.timers.filter(t => t.isActive).length;
+document.getElementById('activeCount').textContent = `${active} active`;
+document.getElementById('totalBadge').textContent = this.timers.length;
+}
+
+getSortedTimers() {
+// Running -> Paused -> Completed -> Ready
+return [...this.timers].sort((a, b) => {
+const aRun = a.isActive; const bRun = b.isActive;
+if (aRun !== bRun) return aRun ? -1 : 1;
+return 0;
+});
+}
+
+renderTimerList() {
+const list = document.getElementById('timersList');
+const empty = document.getElementById('emptyState');
+list.innerHTML = '';
+const sorted = this.getSortedTimers();
+
+if (sorted.length === 0) { empty.classList.remove('system-hidden'); }
+else {
+empty.classList.add('system-hidden');
+sorted.forEach(timer => this.renderTimerItem(timer));
+}
+this.updateCounts();
+}
+
+renderTimerItem(timer) {
+const el = document.createElement('div');
+const stateClass = timer.isActive ? 'active' : (timer.completedAt ? 'ready' : '');
+el.className = `timer-item ${stateClass} ${timer.id === this.currentAlarmId ? 'alarming' : ''}`;
+el.id = `timer-${timer.id}`;
+el.setAttribute('role', 'button'); el.setAttribute('tabindex', '0');
+el.onkeydown = (e) => { if (e.key==='Enter'||e.key===' ') { e.preventDefault(); this.toggleTimerStatus(timer.id); }};
+
+const toggleIcon = timer.isActive ? 'stop' : 'play_circle_filled';
+const toggleLabel = timer.isActive ? 'Stop & Reset' : 'Start';
+const toggleClass = timer.isActive ? 'timer-btn-stop' : 'timer-btn-primary';
+
+el.innerHTML = `
+<div class="timer-time" id="time-${timer.id}">${this.formatTime(timer.remaining)}</div>
+<div class="timer-name" title="${timer.name}">${timer.name}${timer.alarmsTriggered>0?` (${timer.alarmsTriggered}x)`:''}</div>
+<div class="timer-controls">
+<button class="timer-control-btn timer-btn ${toggleClass}" data-action="toggle" data-timer-id="${timer.id}" aria-label="${toggleLabel}">
+<span class="mat-icon" data-icon-group="media">${toggleIcon}</span>
+</button>
+<button class="timer-control-btn timer-btn timer-btn-danger" data-action="delete" data-timer-id="${timer.id}" aria-label="Delete">
+<span class="mat-icon" data-icon-group="action-destructive">delete</span>
+</button>
+</div>`;
+document.getElementById('timersList').appendChild(el);
+}
+
+startActiveTimers() { this.timers.forEach(t => { if(t.isActive && t.remaining>0) this.startTimer(t.id); }); }
+}
+
+window.addEventListener('load', () => { window.timerApp = new TimerManager(); });
+window.addEventListener('beforeunload', () => { if(window.timerApp) Object.values(window.timerApp.intervals).forEach(clearInterval); window.timerApp?.stopAlarmSound(); });
+</script>
+</body>
+</html>

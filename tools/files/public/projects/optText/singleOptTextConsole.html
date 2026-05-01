@@ -1,0 +1,1290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Virtual Scroller - Custom Touch Selection</title>
+    <style>
+        :root {
+            --line-height: 20px;
+            --font-family: 'Courier New', Courier, monospace;
+            --bg-color: #1e1e1e;
+            --text-color: #d4d4d4;
+            --console-bg: #0d0d0d;
+            --console-border: #333;
+            --log-color: #d4d4d4;
+            --warn-color: #cca700;
+            --error-color: #f14c4c;
+            --console-height: 200px;
+            --selection-bg: rgba(38, 79, 120, 0.4);
+            --modal-bg: #2a2a2a;
+            --modal-border: #444;
+            --toolbar-bg: #252526;
+            --toolbar-border: #3e3e42;
+            --dropdown-bg: #2a2a2a;
+            --dropdown-hover: #3a3a3a;
+        }
+
+        body {
+            margin: 0;
+            padding: 20px;
+            background: #121212;
+            font-family: sans-serif;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            box-sizing: border-box;
+            overflow: hidden;
+        }
+
+        .toolbar {
+            display: flex;
+            align-items: center;
+            padding: 4px 8px;
+            background: var(--toolbar-bg);
+            border: 1px solid var(--toolbar-border);
+            border-radius: 4px;
+            margin-bottom: 10px;
+            width: fit-content;
+        }
+
+        .toolbar-dropdown {
+            position: relative;
+            display: inline-block;
+        }
+
+        .toolbar-dropdown-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            height: 28px;
+            background: #3e3e42;
+            border: 1px solid #555;
+            border-radius: 4px;
+            color: #fff;
+            font-size: 14px;
+            cursor: pointer;
+            transition: background 0.2s, transform 0.1s;
+            padding: 0;
+            line-height: 1;
+        }
+        .toolbar-dropdown-btn:hover { background: #4a4a4a; }
+        .toolbar-dropdown-btn:active { transform: scale(0.98); }
+        .toolbar-dropdown-btn.active { background: #0066cc; border-color: #0088ff; }
+
+        .toolbar-dropdown-menu {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            margin-top: 4px;
+            min-width: 160px;
+            background: var(--dropdown-bg);
+            border: 1px solid var(--modal-border);
+            border-radius: 4px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+            z-index: 10000;
+            display: none;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .toolbar-dropdown-menu.active { display: flex; }
+
+        .toolbar-dropdown-item {
+            padding: 9px 12px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 13px;
+            transition: background 0.2s;
+            user-select: none;
+        }
+        .toolbar-dropdown-item:hover { background: var(--dropdown-hover); }
+        .toolbar-dropdown-item:active { background: #444; }
+        .toolbar-dropdown-item .icon { width: 18px; text-align: center; font-size: 14px; }
+        .toolbar-dropdown-item.disabled { opacity: 0.5; pointer-events: none; }
+        .toolbar-dropdown-divider {
+            height: 1px;
+            background: var(--modal-border);
+            margin: 4px 0;
+        }
+
+        .editor-wrapper {
+            position: relative;
+            width: 800px;
+            flex: 1;
+            min-height: 0;
+            border: 1px solid #444;
+            background-color: var(--bg-color);
+            overflow: auto;
+            border-radius: 4px;
+            contain: layout style paint;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .editor-content {
+            font-family: var(--font-family);
+            font-size: 14px;
+            line-height: var(--line-height);
+            color: var(--text-color);
+            white-space: pre;
+            word-wrap: normal;
+            overflow-wrap: normal;
+            outline: none;
+            cursor: text;
+            min-height: 100%;
+            min-width: max-content;
+            width: max-content;
+            position: relative;
+            z-index: 2;
+            /* ✅ KEEP caret visible for typing */
+            caret-color: #00ff00;
+            /* ✅ Allow text selection for caret to work */
+            -webkit-user-select: text;
+            user-select: text;
+            -webkit-touch-callout: none;
+            touch-action: pan-x pan-y;
+        }
+
+        .line {
+            display: block;
+            min-height: var(--line-height);
+            height: var(--line-height);
+            position: relative;
+            z-index: 1;
+        }
+
+        .spacer {
+            pointer-events: none;
+        }
+
+        #selectionOverlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+            z-index: 0;
+            display: none;
+            width: 100%;
+            height: 100%;
+        }
+
+        .selection-highlight {
+            position: absolute;
+            background: var(--selection-bg);
+            border-radius: 2px;
+            left: 0;
+            height: var(--line-height);
+        }
+
+        .cursor-indicator {
+            position: absolute;
+            width: 2px;
+            height: var(--line-height);
+            background: #00ff00;
+            animation: blink 1s infinite;
+            z-index: 3;
+            pointer-events: none;
+        }
+
+        .focus-cursor-indicator {
+            position: absolute;
+            width: 2px;
+            height: var(--line-height);
+            background: #ff9900;
+            animation: blink-fast 0.5s infinite;
+            z-index: 3;
+            pointer-events: none;
+            box-shadow: 0 0 4px rgba(255, 153, 0, 0.6);
+        }
+
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0; }
+        }
+        @keyframes blink-fast {
+            0%, 60% { opacity: 1; }
+            61%, 100% { opacity: 0.4; }
+        }
+
+        .selection-anchor {
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            background: #00aaff;
+            border: 2px solid white;
+            border-radius: 50%;
+            z-index: 4;
+            pointer-events: none;
+            transform: translate(-50%, -50%);
+        }
+
+        .selection-anchor.start { background: #00ff88; }
+        .selection-anchor.end { background: #ff6600; }
+
+        .stats { margin-top: 10px; font-size: 12px; color: #888; }
+
+        .selection-info {
+            position: absolute;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--modal-bg);
+            border: 1px solid var(--modal-border);
+            border-radius: 20px;
+            padding: 6px 16px;
+            font-size: 12px;
+            color: #aaa;
+            display: none;
+            z-index: 100;
+            white-space: nowrap;
+        }
+        .selection-info.active { display: block; }
+
+        .console-panel {
+            margin-top: 10px;
+            border: 1px solid var(--console-border);
+            background-color: var(--console-bg);
+            border-radius: 4px;
+            display: flex;
+            flex-direction: column;
+            height: var(--console-height);
+            min-height: 100px;
+            max-height: 50vh;
+        }
+
+        .console-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px 12px;
+            background: #1a1a1a;
+            border-bottom: 1px solid var(--console-border);
+            font-size: 12px;
+            color: #888;
+            cursor: row-resize;
+            user-select: none;
+        }
+
+        .console-title { display: flex; gap: 12px; align-items: center; }
+        .console-title span {
+            cursor: pointer;
+            padding: 2px 6px;
+            border-radius: 3px;
+        }
+        .console-title span:hover { background: #333; }
+        .console-title span.active { background: #444; color: #fff; }
+
+        .console-actions { display: flex; gap: 8px; }
+        .console-actions button {
+            background: #2a2a2a;
+            border: 1px solid #444;
+            color: #ccc;
+            padding: 2px 8px;
+            font-size: 11px;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        .console-actions button:hover { background: #3a3a3a; }
+
+        .console-output {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px 12px;
+            font-family: var(--font-family);
+            font-size: 12px;
+            line-height: 1.5;
+        }
+        .console-output::-webkit-scrollbar { width: 8px; }
+        .console-output::-webkit-scrollbar-track { background: #1a1a1a; }
+        .console-output::-webkit-scrollbar-thumb { background: #444; border-radius: 4px; }
+
+        .console-entry { padding: 2px 0; white-space: pre-wrap; word-break: break-word; }
+        .console-entry.log { color: var(--log-color); }
+        .console-entry.warn { color: var(--warn-color); }
+        .console-entry.error { color: var(--error-color); }
+        .console-entry .timestamp { color: #666; margin-right: 8px; }
+        .console-collapsed .console-output { display: none; }
+        .console-collapsed { height: auto !important; }
+    </style>
+</head>
+<body>
+
+    <h3>Virtual Scroller - Custom Touch Selection</h3>
+    
+    <div class="toolbar">
+        <div class="toolbar-dropdown" id="selectionDropdown">
+            <button class="toolbar-dropdown-btn" id="dropdownBtn" title="Selection options">▼</button>
+            <div class="toolbar-dropdown-menu" id="dropdownMenu">
+                <div class="toolbar-dropdown-item" data-action="start-selection">
+                    <span class="icon">📍</span><span>Start Selection</span>
+                </div>
+                <div class="toolbar-dropdown-divider"></div>
+                <div class="toolbar-dropdown-item" data-action="copy">
+                    <span class="icon">📋</span><span>Copy</span>
+                </div>
+                <div class="toolbar-dropdown-item" data-action="cut">
+                    <span class="icon">✂️</span><span>Cut</span>
+                </div>
+                <div class="toolbar-dropdown-item" data-action="paste">
+                    <span class="icon">📥</span><span>Paste</span>
+                </div>
+                <div class="toolbar-dropdown-divider"></div>
+                <div class="toolbar-dropdown-item" data-action="clear-selection">
+                    <span class="icon">❌</span><span>Clear Selection</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="stats" id="stats">Lines: 0 | Rendered: 0 | Cursor: 0:0 | Selection: none</div>
+
+    <div class="editor-wrapper" id="editorWrapper">
+        <div class="editor-content" id="editorContent" contenteditable="true" spellcheck="false" role="textbox" aria-multiline="true"></div>
+        <div id="selectionOverlay"></div>
+        <div id="cursorIndicator" class="cursor-indicator" style="display: none;"></div>
+        <div id="focusCursorIndicator" class="focus-cursor-indicator" style="display: none;"></div>
+        <div id="anchorStart" class="selection-anchor start" style="display: none;"></div>
+        <div id="anchorEnd" class="selection-anchor end" style="display: none;"></div>
+    </div>
+    
+    <div id="selectionInfo" class="selection-info">
+        <span id="selectionInfoText">Selecting... Line 0, Col 0</span>
+    </div>
+
+    <div class="console-panel" id="consolePanel">
+        <div class="console-header" id="consoleHeader">
+            <div class="console-title">
+                <span id="filterAll" class="active">All</span>
+                <span id="filterLog">Log</span>
+                <span id="filterWarn">Warn</span>
+                <span id="filterError">Error</span>
+            </div>
+            <div class="console-actions">
+                <button id="clearConsole">Clear</button>
+                <button id="toggleConsole">Collapse</button>
+            </div>
+        </div>
+        <div class="console-output" id="consoleOutput"></div>
+    </div>
+
+    <script>
+        const TOTAL_LINES = 1000000;
+        const LINE_HEIGHT = 20;
+        const CHAR_WIDTH = 8.4;
+        const BUFFER_LINES = 10;
+
+        const editorWrapper = document.getElementById('editorWrapper');
+        const editorContent = document.getElementById('editorContent');
+        const selectionOverlay = document.getElementById('selectionOverlay');
+        const cursorIndicator = document.getElementById('cursorIndicator');
+        const focusCursorIndicator = document.getElementById('focusCursorIndicator');
+        const anchorStart = document.getElementById('anchorStart');
+        const anchorEnd = document.getElementById('anchorEnd');
+        const selectionInfo = document.getElementById('selectionInfo');
+        const selectionInfoText = document.getElementById('selectionInfoText');
+        const statsEl = document.getElementById('stats');
+
+        const dropdownBtn = document.getElementById('dropdownBtn');
+        const dropdownMenu = document.getElementById('dropdownMenu');
+
+        const consolePanel = document.getElementById('consolePanel');
+        const consoleOutput = document.getElementById('consoleOutput');
+        const consoleHeader = document.getElementById('consoleHeader');
+        const clearConsoleBtn = document.getElementById('clearConsole');
+        const toggleConsoleBtn = document.getElementById('toggleConsole');
+        const filterAll = document.getElementById('filterAll');
+        const filterLog = document.getElementById('filterLog');
+        const filterWarn = document.getElementById('filterWarn');
+        const filterError = document.getElementById('filterError');
+
+        let consoleEntries = [];
+        let activeFilter = 'all';
+        let isConsoleCollapsed = false;
+        let isResizing = false;
+        let startY, startHeight;
+
+        let linesArray = [];
+        let cursorLine = 0;
+        let cursorCol = 0;
+        let isComposing = false;
+        let isUpdating = false;
+        let scrollTicking = false;
+
+        // ✅ Custom selection state (dropdown-based)
+        let customSelection = {
+            isActive: false,
+            anchor: null,
+            focus: null
+        };
+
+        let lastTap = { line: -1, col: -1, time: 0 };
+        const TAP_THRESHOLD = 300;
+        const POSITION_THRESHOLD = 5;
+        let selectionRAF = null;
+
+        let touchStartPos = null;
+        let isScrolling = false;
+        const SCROLL_THRESHOLD = 5;
+
+        // ✅ Track if we're intentionally allowing a native selection
+        let allowNativeSelection = false;
+        let selectionChangeTimeout = null;
+
+        const originalConsole = { log: console.log, warn: console.warn, error: console.error };
+
+        function formatTimestamp() {
+            const now = new Date();
+            return `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}:${now.getSeconds().toString().padStart(2,'0')}.${now.getMilliseconds().toString().padStart(3,'0')}`;
+        }
+
+        function addConsoleEntry(level, args) {
+            const timestamp = formatTimestamp();
+            const message = args.map(arg => {
+                if (typeof arg === 'object') {
+                    try { return JSON.stringify(arg, null, 2); } catch { return String(arg); }
+                }
+                return String(arg);
+            }).join(' ');
+            const entry = { timestamp, level, message };
+            consoleEntries.push(entry);
+            if (consoleEntries.length > 1000) consoleEntries.shift();
+            renderConsoleEntry(entry);
+        }
+
+        function renderConsoleEntry(entry) {
+            if (activeFilter !== 'all' && activeFilter !== entry.level) return;
+            const div = document.createElement('div');
+            div.className = `console-entry ${entry.level}`;
+            div.innerHTML = `<span class="timestamp">[${entry.timestamp}]</span>${escapeHtml(entry.message)}`;
+            consoleOutput.appendChild(div);
+            consoleOutput.scrollTop = consoleOutput.scrollHeight;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function renderConsole(filter = 'all') {
+            activeFilter = filter;
+            consoleOutput.innerHTML = '';
+            consoleEntries.forEach(entry => {
+                if (filter === 'all' || filter === entry.level) renderConsoleEntry(entry);
+            });
+        }
+
+        function clearConsole() { consoleEntries = []; consoleOutput.innerHTML = ''; }
+
+        console.log = function(...args) { originalConsole.log.apply(console, args); addConsoleEntry('log', args); };
+        console.warn = function(...args) { originalConsole.warn.apply(console, args); addConsoleEntry('warn', args); };
+        console.error = function(...args) { originalConsole.error.apply(console, args); addConsoleEntry('error', args); };
+
+        clearConsoleBtn.addEventListener('click', clearConsole);
+        toggleConsoleBtn.addEventListener('click', () => {
+            isConsoleCollapsed = !isConsoleCollapsed;
+            consolePanel.classList.toggle('console-collapsed', isConsoleCollapsed);
+            toggleConsoleBtn.textContent = isConsoleCollapsed ? 'Expand' : 'Collapse';
+            if (!isConsoleCollapsed) consoleOutput.scrollTop = consoleOutput.scrollHeight;
+        });
+        [filterAll, filterLog, filterWarn, filterError].forEach(btn => {
+            btn.addEventListener('click', () => {
+                [filterAll, filterLog, filterWarn, filterError].forEach(el => el.classList.remove('active'));
+                btn.classList.add('active');
+                renderConsole(btn.id.replace('filter', '').toLowerCase());
+            });
+        });
+
+        consoleHeader.addEventListener('mousedown', (e) => {
+            if (e.target.tagName === 'BUTTON' || e.target.tagName === 'SPAN') return;
+            isResizing = true;
+            startY = e.clientY;
+            startHeight = consolePanel.offsetHeight;
+            document.addEventListener('mousemove', onResize);
+            document.addEventListener('mouseup', stopResize);
+            e.preventDefault();
+        });
+        function onResize(e) {
+            if (!isResizing) return;
+            const deltaY = startY - e.clientY;
+            const newHeight = Math.max(100, Math.min(startHeight + deltaY, window.innerHeight * 0.7));
+            consolePanel.style.height = `${newHeight}px`;
+            if (isConsoleCollapsed) {
+                consolePanel.classList.remove('console-collapsed');
+                isConsoleCollapsed = false;
+                toggleConsoleBtn.textContent = 'Collapse';
+            }
+        }
+        function stopResize() {
+            isResizing = false;
+            document.removeEventListener('mousemove', onResize);
+            document.removeEventListener('mouseup', stopResize);
+        }
+
+        function getVisibleRange() {
+            const scrollTop = editorWrapper.scrollTop;
+            const viewportHeight = editorWrapper.clientHeight;
+            const startLine = Math.floor(scrollTop / LINE_HEIGHT);
+            const visibleCount = Math.ceil(viewportHeight / LINE_HEIGHT);
+            return {
+                start: Math.max(0, startLine - BUFFER_LINES),
+                end: Math.min(linesArray.length, startLine + visibleCount + BUFFER_LINES),
+                scrollTop
+            };
+        }
+
+        function renderVisibleLines(forceCursorPos = null) {
+            if (isUpdating) return;
+            isUpdating = true;
+            const savedCursor = forceCursorPos ? null : saveCursor();
+            const range = getVisibleRange();
+            const fragment = document.createDocumentFragment();
+            
+            const topSpacer = document.createElement('div');
+            topSpacer.className = 'spacer';
+            topSpacer.style.height = `${range.start * LINE_HEIGHT}px`;
+            fragment.appendChild(topSpacer);
+            
+            for (let i = range.start; i < range.end; i++) {
+                const lineDiv = document.createElement('div');
+                lineDiv.className = 'line';
+                lineDiv.dataset.lineIndex = i;
+                const textNode = document.createTextNode(linesArray[i] || '');
+                lineDiv.appendChild(textNode);
+                if (!linesArray[i]) lineDiv.classList.add('empty');
+                fragment.appendChild(lineDiv);
+            }
+            
+            const bottomLines = linesArray.length - range.end;
+            if (bottomLines > 0) {
+                const bottomSpacer = document.createElement('div');
+                bottomSpacer.className = 'spacer';
+                bottomSpacer.style.height = `${bottomLines * LINE_HEIGHT}px`;
+                fragment.appendChild(bottomSpacer);
+            }
+            
+            editorContent.innerHTML = '';
+            editorContent.appendChild(fragment);
+            
+            if (forceCursorPos) setCursor(forceCursorPos.line, forceCursorPos.col);
+            else if (savedCursor) restoreCursor(savedCursor);
+            
+            updateCursorIndicator();
+            updateFocusCursorIndicator();
+            updateSelectionAnchors();
+            
+            if (customSelection.isActive) {
+                if (selectionRAF) cancelAnimationFrame(selectionRAF);
+                selectionRAF = requestAnimationFrame(renderSelectionHighlight);
+            }
+            updateStats();
+            isUpdating = false;
+        }
+
+        function saveCursor() {
+            const selection = window.getSelection();
+            if (!selection.rangeCount) return { line: cursorLine, col: cursorCol };
+            const range = selection.getRangeAt(0);
+            let node = range.startContainer;
+            while (node && node !== editorContent) {
+                if (node.classList?.contains('line')) {
+                    const lineIndex = parseInt(node.dataset.lineIndex);
+                    if (!isNaN(lineIndex)) return { line: lineIndex, col: range.startOffset };
+                }
+                node = node.parentNode;
+            }
+            return { line: cursorLine, col: cursorCol };
+        }
+
+        function restoreCursor(savedPos) {
+            if (!savedPos) return false;
+            const range = getVisibleRange();
+            if (savedPos.line >= range.start && savedPos.line < range.end) {
+                const relativeIndex = savedPos.line - range.start;
+                const lineElement = editorContent.children[relativeIndex + 1];
+                if (lineElement?.classList.contains('line')) {
+                    const textNode = lineElement.firstChild;
+                    if (textNode?.nodeType === Node.TEXT_NODE) {
+                        const validCol = Math.min(savedPos.col, textNode.textContent.length);
+                        const newRange = document.createRange();
+                        newRange.setStart(textNode, validCol);
+                        newRange.collapse(true);
+                        const sel = window.getSelection();
+                        sel.removeAllRanges();
+                        sel.addRange(newRange);
+                        cursorLine = savedPos.line;
+                        cursorCol = validCol;
+                        return true;
+                    }
+                }
+            }
+            cursorLine = savedPos.line;
+            cursorCol = savedPos.col;
+            return false;
+        }
+
+        function setCursor(line, col) {
+            const range = getVisibleRange();
+            if (line >= range.start && line < range.end) {
+                const relativeIndex = line - range.start;
+                const lineElement = editorContent.children[relativeIndex + 1];
+                if (lineElement?.classList.contains('line')) {
+                    const textNode = lineElement.firstChild;
+                    if (textNode?.nodeType === Node.TEXT_NODE) {
+                        const validCol = Math.min(col, textNode.textContent.length);
+                        const newRange = document.createRange();
+                        newRange.setStart(textNode, validCol);
+                        newRange.collapse(true);
+                        const sel = window.getSelection();
+                        sel.removeAllRanges();
+                        sel.addRange(newRange);
+                        cursorLine = line;
+                        cursorCol = validCol;
+                        return true;
+                    }
+                }
+            }
+            cursorLine = line;
+            cursorCol = col;
+            return false;
+        }
+
+        // ✅ Check if native selection has actual range (not just caret)
+        function hasNativeSelectionRange() {
+            const selection = window.getSelection();
+            if (!selection.rangeCount) return false;
+            const range = selection.getRangeAt(0);
+            return !range.collapsed; // collapsed = caret only, not collapsed = text selected
+        }
+
+        // ✅ Clear native selection but keep caret position
+        function clearNativeSelectionKeepCaret() {
+            const selection = window.getSelection();
+            if (!selection.rangeCount) return;
+            
+            const range = selection.getRangeAt(0);
+            const collapsed = range.collapsed;
+            
+            // Only clear if there's an actual selection (not just caret)
+            if (!collapsed) {
+                // Collapse the selection to caret position
+                range.collapse(true);
+                selection.removeAllRanges();
+                selection.addRange(range);
+            }
+        }
+
+        // ✅ Sync cursor position from native caret
+        function syncCursorFromNativeSelection() {
+            if (isUpdating || isComposing) return;
+            
+            const selection = window.getSelection();
+            if (!selection.rangeCount) return;
+            
+            const range = selection.getRangeAt(0);
+            let node = range.startContainer;
+            let foundLine = null;
+            
+            while (node && node !== editorContent) {
+                if (node.classList?.contains('line')) {
+                    const lineIndex = parseInt(node.dataset.lineIndex);
+                    if (!isNaN(lineIndex)) {
+                        foundLine = { line: lineIndex, col: range.startOffset };
+                    }
+                    break;
+                }
+                node = node.parentNode;
+            }
+            
+            if (foundLine) {
+                const lineText = linesArray[foundLine.line] || '';
+                const validCol = Math.min(foundLine.col, lineText.length);
+                
+                if (cursorLine !== foundLine.line || cursorCol !== validCol) {
+                    cursorLine = foundLine.line;
+                    cursorCol = validCol;
+                    
+                    updateCursorIndicator();
+                    updateFocusCursorIndicator();
+                    updateSelectionAnchors();
+                    updateStats();
+                    
+                    if (customSelection.isActive) {
+                        customSelection.focus = { line: cursorLine, col: cursorCol };
+                        if (selectionRAF) cancelAnimationFrame(selectionRAF);
+                        selectionRAF = requestAnimationFrame(renderSelectionHighlight);
+                        updateSelectionInfo();
+                    }
+                }
+            }
+        }
+
+        function updateCursorIndicator() {
+            const range = getVisibleRange();
+            if (cursorLine >= range.start && cursorLine < range.end) {
+                const relativeIndex = cursorLine - range.start;
+                const lineElement = editorContent.children[relativeIndex + 1];
+                if (lineElement) {
+                    cursorIndicator.style.left = `${cursorCol * CHAR_WIDTH}px`;
+                    cursorIndicator.style.top = `${lineElement.offsetTop}px`;
+                    cursorIndicator.style.display = 'block';
+                    return;
+                }
+            }
+            cursorIndicator.style.display = 'none';
+        }
+
+        function updateFocusCursorIndicator() {
+            if (!customSelection.isActive || !customSelection.focus) {
+                focusCursorIndicator.style.display = 'none';
+                return;
+            }
+            
+            const { line, col } = customSelection.focus;
+            const range = getVisibleRange();
+            
+            if (line >= range.start && line < range.end) {
+                const relativeIndex = line - range.start;
+                const lineElement = editorContent.children[relativeIndex + 1];
+                if (lineElement) {
+                    focusCursorIndicator.style.left = `${col * CHAR_WIDTH}px`;
+                    focusCursorIndicator.style.top = `${lineElement.offsetTop}px`;
+                    focusCursorIndicator.style.display = 'block';
+                    return;
+                }
+            }
+            focusCursorIndicator.style.display = 'none';
+        }
+
+        function updateSelectionAnchors() {
+            const range = getVisibleRange();
+            if (customSelection.anchor) {
+                const { line, col } = customSelection.anchor;
+                if (line >= range.start && line < range.end) {
+                    const relativeIndex = line - range.start;
+                    const lineElement = editorContent.children[relativeIndex + 1];
+                    if (lineElement) {
+                        anchorStart.style.left = `${col * CHAR_WIDTH}px`;
+                        anchorStart.style.top = `${lineElement.offsetTop + LINE_HEIGHT / 2}px`;
+                        anchorStart.style.display = 'block';
+                    } else anchorStart.style.display = 'none';
+                } else anchorStart.style.display = 'none';
+            } else anchorStart.style.display = 'none';
+
+            if (customSelection.focus) {
+                const { line, col } = customSelection.focus;
+                if (line >= range.start && line < range.end) {
+                    const relativeIndex = line - range.start;
+                    const lineElement = editorContent.children[relativeIndex + 1];
+                    if (lineElement) {
+                        anchorEnd.style.left = `${col * CHAR_WIDTH}px`;
+                        anchorEnd.style.top = `${lineElement.offsetTop + LINE_HEIGHT / 2}px`;
+                        anchorEnd.style.display = 'block';
+                    } else anchorEnd.style.display = 'none';
+                } else anchorEnd.style.display = 'none';
+            } else anchorEnd.style.display = 'none';
+        }
+
+        function normalizeSelection(a, b) {
+            if (a.line < b.line || (a.line === b.line && a.col <= b.col)) {
+                return { start: { ...a }, end: { ...b } };
+            }
+            return { start: { ...b }, end: { ...a } };
+        }
+
+        function getLogicalSelectionText() {
+            if (!customSelection.anchor || !customSelection.focus) return '';
+            const { start, end } = normalizeSelection(customSelection.anchor, customSelection.focus);
+            const result = [];
+            for (let l = start.line; l <= end.line; l++) {
+                const line = linesArray[l] || '';
+                if (l === start.line && l === end.line) result.push(line.slice(start.col, end.col));
+                else if (l === start.line) result.push(line.slice(start.col));
+                else if (l === end.line) result.push(line.slice(0, end.col));
+                else result.push(line);
+            }
+            return result.join('\n');
+        }
+
+        function getSelectionLength() {
+            if (!customSelection.anchor || !customSelection.focus) return 0;
+            const { start, end } = normalizeSelection(customSelection.anchor, customSelection.focus);
+            let length = 0;
+            for (let l = start.line; l <= end.line; l++) {
+                const line = linesArray[l] || '';
+                if (l === start.line && l === end.line) length += end.col - start.col;
+                else if (l === start.line) length += line.length - start.col;
+                else if (l === end.line) length += end.col;
+                else length += line.length;
+                if (l < end.line) length += 1;
+            }
+            return length;
+        }
+
+        function renderSelectionHighlight() {
+            if (!customSelection.anchor || !customSelection.focus) {
+                selectionOverlay.style.display = 'none';
+                selectionOverlay.innerHTML = '';
+                return;
+            }
+            const { start, end } = normalizeSelection(customSelection.anchor, customSelection.focus);
+            const visibleRange = getVisibleRange();
+            const contentRect = editorContent.getBoundingClientRect();
+            const scrollLeft = editorWrapper.scrollLeft;
+            selectionOverlay.innerHTML = '';
+
+            for (let line = start.line; line <= end.line; line++) {
+                const lineText = linesArray[line] || '';
+                const isStartLine = line === start.line;
+                const isEndLine = line === end.line;
+                const startCol = isStartLine ? start.col : 0;
+                const endCol = isEndLine ? end.col : lineText.length;
+                const lineEl = editorContent.querySelector(`.line[data-line-index="${line}"]`);
+
+                if (lineEl?.firstChild?.nodeType === Node.TEXT_NODE) {
+                    const range = document.createRange();
+                    const textNode = lineEl.firstChild;
+                    range.setStart(textNode, Math.min(startCol, textNode.length));
+                    range.setEnd(textNode, Math.min(endCol, textNode.length));
+                    const rect = range.getBoundingClientRect();
+                    const highlight = document.createElement('div');
+                    highlight.className = 'selection-highlight';
+                    highlight.style.left = `${rect.left - contentRect.left + scrollLeft}px`;
+                    highlight.style.top = `${rect.top - contentRect.top}px`;
+                    highlight.style.width = `${Math.max(2, rect.width)}px`;
+                    highlight.style.height = `${rect.height}px`;
+                    selectionOverlay.appendChild(highlight);
+                } else {
+                    const highlight = document.createElement('div');
+                    highlight.className = 'selection-highlight';
+                    highlight.style.top = `${(line - visibleRange.start) * LINE_HEIGHT}px`;
+                    highlight.style.height = `${LINE_HEIGHT}px`;
+                    if (isStartLine && isEndLine) {
+                        const estimatedWidth = Math.max(2, (endCol - startCol) * CHAR_WIDTH);
+                        highlight.style.left = `${startCol * CHAR_WIDTH + scrollLeft}px`;
+                        highlight.style.width = `${estimatedWidth}px`;
+                    } else if (isStartLine) {
+                        highlight.style.left = `${startCol * CHAR_WIDTH + scrollLeft}px`;
+                        highlight.style.width = `calc(100% - ${startCol * CHAR_WIDTH}px)`;
+                    } else if (isEndLine) {
+                        highlight.style.left = `${scrollLeft}px`;
+                        highlight.style.width = `${endCol * CHAR_WIDTH}px`;
+                    } else {
+                        highlight.style.left = `${scrollLeft}px`;
+                        highlight.style.width = '100%';
+                    }
+                    selectionOverlay.appendChild(highlight);
+                }
+            }
+            selectionOverlay.style.display = 'block';
+            selectionOverlay.style.width = `${Math.max(editorWrapper.clientWidth, editorContent.scrollWidth)}px`;
+            selectionOverlay.style.height = `${editorWrapper.clientHeight}px`;
+        }
+
+        function getTapPosition(e) {
+            let clientX, clientY;
+            if (e.touches && e.touches[0]) {
+                clientX = e.touches[0].clientX;
+                clientY = e.touches[0].clientY;
+            } else if (e.changedTouches && e.changedTouches[0]) {
+                clientX = e.changedTouches[0].clientX;
+                clientY = e.changedTouches[0].clientY;
+            } else {
+                clientX = e.clientX;
+                clientY = e.clientY;
+            }
+            
+            const wrapperRect = editorWrapper.getBoundingClientRect();
+            const relativeX = clientX - wrapperRect.left;
+            const relativeY = clientY - wrapperRect.top;
+            const absoluteY = relativeY + editorWrapper.scrollTop;
+            const absoluteX = relativeX + editorWrapper.scrollLeft;
+            const line = Math.floor(absoluteY / LINE_HEIGHT);
+            const col = Math.floor(absoluteX / CHAR_WIDTH);
+            
+            return {
+                line: Math.max(0, Math.min(linesArray.length - 1, line)),
+                col: Math.max(0, Math.min((linesArray[line] || '').length, col)),
+                x: absoluteX,
+                y: absoluteY
+            };
+        }
+
+        function isSamePosition(pos1, pos2) {
+            return Math.abs(pos1.line - pos2.line) <= POSITION_THRESHOLD &&
+                   Math.abs(pos1.col - pos2.col) <= POSITION_THRESHOLD;
+        }
+
+        // ✅ DETECT native selection and clear it (but keep caret)
+        document.addEventListener('selectionchange', () => {
+            if (document.activeElement !== editorContent) return;
+            if (isUpdating || isComposing) return;
+            if (allowNativeSelection) return;
+            
+            // Check if there's an actual text selection (not just caret)
+            if (hasNativeSelectionRange()) {
+                // Clear the selection but keep caret position
+                clearNativeSelectionKeepCaret();
+                console.log('🚫 Native selection cleared (keeping caret)');
+            }
+            
+            // Always sync cursor position
+            syncCursorFromNativeSelection();
+        });
+
+        // ✅ Allow native selection temporarily for specific operations
+        function temporarilyAllowNativeSelection(callback) {
+            allowNativeSelection = true;
+            callback();
+            setTimeout(() => { allowNativeSelection = false; }, 50);
+        }
+
+        editorContent.addEventListener('touchstart', (e) => {
+            if (isComposing || isUpdating) return;
+            const touch = e.touches[0];
+            touchStartPos = { x: touch.clientX, y: touch.clientY };
+            isScrolling = false;
+        }, { passive: true });
+
+        editorContent.addEventListener('touchmove', (e) => {
+            if (!touchStartPos) return;
+            const touch = e.touches[0];
+            const deltaX = Math.abs(touch.clientX - touchStartPos.x);
+            const deltaY = Math.abs(touch.clientY - touchStartPos.y);
+            if (deltaY > SCROLL_THRESHOLD || deltaX > SCROLL_THRESHOLD) {
+                isScrolling = true;
+                touchStartPos = null;
+            }
+        }, { passive: true });
+
+        editorContent.addEventListener('touchend', (e) => {
+            if (isComposing || isUpdating || isScrolling) {
+                touchStartPos = null;
+                isScrolling = false;
+                return;
+            }
+            if (touchStartPos) {
+                e.preventDefault();
+                const tapPos = getTapPosition(e);
+                const now = Date.now();
+                
+                if (customSelection.isActive) {
+                    customSelection.focus = { line: tapPos.line, col: tapPos.col };
+                    updateFocusCursorIndicator();
+                    updateSelectionAnchors();
+                    renderSelectionHighlight();
+                    updateSelectionInfo();
+                } else {
+                    cursorLine = tapPos.line;
+                    cursorCol = tapPos.col;
+                    setCursor(tapPos.line, tapPos.col);
+                }
+                
+                updateCursorIndicator();
+                updateStats();
+                lastTap = { line: tapPos.line, col: tapPos.col, time: now };
+            }
+            touchStartPos = null;
+            isScrolling = false;
+        }, { passive: false });
+
+        editorContent.addEventListener('touchcancel', () => {
+            touchStartPos = null;
+            isScrolling = false;
+        });
+
+        editorContent.addEventListener('mousedown', (e) => {
+            if (isComposing || isUpdating) return;
+            const tapPos = getTapPosition(e);
+            const now = Date.now();
+            
+            if (customSelection.isActive) {
+                customSelection.focus = { line: tapPos.line, col: tapPos.col };
+                updateFocusCursorIndicator();
+                updateSelectionAnchors();
+                renderSelectionHighlight();
+                updateSelectionInfo();
+            } else {
+                cursorLine = tapPos.line;
+                cursorCol = tapPos.col;
+                setCursor(tapPos.line, tapPos.col);
+            }
+            
+            updateCursorIndicator();
+            updateStats();
+            lastTap = { line: tapPos.line, col: tapPos.col, time: now };
+        });
+
+        dropdownBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            const isActive = dropdownMenu.classList.contains('active');
+            dropdownMenu.classList.toggle('active');
+            dropdownBtn.classList.toggle('active');
+            if (!isActive) updateDropdownOptions();
+        });
+
+        document.addEventListener('click', (e) => {
+            if (!dropdownBtn.contains(e.target) && !dropdownMenu.contains(e.target)) {
+                dropdownMenu.classList.remove('active');
+                dropdownBtn.classList.remove('active');
+            }
+        });
+
+        dropdownMenu.addEventListener('click', (e) => {
+            const option = e.target.closest('.toolbar-dropdown-item');
+            if (!option || option.classList.contains('disabled')) return;
+            handleModalAction(option.dataset.action);
+            dropdownMenu.classList.remove('active');
+            dropdownBtn.classList.remove('active');
+        });
+
+        dropdownMenu.addEventListener('mousedown', (e) => {
+            e.stopPropagation();
+        });
+
+        function updateDropdownOptions() {
+            const options = dropdownMenu.querySelectorAll('.toolbar-dropdown-item');
+            options.forEach(opt => {
+                const action = opt.dataset.action;
+                opt.classList.remove('disabled');
+                if ((action === 'copy' || action === 'cut' || action === 'clear-selection') && !customSelection.isActive) {
+                    opt.classList.add('disabled');
+                }
+                if (action === 'start-selection' && customSelection.isActive) {
+                    opt.classList.add('disabled');
+                }
+            });
+        }
+
+        function handleModalAction(action) {
+            switch (action) {
+                case 'start-selection': startSelection(); break;
+                case 'copy': copySelection(); break;
+                case 'cut': cutSelection(); break;
+                case 'paste': pasteFromClipboard(); break;
+                case 'clear-selection': clearCustomSelection(); break;
+            }
+        }
+
+        function startSelection() {
+            customSelection.isActive = true;
+            customSelection.anchor = { line: cursorLine, col: cursorCol };
+            customSelection.focus = { line: cursorLine, col: cursorCol };
+            selectionInfo.classList.add('active');
+            updateSelectionInfo();
+            updateSelectionAnchors();
+            updateFocusCursorIndicator();
+            renderSelectionHighlight();
+            updateStats();
+            console.log(`📍 Selection started at Line ${cursorLine}, Col ${cursorCol}`);
+        }
+
+        function copySelection() {
+            if (!customSelection.isActive) return;
+            const text = getLogicalSelectionText();
+            // ✅ Temporarily allow native selection for clipboard API
+            temporarilyAllowNativeSelection(() => {
+                navigator.clipboard.writeText(text).then(() => {
+                    console.log('✅ Copied:', text.slice(0, 100) + (text.length > 100 ? '...' : ''));
+                }).catch(err => console.error('❌ Copy failed:', err));
+            });
+        }
+
+        function cutSelection() {
+            if (!customSelection.isActive) return;
+            const text = getLogicalSelectionText();
+            const { start, end } = normalizeSelection(customSelection.anchor, customSelection.focus);
+            for (let l = start.line; l <= end.line; l++) {
+                const line = linesArray[l] || '';
+                if (l === start.line && l === end.line) linesArray[l] = line.slice(0, start.col) + line.slice(end.col);
+                else if (l === start.line) linesArray[l] = line.slice(0, start.col);
+                else if (l === end.line) linesArray[l] = line.slice(end.col);
+                else linesArray[l] = '';
+            }
+            if (end.line > start.line) linesArray.splice(start.line + 1, end.line - start.line);
+            temporarilyAllowNativeSelection(() => {
+                navigator.clipboard.writeText(text).then(() => {
+                    console.log('✂️ Cut:', text.slice(0, 100) + (text.length > 100 ? '...' : ''));
+                }).catch(err => console.error('❌ Cut failed:', err));
+            });
+            cursorLine = start.line; cursorCol = start.col;
+            clearCustomSelection();
+            editorContent.style.height = `${linesArray.length * LINE_HEIGHT}px`;
+            renderVisibleLines({ line: start.line, col: start.col });
+        }
+
+        async function pasteFromClipboard() {
+            try {
+                const text = await navigator.clipboard.readText();
+                const lines = text.split('\n');
+                const currentLineText = linesArray[cursorLine] || '';
+                const before = currentLineText.slice(0, cursorCol);
+                const after = currentLineText.slice(cursorCol);
+                const newLines = [];
+                if (lines.length === 1) newLines.push(before + lines[0] + after);
+                else {
+                    newLines.push(before + lines[0]);
+                    for (let i = 1; i < lines.length - 1; i++) newLines.push(lines[i]);
+                    newLines.push(lines[lines.length - 1] + after);
+                }
+                linesArray.splice(cursorLine, 1, ...newLines);
+                const newCursorLine = cursorLine + lines.length - 1;
+                const newCursorCol = lines[lines.length - 1].length;
+                cursorLine = newCursorLine; cursorCol = newCursorCol;
+                editorContent.style.height = `${linesArray.length * LINE_HEIGHT}px`;
+                renderVisibleLines({ line: newCursorLine, col: newCursorCol });
+                console.log('📥 Pasted:', text.slice(0, 100) + (text.length > 100 ? '...' : ''));
+            } catch (err) { console.error('❌ Paste failed:', err); }
+        }
+
+        function clearCustomSelection() {
+            customSelection.isActive = false;
+            customSelection.anchor = null;
+            customSelection.focus = null;
+            selectionInfo.classList.remove('active');
+            selectionOverlay.style.display = 'none';
+            anchorStart.style.display = 'none';
+            anchorEnd.style.display = 'none';
+            focusCursorIndicator.style.display = 'none';
+            updateStats();
+            console.log('❌ Selection cleared');
+        }
+
+        function updateSelectionInfo() {
+            if (customSelection.isActive && customSelection.anchor) {
+                selectionInfoText.textContent = `Selecting... Line ${customSelection.focus?.line ?? customSelection.anchor.line}, Col ${customSelection.focus?.col ?? customSelection.anchor.col}`;
+            }
+        }
+
+        editorWrapper.addEventListener('scroll', () => {
+            if (!scrollTicking) {
+                requestAnimationFrame(() => {
+                    renderVisibleLines();
+                    if (customSelection.isActive) {
+                        renderSelectionHighlight();
+                        updateSelectionAnchors();
+                        updateFocusCursorIndicator();
+                        updateSelectionInfo();
+                    }
+                    scrollTicking = false;
+                });
+                scrollTicking = true;
+            }
+        });
+
+        function syncVisibleLinesToArray() {
+            const lineElements = editorContent.querySelectorAll('.line[data-line-index]');
+            lineElements.forEach(lineEl => {
+                const lineIndex = parseInt(lineEl.dataset.lineIndex);
+                if (!isNaN(lineIndex) && lineIndex < linesArray.length) {
+                    const textNode = lineEl.firstChild;
+                    if (textNode?.nodeType === Node.TEXT_NODE) linesArray[lineIndex] = textNode.textContent;
+                }
+            });
+        }
+
+        editorContent.addEventListener('input', (e) => {
+            if (isComposing || isUpdating) return;
+            clearCustomSelection();
+            syncVisibleLinesToArray();
+            syncCursorFromNativeSelection();
+            updateStats();
+        });
+
+        editorContent.addEventListener('keydown', (e) => {
+            if (isComposing || isUpdating) return;
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                clearCustomSelection();
+                const currentCursor = saveCursor();
+                syncVisibleLinesToArray();
+                const currentLineText = linesArray[currentCursor.line] || '';
+                const before = currentLineText.slice(0, currentCursor.col);
+                const after = currentLineText.slice(currentCursor.col);
+                linesArray[currentCursor.line] = before;
+                linesArray.splice(currentCursor.line + 1, 0, after);
+                cursorLine = currentCursor.line + 1; cursorCol = 0;
+                editorContent.style.height = `${linesArray.length * LINE_HEIGHT}px`;
+                renderVisibleLines({ line: cursorLine, col: cursorCol });
+            }
+            if (e.key === 'Backspace') {
+                if (cursorCol === 0 && cursorLine > 0) {
+                    e.preventDefault();
+                    clearCustomSelection();
+                    syncVisibleLinesToArray();
+                    const prevLineText = linesArray[cursorLine - 1] || '';
+                    const currentLineText = linesArray[cursorLine] || '';
+                    linesArray[cursorLine - 1] = prevLineText + currentLineText;
+                    linesArray.splice(cursorLine, 1);
+                    cursorLine--; cursorCol = prevLineText.length;
+                    editorContent.style.height = `${linesArray.length * LINE_HEIGHT}px`;
+                    renderVisibleLines({ line: cursorLine, col: cursorCol });
+                }
+            }
+        });
+
+        editorContent.addEventListener('compositionstart', () => { isComposing = true; });
+        editorContent.addEventListener('compositionend', () => { isComposing = false; syncVisibleLinesToArray(); renderVisibleLines(); });
+        editorContent.addEventListener('keyup', () => {
+            if (!isComposing && !isUpdating) {
+                const savedCursor = saveCursor();
+                cursorLine = savedCursor.line; cursorCol = savedCursor.col;
+                updateCursorIndicator();
+                updateFocusCursorIndicator();
+                updateStats();
+            }
+        });
+        editorContent.addEventListener('focus', () => {
+            if (!isUpdating) { 
+                setCursor(cursorLine, cursorCol); 
+                updateCursorIndicator();
+                updateFocusCursorIndicator();
+            }
+        });
+
+        function updateStats() {
+            const range = getVisibleRange();
+            const rendered = range.end - range.start;
+            let selectionText = 'none';
+            if (customSelection.isActive && customSelection.anchor && customSelection.focus) {
+                const { start, end } = normalizeSelection(customSelection.anchor, customSelection.focus);
+                selectionText = `${end.line - start.line + 1} line(s), ${getSelectionLength()} chars`;
+            }
+            statsEl.textContent = `Lines: ${linesArray.length.toLocaleString()} | Rendered: ${rendered} | Cursor: ${cursorLine}:${cursorCol} | Selection: ${selectionText}`;
+        }
+
+        function initializeText() {
+            console.time("Initialize Text");
+            linesArray = new Array(TOTAL_LINES).fill(0).map((_, i) => `Line ${i + 1}: This is sample text for line number ${i + 1}.`);
+            linesArray[0] = `Line 1: ` + 'x'.repeat(5000) + ` <- Long line for horizontal scroll testing`;
+            console.timeEnd("Initialize Text");
+            editorContent.style.height = `${TOTAL_LINES * LINE_HEIGHT}px`;
+            renderVisibleLines(); updateStats();
+            setTimeout(() => { editorContent.focus(); setCursor(0, 0); updateCursorIndicator(); }, 100);
+        }
+
+        window.addEventListener('resize', () => {
+            renderVisibleLines();
+            if (customSelection.isActive) { 
+                renderSelectionHighlight(); 
+                updateSelectionAnchors();
+                updateFocusCursorIndicator();
+            }
+            updateCursorIndicator();
+        });
+
+        initializeText();
+        console.log('✅ Native caret enabled for typing!');
+        console.log('🚫 Native text selection: Auto-cleared (caret kept)');
+        console.log('👆 Single tap: Place cursor');
+        console.log('🔽 Dropdown: Start Selection → Adjust → Copy/Cut → Clear');
+        console.log('🟢 Green cursor: Edit position | 🟠 Orange cursor: Selection endpoint');
+        console.log('↔️ Horizontal scroll: Enabled');
+        console.log('⌨️ Typing & Backspace: Working');
+    </script>
+</body>
+</html>
