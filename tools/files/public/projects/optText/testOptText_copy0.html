@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>optText Component Test</title>
+    <style>
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body {
+            margin: 0; padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #f5f5f7;
+            height: 100dvh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        /* Header */
+        .test-header {
+            background: #fff;
+            padding: 8px 12px;
+            border-bottom: 1px solid #ddd;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            z-index: 10;
+        }
+        .test-header h1 {
+            font-size: 14px; margin: 0; font-weight: 600; color: #333;
+        }
+        .test-btn {
+            padding: 6px 12px;
+            font-size: 12px;
+            border: 1px solid #ccc;
+            background: #fff;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .test-btn:hover { background: #f0f0f0; }
+        .test-btn:active { transform: scale(0.98); }
+        .test-btn.primary { background: #007aff; color: #fff; border-color: #007aff; }
+        .test-btn.primary:hover { background: #0066cc; }
+        .test-btn.danger { background: #ff3b30; color: #fff; border-color: #ff3b30; }
+        .test-btn.danger:hover { background: #cc2f26; }
+        
+        /* Editor Area */
+        #editor-host {
+            flex: 1;
+            min-height: 0;
+            background: #fff;
+            border-top: 1px solid #ddd;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        /* Console Panel */
+        #console-panel {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            font-family: 'Menlo', 'Consolas', monospace;
+            font-size: 11px;
+            max-height: 40vh;
+            overflow-y: auto;
+            border-top: 1px solid #444;
+            display: none;
+        }
+        #console-panel.visible { display: block; }
+        .console-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px 10px;
+            background: #2d2d2d;
+            border-bottom: 1px solid #444;
+            position: sticky;
+            top: 0;
+        }
+        .console-header span { font-weight: 600; color: #fff; }
+        .console-clear {
+            background: none; border: none; color: #888; cursor: pointer; font-size: 11px;
+        }
+        .console-clear:hover { color: #fff; }
+        .console-entries { padding: 4px 10px; }
+        .console-entry {
+            padding: 3px 0;
+            border-bottom: 1px solid #333;
+            display: flex;
+            gap: 8px;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        .console-entry.log { color: #d4d4d4; }
+        .console-entry.warn { color: #ffa500; }
+        .console-entry.error { color: #ff6b6b; }
+        .console-time { color: #666; min-width: 50px; flex-shrink: 0; }
+        .console-msg { flex: 1; }
+        
+        /* Controls Panel */
+        #controls-panel {
+            background: #fff;
+            padding: 8px 12px;
+            border-top: 1px solid #ddd;
+            display: none;
+            max-height: 30vh;
+            overflow-y: auto;
+        }
+        #controls-panel.visible { display: block; }
+        .control-row {
+            display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap;
+        }
+        .control-row input, .control-row textarea {
+            flex: 1; min-width: 120px;
+            padding: 6px 8px;
+            font-size: 12px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        .control-row textarea { min-height: 60px; resize: vertical; }
+        .control-label {
+            font-size: 11px; color: #666; margin-bottom: 2px; display: block;
+        }
+        
+        /* Toast for feedback */
+        .test-toast {
+            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+            background: rgba(0,0,0,0.85); color: #fff;
+            padding: 10px 18px; border-radius: 8px; font-size: 13px;
+            z-index: 9999; animation: toast-fade 2s ease; pointer-events: none;
+        }
+        @keyframes toast-fade {
+            0%,100% { opacity: 0; transform: translateX(-50%) translateY(10px); }
+            15%,85% { opacity: 1; transform: translateX(-50%) translateY(0); }
+        }
+        
+        /* Responsive */
+        @media (max-width: 480px) {
+            .test-header { padding: 6px 8px; }
+            .test-btn { padding: 5px 10px; font-size: 11px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="test-header">
+        <h1>optText Test</h1>
+        <button class="test-btn primary" id="btn-toggle-console">📋 Console</button>
+        <button class="test-btn" id="btn-toggle-controls">⚙️ Controls</button>
+        <button class="test-btn" id="btn-load-sample">📄 Load Sample</button>
+        <button class="test-btn" id="btn-clear">🗑️ Clear</button>
+        <button class="test-btn danger" id="btn-destroy">🔥 Destroy</button>
+    </div>
+    
+    <div id="editor-host"></div>
+    
+    <div id="controls-panel">
+        <div class="control-row">
+            <div style="flex:1">
+                <label class="control-label">Set Value</label>
+                <textarea id="input-set-value" placeholder="Paste text here..."></textarea>
+            </div>
+            <button class="test-btn primary" id="btn-apply-value" style="align-self:flex-end">Apply</button>
+        </div>
+        <div class="control-row">
+            <button class="test-btn" id="btn-get-value">📋 Get Value</button>
+            <button class="test-btn" id="btn-get-selection">🔲 Get Selection</button>
+            <button class="test-btn" id="btn-start-select">✏️ Start Select</button>
+        </div>
+        <div class="control-row">
+            <label class="control-label">Config Override</label>
+            <input type="text" id="input-config" placeholder='{"lineHeight":28,"fontSize":14}'>
+            <button class="test-btn" id="btn-apply-config">Apply Config</button>
+        </div>
+    </div>
+    
+    <div id="console-panel">
+        <div class="console-header">
+            <span>Console Output</span>
+            <button class="console-clear" id="btn-clear-console">Clear</button>
+        </div>
+        <div class="console-entries" id="console-entries"></div>
+    </div>
+
+    <script type="module">
+        // ====================================================================
+        // CONSOLE CAPTURE (For iPhone / No DevTools)
+        // ====================================================================
+        const ConsoleCapture = (() => {
+            const original = {
+                log: console.log,
+                warn: console.warn,
+                error: console.error,
+                info: console.info
+            };
+            const entries = [];
+            const maxEntries = 200;
+            
+            function formatTime() {
+                const now = new Date();
+                return `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}:${now.getSeconds().toString().padStart(2,'0')}`;
+            }
+            
+            function add(level, args) {
+                const entry = {
+                    time: formatTime(),
+                    level,
+                    message: args.map(a => {
+                        try {
+                            return typeof a === 'object' ? JSON.stringify(a, null, 2) : String(a);
+                        } catch { return String(a); }
+                    }).join(' ')
+                };
+                entries.push(entry);
+                if (entries.length > maxEntries) entries.shift();
+                render();
+            }
+            
+            function render() {
+                const container = document.getElementById('console-entries');
+                if (!container) return;
+                container.innerHTML = entries.map(e => `
+                    <div class="console-entry ${e.level}">
+                        <span class="console-time">${e.time}</span>
+                        <span class="console-msg">${e.message}</span>
+                    </div>
+                `).join('');
+                container.scrollTop = container.scrollHeight;
+            }
+            
+            function hook() {
+                console.log = (...args) => { original.log(...args); add('log', args); };
+                console.warn = (...args) => { original.warn(...args); add('warn', args); };
+                console.error = (...args) => { original.error(...args); add('error', args); };
+                console.info = (...args) => { original.info(...args); add('log', args); };
+            }
+            
+            function clear() { entries.length = 0; render(); }
+            function show() { document.getElementById('console-panel')?.classList.add('visible'); }
+            function hide() { document.getElementById('console-panel')?.classList.remove('visible'); }
+            function toggle() { 
+                const panel = document.getElementById('console-panel');
+                panel?.classList.toggle('visible');
+            }
+            
+            return { hook, clear, show, hide, toggle, render };
+        })();
+        
+        // Hook console immediately
+        ConsoleCapture.hook();
+        
+        // ====================================================================
+        // TEST SAMPLE DATA (Defined inline per requirement)
+        // ====================================================================
+        const SAMPLE_DATA = `// optText Component - Test Sample
+// Generated: ${new Date().toISOString()}
+
+function greet(name) {
+    return \`Hello, \${name}!\`;
+}
+
+const users = [
+    { id: 1, name: "Alice", role: "admin" },
+    { id: 2, name: "Bob", role: "user" },
+    { id: 3, name: "Charlie", role: "moderator" }
+];
+
+// Async example
+async function fetchUserData(userId) {
+    try {
+        const response = await fetch(\`/api/users/\${userId}\`);
+        if (!response.ok) throw new Error('Not found');
+        return await response.json();
+    } catch (error) {
+        console.error('Fetch failed:', error);
+        return null;
+    }
+}
+
+// Test logging
+console.log('Sample data loaded');
+console.warn('This is a test warning');
+console.error('This is a test error');
+
+// More content to enable scrolling...
+${Array.from({length: 50}, (_, i) => `// Line ${i + 1}: Lorem ipsum dolor sit amet, consectetur adipiscing elit.`).join('\n')}
+
+// End of sample`;
+
+        // ====================================================================
+        // TEST CONTROLLER
+        // ====================================================================
+        let editorInstance = null;
+        let editorContainer = null;
+        
+        function showToast(msg) {
+            const existing = document.querySelector('.test-toast');
+            if (existing) existing.remove();
+            const toast = document.createElement('div');
+            toast.className = 'test-toast';
+            toast.textContent = msg;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 2000);
+        }
+        
+        function initEditor() {
+            if (editorInstance) return;
+            
+            import('./optText.js').then(({ setupOptTextInstance }) => {
+                const host = document.getElementById('editor-host');
+                editorContainer = setupOptTextInstance();
+                
+                // Set up event listeners for testing
+                editorContainer.onchange = (e) => console.log('✓ onchange fired', { length: e.target.value.length });
+                editorContainer.oninput = (e) => console.log('→ oninput fired', { cursor: { line: e.target.cursor?.line, col: e.target.cursor?.col } });
+                
+                host.innerHTML = '';
+                host.appendChild(editorContainer);
+                
+                console.log('optText instance initialized');
+                showToast('Editor ready');
+            }).catch(err => {
+                console.error('Failed to load optText:', err);
+                showToast('Load failed - check console');
+            });
+        }
+        
+        function destroyEditor() {
+            if (editorContainer?.parentNode) {
+                editorContainer.parentNode.removeChild(editorContainer);
+                editorContainer = null;
+                editorInstance = null;
+                console.log('Editor destroyed');
+                showToast('Editor destroyed');
+            }
+        }
+        
+        function loadSample() {
+            if (!editorContainer) { initEditor(); return; }
+            editorContainer.value = SAMPLE_DATA;
+            console.log('Sample data loaded:', SAMPLE_DATA.split('\n').length, 'lines');
+            showToast('Sample loaded (' + SAMPLE_DATA.split('\n').length + ' lines)');
+        }
+        
+        function clearEditor() {
+            if (editorContainer) {
+                editorContainer.value = '';
+                console.log('Editor cleared');
+                showToast('Cleared');
+            }
+        }
+        
+        function applyValue() {
+            const input = document.getElementById('input-set-value');
+            if (editorContainer && input.value) {
+                editorContainer.value = input.value;
+                console.log('Value applied:', input.value.length, 'chars');
+                showToast('Value applied');
+                input.value = '';
+            }
+        }
+        
+        function getValue() {
+            if (editorContainer) {
+                const val = editorContainer.value;
+                console.log('Current value:', val);
+                console.log('Stats:', { lines: val.split('\n').length, chars: val.length });
+                showToast('Value logged to console');
+            }
+        }
+        
+        function getSelection() {
+            if (editorContainer) {
+                // Note: selection API would need to be exposed in optText.js
+                // This is a placeholder for testing
+                console.log('Selection API: Not yet exposed in component');
+                showToast('Selection: API not exposed');
+            }
+        }
+        
+        function startSelect() {
+            if (editorContainer) {
+                // Trigger via custom event or method if exposed
+                console.log('Start select: Trigger selection mode');
+                showToast('Selection mode: Use menu → Start Select');
+            }
+        }
+        
+        function applyConfig() {
+            const input = document.getElementById('input-config');
+            if (editorContainer && input.value) {
+                try {
+                    const cfg = JSON.parse(input.value);
+                    editorContainer.config = cfg;
+                    console.log('Config applied:', cfg);
+                    showToast('Config updated');
+                    input.value = '';
+                } catch (e) {
+                    console.error('Invalid config JSON:', e);
+                    showToast('Invalid JSON');
+                }
+            }
+        }
+        
+        // ====================================================================
+        // UI EVENT BINDINGS
+        // ====================================================================
+        document.addEventListener('DOMContentLoaded', () => {
+            // Initialize editor on load
+            initEditor();
+            
+            // Header buttons
+            document.getElementById('btn-toggle-console').addEventListener('click', ConsoleCapture.toggle);
+            document.getElementById('btn-toggle-controls').addEventListener('click', () => {
+                document.getElementById('controls-panel')?.classList.toggle('visible');
+            });
+            document.getElementById('btn-load-sample').addEventListener('click', loadSample);
+            document.getElementById('btn-clear').addEventListener('click', clearEditor);
+            document.getElementById('btn-destroy').addEventListener('click', destroyEditor);
+            
+            // Console panel
+            document.getElementById('btn-clear-console').addEventListener('click', () => {
+                ConsoleCapture.clear();
+                showToast('Console cleared');
+            });
+            
+            // Controls panel
+            document.getElementById('btn-apply-value').addEventListener('click', applyValue);
+            document.getElementById('btn-get-value').addEventListener('click', getValue);
+            document.getElementById('btn-get-selection').addEventListener('click', getSelection);
+            document.getElementById('btn-start-select').addEventListener('click', startSelect);
+            document.getElementById('btn-apply-config').addEventListener('click', applyConfig);
+            
+            // Keyboard shortcuts for testing
+            document.addEventListener('keydown', (e) => {
+                if (e.ctrlKey || e.metaKey) {
+                    if (e.key === 'l') { e.preventDefault(); loadSample(); }
+                    if (e.key === 'k') { e.preventDefault(); ConsoleCapture.clear(); }
+                    if (e.key === 'c') { e.preventDefault(); clearEditor(); }
+                }
+            });
+            
+            console.log('Test page initialized');
+            console.log('Shortcuts: Ctrl/Cmd+L=Load Sample, K=Clear Console, C=Clear Editor');
+        });
+    </script>
+</body>
+</html>

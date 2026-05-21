@@ -1,0 +1,15 @@
+# 1. Clone the starterpack
+git clone https://github.com/michaelfranzl/clang-wasm-browser-starterpack
+cd clang-wasm-browser-starterpack
+
+# 2. Download WASI SDK (native clang for building the examples)
+#    Get from: https://github.com/WebAssembly/wasi-sdk/releases
+#    Extract to /opt/wasi-sdk or set WASI_SDK env var
+
+# 3. Build examples (this pre-compiles the WASM binaries for the demo)
+cd examples
+WASI_SDK=/path/to/wasi-sdk make
+
+# 4. Serve locally
+python3 -m http.server 8000
+# Open http://localhost:8000 in browser

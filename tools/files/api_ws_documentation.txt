@@ -1,0 +1,178 @@
+========================================================================
+SERVER COMPONENT DEVELOPMENT GUIDE
+========================================================================
+Version: 1.0
+Target:  files/*.api.js  |  files/*.ws.js
+Runtime: Node.js v18+ (Native http/https, no external deps)
+
+========================================================================
+1. ARCHITECTURE OVERVIEW
+========================================================================
+- Dynamic Routing: Any file ending in .api.js or .ws.js anywhere under 
+  the "files/" directory becomes a live endpoint.
+- Zero-Config: No route registration or app.listen required.
+- Security: All paths are sandboxed to "files/". External IPs blocked 
+  by default (LAN-only). Path traversal attacks are neutralized.
+- Caching: Handlers are loaded on first access and cached in memory. 
+  Unused handlers are purged after 60 minutes of inactivity.
+
+========================================================================
+2. HTTP API HANDLERS (.api.js)
+========================================================================
+2.1 FILE PLACEMENT & ACCESS
+  Location: files/<any/path>/myhandler.api.js
+  Endpoint: http://localhost/<any/path>/myhandler.api.js
+  Method:   GET, POST, PUT, PATCH, DELETE (handled by your logic)
+
+2.2 REQUIRED EXPORT
+  module.exports.handler = async function(req, res) {
+      // Your logic here
+  };
+
+2.3 REQUEST OBJECT (req)
+  - req.method      : HTTP method string
+  - req.url         : Raw request URL (including query string)
+  - req.headers     : Object containing all HTTP headers
+  - req.on('data')  : Stream chunks for POST/PUT bodies
+  - req.on('end')   : Fires when request body is fully received
+  - NOTE: Do NOT call req.resume() unless consuming streams manually.
+
+2.4 RESPONSE OBJECT (res)
+  - res.writeHead(statusCode, headers)
+  - res.write(chunk)
+  - res.end(data)     : MUST be called to complete the request
+  - res.headersSent   : Boolean, true after writeHead/end is called
+
+2.5 BUILT-IN GLOBAL HELPERS
+  Available in handler scope without requiring:
+  - sendPlainTextResponse(res, message, statusCode=200, headers={})
+  - sendJsonResponse(res, dataObject, statusCode=200, headers={})
+  - streamFile(req, res, filePath, contentType, statusCode=200, headers={})
+
+2.6 EXAMPLES
+  [JSON Response]
+  module.exports.handler = async function(req, res) {
+      sendJsonResponse(res, { status: "ok", time: Date.now() });
+  };
+
+  [POST Body Parser]
+  module.exports.handler = function(req, res) {
+      let body = '';
+      req.on('data', chunk => body += chunk);
+      req.on('end', () => {
+          try {
+              const payload = JSON.parse(body);
+              sendJsonResponse(res, { received: payload });
+          } catch {
+              sendPlainTextResponse(res, "Invalid JSON", 400);
+          }
+      });
+  };
+
+========================================================================
+3. WEBSOCKET HANDLERS (.ws.js)
+========================================================================
+3.1 FILE PLACEMENT & ACCESS
+  Location: files/<any/path>/myservice.ws.js
+  Endpoint: ws://localhost/<any/path>/myservice.ws.js
+  Protocol: WebSocket (RFC 6455, text frames only)
+
+3.2 REQUIRED EXPORT
+  module.exports.handler = function(ws, req) {
+      return {
+          onOpen: () => {},
+          onMessage: (messageString) => {},
+          onClose: () => {}
+      };
+  };
+
+3.3 WEBSOCKET OBJECT (ws)
+  - ws.send(message)       : Sends string to client (auto-frames)
+  - ws.close(code, reason) : Closes connection (default: 1000, "")
+  - ws.readyState          : 1 = OPEN, 3 = CLOSED
+  - ws._socket             : Raw Node.js net.Socket (advanced use)
+  - NOTE: Binary frames are explicitly rejected by the server.
+          Always send/expect UTF-8 text (JSON recommended).
+
+3.4 LIFECYCLE CALLBACKS
+  - onOpen()        : Fires immediately after handshake completes.
+                      Use ws.send() here for welcome messages.
+  - onMessage(msg)  : Fires on each client frame. "msg" is a plain
+                      string. Parse JSON yourself.
+  - onClose()       : Fires when socket closes (clean or error).
+                      Cleanup timers, remove from rooms, etc.
+
+3.5 EXAMPLE
+  module.exports.handler = function(ws, req) {
+      const clientId = req.socket.remoteAddress;
+      let messageCount = 0;
+
+      return {
+          onOpen: () => {
+              ws.send(JSON.stringify({ type: "welcome", id: clientId }));
+          },
+          onMessage: (raw) => {
+              messageCount++;
+              try {
+                  const data = JSON.parse(raw);
+                  ws.send(JSON.stringify({ 
+                      echo: data, 
+                      count: messageCount 
+                  }));
+              } catch (e) {
+                  ws.send(JSON.stringify({ error: "Bad JSON" }));
+              }
+          },
+          onClose: () => {
+              console.warn(`Client ${clientId} disconnected (${messageCount} msgs)`);
+          }
+      };
+  };
+
+========================================================================
+4. SECURITY & CONSTRAINTS
+========================================================================
+- LAN ENFORCEMENT: Connections from public IPs return 403.
+  Override: ALLOW_IPS=1.2.3.4,10.0.0.5 node webserver.js
+- PATH SANDBOXING: All file operations are strictly confined to "files/".
+  Relative paths like "../" or "%2e%2e/" are automatically blocked.
+- COLD STARTS: First request triggers file load & validation (~10-50ms).
+- HOT RELOAD: Handlers are cached. During development, restart the 
+  server to see changes immediately, or wait 60min for auto-purge.
+- NO BLOCKING: Avoid sync fs calls or long loops. Use async/await.
+  Blocking the event loop will stall all clients.
+- ERROR BOUNDARIES: Uncaught exceptions in .api.js return 500.
+  Uncaught exceptions in .ws.js force-close the socket with code 1011.
+
+========================================================================
+5. TROUBLESHOOTING
+========================================================================
+[404 Not Found]
+  - Verify exact filename matches extension (.api.js / .ws.js)
+  - Check URL path case-sensitivity (Linux servers)
+  - Ensure file is inside "files/" directory
+
+[500 Internal Error]
+  - Check server console for console.error output
+  - Verify module.exports.handler is a function
+  - Ensure no syntax errors in the handler file
+
+[WebSocket Connects but Drops Immediately]
+  - Client must send masked frames (browser WebSocket does this)
+  - Check onMessage/onClose for thrown errors
+  - Verify server supports text frames only (opcode 1)
+
+[Changes Not Reflecting]
+  - Server caches handlers for performance
+  - Restart Node process: Ctrl+C -> node webserver.js
+  - Or wait 60 minutes for automatic cache eviction
+
+========================================================================
+6. QUICK REFERENCE CARD
+========================================================================
+.api.js  -> module.exports.handler(req, res) -> res.end()
+.ws.js   -> module.exports.handler(ws, req)  -> { onOpen, onMessage, onClose }
+Globals  -> sendPlainTextResponse, sendJsonResponse, streamFile
+Cache    -> 60 min idle timeout per handler
+Security -> LAN-only, path-trap sandboxed to ./files/, RFC1918 enforced
+========================================================================

@@ -1,0 +1,195 @@
+:root {
+    --system-bg: #000000;
+    --system-window-bg: rgba(0, 10, 20, 0.85);
+    --system-header-bg: rgba(0, 20, 40, 0.9);
+    --system-accent: #00d4ff;
+    --system-accent-dim: #0088aa;
+    --system-highlight: #00ffff;
+    --system-text: #e0ffff;
+    --system-text-dim: #00aacc;
+    --system-text-on-accent: #000000;
+    --system-border: rgba(0, 212, 255, 0.3);
+    --system-radius: 4px;
+    --system-radius-lg: 8px;
+    --system-shadow: 0 0 20px rgba(0, 212, 255, 0.3);
+    --system-font: 'Orbitron', sans-serif;
+    --system-font-mono: 'Share Tech Mono', monospace;
+    --system-success: #00ff88;
+    --system-warning: #ffaa00;
+    --system-danger: #ff3366;
+    --system-info: #00d4ff;
+    --system-icon-bg: rgba(0, 20, 40, 0.7);
+    --system-icon-border: 1px solid rgba(0, 212, 255, 0.4);
+    --system-icon-group-navigation: #00d4ff;
+    --system-icon-group-action-primary: #00ff88;
+    --system-icon-group-action-destructive: #ff3366;
+    --system-icon-group-action-confirmation: #00ff88;
+}
+
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Share+Tech+Mono&display=swap');
+
+html, html body, body {
+    background: #000000 !important;
+    min-height: 100dvh !important;
+    min-width: 100vw !important;
+    overflow: hidden !important;
+}
+
+/* 3D Scene Container */
+#tron-3d-wrapper {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    perspective: 1000px;
+    perspective-origin: 50% 50%;
+    overflow: hidden;
+    background: linear-gradient(180deg, #000011 0%, #000005 50%, #000000 100%);
+    z-index: 0;
+}
+
+#tron-3d-scene {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    transform-style: preserve-3d;
+    transition: transform 0.1s ease-out;
+}
+
+/* Ground Grid */
+.tron-grid {
+    position: absolute;
+    bottom: -50%;
+    left: -50%;
+    width: 200%;
+    height: 100%;
+    background-image: 
+        linear-gradient(rgba(0, 212, 255, 0.3) 2px, transparent 2px),
+        linear-gradient(90deg, rgba(0, 212, 255, 0.3) 2px, transparent 2px);
+    background-size: 100px 100px;
+    transform: rotateX(60deg);
+    transform-style: preserve-3d;
+    animation: gridMove 10s linear infinite;
+    box-shadow: 0 0 100px rgba(0, 212, 255, 0.2);
+}
+
+@keyframes gridMove {
+    0% { transform: rotateX(60deg) translateZ(0); }
+    100% { transform: rotateX(60deg) translateZ(100px); }
+}
+
+/* City Container */
+.tron-city {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    transform-style: preserve-3d;
+}
+
+/* Individual Building */
+.tron-building {
+    position: absolute;
+    bottom: 20%;
+    transform-style: preserve-3d;
+}
+
+.tron-building__face {
+    position: absolute;
+    background: rgba(0, 212, 255, 0.1);
+    border: 2px solid rgba(0, 212, 255, 0.6);
+    box-shadow: 
+        0 0 20px rgba(0, 212, 255, 0.4),
+        inset 0 0 20px rgba(0, 212, 255, 0.2);
+    image-rendering: pixelated;
+}
+
+/* Building Windows Grid */
+.tron-building__face::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-image: 
+        repeating-linear-gradient(
+            0deg,
+            rgba(0, 212, 255, 0.6) 0px,
+            rgba(0, 212, 255, 0.6) 2px,
+            transparent 2px,
+            transparent 20px
+        ),
+        repeating-linear-gradient(
+            90deg,
+            rgba(0, 212, 255, 0.6) 0px,
+            rgba(0, 212, 255, 0.6) 2px,
+            transparent 2px,
+            transparent 20px
+        );
+    opacity: 0.7;
+}
+
+/* Building Top */
+.tron-building__face--top {
+    background: rgba(0, 212, 255, 0.2);
+    border-color: rgba(0, 212, 255, 0.8);
+}
+
+/* Horizon Glow */
+.tron-horizon {
+    position: absolute;
+    bottom: 30%;
+    left: 0;
+    width: 100%;
+    height: 200px;
+    background: linear-gradient(180deg, 
+        transparent 0%, 
+        rgba(0, 212, 255, 0.2) 50%,
+        transparent 100%);
+    box-shadow: 0 0 100px rgba(0, 212, 255, 0.5);
+    pointer-events: none;
+}
+
+/* Canvas */
+#themeCanvas {
+    display: block !important;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+    pointer-events: none;
+    background: transparent !important;
+}
+
+/* System Components */
+.system-card {
+    background: var(--system-window-bg);
+    border: 1px solid var(--system-border);
+    box-shadow: var(--system-shadow);
+    backdrop-filter: blur(10px);
+}
+
+.system-btn {
+    background: var(--system-accent);
+    color: var(--system-text-on-accent);
+    box-shadow: 0 0 15px rgba(0, 212, 255, 0.4);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-family: var(--system-font);
+}
+
+.system-btn:active {
+    box-shadow: 0 0 25px rgba(0, 212, 255, 0.6);
+}
+
+.mat-icon[data-icon-group] {
+    color: var(--system-icon-group-default, var(--system-text));
+    text-shadow: 0 0 10px currentColor;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .tron-grid { animation: none !important; }
+}

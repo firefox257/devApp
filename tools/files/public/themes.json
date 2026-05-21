@@ -87,6 +87,23 @@
 			"particleCount": 30,
 			"glowIntensity": 0.8
 		}
+	},
+
+
+
+	"tron": {
+		"name": "TRON Legacy",
+		"description": "Futuristic neon grid with gyroscope 3D effects",
+		"css": "themes/tron/tronstyles.css",
+		"script": "themes/tron/tronscript.js",
+		"canvas": true,
+		"preview": "themes/tron/preview.jpg",
+		"author": "Your Name",
+		"version": "1.0.0",
+		"settings": {
+			"particleCount": 50,
+			"enableGyroscope": true
+		}
 	}
 
 
