@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>C++ → WASM Compiler + Runner</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #1a1a2e; color: #eee; padding: 20px; }
+        .container { max-width: 1400px; margin: 0 auto; }
+        h1 { color: #00d9ff; margin-bottom: 20px; }
+        .toolbar { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
+        button { background: #00d9ff; color: #1a1a2e; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        button:hover { background: #00b8d4; }
+        button:disabled { background: #555; cursor: not-allowed; }
+        button.danger { background: #ff4757; }
+        button.success { background: #2ed573; }
+        select, input[type="text"] { background: #16213e; color: #eee; border: 1px solid #00d9ff; padding: 10px; border-radius: 5px; }
+        .panels { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .panel { background: #16213e; border-radius: 10px; padding: 20px; }
+        .panel h2 { color: #00d9ff; margin-bottom: 15px; font-size: 16px; }
+        textarea { width: 100%; height: 400px; background: #0f0f23; color: #00ff00; border: 1px solid #333; padding: 15px; font-family: 'Courier New', monospace; font-size: 14px; border-radius: 5px; resize: vertical; }
+        .output { background: #0f0f23; border: 1px solid #333; padding: 15px; border-radius: 5px; height: 400px; overflow-y: auto; font-family: 'Courier New', monospace; font-size: 14px; white-space: pre-wrap; }
+        .status { padding: 10px; border-radius: 5px; margin-bottom: 15px; }
+        .status.connected { background: #2ed573; color: #1a1a2e; }
+        .status.disconnected { background: #ff4757; color: white; }
+        .status.compiling { background: #ffa502; color: #1a1a2e; }
+        .file-list { background: #0f0f23; border: 1px solid #333; padding: 15px; border-radius: 5px; min-height: 100px; }
+        .file-item { padding: 5px 10px; background: #16213e; margin: 5px 0; border-radius: 3px; font-size: 13px; }
+        .log { background: #0f0f23; border: 1px solid #333; padding: 15px; border-radius: 5px; height: 200px; overflow-y: auto; font-family: 'Courier New', monospace; font-size: 12px; }
+        .log-entry { margin: 3px 0; }
+        .log-entry.error { color: #ff4757; }
+        .log-entry.success { color: #2ed573; }
+        .log-entry.info { color: #00d9ff; }
+        @media (max-width: 900px) { .panels { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 C++ → WASM Compiler + Runner</h1>
+        
+        <div id="status" class="status disconnected">Disconnected</div>
+        
+        <div class="toolbar">
+            <select id="optimization">
+                <option value="-O0">⚡ Optimization: None (-O0)</option>
+                <option value="-O1">-O1</option>
+                <option value="-O2">-O2</option>
+                <option value="-O3">-O3</option>
+            </select>
+            <button id="btnConnect">🔌 Connect</button>
+            <button id="btnCompile" disabled>▶ Compile</button>
+            <button id="btnRun" disabled>▶ Run WASM</button>
+            <button id="btnClear" class="danger">🗑 Clear</button>
+            <button id="btnCopy" class="success">📋 Copy</button>
+            <button id="btnDownload" class="success">💾 Download .wasm</button>
+            <button id="btnRefresh">🔄 Refresh Files</button>
+            <label><input type="checkbox" id="autoRun"> Auto-run after compile</label>
+            <label><input type="checkbox" id="verbose"> Verbose (-v)</label>
+        </div>
+        
+        <div class="panels">
+            <div class="panel">
+                <h2>📝 Source Code <span id="lineCount">0 lines</span></h2>
+                <textarea id="sourceCode" spellcheck="false">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Hello from C++ to WebAssembly!" &lt;&lt; std::endl;
+    
+    for (int i = 1; i &lt;= 5; i++) {
+        std::cout &lt;&lt; "Count: " &lt;&lt; i &lt;&lt; std::endl;
+    }
+    
+    return 0;
+}</textarea>
+            </div>
+            
+            <div class="panel">
+                <h2>📤 Output (stdout/stderr) <span id="outputCount">0 lines</span></h2>
+                <div id="output" class="output">Waiting for compilation...</div>
+            </div>
+        </div>
+        
+        <div class="panels" style="margin-top: 20px;">
+            <div class="panel">
+                <h2>📁 Compiled WASM Files (on wasi-fs)</h2>
+                <div id="fileList" class="file-list">Clear All<br>Connect and compile to see files...</div>
+            </div>
+            
+            <div class="panel">
+                <h2>📊 Activity Log</h2>
+                <div id="activityLog" class="log"></div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { compiler, runClang } from './wasm-compiler.js';
+        
+        const els = {
+            status: document.getElementById('status'),
+            sourceCode: document.getElementById('sourceCode'),
+            output: document.getElementById('output'),
+            fileList: document.getElementById('fileList'),
+            activityLog: document.getElementById('activityLog'),
+            lineCount: document.getElementById('lineCount'),
+            outputCount: document.getElementById('outputCount'),
+            optimization: document.getElementById('optimization'),
+            btnConnect: document.getElementById('btnConnect'),
+            btnCompile: document.getElementById('btnCompile'),
+            btnRun: document.getElementById('btnRun'),
+            btnClear: document.getElementById('btnClear'),
+            btnCopy: document.getElementById('btnCopy'),
+            btnDownload: document.getElementById('btnDownload'),
+            btnRefresh: document.getElementById('btnRefresh'),
+            autoRun: document.getElementById('autoRun'),
+            verbose: document.getElementById('verbose')
+        };
+        
+        let currentWasm = null;
+        let isConnected = false;
+        
+        function log(msg, type = 'info') {
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+            els.activityLog.appendChild(entry);
+            els.activityLog.scrollTop = els.activityLog.scrollHeight;
+        }
+        
+        function updateStatus(state, text) {
+            els.status.className = `status ${state}`;
+            els.status.textContent = text;
+        }
+        
+        function updateLineCount() {
+            const lines = els.sourceCode.value.split('\n').length;
+            els.lineCount.textContent = `${lines} lines`;
+        }
+        
+        function updateOutputCount() {
+            const lines = els.output.textContent.split('\n').filter(l => l.trim()).length;
+            els.outputCount.textContent = `${lines} lines`;
+        }
+        
+        async function connect() {
+            try {
+                updateStatus('compiling', 'Connecting to FS Proxy...');
+                log('Connecting to WebSocket FS Proxy...', 'info');
+                await compiler.initialize();
+                isConnected = true;
+                updateStatus('connected', 'Connected 📦 LLVM: v22.0.0-git20542-10');
+                els.btnConnect.disabled = true;
+                els.btnCompile.disabled = false;
+                log('FS Proxy connected successfully', 'success');
+                await refreshFiles();
+            } catch (err) {
+                updateStatus('disconnected', `Disconnected ❌ ${err.message}`);
+                log(`Connection failed: ${err.message}`, 'error');
+            }
+        }
+        
+        async function compile() {
+            if (!isConnected) {
+                log('Not connected. Click Connect first.', 'error');
+                return;
+            }
+            
+            try {
+                updateStatus('compiling', 'Compiling...');
+                els.btnCompile.disabled = true;
+                log('Starting compilation...', 'info');
+                
+                const source = els.sourceCode.value;
+                const opt = els.optimization.value;
+                const verbose = els.verbose.checked ? ['-v'] : [];
+                
+                const output = [];
+                const errors = [];
+                
+                const result = await runClang(
+                    [opt, '-o', '/compiled/a.out.wasm', '-x', 'c++', '-', ...verbose],
+                    { '/sources/main.cpp': source },
+                    {
+                        stdout: (line) => { output.push(line); els.output.textContent = output.join('\n'); updateOutputCount(); },
+                        stderr: (line) => { errors.push(line); els.output.textContent = errors.join('\n'); updateOutputCount(); }
+                    }
+                );
+                
+                if (result.success) {
+                    currentWasm = result.wasm;
+                    updateStatus('connected', 'Compilation successful ✅');
+                    log(`Compilation successful: ${result.outputPath}`, 'success');
+                    els.btnRun.disabled = !currentWasm;
+                    if (els.autoRun.checked) await runWasm();
+                } else {
+                    updateStatus('connected', 'Compilation failed ❌');
+                    log(`Compilation failed: ${result.logs.stderr.join('\n')}`, 'error');
+                }
+                
+                await refreshFiles();
+            } catch (err) {
+                updateStatus('connected', `Error: ${err.message}`);
+                log(`Compilation error: ${err.message}`, 'error');
+                els.output.textContent = `❌ Error: ${err.message}`;
+            } finally {
+                els.btnCompile.disabled = false;
+            }
+        }
+        
+        async function runWasm() {
+            if (!currentWasm) {
+                log('No WASM file to run', 'error');
+                return;
+            }
+            
+            try {
+                log('Running WASM...', 'info');
+                els.output.textContent = 'Running WASM...\n';
+                
+                // For now, just show the WASM is ready
+                // Full WASM execution would require a WASM runtime
+                els.output.textContent += '✅ WASM file ready: /compiled/a.out.wasm\n';
+                els.output.textContent += `Size: ${currentWasm.byteLength} bytes\n`;
+                els.output.textContent += '\nTo execute this WASM, you need a WASM runtime.\n';
+                els.output.textContent += 'The file is saved on the persistent FS.\n';
+                
+                log('WASM execution complete', 'success');
+                updateOutputCount();
+            } catch (err) {
+                log(`WASM run error: ${err.message}`, 'error');
+            }
+        }
+        
+        async function refreshFiles() {
+            try {
+                const files = await compiler.listFiles();
+                els.fileList.innerHTML = '';
+                
+                if (files.compiled.length === 0 && files.sources.length === 0) {
+                    els.fileList.innerHTML = 'No files yet...';
+                    return;
+                }
+                
+                if (files.compiled.length > 0) {
+                    const header = document.createElement('div');
+                    header.style.fontWeight = 'bold';
+                    header.style.color = '#00d9ff';
+                    header.textContent = '📦 Compiled:';
+                    els.fileList.appendChild(header);
+                    
+                    files.compiled.forEach(f => {
+                        const item = document.createElement('div');
+                        item.className = 'file-item';
+                        item.textContent = `  /compiled/${f.name}`;
+                        els.fileList.appendChild(item);
+                    });
+                }
+                
+                if (files.sources.length > 0) {
+                    const header = document.createElement('div');
+                    header.style.fontWeight = 'bold';
+                    header.style.color = '#2ed573';
+                    header.textContent = '📝 Sources:';
+                    els.fileList.appendChild(header);
+                    
+                    files.sources.forEach(f => {
+                        const item = document.createElement('div');
+                        item.className = 'file-item';
+                        item.textContent = `  /sources/${f.name}`;
+                        els.fileList.appendChild(item);
+                    });
+                }
+                
+                log(`Refreshed file list: ${files.compiled.length} compiled, ${files.sources.length} sources`, 'info');
+            } catch (err) {
+                log(`Refresh failed: ${err.message}`, 'error');
+            }
+        }
+        
+        function clearOutput() {
+            els.output.textContent = 'Waiting for compilation...';
+            updateOutputCount();
+            log('Output cleared', 'info');
+        }
+        
+        function copyOutput() {
+            navigator.clipboard.writeText(els.output.textContent);
+            log('Output copied to clipboard', 'success');
+        }
+        
+        function downloadWasm() {
+            if (!currentWasm) {
+                log('No WASM file to download', 'error');
+                return;
+            }
+            
+            const blob = new Blob([currentWasm], { type: 'application/wasm' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'a.out.wasm';
+            a.click();
+            URL.revokeObjectURL(url);
+            log('WASM file downloaded', 'success');
+        }
+        
+        // Event listeners
+        els.btnConnect.addEventListener('click', connect);
+        els.btnCompile.addEventListener('click', compile);
+        els.btnRun.addEventListener('click', runWasm);
+        els.btnClear.addEventListener('click', clearOutput);
+        els.btnCopy.addEventListener('click', copyOutput);
+        els.btnDownload.addEventListener('click', downloadWasm);
+        els.btnRefresh.addEventListener('click', refreshFiles);
+        els.sourceCode.addEventListener('input', updateLineCount);
+        
+        // Initialize
+        updateLineCount();
+        log('Ready. Click Connect to start.', 'info');
+    </script>
+</body>
+</html>

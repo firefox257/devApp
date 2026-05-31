@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>LLVM WASM Runner</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: #1a1a2e;
+            color: #eee;
+            min-height: 100vh;
+        }
+        
+        .container {
+            padding: 10px;
+            max-width: 100%;
+        }
+        
+        h1 {
+            font-size: 1.2rem;
+            margin: 0 0 10px 0;
+            color: #00d9ff;
+        }
+        
+        .input-section {
+            background: #16213e;
+            border-radius: 8px;
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+        
+        .input-section label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 0.85rem;
+            color: #aaa;
+        }
+        
+        textarea {
+            width: 100%;
+            min-height: 80px;
+            background: #0f0f23;
+            border: 1px solid #333;
+            border-radius: 4px;
+            color: #0f0;
+            font-family: 'Courier New', monospace;
+            font-size: 0.8rem;
+            padding: 8px;
+            resize: vertical;
+        }
+        
+        .btn {
+            background: #00d9ff;
+            color: #000;
+            border: none;
+            border-radius: 4px;
+            padding: 10px 20px;
+            font-size: 0.9rem;
+            font-weight: bold;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 10px;
+        }
+        
+        .btn:disabled {
+            background: #555;
+            color: #888;
+        }
+        
+        .btn:active {
+            opacity: 0.8;
+        }
+        
+        /* On-Screen Console */
+        .console-container {
+            background: #0a0a14;
+            border-radius: 8px;
+            border: 1px solid #333;
+            overflow: hidden;
+        }
+        
+        .console-header {
+            background: #16213e;
+            padding: 8px 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #333;
+        }
+        
+        .console-title {
+            font-size: 0.8rem;
+            color: #00d9ff;
+            font-weight: bold;
+        }
+        
+        .console-controls {
+            display: flex;
+            gap: 5px;
+        }
+        
+        .console-btn {
+            background: #333;
+            color: #fff;
+            border: none;
+            border-radius: 3px;
+            padding: 4px 8px;
+            font-size: 0.7rem;
+            cursor: pointer;
+        }
+        
+        .console-btn.clear {
+            background: #e74c3c;
+        }
+        
+        .console-output {
+            height: 300px;
+            overflow-y: auto;
+            padding: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.75rem;
+            line-height: 1.4;
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        .console-output::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        .console-output::-webkit-scrollbar-thumb {
+            background: #444;
+            border-radius: 3px;
+        }
+        
+        .log-entry {
+            margin-bottom: 4px;
+            padding: 2px 4px;
+            border-radius: 2px;
+            word-break: break-word;
+        }
+        
+        .log-entry.log {
+            color: #0f0;
+            background: rgba(0, 255, 0, 0.05);
+        }
+        
+        .log-entry.warn {
+            color: #ff0;
+            background: rgba(255, 255, 0, 0.05);
+        }
+        
+        .log-entry.error {
+            color: #f55;
+            background: rgba(255, 0, 0, 0.1);
+        }
+        
+        .log-entry.info {
+            color: #00d9ff;
+            background: rgba(0, 217, 255, 0.05);
+        }
+        
+        .timestamp {
+            color: #666;
+            font-size: 0.65rem;
+            margin-right: 6px;
+        }
+        
+        .status-bar {
+            background: #16213e;
+            padding: 8px 10px;
+            font-size: 0.75rem;
+            border-top: 1px solid #333;
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 6px;
+        }
+        
+        .status-indicator.loading {
+            background: #ff0;
+            animation: pulse 1s infinite;
+        }
+        
+        .status-indicator.ready {
+            background: #0f0;
+        }
+        
+        .status-indicator.error {
+            background: #f00;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .progress-bar {
+            height: 4px;
+            background: #333;
+            border-radius: 2px;
+            overflow: hidden;
+            margin-top: 5px;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: #00d9ff;
+            width: 0%;
+            transition: width 0.3s;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 LLVM WASM Runner</h1>
+        
+        <div class="input-section">
+            <label for="llvmArgs">LLVM Arguments (space-separated):</label>
+            <textarea id="llvmArgs" placeholder="--version">--version</textarea>
+            
+            <label for="fileInput" style="margin-top: 10px;">Input Files (optional):</label>
+            <textarea id="fileInput" placeholder='{"test.c": "int main() { return 0; }"}'></textarea>
+            
+            <button class="btn" id="runBtn" disabled>Run LLVM</button>
+        </div>
+        
+        <div class="console-container">
+            <div class="console-header">
+                <span class="console-title">📟 Console Output</span>
+                <div class="console-controls">
+                    <button class="console-btn" id="toggleConsole">▼</button>
+                    <button class="console-btn clear" id="clearConsole">Clear</button>
+                </div>
+            </div>
+            <div class="console-output" id="consoleOutput"></div>
+            <div class="status-bar">
+                <span class="status-indicator loading" id="statusIndicator"></span>
+                <span id="statusText">Loading WASM modules...</span>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        // ============================================
+        // ON-SCREEN CONSOLE CAPTURE SYSTEM
+        // ============================================
+        
+        class ScreenConsole {
+            constructor(outputElement) {
+                this.output = outputElement;
+                this.entries = [];
+                this.maxEntries = 500;
+                this.originalConsole = {
+                    log: console.log,
+                    warn: console.warn,
+                    error: console.error,
+                    info: console.info
+                };
+                this.setupCapture();
+            }
+            
+            setupCapture() {
+                const self = this;
+                
+                console.log = function(...args) {
+                    self.add('log', args);
+                    self.originalConsole.log.apply(console, args);
+                };
+                
+                console.warn = function(...args) {
+                    self.add('warn', args);
+                    self.originalConsole.warn.apply(console, args);
+                };
+                
+                console.error = function(...args) {
+                    self.add('error', args);
+                    self.originalConsole.error.apply(console, args);
+                };
+                
+                console.info = function(...args) {
+                    self.add('info', args);
+                    self.originalConsole.info.apply(console, args);
+                };
+                
+                // Capture unhandled errors
+                window.addEventListener('error', (e) => {
+                    self.add('error', [e.message, `${e.filename}:${e.lineno}:${e.colno}`]);
+                });
+                
+                window.addEventListener('unhandledrejection', (e) => {
+                    self.add('error', ['Unhandled Promise Rejection:', e.reason]);
+                });
+            }
+            
+            add(type, args) {
+                const timestamp = new Date().toLocaleTimeString();
+                const message = args.map(arg => {
+                    if (typeof arg === 'object') {
+                        try {
+                            return JSON.stringify(arg, null, 2);
+                        } catch {
+                            return String(arg);
+                        }
+                    }
+                    return String(arg);
+                }).join(' ');
+                
+                const entry = { type, timestamp, message };
+                this.entries.push(entry);
+                
+                if (this.entries.length > this.maxEntries) {
+                    this.entries.shift();
+                }
+                
+                this.render();
+                this.scrollToBottom();
+            }
+            
+            render() {
+                this.output.innerHTML = this.entries.map(entry => `
+                    <div class="log-entry ${entry.type}">
+                        <span class="timestamp">[${entry.timestamp}]</span>
+                        <span>${this.escapeHtml(entry.message)}</span>
+                    </div>
+                `).join('');
+            }
+            
+            escapeHtml(text) {
+                const div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
+            }
+            
+            scrollToBottom() {
+                this.output.scrollTop = this.output.scrollHeight;
+            }
+            
+            clear() {
+                this.entries = [];
+                this.render();
+            }
+            
+            restore() {
+                console.log = this.originalConsole.log;
+                console.warn = this.originalConsole.warn;
+                console.error = this.originalConsole.error;
+                console.info = this.originalConsole.info;
+            }
+        }
+        
+        // ============================================
+        // LLVM WASM LOADER
+        // ============================================
+        
+        class LLVMWasmLoader {
+            constructor(baseURL = '.') {
+                this.baseURL = baseURL;
+                this.modules = {};
+                this.filesystem = {};
+                this.loaded = false;
+                this.loadProgress = 0;
+            }
+            
+            async load(onProgress) {
+                const moduleNames = [
+                    'llvm.core.wasm',
+                    'llvm.core2.wasm', 
+                    'llvm.core3.wasm',
+                    'llvm.core4.wasm'
+                ];
+                
+                const totalModules = moduleNames.length + 1; // +1 for resources.tar
+                let loadedCount = 0;
+                
+                const updateProgress = () => {
+                    loadedCount++;
+                    this.loadProgress = (loadedCount / totalModules) * 100;
+                    if (onProgress) {
+                        onProgress(this.loadProgress);
+                    }
+                };
+                
+                // Load WASM modules
+                for (const moduleName of moduleNames) {
+                    console.info(`Loading ${moduleName}...`);
+                    try {
+                        const response = await fetch(`${this.baseURL}/${moduleName}`);
+                        if (!response.ok) {
+                            throw new Error(`Failed to load ${moduleName}: ${response.status}`);
+                        }
+                        const wasmBytes = await response.arrayBuffer();
+                        this.modules[moduleName] = await WebAssembly.compile(wasmBytes);
+                        console.info(`✓ ${moduleName} loaded`);
+                        updateProgress();
+                    } catch (err) {
+                        console.error(`Failed to load ${moduleName}:`, err);
+                        throw err;
+                    }
+                }
+                
+                // Load filesystem resources
+                console.info('Loading llvm-resources.tar...');
+                try {
+                    const response = await fetch(`${this.baseURL}/llvm-resources.tar`);
+                    if (!response.ok) {
+                        throw new Error(`Failed to load resources: ${response.status}`);
+                    }
+                    const tarBuffer = await response.arrayBuffer();
+                    this.filesystem = this.parseTar(tarBuffer);
+                    console.info('✓ llvm-resources.tar loaded');
+                    updateProgress();
+                } catch (err) {
+                    console.error('Failed to load resources:', err);
+                    throw err;
+                }
+                
+                this.loaded = true;
+                console.info('All WASM modules loaded successfully!');
+                return this;
+            }
+            
+            parseTar(buffer) {
+                // Simple TAR parser for the resources
+                const files = {};
+                const view = new Uint8Array(buffer);
+                let offset = 0;
+                
+                while (offset < buffer.byteLength - 512) {
+                    const name = this.readString(view, offset, 100);
+                    if (name.length === 0) break;
+                    
+                    const size = this.readOctal(view, offset + 124, 12);
+                    const type = view[offset + 156];
+                    
+                    const nameParts = name.split('/').filter(p => p);
+                    const fileName = nameParts.pop();
+                    
+                    let dir = files;
+                    for (const dirName of nameParts) {
+                        if (!dir[dirName]) dir[dirName] = {};
+                        dir = dir[dirName];
+                    }
+                    
+                    if (type === 5) {
+                        // Directory
+                        dir[fileName] = {};
+                    } else {
+                        // File
+                        const data = new Uint8Array(buffer, offset + 512, size);
+                        dir[fileName] = data;
+                    }
+                    
+                    offset += 512 + Math.ceil(size / 512) * 512;
+                }
+                
+                return { usr: files };
+            }
+            
+            readString(view, offset, length) {
+                let str = '';
+                for (let i = 0; i < length; i++) {
+                    const char = view[offset + i];
+                    if (char === 0) break;
+                    str += String.fromCharCode(char);
+                }
+                return str.trim();
+            }
+            
+            readOctal(view, offset, length) {
+                let str = '';
+                for (let i = 0; i < length; i++) {
+                    const char = view[offset + i];
+                    if (char < 48 || char > 55) break;
+                    str += String.fromCharCode(char);
+                }
+                return parseInt(str, 8) || 0;
+            }
+        }
+        
+        // ============================================
+        // LLVM RUNNER
+        // ============================================
+        
+        class LLVMRunner {
+            constructor(loader) {
+                this.loader = loader;
+                this.instance = null;
+            }
+            
+            async run(args, files = {}, options = {}) {
+                if (!this.loader.loaded) {
+                    throw new Error('WASM modules not loaded');
+                }
+                
+                console.info('Running LLVM with args:', args.join(' '));
+                
+                // Create virtual filesystem
+                const vfs = {
+                    ...this.loader.filesystem,
+                    ...files
+                };
+                
+                // Capture output
+                const output = {
+                    stdout: [],
+                    stderr: [],
+                    exitCode: 0
+                };
+                
+                // Simple WASM invocation (adapt based on your actual WASM exports)
+                try {
+                    // This is a simplified runner - you'll need to adapt based on 
+                    // the actual exports from your WASM modules
+                    console.info('Executing WASM...');
+                    
+                    // For now, we'll simulate the execution
+                    // In production, you'd instantiate the WASM and call the exports
+                    await this.instantiateAndRun(args, vfs, output);
+                    
+                } catch (err) {
+                    console.error('Execution error:', err);
+                    output.exitCode = 1;
+                    throw err;
+                }
+                
+                return output;
+            }
+            
+            async instantiateAndRun(args, vfs, output) {
+                // Import the bundle.js exports if available
+                // This is where you'd integrate with the actual bundle.js
+                console.info('WASM instantiation complete');
+                console.info('Args:', args);
+                console.info('Files:', Object.keys(vfs));
+                
+                // Simulate some output for demonstration
+                output.stdout.push('LLVM WASM Ready');
+                output.stdout.push(`Command: ${args.join(' ')}`);
+            }
+        }
+        
+        // ============================================
+        // MAIN APPLICATION
+        // ============================================
+        
+        const consoleOutput = document.getElementById('consoleOutput');
+        const statusIndicator = document.getElementById('statusIndicator');
+        const statusText = document.getElementById('statusText');
+        const progressFill = document.getElementById('progressFill');
+        const runBtn = document.getElementById('runBtn');
+        const clearBtn = document.getElementById('clearConsole');
+        const toggleBtn = document.getElementById('toggleConsole');
+        const llvmArgsInput = document.getElementById('llvmArgs');
+        const fileInput = document.getElementById('fileInput');
+        
+        const screenConsole = new ScreenConsole(consoleOutput);
+        const loader = new LLVMWasmLoader('.');
+        let runner = null;
+        
+        // Update status
+        function updateStatus(state, message, progress = 0) {
+            statusIndicator.className = `status-indicator ${state}`;
+            statusText.textContent = message;
+            progressFill.style.width = `${progress}%`;
+        }
+        
+        // Initialize
+        async function init() {
+            try {
+                updateStatus('loading', 'Loading WASM modules...', 0);
+                
+                await loader.load((progress) => {
+                    updateStatus('loading', `Loading... ${Math.round(progress)}%`, progress);
+                });
+                
+                runner = new LLVMRunner(loader);
+                updateStatus('ready', 'Ready to run', 100);
+                runBtn.disabled = false;
+                
+                console.info('✅ LLVM WASM initialized successfully');
+                
+            } catch (err) {
+                updateStatus('error', 'Failed to load', 0);
+                console.error('Initialization failed:', err);
+                runBtn.disabled = true;
+            }
+        }
+        
+        // Run button handler
+        runBtn.addEventListener('click', async () => {
+            const args = llvmArgsInput.value.trim().split(/\s+/).filter(a => a);
+            let files = {};
+            
+            try {
+                const filesText = fileInput.value.trim();
+                if (filesText) {
+                    files = JSON.parse(filesText);
+                }
+            } catch (err) {
+                console.error('Invalid files JSON:', err);
+                screenConsole.add('error', ['Invalid files JSON:', err.message]);
+                return;
+            }
+            
+            runBtn.disabled = true;
+            updateStatus('loading', 'Running...', 50);
+            
+            try {
+                const result = await runner.run(args, files);
+                updateStatus('ready', 'Complete', 100);
+                
+                if (result.stdout) {
+                    result.stdout.forEach(line => console.log(line));
+                }
+                if (result.stderr) {
+                    result.stderr.forEach(line => console.warn(line));
+                }
+                
+            } catch (err) {
+                updateStatus('error', 'Error', 0);
+                console.error('Run failed:', err);
+            }
+            
+            runBtn.disabled = false;
+        });
+        
+        // Clear console
+        clearBtn.addEventListener('click', () => {
+            screenConsole.clear();
+            console.info('Console cleared');
+        });
+        
+        // Toggle console
+        let consoleExpanded = true;
+        toggleBtn.addEventListener('click', () => {
+            consoleExpanded = !consoleExpanded;
+            consoleOutput.style.display = consoleExpanded ? 'block' : 'none';
+            toggleBtn.textContent = consoleExpanded ? '▼' : '▲';
+        });
+        
+        // Start initialization
+        init();
+    </script>
+</body>
+</html>

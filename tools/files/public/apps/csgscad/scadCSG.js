@@ -1533,14 +1533,14 @@ function convertTo2d(path) {
 			case 'lr':
 			newPath.push(path[i + 1], path[i + 2]) // Add X and Y, ignore Z
 			i += 4
-			break
+			break;
 			case 'q':
 			case 'qr':
 			case 'x':
 			case 'xr':
 			newPath.push(path[i + 1], path[i + 2], path[i + 4], path[i + 5]) // Add CPs and EP, ignore Z
 			i += 7
-			break
+			break;
 			case 'c':
 			case 'cr':
 			newPath.push(
@@ -1552,19 +1552,20 @@ function convertTo2d(path) {
 				path[i + 8]
 			) // Add CPs and EP, ignore Z
 			i += 10
-			break
+			break;
 			case 'r':
 			case 'n':
 			newPath.push(path[i + 1])
 			i += 2
-			break
+			break;
 			case 's':
+			case 'st':
 			newPath.push(path[i + 1], path[i + 2])
 			i += 3
-			break
+			break;
 			default:
 			i++
-			break
+			break;
 		}
 	}
 	return newPath
@@ -1583,7 +1584,7 @@ function convertTo3d(path, z = 0) {
 			case 'lr':
 			newPath.push(path[i + 1], path[i + 2], z) // Add X, Z, and Y
 			i += 3
-			break
+			break;
 			case 'q':
 			case 'qr':
 			case 'x':
@@ -1597,7 +1598,7 @@ function convertTo3d(path, z = 0) {
 				z
 			) // Add Z for CPs and EP
 			i += 5
-			break
+			break;
 			case 'c':
 			case 'cr':
 			newPath.push(
@@ -1612,19 +1613,20 @@ function convertTo3d(path, z = 0) {
 				z
 			) // Add Z for CPs and EP
 			i += 7
-			break
+			break;
 			case 'r':
 			case 'n':
 			newPath.push(path[i + 1])
 			i += 2
-			break
+			break;
 			case 's':
+			case 'st':
 			newPath.push(path[i + 1], path[i + 2])
 			i += 3
-			break
+			break;
 			default:
 			i++
-			break
+			break;
 		}
 	}
 	return newPath
@@ -1635,7 +1637,7 @@ function convertTo3d(path, z = 0) {
 //work on helper path functions
 
 
-
+//deprecated use sweep3d.
 function arcPath3d(config) {
 	const { startAng, endAng, fn, d } = config
 
@@ -2194,6 +2196,7 @@ class Path2d {
 
 				case 'r':
 				case 's':
+				case 'st':
 				i += command === 'r' ? 2 : 3
 				break
 
@@ -2620,6 +2623,12 @@ class Path3d {
 		return this
 	}
 
+	// Set target scale to for the NEXT point
+	st(sx, sy) {
+		this._path.push('st', sx, sy)
+		return this
+	}
+
 	// --- Public Result Method ---
 
 	/// Executes the full path processing (Tessellation and Normal Calculation).
@@ -2916,14 +2925,17 @@ class Path3d {
 		this._cp = [0, 0, 0]
 		this._cr = 0
 		this._cs = [1, 1]
+		this._cst = [null, null]
 		this._atn = 1
 		this._atr = 0
 		this._ats = [1, 1]
+		this._atst=[null, null]
 
 		const newPath = {
 			p: [],
 			r: [],
 			s: [],
+			st:[],
 			n: [],
 			close: this._close,
 			xyInitAng: this._xyInitAng
@@ -2933,9 +2945,11 @@ class Path3d {
 		let cp = this._cp.slice()
 		let cr = this._cr
 		let cs = this._cs.slice()
+		let cst = this._cst.slice()
 		let atn = this._atn
 		let atr = this._atr
 		let ats = this._ats.slice()
+		let atst = this._atst.slice()
 
 		let i = 0
 		while (i < paths.length) {
@@ -2948,6 +2962,7 @@ class Path3d {
 				newPath.p.push([...cp])
 				newPath.r.push(atr)
 				newPath.s.push([...ats])
+				newPath.st.push([...atst])
 				commandLength = 4
 				break
 				case 'mr':
@@ -2972,9 +2987,17 @@ class Path3d {
 						const ir = cr * (1 - t) + atr * t
 						const isx = cs[0] * (1 - t) + ats[0] * t
 						const isy = cs[1] * (1 - t) + ats[1] * t
+						var istx = null;
+						var isty = null;
+						if(cst[0]!= null && cst[1] != null && atst[0] != null && atst[1] != null) {
+							istx = cst[0] * (1 - t) + atst[0] * t
+							isty = cst[1] * (1 - t) + atst[1] * t
+						}
+
 						newPath.p.push([ix, iy, iz])
 						newPath.r.push(ir)
 						newPath.s.push([isx, isy])
+						newPath.st.push([istx, isty])
 					}
 					cp = atp
 					cr = atr
@@ -2998,9 +3021,17 @@ class Path3d {
 						const ir = cr * (1 - t) + atr * t
 						const isx = cs[0] * (1 - t) + ats[0] * t
 						const isy = cs[1] * (1 - t) + ats[1] * t
+						var istx = null;
+						var isty = null;
+						if(cst[0]!= null && cst[1] != null && atst[0] != null && atst[1] != null) {
+							istx = cst[0] * (1 - t) + atst[0] * t
+							isty = cst[1] * (1 - t) + atst[1] * t
+						}
+
 						newPath.p.push([ix, iy, iz])
 						newPath.r.push(ir)
 						newPath.s.push([isx, isy])
+						newPath.st.push([istx, isty])
 					}
 					cp = endPoint_lr
 					cr = atr
@@ -3030,6 +3061,14 @@ class Path3d {
 									cs[0] * (1 - t) + ats[0] * t,
 									cs[1] * (1 - t) + ats[1] * t
 								])
+							var istx = null;
+							var isty = null;
+							if(cst[0]!= null && cst[1] != null && atst[0] != null && atst[1] != null) {
+								istx = cst[0] * (1 - t) + atst[0] * t
+								isty = cst[1] * (1 - t) + atst[1] * t
+							}
+							newPath.st.push([istx, isty])
+
 						})
 
 					cp = endPoint
@@ -3068,6 +3107,13 @@ class Path3d {
 									cs[0] * (1 - t) + ats[0] * t,
 									cs[1] * (1 - t) + ats[1] * t
 								])
+							var istx = null;
+							var isty = null;
+							if(cst[0]!= null && cst[1] != null && atst[0] != null && atst[1] != null) {
+								istx = cst[0] * (1 - t) + atst[0] * t
+								isty = cst[1] * (1 - t) + atst[1] * t
+							}
+							newPath.st.push([istx, isty])
 						})
 
 					cp = endPoint
@@ -3099,6 +3145,14 @@ class Path3d {
 									cs[0] * (1 - t) + ats[0] * t,
 									cs[1] * (1 - t) + ats[1] * t
 								])
+								
+							var istx = null;
+							var isty = null;
+							if(cst[0]!= null && cst[1] != null && atst[0] != null && atst[1] != null) {
+								istx = cst[0] * (1 - t) + atst[0] * t
+								isty = cst[1] * (1 - t) + atst[1] * t
+							}
+							newPath.st.push([istx, isty])
 						})
 
 					cp = endPoint
@@ -3142,6 +3196,14 @@ class Path3d {
 									cs[0] * (1 - t) + ats[0] * t,
 									cs[1] * (1 - t) + ats[1] * t
 								])
+								
+							var istx = null;
+							var isty = null;
+							if(cst[0]!= null && cst[1] != null && atst[0] != null && atst[1] != null) {
+								istx = cst[0] * (1 - t) + atst[0] * t
+								isty = cst[1] * (1 - t) + atst[1] * t
+							}
+							newPath.st.push([istx, isty])
 						})
 
 					cp = endPoint
@@ -3173,6 +3235,14 @@ class Path3d {
 									cs[0] * (1 - t) + ats[0] * t,
 									cs[1] * (1 - t) + ats[1] * t
 								])
+								
+							var istx = null;
+							var isty = null;
+							if(cst[0]!= null && cst[1] != null && atst[0] != null && atst[1] != null) {
+								istx = cst[0] * (1 - t) + atst[0] * t
+								isty = cst[1] * (1 - t) + atst[1] * t
+							}
+							newPath.st.push([istx, isty])
 						})
 
 					// Explicitly push the final endpoint (P2)
@@ -3213,6 +3283,15 @@ class Path3d {
 									cs[0] * (1 - t) + ats[0] * t,
 									cs[1] * (1 - t) + ats[1] * t
 								])
+								
+								
+							var istx = null;
+							var isty = null;
+							if(cst[0]!= null && cst[1] != null && atst[0] != null && atst[1] != null) {
+								istx = cst[0] * (1 - t) + atst[0] * t
+								isty = cst[1] * (1 - t) + atst[1] * t
+							}
+							newPath.st.push([istx, isty])
 						})
 
 					// Explicitly push the final endpoint (P2)
@@ -3233,6 +3312,10 @@ class Path3d {
 				break
 				case 's':
 				ats = [paths[i + 1], paths[i + 2]]
+				commandLength = 3
+				break
+				case 'st':
+				atst = [paths[i + 1], paths[i + 2]]
 				commandLength = 3
 				break
 				case 'n':
@@ -3438,7 +3521,8 @@ function extrude3d(target, commandPath) {
 		const holePoints = shapeData.holePoints.map((hole) =>
 			hole.map(convertToVector2)
 		)
-
+		
+		/*
 		// 🌟 CRITICAL STEP: Apply Initial Rotation to the cross-section points (Replicating linePaths3d)
 		const rotatePoints = (points) => {
 			for (const point of points) {
@@ -3452,6 +3536,7 @@ function extrude3d(target, commandPath) {
 		rotatePoints(contourPoints)
 		holePoints.forEach(rotatePoints)
 		// 🌟 END CRITICAL STEP
+		//*/
 
 		// Triangulate the 2D shape for the caps
 		const capTriangles = THREE.ShapeUtils.triangulateShape(
@@ -3476,7 +3561,16 @@ function extrude3d(target, commandPath) {
 			// Apply path.s for scale
 			x = x * path.s[i][0]
 			y = y * path.s[i][1]
-
+			
+			
+			//apply prerotation for algnment extrusion
+			const prex=x;
+			const prey=y;
+			x=prex*cosR - prey * sinR;
+			y=prex * sinR + prey * cosR
+			//*/
+			
+			
 			// Apply 2D rotation (path.r)
 			var o = preCalc[i]
 			let rotatedX = x * o.cosR - y * o.sinR

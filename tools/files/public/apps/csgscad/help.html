@@ -1,1004 +1,2137 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>CSG Editor - Help Documentation (Updated)</title>
-<style>
-/* BASE STYLES - Matching the CSG Editor Dark Theme */
-html,
-body {
-	height: 100%;
-	margin: 0;
-	padding: 0;
-}
-body {
-	font-family: 'Segoe UI', sans-serif;
-	background: #282c34;
-	color: #f8f8f8;
-	padding: 20px;
-	line-height: 1.6;
-}
-/* HEADINGS */
-h1,
-h2,
-h3,
-h4 {
-	color: #61afef;
-	padding-bottom: 8px;
-	margin-top: 1.5em;
-}
-h1 {
-	text-align: center;
-	font-size: 2.2em;
-	margin-bottom: 1em;
-}
-h2 {
-	font-size: 1.8em;
-}
-h3 {
-	font-size: 1.4em;
-	color: #98c379;
-}
-h4 {
-	font-size: 1.2em;
-	color: #e06c75;
-}
-/* LISTS AND PARAGRAPHS */
-p,
-li {
-	margin: 10px 0;
-}
-ul,
-ol {
-	padding-left: 20px;
-}
-/* TABLE OF CONTENTS (TOC) */
-.toc {
-	background: #3e4451;
-	padding: 20px;
-	border-radius: 8px;
-	margin-bottom: 30px;
-}
-.toc ul {
-	list-style-type: none;
-	padding-left: 0;
-}
-.toc li {
-	margin: 8px 0;
-}
-.toc li ul {
-	padding-left: 20px;
-	list-style-type: disc;
-}
-.toc li ul li ul {
-	padding-left: 20px;
-	list-style-type: circle;
-}
-.toc a {
-	color: #61afef;
-	text-decoration: none;
-}
-.toc a:hover {
-	text-decoration: underline;
-}
-/* TOOLBAR BUTTON DESCRIPTIONS */
-.button-desc {
-	display: flex;
-	align-items: center;
-	gap: 15px;
-	background: #3e4451;
-	padding: 12px;
-	border-radius: 6px;
-	margin: 15px 0;
-}
-.button-icon {
-	font-size: 1.8em;
-	width: 35px;
-	height: 35px;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	border-radius: 4px;
-	font-weight: bold;
-	background: #4a515e;
-	color: #f8f8f8;
-}
-/* NAVIGATION BUTTONS */
-.nav-buttons {
-	display: flex;
-	justify-content: space-between;
-	margin: 30px 0;
-}
-.nav-button {
-	background: #3498db;
-	color: white;
-	border: none;
-	padding: 10px 20px;
-	border-radius: 5px;
-	cursor: pointer;
-	text-decoration: none;
-	display: inline-block;
-	transition: background 0.3s;
-}
-.nav-button:hover {
-	background: #2980b9;
-}
-/* CODE AND NOTES */
-pre {
-	background: #1e2127;
-	border-left: 4px solid #e06c75;
-	padding: 15px;
-	margin: 20px 0;
-	overflow-x: auto;
-	white-space: pre-wrap;
-	word-wrap: break-word;
-}
-.example-block {
-	background: #3e4451;
-	padding: 15px;
-	border-radius: 6px;
-	margin: 20px 0;
-}
-.example-title {
-	font-weight: bold;
-	color: #e06c75;
-	margin-bottom: 10px;
-}
-.note {
-	background: #3e4451;
-	padding: 15px;
-	border-radius: 6px;
-	margin: 20px 0;
-	border-left: 4px solid #61afef;
-}
-.warning {
-	background: #544a4a;
-	padding: 15px;
-	border-radius: 6px;
-	margin: 20px 0;
-	border-left: 4px solid #e06c75;
-}
-/* TABLES */
-table {
-	width: 100%;
-	border-collapse: collapse;
-	margin: 20px 0;
-	background: #3e4451;
-}
-th,
-td {
-	border: 1px solid #545862;
-	padding: 12px;
-	text-align: left;
-}
-th {
-	background: #2c3e50;
-	color: #61afef;
-}
-tr:nth-child(even) {
-	background: #34495e;
-}
-hr {
-	border: 0;
-	height: 1px;
-	background: #545862;
-	margin: 40px 0;
-}
-/* FIXED JUMP BACK BUTTON */
-#jump-back-btn {
-	position: fixed;
-	bottom: 20px;
-	right: 20px;
-	background: #61afef;
-	color: #282c34;
-	border: none;
-	padding: 10px 15px;
-	border-radius: 5px;
-	cursor: pointer;
-	font-weight: bold;
-	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-	z-index: 1000;
-	display: none;
-}
-#jump-back-btn:hover {
-	background: #569cd6;
-	transform: translateY(-1px);
-}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>CSG Editor & scadCSG.js Complete Documentation</title>
+    <style>
+        :root {
+            --primary: #667eea;
+            --primary-dark: #764ba2;
+            --bg: #f8fafc;
+            --surface: #ffffff;
+            --text: #1e293b;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+            --code-bg: #1e1e1e;
+            --code-text: #f8f8f2;
+            --header-h: 56px;
+            --sidebar-w: 280px;
+            --radius: 12px;
+            --shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html { scroll-behavior: smooth; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        /* Header */
+        header {
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            height: var(--header-h);
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            padding: 0 1rem;
+            z-index: 1000;
+            box-shadow: var(--shadow);
+        }
+
+        .menu-btn {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--text);
+            padding: 0.5rem;
+            margin-right: 0.75rem;
+            border-radius: 8px;
+            transition: background 0.2s;
+        }
+        .menu-btn:hover { background: #f1f5f9; }
+
+        .logo {
+            font-weight: 700;
+            font-size: 1.1rem;
+            color: var(--primary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* Overlay */
+        #overlay {
+            position: fixed;
+            top: var(--header-h); left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.4);
+            z-index: 998;
+            display: none;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        #overlay.active { display: block; opacity: 1; }
+
+        /* Sidebar */
+        #sidebar {
+            position: fixed;
+            top: var(--header-h);
+            left: 0;
+            width: var(--sidebar-w);
+            height: calc(100vh - var(--header-h));
+            background: var(--surface);
+            border-right: 1px solid var(--border);
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding: 1rem;
+            z-index: 999;
+            transition: transform 0.3s ease;
+        }
+
+        #sidebar h4 {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            margin: 1.25rem 0 0.5rem;
+            padding-bottom: 0.25rem;
+            border-bottom: 1px solid var(--border);
+            letter-spacing: 0.05em;
+        }
+
+        #sidebar ul { list-style: none; }
+        #sidebar li { margin: 0.25rem 0; }
+        #sidebar a {
+            display: block;
+            padding: 0.4rem 0.75rem;
+            color: var(--text);
+            text-decoration: none;
+            font-size: 0.85rem;
+            border-radius: 6px;
+            transition: background 0.2s, color 0.2s;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        #sidebar a:hover { background: #f1f5f9; color: var(--primary); }
+
+        /* Main Content */
+        #main {
+            margin-top: var(--header-h);
+            margin-left: var(--sidebar-w);
+            padding: 1.5rem;
+            max-width: 1100px;
+            transition: margin-left 0.3s ease;
+        }
+
+        /* Content Styling */
+        h1 { font-size: 1.75rem; margin: 0 0 1rem; color: #0f172a; }
+        h2 { font-size: 1.4rem; margin: 2rem 0 1rem; color: var(--primary); border-bottom: 2px solid var(--primary); padding-bottom: 0.5rem; }
+        h3 { font-size: 1.15rem; margin: 1.5rem 0 0.75rem; color: #334155; }
+        h4 { font-size: 1rem; margin: 1rem 0 0.5rem; font-weight: 600; }
+        p { margin: 0 0 1rem; }
+        ul { margin: 0 0 1rem 1.5rem; }
+        li { margin: 0.25rem 0; }
+
+        .subtitle { color: var(--text-muted); margin-bottom: 1.5rem; font-size: 1rem; }
+
+        /* Tables */
+        .table-wrap { overflow-x: auto; margin: 1rem 0; border: 1px solid var(--border); border-radius: 8px; }
+        table { width: 100%; border-collapse: collapse; min-width: 500px; }
+        th, td { padding: 0.6rem 0.75rem; text-align: left; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
+        th { background: #f8fafc; font-weight: 600; color: #475569; }
+        tr:last-child td { border-bottom: none; }
+
+        /* Code */
+        pre {
+            background: var(--code-bg);
+            color: var(--code-text);
+            padding: 1rem;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 1rem 0;
+            font-family: "Consolas", "Monaco", monospace;
+            font-size: 0.85rem;
+            line-height: 1.5;
+        }
+        code {
+            font-family: "Consolas", "Monaco", monospace;
+            background: #e2e8f0;
+            color: #7c3aed;
+            padding: 0.15rem 0.4rem;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+        pre code { background: transparent; color: inherit; padding: 0; }
+
+        /* Boxes */
+        .desc { background: #eff6ff; border-left: 4px solid var(--primary); padding: 0.85rem 1rem; margin: 1rem 0; border-radius: 0 6px 6px 0; }
+        .returns { background: #f0fdf4; border-left: 4px solid #22c55e; padding: 0.85rem 1rem; margin: 1rem 0; border-radius: 0 6px 6px 0; }
+        .warning { background: #fef2f2; border-left: 4px solid #ef4444; padding: 0.85rem 1rem; margin: 1rem 0; border-radius: 0 6px 6px 0; }
+        .note { background: #f0f9ff; border-left: 4px solid #0ea5e9; padding: 0.85rem 1rem; margin: 1rem 0; border-radius: 0 6px 6px 0; }
+
+        /* Badges */
+        .badge { display: inline-block; padding: 0.2rem 0.6rem; border-radius: 999px; font-size: 0.75rem; font-weight: 600; margin-left: 0.5rem; vertical-align: middle; }
+        .badge.prim { background: #ff9800; color: white; }
+        .badge.csg { background: #f44336; color: white; }
+        .badge.xf { background: #2196f3; color: white; }
+        .badge.path { background: #9c27b0; color: white; }
+        .badge.imp { background: #009688; color: white; }
+        .badge.util { background: #607d8b; color: white; }
+        .badge.class { background: #8b5cf6; color: white; }
+
+        /* Index Grid */
+        .idx-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 0.5rem; margin: 1rem 0; }
+        .idx-item {
+            display: block; padding: 0.6rem 0.8rem;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: white; text-decoration: none;
+            border-radius: 6px; font-size: 0.85rem;
+            transition: transform 0.2s, box-shadow 0.2s;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .idx-item:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+
+        /* Back Link */
+        .back { display: inline-block; margin: 1.5rem 0; color: var(--primary); text-decoration: none; font-size: 0.9rem; }
+        .back:hover { text-decoration: underline; }
+
+        /* Mobile Responsive */
+        @media (max-width: 768px) {
+            :root { --sidebar-w: 260px; }
+            #sidebar { transform: translateX(-100%); }
+            #sidebar.active { transform: translateX(0); }
+            #main { margin-left: 0; padding: 1rem; }
+            h1 { font-size: 1.4rem; }
+            h2 { font-size: 1.25rem; }
+            .idx-grid { grid-template-columns: repeat(2, 1fr); }
+            .logo { font-size: 1rem; }
+            pre { font-size: 0.8rem; padding: 0.85rem; }
+            table { font-size: 0.85rem; }
+            th, td { padding: 0.5rem 0.6rem; }
+        }
+
+        @media (max-width: 480px) {
+            .idx-grid { grid-template-columns: 1fr; }
+            header { padding: 0 0.75rem; }
+            #main { padding: 0.75rem; }
+        }
+
+        /* Utility */
+        .sig { background: var(--code-bg); color: var(--code-text); padding: 0.75rem 1rem; border-radius: 6px; margin: 0.75rem 0; font-family: monospace; font-size: 0.9rem; overflow-x: auto; }
+        .section { background: var(--surface); padding: 1.25rem; border-radius: var(--radius); margin: 1rem 0; box-shadow: var(--shadow); }
+        
+        /* Method list for classes */
+        .method-list { margin: 1rem 0; }
+        .method-item {
+            padding: 0.5rem 0.75rem;
+            margin: 0.25rem 0;
+            background: #f8fafc;
+            border-left: 3px solid var(--primary);
+            border-radius: 0 4px 4px 0;
+            font-size: 0.9rem;
+        }
+        .method-item code { background: #e2e8f0; padding: 0.1rem 0.3rem; }
+    </style>
 </head>
 <body>
-<h1 id="top">CSG Editor - Help Documentation (Updated)</h1>
-<div class="toc">
-<h2>Table of Contents</h2>
-<ul>
-<li><a href="#about">1. About</a></li>
-<li><a href="#toolbar">2. How to Use the Toolbar</a></li>
-<li>
-<a href="#settings">3. Settings</a>
-<ul>
-<li>
-<a href="#grid-settings">Grid Width/Length/Spacing</a>
-</li>
-<li><a href="#library-path">Library Path</a></li>
-<li>
-<a href="#settings-buttons">Buttons in Settings Panel</a>
-</li>
-</ul>
-</li>
-<li>
-<a href="#textcode">4. How to Use the TextCode Editor</a>
-<ul>
-<li>
-<a href="#editor-interface">Editor Interface & Core Features</a>
-</li>
-<li>
-<a href="#toolbar-buttons">4.1 Toolbar Buttons: Icons and Functions</a>
-</li>
-<li>
-<a href="#bracket-selector">4.2 Bracket Selector</a>
-</li>
-<li>
-<a href="#csg-vs-editor">4.3 Difference Between CSG Scripts and Editor Scripts</a>
-</li>
-<li>
-<a href="#get-include">How to Use get() and include()</a>
-</li>
-<li><a href="#external">External get() and include()</a></li>
-<li>
-<a href="#file-paths">How Paths Work (File Access)</a>
-</li>
-</ul>
-</li>
-<li>
-<a href="#path-creation">5. Paths: How to Create Them</a>
-<ul>
-<li><a href="#path-format">Path Format</a></li>
-<li>
-<a href="#path-commands">Path Commands Reference</a>
-</li>
-<li>
-<a href="#auto-hole">Advanced: Automatic Hole Detection</a>
-</li>
-<li>
-<a href="#arcpath3d-helper"><code>arcPath3d()</code> Helper</a>
-</li>
-<li><a href="#path-examples">Examples</a></li>
-</ul>
-</li>
-<li>
-<a href="#commands">6. scadCSG Commands and How to Use Them</a>
-<ul>
-<li><a href="#primitives">Primitive Shapes</a></li>
-<li><a href="#transformations">Transformations</a></li>
-<li><a href="#csg-operations">CSG Operations</a></li>
-<li><a href="#path-classes">Path Classes (Path2d/Path3d)</a></li>
-<li><a href="#extrusions">2D to 3D Extrusion</a></li>
-<li>
-<a href="#2d-path-manipulation">2D Path Manipulation</a>
-</li>
-<li>
-<a href="#3d-imports">3D Imports (Requires <code>await</code>)</a>
-</li>
-<li>
-<a href="#text-functions">Text Functions (Requires <code>await</code>)</a>
-</li>
-<li><a href="#utilities">Utility Functions</a></li>
-<li><a href="#three-access">Three.js Access</a></li>
-</ul>
-</li>
-<li><a href="#examples">7. Complete Examples</a></li>
-</ul>
-</div>
 
-<section id="about">
-<h2>1. About</h2>
-<p>
-Welcome to the <strong>CSG Editor</strong>! This is a powerful,
-mobile-friendly, browser-based CAD (Computer-Aided Design) tool
-that lets you create complex 3D models using Constructive Solid
-Geometry (CSG) operations.
-</p>
-<p>
-You write scripts in a JavaScript-like syntax to define shapes
-(like cubes, spheres, cylinders), transform them (translate,
-	rotate, scale), and combine them using boolean operations
-(union, difference, intersection). The result is rendered in
-real-time in the 3D view.
-</p>
-<p>
-This editor is designed for rapid prototyping, 3D printing
-preparation, and educational purposes. It combines the power of
-OpenSCAD-style scripting with the immediacy of a live 3D
-preview.
-</p>
-</section>
+<header>
+    <button class="menu-btn" id="menuToggle" aria-label="Menu">☰</button>
+    <div class="logo">CSG Editor & scadCSG.js Complete Docs</div>
+</header>
 
-<hr />
-<div class="nav-buttons">
-<a href="#toolbar" class="nav-button">Next: Toolbar &rarr;</a>
-<a href="#top" class="nav-button">↑ Top</a>
-</div>
+<div id="overlay"></div>
 
-<section id="toolbar">
-<h2>2. How to Use the Toolbar</h2>
-<p>
-The toolbar at the top of the screen contains buttons to switch
-between different views and perform common actions. Here's what
-each button does:
-</p>
-<div class="button-desc">
-<div class="button-icon" style="background: #98c379">&#x1F5BC;</div>
-<div>
-<strong>3D View Button</strong> (<code>&#x1F5BC;</code>)<br />
-Switches to the <strong>3D Rendering View</strong> where you can see and
-interact with your model.
-</div>
-</div>
-<div class="button-desc">
-<div class="button-icon" style="background: #e06c75">&#x1F4BB;</div>
-<div>
-<strong>CSG Code Editor</strong> (<code>&#x1F4BB;</code>)<br />
-Switches to the <strong>CSG Script</strong> editor. This is where you
-write the main code that defines your 3D model.
-</div>
-</div>
-<div class="button-desc">
-<div class="button-icon" style="background: #61afef">&#x2B9D;</div>
-<div>
-<strong>Editor Code</strong> (<code>&#x2B9D;</code>)<br />
-Switches to the <strong>Editor Script</strong> editor. This is where you
-define reusable functions and constants.
-</div>
-</div>
-<div class="button-desc">
-<div class="button-icon" style="background: #98c379">&#x1F4CB;</div>
-<div>
-<strong>Toggle Wireframe</strong> (<code>&#x1F4CB;</code>)<br />
-Toggles display between solid and <strong>wireframe mode</strong>.
-</div>
-</div>
-<div class="button-desc">
-<div class="button-icon" style="background: #dc3545">&#x2716;</div>
-<div>
-<strong>Clear Cache</strong> (<code>&#x2716;</code>)<br />
-Clears the cached result for the currently active script tab.
-</div>
-</div>
-<div class="button-desc">
-<div class="button-icon" style="background: #61afef">&#x2699;</div>
-<div>
-<strong>Settings</strong> (<code>&#x2699;</code>)<br />
-Opens the Settings panel for grid size and library path configuration.
-</div>
-</div>
-<div class="button-desc">
-<div class="button-icon" style="background: #98c379">&#x1F4E5;</div>
-<div>
-<strong>Load Project</strong> (<code>&#x1F4E5;</code>)<br />
-Opens a file picker to load a saved project (.json file).
-</div>
-</div>
-<div class="button-desc">
-<div class="button-icon" style="background: #98c379">&#x1F4BE;</div>
-<div>
-<strong>Save Project</strong> (<code>&#x1F4BE;</code>)<br />
-Saves the current project, including all scripts and cached geometry.
-</div>
-</div>
-<div class="button-desc">
-<div class="button-icon" style="background: #61afef">&#x2753;</div>
-<div>
-<strong>Help</strong> (<code>&#x2753;</code>)<br />
-Opens this help documentation.
-</div>
-</div>
-<div class="button-desc">
-<div class="button-icon" style="background: #dc3545">&#x1F5D1;</div>
-<div>
-<strong>Clear Console</strong> (<code>&#x1F5D1;</code>)<br />
-Clears all messages from the console panel.
-</div>
-</div>
-<p><strong>Keyboard Shortcuts:</strong></p>
-<ul>
-<li><code>Ctrl+S</code> / <code>Cmd+S</code>: Open Save dialog</li>
-<li><code>Ctrl+F</code> / <code>Cmd+F</code>: Open Find dialog</li>
-<li><code>F3</code>: Find next occurrence</li>
-<li><code>Shift+F3</code>: Find previous occurrence</li>
-</ul>
-</section>
+<nav id="sidebar">
+    <h4>📘 Editor Guide</h4>
+    <ul>
+        <li><a href="#about">1. About</a></li>
+        <li><a href="#toolbar">2. Toolbar</a></li>
+        <li><a href="#settings">3. Settings</a></li>
+        <li><a href="#textcode">4. TextCode Editor</a></li>
+        <li><a href="#csg-vs-editor">CSG vs Editor Scripts</a></li>
+        <li><a href="#get-include">get() & include()</a></li>
+        <li><a href="#paths-guide">5. Paths & Files</a></li>
+    </ul>
 
-<hr />
-<div class="nav-buttons">
-<a href="#settings" class="nav-button">Next: Settings &rarr;</a>
-<a href="#top" class="nav-button">↑ Top</a>
-</div>
+    <h4>🔧 API Reference</h4>
+    <ul>
+        <li><a href="#index">📋 Complete Index</a></li>
+        <li><a href="#primitives">🔷 Primitives</a></li>
+        <li><a href="#csg">⚡ CSG Operations</a></li>
+        <li><a href="#transforms">🔄 Transformations</a></li>
+        <li><a href="#path-classes">🧱 Path Classes</a></li>
+        <li><a href="#path-funcs">🛤️ Path Functions</a></li>
+        <li><a href="#path-manip">✏️ Path Manipulation</a></li>
+        <li><a href="#shape-text">🔤 Shape & Text</a></li>
+        <li><a href="#imports">📥 Import Functions</a></li>
+        <li><a href="#utilities">🛠️ Utilities</a></li>
+    </ul>
 
-<section id="settings">
-<h2>3. Settings</h2>
-<p>The Settings panel allows you to configure the modeling environment.</p>
+    <h4>💡 Examples</h4>
+    <ul>
+        <li><a href="#examples">7. Complete Examples</a></li>
+    </ul>
 
-<h3 id="grid-settings">Grid Width / Length / Spacing</h3>
-<p>Sets the dimensions (X, Y) and line separation of the build plate grid in millimeters.</p>
+    <div style="margin-top:1.5rem;padding:0.75rem;background:#f8fafc;border-radius:8px;font-size:0.8rem;color:var(--text-muted)">
+        <strong>📱 Mobile:</strong> Tap ☰ to navigate. Tap outside to close.
+    </div>
+</nav>
 
-<h3 id="library-path">Library Path</h3>
-<p>Base path used with the <code>$lib/</code> prefix in <code>get()</code> or <code>include()</code> functions.</p>
-<div class="note">
-<p><strong>Note:</strong> Settings are saved in browser local storage and persist between sessions.</p>
-</div>
+<main id="main">
 
-<h3 id="settings-buttons">Buttons in Settings Panel</h3>
-<div class="button-desc">
-<div class="button-icon" style="background: #28a745">&#x1F4BE;</div>
-<div><strong>Save Settings</strong><br />Saves current settings to local storage.</div>
-</div>
-<div class="button-desc">
-<div class="button-icon" style="background: #dc3545">&#x1F9F9;</div>
-<div><strong>Clear All Cache</strong><br />Clears all caches and removes objects from the 3D scene.</div>
-</div>
-</section>
+    <!-- EDITOR GUIDE SECTIONS -->
+    <section id="about" class="section">
+        <h1>1. About</h1>
+        <p class="subtitle">Welcome to the CSG Editor! This is a powerful, mobile-friendly, browser-based CAD tool that lets you create complex 3D models using Constructive Solid Geometry (CSG) operations.</p>
+        <p>You write scripts in a JavaScript-like syntax to define shapes (like cubes, spheres, cylinders), transform them (translate, rotate, scale), and combine them using boolean operations (union, difference, intersection). The result is rendered in real-time in the 3D view.</p>
+        <p>This editor is designed for rapid prototyping, 3D printing preparation, and educational purposes. It combines the power of OpenSCAD-style scripting with the immediacy of a live 3D preview.</p>
+        <div class="note"><strong>Coordinate Systems:</strong> 2D paths use Y-up (X=right, Y=up). 3D geometry uses Z-up (X=width, Y=depth, Z=height).</div>
+    </section>
 
-<hr />
-<div class="nav-buttons">
-<a href="#textcode" class="nav-button">Next: TextCode Editor &rarr;</a>
-<a href="#top" class="nav-button">↑ Top</a>
-</div>
+    <section id="toolbar" class="section">
+        <h2>2. How to Use the Toolbar</h2>
+        <p>The toolbar at the top of the screen contains buttons to switch between different views and perform common actions.</p>
+        <div class="table-wrap">
+            <table>
+                <thead><tr><th>Icon</th><th>Function</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td>🖼</td><td>3D View</td><td>Switches to the 3D Rendering View.</td></tr>
+                    <tr><td>💻</td><td>CSG Code</td><td>Switches to the CSG Script editor (main model code).</td></tr>
+                    <tr><td>⮝</td><td>Editor Code</td><td>Switches to Editor Script editor (functions/constants).</td></tr>
+                    <tr><td>📋</td><td>Wireframe</td><td>Toggles display between solid and wireframe mode.</td></tr>
+                    <tr><td>✖</td><td>Clear Cache</td><td>Clears the cached result for the active script.</td></tr>
+                    <tr><td>⚙</td><td>Settings</td><td>Opens Settings panel (grid, library path).</td></tr>
+                    <tr><td>📥</td><td>Load Project</td><td>Load a saved project (.json).</td></tr>
+                    <tr><td>💾</td><td>Save Project</td><td>Save current project and geometry.</td></tr>
+                    <tr><td>❓</td><td>Help</td><td>Opens this documentation.</td></tr>
+                    <tr><td>🗑</td><td>Clear Console</td><td>Clears console messages.</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <h4>Keyboard Shortcuts</h4>
+        <ul>
+            <li><code>Ctrl+S</code> / <code>Cmd+S</code>: Save</li>
+            <li><code>Ctrl+F</code> / <code>Cmd+F</code>: Find</li>
+            <li><code>F3</code>: Find Next</li>
+        </ul>
+    </section>
 
-<section id="textcode">
-<h2>4. How to Use the TextCode Editor</h2>
-<p>A powerful, multi-tab code editor with syntax-aware features.</p>
+    <section id="settings" class="section">
+        <h2>3. Settings</h2>
+        <p>The Settings panel allows you to configure the modeling environment.</p>
+        <h4>Grid Width / Length / Spacing</h4>
+        <p>Sets the dimensions (X, Y) and line separation of the build plate grid in millimeters.</p>
+        <h4>Library Path</h4>
+        <p>Base path used with the <code>$lib/</code> prefix in <code>get()</code> or <code>include()</code> functions.</p>
+        <div class="note"><strong>Note:</strong> Settings are saved in browser local storage and persist between sessions.</div>
+        <h4>Buttons in Settings Panel</h4>
+        <ul>
+            <li><strong>💾 Save Settings:</strong> Saves current settings to local storage.</li>
+            <li><strong>🧹 Clear All Cache:</strong> Clears all caches and removes objects from the 3D scene.</li>
+        </ul>
+    </section>
 
-<h3 id="editor-interface">Editor Interface & Core Features</h3>
-<ul>
-<li><strong>Smart Indentation</strong>: Auto-indentation for brackets</li>
-<li><strong>Multi-Page Support</strong>: Multiple script tabs</li>
-<li><strong>Find & Replace</strong>: Press <code>Ctrl+F</code></li>
-<li><strong>Beautify</strong>: Auto-format code</li>
-</ul>
+    <section id="textcode" class="section">
+        <h2>4. How to Use the TextCode Editor</h2>
+        <p>A powerful, multi-tab code editor with syntax-aware features.</p>
+        <h4>Editor Interface & Core Features</h4>
+        <ul>
+            <li><strong>Smart Indentation:</strong> Auto-indentation for brackets.</li>
+            <li><strong>Multi-Page Support:</strong> Multiple script tabs.</li>
+            <li><strong>Find & Replace:</strong> Press <code>Ctrl+F</code>.</li>
+            <li><strong>Beautify:</strong> Auto-format code.</li>
+        </ul>
+        <h4>4.1 Toolbar Buttons</h4>
+        <p>↩ Undo | ↪ Redo | 🔤 Select All | 🔗 Select Bracket | # Go To Line | 🔍 Find | 🗃 Pages | ▶ Run | 💾 Save | ✨ Beautify</p>
+        <h4>4.2 Bracket Selector</h4>
+        <p>Selects entire code blocks when cursor is inside brackets <code>{}</code>, <code>[]</code>, <code>()</code>, <code><></code>.</p>
+        <h4 id="csg-vs-editor">4.3 CSG Scripts vs Editor Scripts</h4>
+        <ul>
+            <li><strong>CSG Scripts (Red Monitor):</strong> Must return 3D objects for rendering.</li>
+            <li><strong>Editor Scripts (Blue Editor):</strong> Return reusable functions/constants.</li>
+        </ul>
+    </section>
 
-<h3 id="toolbar-buttons">4.1 Toolbar Buttons</h3>
-<div class="button-desc">
-<div class="button-icon">&#x21A9;</div><div><strong>Undo</strong></div>
-</div>
-<div class="button-desc">
-<div class="button-icon">&#x21AA;</div><div><strong>Redo</strong></div>
-</div>
-<div class="button-desc">
-<div class="button-icon">&#x1F524;</div><div><strong>Select All</strong></div>
-</div>
-<div class="button-desc">
-<div class="button-icon">&#x1F517;</div><div><strong>Select Bracket Content</strong></div>
-</div>
-<div class="button-desc">
-<div class="button-icon">&#x23;</div><div><strong>Go To Line</strong></div>
-</div>
-<div class="button-desc">
-<div class="button-icon">&#x1F50D;</div><div><strong>Find</strong></div>
-</div>
-<div class="button-desc">
-<div class="button-icon">&#x1F5C3;</div><div><strong>Pages Menu</strong></div>
-</div>
-<div class="button-desc">
-<div class="button-icon">&#x25B6;</div><div><strong>Run</strong></div>
-</div>
-<div class="button-desc">
-<div class="button-icon">&#x1F4BE;</div><div><strong>Save</strong></div>
-</div>
-<div class="button-desc">
-<div class="button-icon">&#x2728;</div><div><strong>Beautify</strong></div>
-</div>
+    <section id="get-include" class="section">
+        <h2>How to Use get() and include()</h2>
+        <p>These functions allow you to modularize your code across different tabs and files.</p>
+        <h4>Internal Usage (Within Project)</h4>
+        <ul>
+            <li><code>include(name)</code>: Load exports from an <strong>Editor Script</strong> tab by name.</li>
+            <li><code>get(name)</code>: Load 3D model result from a <strong>CSG Script</strong> tab by name.</li>
+        </ul>
+        <h4>External Usage (From Files)</h4>
+        <ul>
+            <li><code>include(name, filepath)</code>: Load Editor script from external file.</li>
+            <li><code>get(name, filepath)</code>: Load CSG script from external file.</li>
+        </ul>
+        <h4>Path Resolution</h4>
+        <ul>
+            <li><strong>Absolute:</strong> Start with <code>/</code> - resolved from root</li>
+            <li><strong>Library:</strong> Start with <code>$lib/</code> - uses Library Path setting</li>
+            <li><strong>Relative:</strong> Relative to current project file directory</li>
+        </ul>
+        <div class="warning"><strong>Async Note:</strong> External imports may require <code>await</code> depending on implementation context.</div>
+    </section>
 
-<h3 id="bracket-selector">4.2 Bracket Selector</h3>
-<p>Selects entire code blocks when cursor is inside brackets <code>{}</code>, <code>[]</code>, <code>()</code>, <code>&lt;&gt;</code>.</p>
+    <section id="paths-guide" class="section">
+        <h2>5. Paths: How to Create Them</h2>
+        <p>2D paths are the foundation for complex extruded shapes. Paths are defined as arrays of commands with parameters.</p>
+        
+        <h4>Path Data Format</h4>
+        <pre>{
+  path: [
+    'm', x, y,           // Move to (Absolute)
+    'lr', dx, dy,        // Line to (Relative)
+    'q', cx, cy, x, y,   // Quadratic Bezier
+    'x', cx, cy, x, y,   // Arc via control point
+    'n', segments,       // Set segments for next curve
+  ],
+  fn: 40 // Default resolution for curves
+}</pre>
 
-<h3 id="csg-vs-editor">4.3 CSG Scripts vs Editor Scripts</h3>
-<ul>
-<li><strong>CSG Scripts</strong> (Red Monitor): Must return 3D objects for rendering</li>
-<li><strong>Editor Scripts</strong> (Blue Editor): Return reusable functions/constants</li>
-</ul>
+        <h4>Path Commands Reference</h4>
+        <div class="table-wrap">
+            <table>
+                <thead><tr><th>Cmd</th><th>Type</th><th>Syntax</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td>m</td><td>Absolute</td><td>'m', x, y</td><td>Move To (absolute position)</td></tr>
+                    <tr><td>mr</td><td>Relative</td><td>'mr', dx, dy</td><td>Move To (relative offset)</td></tr>
+                    <tr><td>l</td><td>Absolute</td><td>'l', x, y</td><td>Line To (absolute)</td></tr>
+                    <tr><td>lr</td><td>Relative</td><td>'lr', dx, dy</td><td>Line To (relative)</td></tr>
+                    <tr><td>q</td><td>Absolute</td><td>'q', cx, cy, x, y</td><td>Quadratic Bezier curve</td></tr>
+                    <tr><td>qr</td><td>Relative</td><td>'qr', dcx, dcy, dx, dy</td><td>Quadratic Bezier (relative)</td></tr>
+                    <tr><td>c</td><td>Absolute</td><td>'c', cx1, cy1, cx2, cy2, x, y</td><td>Cubic Bezier curve</td></tr>
+                    <tr><td>cr</td><td>Relative</td><td>'cr', dcx1, dcy1, dcx2, dcy2, dx, dy</td><td>Cubic Bezier (relative)</td></tr>
+                    <tr><td>x</td><td>Absolute</td><td>'x', cx, cy, x, y</td><td>Arc via control point</td></tr>
+                    <tr><td>xr</td><td>Relative</td><td>'xr', dcx, dcy, dx, dy</td><td>Arc (relative)</td></tr>
+                    <tr><td>n</td><td>Utility</td><td>'n', segments</td><td>Set segments for next command</td></tr>
+                    <tr><td>r</td><td>3D Modifier</td><td>'r', angle</td><td>Set target rotation for extrusion</td></tr>
+                    <tr><td>s</td><td>3D Modifier</td><td>'s', sx, sy</td><td>Set target scale for extrusion</td></tr>
+                </tbody>
+            </table>
+        </div>
 
-<h3 id="get-include">How to Use get() and include()</h3>
-<ul>
-<li><code>include(name)</code>: Load exports from an Editor Script tab</li>
-<li><code>get(name)</code>: Load 3D model result from a CSG Script tab</li>
-</ul>
-
-<h3 id="external">External get() and include()</h3>
-<ul>
-<li><code>include(name, filepath)</code>: Load Editor script from file</li>
-<li><code>get(name, filepath)</code>: Load CSG script from file</li>
-</ul>
-
-<h3 id="file-paths">How Paths Work</h3>
-<ol>
-<li><strong>Absolute</strong>: Start with <code>/</code></li>
-<li><strong>Library</strong>: Start with <code>$lib/</code> (uses Library Path setting)</li>
-<li><strong>Relative</strong>: Relative to current project file directory</li>
-</ol>
-</section>
-
-<hr />
-<div class="nav-buttons">
-<a href="#path-creation" class="nav-button">Next: Paths &rarr;</a>
-<a href="#top" class="nav-button">↑ Top</a>
-</div>
-
-<section id="path-creation">
-<h2>5. Paths: How to Create Them</h2>
-<p>2D paths are the foundation for complex extruded shapes.</p>
-
-<h3 id="path-format">Path Format</h3>
-<pre><code>{
-path: [
-'m', x, y,           // Move to (Absolute)
-'lr', dx, dy,        // Line to (Relative)
-'q', cx, cy, x, y,   // Quadratic Bezier
-'x', cx, cy, x, y,   // Arc via control point
-],
-fn: 40 // Resolution for curves
-}</code></pre>
-<div class="note">
-<p><strong>2D Coordinates:</strong> Y-up system (positive X=right, positive Y=up)</p>
-</div>
-
-<h3 id="path-commands">Path Commands Reference</h3>
-<table>
-<thead>
-<tr><th>Command</th><th>Type</th><th>Syntax</th><th>Description</th></tr>
-</thead>
-<tbody>
-<tr><td><code>m</code></td><td>Absolute</td><td><code>'m', x, y</code></td><td>Move To</td></tr>
-<tr><td><code>mr</code></td><td>Relative</td><td><code>'mr', dx, dy</code></td><td>Move To (relative)</td></tr>
-<tr><td><code>l</code></td><td>Absolute</td><td><code>'l', x, y</code></td><td>Line To</td></tr>
-<tr><td><code>lr</code></td><td>Relative</td><td><code>'lr', dx, dy</code></td><td>Line To (relative)</td></tr>
-<tr><td><code>q</code></td><td>Absolute</td><td><code>'q', cx, cy, x, y</code></td><td>Quadratic Bezier</td></tr>
-<tr><td><code>qr</code></td><td>Relative</td><td><code>'qr', dcx, dcy, dx, dy</code></td><td>Quadratic Bezier (relative)</td></tr>
-<tr><td><code>c</code></td><td>Absolute</td><td><code>'c', cx1, cy1, cx2, cy2, x, y</code></td><td>Cubic Bezier</td></tr>
-<tr><td><code>cr</code></td><td>Relative</td><td><code>'cr', dcx1, dcy1, dcx2, dcy2, dx, dy</code></td><td>Cubic Bezier (relative)</td></tr>
-<tr><td><code>x</code></td><td>Absolute</td><td><code>'x', cx, cy, x, y</code></td><td>Arc via control point</td></tr>
-<tr><td><code>xr</code></td><td>Relative</td><td><code>'xr', dcx, dcy, dx, dy</code></td><td>Arc (relative)</td></tr>
-<tr><td><code>n</code></td><td>Utility</td><td><code>'n', segments</code></td><td>Set segments for next command</td></tr>
-<tr><td><code>r</code></td><td>3D Modifier</td><td><code>'r', angle</code></td><td>Rotation for extrusion</td></tr>
-<tr><td><code>s</code></td><td>3D Modifier</td><td><code>'s', sx, sy</code></td><td>Scale for extrusion</td></tr>
-</tbody>
-</table>
-
-<h3 id="auto-hole">Automatic Hole Detection</h3>
-<p>The <code>shape()</code> function automatically detects holes based on path nesting.</p>
-
-<h3 id="arcpath3d-helper">arcPath3d() Helper</h3>
-<p>Generates smooth 3D paths for extrusion. Parameters: <code>startAng</code>, <code>endAng</code> (degrees), <code>r</code> (radius), <code>fn</code> (resolution).</p>
-
-<h3 id="path-examples">Path Examples</h3>
-<div class="example-block">
-<div class="example-title">Simple Triangle</div>
-<pre><code>const trianglePath = {
-path: ['m', 0, 0, 'l', 10, 0, 'l', 5, 10, 'l', 0, 0]
+        <h4>Automatic Hole Detection</h4>
+        <p>The <code>shape()</code> function automatically detects holes based on path nesting using bounding box containment and scanline testing. Outer contours are solids; nested contours are holes.</p>
+        
+        <h4>arcPath3d() Helper</h4>
+        <p>Generates smooth 3D arc paths for extrusion. Parameters: <code>startAng</code>, <code>endAng</code> (degrees), <code>r</code> or <code>d</code> (radius/diameter), <code>fn</code> (resolution).</p>
+        
+        <h4>Path Examples</h4>
+        <pre>// Simple Triangle
+const trianglePath = {
+  path: ['m', 0, 0, 'l', 10, 0, 'l', 5, 10, 'l', 0, 0],
+  fn: 32
 };
 const triangleShape = shape(trianglePath);
 const straightPath = { path: ['m', 0, 0, 0, 'l', 0, 0, 2], fn: 1 };
-return linePaths3d(triangleShape, straightPath);</code></pre>
-</div>
-</section>
+return linePaths3d(triangleShape, straightPath);
 
-<hr />
-<div class="nav-buttons">
-<a href="#commands" class="nav-button">Next: Commands &rarr;</a>
-<a href="#top" class="nav-button">↑ Top</a>
-</div>
+// Using Path2d class (method chaining)
+const roundedRect = new Path2d()
+  .fn(32)
+  .m(0, 0)
+  .l(50, 0)
+  .q(55, 0, 55, 5)  // Rounded corner
+  .l(55, 25)
+  .q(55, 30, 50, 30)
+  .l(0, 30)
+  .q(-5, 30, -5, 25)
+  .l(-5, 5)
+  .q(-5, 0, 0, 0)
+  .getPoints();</pre>
+    </section>
 
-<section id="commands">
-<h2>6. scadCSG Commands and How to Use Them</h2>
-<div class="note">
-<p><strong>3D Coordinate System:</strong> Z-up system (X=width, Y=depth, Z=height)</p>
-</div>
+    <!-- API REFERENCE -->
+    <section id="index" class="section">
+        <h2>📋 Complete Function Index</h2>
+        <div class="idx-grid">
+            <a href="#sphere" class="idx-item">sphere()</a>
+            <a href="#cube" class="idx-item">cube()</a>
+            <a href="#cylinder" class="idx-item">cylinder()</a>
+            <a href="#union" class="idx-item">union()</a>
+            <a href="#difference" class="idx-item">difference()</a>
+            <a href="#intersect" class="idx-item">intersect()</a>
+            <a href="#inverseIntersect" class="idx-item">inverseIntersect()</a>
+            <a href="#translate" class="idx-item">translate()</a>
+            <a href="#rotate" class="idx-item">rotate()</a>
+            <a href="#scale" class="idx-item">scale()</a>
+            <a href="#color" class="idx-item">color()</a>
+            <a href="#subdivide" class="idx-item">subdivide()</a>
+            <a href="#expand" class="idx-item">expand()</a>
+            <a href="#floor" class="idx-item">floor()</a>
+            <a href="#convexHull" class="idx-item">convexHull()</a>
+            <a href="#align" class="idx-item">align()</a>
+            <a href="#scaleTo" class="idx-item">scaleTo()</a>
+            <a href="#scaleAdd" class="idx-item">scaleAdd()</a>
+            <a href="#show" class="idx-item">show()</a>
+            <a href="#hide" class="idx-item">hide()</a>
+            <a href="#boundingBox" class="idx-item">boundingBox()</a>
+            <a href="#placement" class="idx-item">placement()</a>
+            <a href="#Path2d" class="idx-item">Path2d()</a>
+            <a href="#Path3d" class="idx-item">Path3d()</a>
+            <a href="#extrude3d" class="idx-item">extrude3d()</a>
+            <a href="#sweep3d" class="idx-item">sweep3d()</a>
+            <a href="#linePaths3d" class="idx-item">linePaths3d()</a>
+            <a href="#convertTo2d" class="idx-item">convertTo2d()</a>
+            <a href="#convertTo3d" class="idx-item">convertTo3d()</a>
+            <a href="#arcPath3d" class="idx-item">arcPath3d()</a>
+            <a href="#translatePath" class="idx-item">translatePath()</a>
+            <a href="#rotatePath" class="idx-item">rotatePath()</a>
+            <a href="#scalePath" class="idx-item">scalePath()</a>
+            <a href="#scaleToPath" class="idx-item">scaleToPath()</a>
+            <a href="#scaleAddPath" class="idx-item">scaleAddPath()</a>
+            <a href="#alignPath" class="idx-item">alignPath()</a>
+            <a href="#boundingBoxPath" class="idx-item">boundingBoxPath()</a>
+            <a href="#shape" class="idx-item">shape()</a>
+            <a href="#font" class="idx-item">font()</a>
+            <a href="#text" class="idx-item">text()</a>
+            <a href="#importStl" class="idx-item">importStl()</a>
+            <a href="#importGlb" class="idx-item">importGlb()</a>
+            <a href="#importObj" class="idx-item">importObj()</a>
+            <a href="#importFbx" class="idx-item">importFbx()</a>
+            <a href="#importSvg" class="idx-item">importSvg()</a>
+            <a href="#clone" class="idx-item">clone()</a>
+        </div>
+    </section>
 
-<h3 id="primitives">Primitive Shapes</h3>
-<table>
-<thead>
-<tr><th>Function</th><th>Parameters</th><th>Description</th></tr>
-</thead>
-<tbody>
-<tr><td><code>sphere()</code></td><td><code>{ r, d, fn }</code></td><td>Creates a sphere (r=radius, d=diameter, fn=segments)</td></tr>
-<tr><td><code>cube()</code></td><td><code>[x, y, z]</code></td><td>Creates a box with specified dimensions</td></tr>
-<tr><td><code>cylinder()</code></td><td><code>{ r, rt, rb, d, dt, db, h, fn }</code></td><td>Creates cylinder/cone (rt/rb=top/bottom radius)</td></tr>
-</tbody>
-</table>
-<div class="example-block">
-<div class="example-title">Primitive Examples</div>
-<pre><code>// Sphere with radius 5mm, 32 segments
-const ball = sphere({ r: 5, fn: 32 });
+    <!-- PRIMITIVES -->
+    <h2 id="primitives" style="color:white;margin:2rem 0 1rem;text-align:center">🔷 Primitive Shapes</h2>
 
-// Cube 20x20x10mm
-const box = cube([20, 20, 10]);
+    <section id="sphere" class="section">
+        <h3>sphere() <span class="badge prim">Primitive</span></h3>
+        <div class="sig">sphere({ r, d, fn } = {})</div>
+        <div class="desc"><strong>Description:</strong> Creates a 3D sphere mesh with customizable radius/diameter and tessellation quality. Uses THREE.SphereGeometry internally.</div>
+        <div class="table-wrap"><table><thead><tr><th>Parameter</th><th>Type</th><th>Default</th><th>Description</th></tr></thead><tbody>
+            <tr><td>r</td><td>number</td><td>1</td><td>Radius of the sphere in millimeters</td></tr>
+            <tr><td>d</td><td>number</td><td>undefined</td><td>Diameter (overrides r if provided)</td></tr>
+            <tr><td>fn</td><td>number</td><td>32</td><td>Number of segments for tessellation (higher = smoother, more polygons)</td></tr>
+        </tbody></table></div>
+        <div class="returns"><strong>Returns:</strong> THREE.Mesh - A sphere mesh with defaultMaterial.clone()</div>
+        <pre>// Example Usage:
+const ball = sphere({ r: 5, fn: 64 });  // Smooth sphere, 5mm radius
+const smallBall = sphere({ d: 2 });      // 2mm diameter sphere
+const lowPolyBall = sphere({ r: 3, fn: 8 });  // Low-poly sphere for performance
 
-// Cone (different top/bottom radii)
-const cone = cylinder({ rt: 0, rb: 5, h: 15, fn: 32 });
+// Use in CSG operations
+const sphereWithHole = difference(
+  sphere({ r: 10 }),
+  cylinder({ r: 2, h: 25 })
+);</pre>
+        <a href="#index" class="back">⬆ Back to Index</a>
+    </section>
 
-return union([ball, box, cone]);</code></pre>
-</div>
+    <section id="cube" class="section">
+        <h3>cube() <span class="badge prim">Primitive</span></h3>
+        <div class="sig">cube([x = 1, y = 1, z = 1] = [1, 1, 1])</div>
+        <div class="desc"><strong>Description:</strong> Creates a 3D box/cube mesh with customizable dimensions along each axis. Uses THREE.BoxGeometry internally.</div>
+        <div class="table-wrap"><table><thead><tr><th>Parameter</th><th>Type</th><th>Default</th><th>Description</th></tr></thead><tbody>
+            <tr><td>x</td><td>number</td><td>1</td><td>Width along X-axis in millimeters</td></tr>
+            <tr><td>y</td><td>number</td><td>1</td><td>Height along Y-axis in millimeters</td></tr>
+            <tr><td>z</td><td>number</td><td>1</td><td>Depth along Z-axis in millimeters</td></tr>
+        </tbody></table></div>
+        <div class="returns"><strong>Returns:</strong> THREE.Mesh - A box mesh with defaultMaterial.clone()</div>
+        <pre>// Example Usage:
+const box = cube([10, 5, 3]);           // 10×5×3 mm box
+const cube2 = cube();                    // 1×1×1 unit cube
+const plate = cube([20, 20, 1]);        // Flat 20×20×1 mm plate
 
-<h3 id="transformations">Transformations</h3>
-<table>
-<thead>
-<tr><th>Function</th><th>Parameters</th><th>Description</th></tr>
-</thead>
-<tbody>
-<tr><td><code>translate()</code></td><td><code>[x, y, z], ...target</code></td><td>Moves geometry by offset</td></tr>
-<tr><td><code>rotate()</code></td><td><code>[x, y, z], ...target</code></td><td>Rotates in <strong>degrees</strong> (X, Y, Z order)</td></tr>
-<tr><td><code>scale()</code></td><td><code>[x, y, z], ...target</code></td><td>Scales by factors</td></tr>
-<tr><td><code>scaleTo()</code></td><td><code>{ x, y, z }, ...target</code></td><td>Scales proportionally to target dimension</td></tr>
-<tr><td><code>scaleAdd()</code></td><td><code>{ x, y, z }, ...target</code></td><td>Adds value to dimensions</td></tr>
-<tr><td><code>floor()</code></td><td><code>...target</code></td><td>Moves lowest point to Z=0</td></tr>
-<tr><td><code>align()</code></td><td><code>{ lx, rx, cx, uy, dy, cy, bz, tz, cz }, ...target</code></td><td>Aligns by bounding box</td></tr>
-<tr><td><code>placement()</code></td><td><code>offsets, obj, ...target</code></td><td>Aligns targets relative to obj</td></tr>
-</tbody>
-</table>
-<div class="note">
-<p><strong>Placement Commands:</strong> [REF-ANCHOR][TARGET-ALIGN][AXIS]</p>
-<ul>
-<li><strong>X:</strong> l=left(min), r=right(max), c=center (llx, lrx, lcx, rlx, rrx, rcx, clx, crx, ccx)</li>
-<li><strong>Y:</strong> d=down(min), u=up(max), c=center (ldy, luy, lcy, rdy, ruy, rcy, cdy, cuy, ccy)</li>
-<li><strong>Z:</strong> b=bottom(min), t=top(max), c=center (lbz, ltz, lcz, rbz, rtz, rcz, cbz, ctz, ccz)</li>
-</ul>
-</div>
-<div class="example-block">
-<div class="example-title">Transformation Examples</div>
-<pre><code>// Translate 10mm up on Z
-const moved = translate([0, 0, 10], cube([5, 5, 5]));
+// Center a cube at origin (cubes are centered by default)
+const centered = cube([10, 10, 10]);</pre>
+        <a href="#index" class="back">⬆ Back to Index</a>
+    </section>
 
-// Rotate 45° around Z
-const rotated = rotate([0, 0, 45], cube([5, 5, 5]));
+    <section id="cylinder" class="section">
+        <h3>cylinder() <span class="badge prim">Primitive</span></h3>
+        <div class="sig">cylinder({ d, dt, db, r, rt, rb, h, fn } = {})</div>
+        <div class="desc"><strong>Description:</strong> Creates a 3D cylinder or cone mesh. Supports different top and bottom radii for conical shapes. Uses THREE.CylinderGeometry internally and rotates -90° on X to align with Z-up system.</div>
+        <div class="table-wrap"><table><thead><tr><th>Parameter</th><th>Type</th><th>Default</th><th>Description</th></tr></thead><tbody>
+            <tr><td>d</td><td>number</td><td>1</td><td>Uniform diameter for top and bottom</td></tr>
+            <tr><td>dt</td><td>number</td><td>undefined</td><td>Top diameter (overrides d)</td></tr>
+            <tr><td>db</td><td>number</td><td>undefined</td><td>Bottom diameter (overrides d)</td></tr>
+            <tr><td>r</td><td>number</td><td>0.5</td><td>Uniform radius for top and bottom</td></tr>
+            <tr><td>rt</td><td>number</td><td>undefined</td><td>Top radius (overrides r)</td></tr>
+            <tr><td>rb</td><td>number</td><td>undefined</td><td>Bottom radius (overrides r)</td></tr>
+            <tr><td>h</td><td>number</td><td>1</td><td>Height of cylinder along Z-axis</td></tr>
+            <tr><td>fn</td><td>number</td><td>32</td><td>Number of radial segments (smoothness)</td></tr>
+        </tbody></table></div>
+        <div class="returns"><strong>Returns:</strong> THREE.Mesh - A cylinder/cone mesh with defaultMaterial.clone()</div>
+        <pre>// Example Usage:
+const pipe = cylinder({ d: 2, h: 10 });              // Uniform cylinder
+const cone = cylinder({ rt: 0, rb: 5, h: 10 });      // Cone (pointed top)
+const tapered = cylinder({ dt: 2, db: 4, h: 8 });    // Tapered cylinder
 
-// Scale to exactly 20mm on X (proportional)
-const sized = scaleTo({ x: 20 }, cube([10, 10, 10]));
+// Create a pin with head
+const pin = union(
+  cylinder({ d: 1, h: 15 }),                          // Shaft
+  translate([0, 0, 15], cylinder({ d: 3, h: 2 }))    // Head
+);</pre>
+        <a href="#index" class="back">⬆ Back to Index</a>
+    </section>
 
-// Add 5mm to all dimensions
-const expanded = scaleAdd({ x: 5, y: 5, z: 5 }, cube([10, 10, 10]));
+    <!-- CSG OPERATIONS -->
+    <h2 id="csg" style="color:white;margin:2rem 0 1rem;text-align:center">⚡ CSG Operations</h2>
 
-// Place sphere on top of cube with 2mm offset
-const base = cube([20, 20, 5]);
-const top = sphere({ r: 5 });
-placement({ 'ttz': 2 }, base, top);
+    <section id="union" class="section">
+        <h3>union() <span class="badge csg">CSG</span></h3>
+        <div class="sig">union(...target)</div>
+        <div class="desc"><strong>Description:</strong> Performs boolean union operation on multiple meshes using three-bvh-csg. Combines all meshes into a single mesh, removing internal geometry where meshes overlap. Uses ADDITION operation.</div>
+        <div class="table-wrap"><table><thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead><tbody>
+            <tr><td>target</td><td>...THREE.Mesh|Brush</td><td>Two or more meshes to combine (spread operator). Can also pass arrays with spread: union(...array)</td></tr>
+        </tbody></table></div>
+        <div class="returns"><strong>Returns:</strong> THREE.Mesh|Brush - Combined mesh result from CSG evaluator, or null if no meshes provided</div>
+        <pre>// Example Usage:
+const box1 = cube([5, 5, 5]);
+const box2 = translate([3, 0, 0], cube([5, 5, 5]));
+const combined = union(box1, box2);  // Two overlapping boxes merged
 
-return union([base, top]);</code></pre>
-</div>
+// Can also pass arrays
+const allParts = [part1, part2, part3];
+const assembly = union(...allParts);
 
-<h3 id="csg-operations">CSG Operations</h3>
-<table>
-<thead>
-<tr><th>Function</th><th>Parameters</th><th>Description</th></tr>
-</thead>
-<tbody>
-<tr><td><code>union()</code></td><td><code>...target</code></td><td>Combines objects (addition)</td></tr>
-<tr><td><code>difference()</code></td><td><code>mainMesh, ...target</code></td><td>Subtracts targets from main</td></tr>
-<tr><td><code>intersect()</code></td><td><code>...target</code></td><td>Finds overlapping volume (2+ meshes)</td></tr>
-<tr><td><code>inverseIntersect()</code></td><td><code>...target</code></td><td>Symmetric difference (XOR)</td></tr>
-</tbody>
-</table>
-<div class="example-block">
-<div class="example-title">CSG Examples</div>
-<pre><code>// Union: Combine objects
-const combined = union(cube([10, 10, 10]), sphere({ r: 5 }));
+// Complex assembly
+const base = cube([20, 20, 2]);
+const post1 = translate([5, 5, 2], cylinder({ r: 2, h: 10 }));
+const post2 = translate([15, 15, 2], cylinder({ r: 2, h: 10 }));
+const assembly = union(base, post1, post2);</pre>
+        <a href="#index" class="back">⬆ Back to Index</a>
+    </section>
 
-// Difference: Cut hole through cube
-const base = cube([20, 20, 20]);
-const cutter = cylinder({ r: 3, h: 25 });
-const withHole = difference(base, translate([10, 10, -2.5], cutter));
+    <section id="difference" class="section">
+        <h3>difference() <span class="badge csg">CSG</span></h3>
+        <div class="sig">difference(meshes, ...target)</div>
+        <div class="desc"><strong>Description:</strong> Performs boolean subtraction operation using three-bvh-csg. Subtracts one or more meshes from a base mesh, creating holes or cutouts. Uses SUBTRACTION operation.</div>
+        <div class="table-wrap"><table><thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead><tbody>
+            <tr><td>meshes</td><td>THREE.Mesh|Brush|Array</td><td>Base mesh(es) to subtract from. Can be single mesh or array of meshes (auto-unioned)</td></tr>
+            <tr><td>target</td><td>...THREE.Mesh|Brush</td><td>Mesh(es) to subtract (spread operator). These are the "cutters"</td></tr>
+        </tbody></div></table>
+        <div class="returns"><strong>Returns:</strong> THREE.Mesh|Brush - Result mesh with subtractions applied</div>
+        <div class="warning">⚠️ <strong>Warning:</strong> Throws error if base mesh or subtrahends are missing</div>
+        <pre>// Example Usage:
+const block = cube([10, 10, 10]);
+const hole = cylinder({ d: 3, h: 15 });
+const blockWithHole = difference(block, hole);  // Hole through center
 
-// Intersect: Keep only overlap
-const overlap = intersect(cube([15, 15, 15]), sphere({ r: 10 }));
+// Multiple holes
+const multiHole = difference(
+  block,
+  translate([3, 3, -2.5], hole),
+  translate([-3, -3, -2.5], clone(hole))
+);
 
-// XOR: Keep non-overlapping parts
-const xor = inverseIntersect(cube([15, 15, 15]), sphere({ r: 10 }));
+// Array of cutters
+const cutters = [hole1, hole2, hole3];
+const perforated = difference(basePlate, ...cutters);</pre>
+        <a href="#index" class="back">⬆ Back to Index</a>
+    </section>
 
-return withHole;</code></pre>
-</div>
+    <section id="intersect" class="section">
+        <h3>intersect() <span class="badge csg">CSG</span></h3>
+        <div class="sig">intersect(...target)</div>
+        <div class="desc"><strong>Description:</strong> Performs boolean intersection operation using three-bvh-csg. Returns only the volume where all meshes overlap. Uses INTERSECTION operation.</div>
+        <div class="table-wrap"><table><thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead><tbody>
+            <tr><td>target</td><td>...THREE.Mesh|Brush</td><td>Two or more meshes to intersect (spread operator)</td></tr>
+        </tbody></table></div>
+        <div class="returns"><strong>Returns:</strong> THREE.Mesh|Brush - Intersection result mesh (common volume)</div>
+        <div class="warning">⚠️ <strong>Warning:</strong> Requires at least 2 meshes, throws error otherwise</div>
+        <pre>// Example Usage:
+const sphere1 = sphere({ r: 5 });
+const sphere2 = translate([3, 0, 0], sphere({ r: 5 }));
+const overlap = intersect(sphere1, sphere2);  // Lens-shaped intersection
 
-<h3 id="path-classes">Path Classes (NEW)</h3>
-<div class="note">
-<p><strong>Path2d</strong> and <strong>Path3d</strong> are class-based path builders with method chaining.</p>
-</div>
-<table>
-<thead>
-<tr><th>Class</th><th>Methods</th><th>Description</th></tr>
-</thead>
-<tbody>
-<tr>
-<td><code>Path2d</code></td>
-<td><code>m(), mr(), l(), lr(), q(), qr(), c(), cr(), x(), xr(), n(), fn(), path(), getPoints(), boundingBox()</code></td>
-<td>2D path builder</td>
-</tr>
-<tr>
-<td><code>Path3d</code></td>
-<td><code>All Path2d + m(x,y,z), r(rotation), s(sx,sy), close(v), xyInitAng(v)</code></td>
-<td>3D path builder</td>
-</tr>
-</tbody>
-</table>
-<div class="example-block">
-<div class="example-title">Path Class Examples</div>
-<pre><code>// Path2d: Rounded rectangle
-const path2d = new Path2d()
-.fn(32)
-.m(0, 0)
-.l(50, 0)
-.l(50, 30)
-.l(0, 30)
-.l(0, 0);
+// Common volume of multiple shapes
+const common = intersect(shape1, shape2, shape3);
 
-// Path3d: Extrusion path with rotation
+// Create custom connector by intersecting profiles
+const connector = intersect(
+  cylinder({ r: 5, h: 10 }),
+  rotate([0, 90, 0], cylinder({ r: 5, h: 10 }))
+);</pre>
+        <a href="#index" class="back">⬆ Back to Index</a>
+    </section>
+
+    <section id="inverseIntersect" class="section">
+        <h3>inverseIntersect() <span class="badge csg">CSG</span></h3>
+        <div class="sig">inverseIntersect(...target)</div>
+        <div class="desc"><strong>Description:</strong> Computes symmetric difference (XOR) of meshes. Returns parts that don't overlap, excluding the intersection volume. Implemented as: union - intersection.</div>
+        <div class="table-wrap"><table><thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead><tbody>
+            <tr><td>target</td><td>...THREE.Mesh|Brush</td><td>Two or more meshes for symmetric difference</td></tr>
+        </tbody></table></div>
+        <div class="returns"><strong>Returns:</strong> THREE.Mesh|Brush - Symmetric difference result (non-overlapping parts)</div>
+        <pre>// Example Usage:
+const shape1 = cube([10, 10, 10]);
+const shape2 = sphere({ r: 7 });
+const nonOverlapping = inverseIntersect(shape1, shape2);
+// Returns: (shape1 ∪ shape2) - (shape1 ∩ shape2)
+
+// Create interlocking parts
+const partA = inverseIntersect(base, cutter);
+const partB = difference(cutter, base);</pre>
+        <a href="#index" class="back">⬆ Back to Index</a>
+    </section>
+
+    <!-- TRANSFORMATIONS -->
+    <h2 id="transforms" style="color:white;margin:2rem 0 1rem;text-align:center">🔄 Transformations</h2>
+
+    <section id="translate" class="section">
+        <h3>translate() <span class="badge xf">Transform</span></h3>
+        <div class="sig">translate([x, y, z], ...target)</div>
+        <div class="desc"><strong>Description:</strong> Moves mesh(es) by specified offset in 3D space. Modifies geometry directly using THREE.BufferGeometry.translate(). All transformations are in millimeters.</div>
+        <div class="table-wrap"><table><thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead><tbody>
+            <tr><td>[x, y, z]</td><td>Array[number]</td><td>Translation vector in 3D space (mm). X=right, Y=depth, Z=up</td></tr>
+            <tr><td>target</td><td>...THREE.Mesh|Brush</td><td>Mesh(es) to translate. Supports spread operator and nested structures</td></tr>
+        </tbody></table></div>
+        <div class="returns"><strong>Returns:</strong> THREE.Mesh|Brush - Translated mesh(es) (same reference, modified in place)</div>
+        <pre>// Example Usage:
+const box = cube([5, 5, 5]);
+const movedBox = translate([10, 0, 5], box);  // Move 10mm right, 5mm up
+
+// Chain with other operations
+const positioned = translate(
+  [5, 5, 0],
+  rotate([0, 45, 0], cube([5, 5, 5]))
+);
+
+// Translate multiple objects
+translate([0, 0, 10], obj1, obj2, obj3);
+
+// Relative positioning
+const base = cube([20, 20, 2]);
+const post = translate([10, 10, 2], cylinder({ r: 2, h: 8 }));</pre>
+        <a href="#index" class="back">⬆ Back to Index</a>
+    </section>
+
+    <section id="rotate" class="section">
+        <h3>rotate() <span class="badge xf">Transform</span></h3>
+        <div class="sig">rotate([x, y, z], ...target)</div>
+        <div class="desc"><strong>Description:</strong> Rotates mesh(es) around X, Y, Z axes. Angles specified in degrees. Uses Z-up coordinate system. Rotations are applied to geometry using THREE.BufferGeometry.rotate*() methods.</div>
+        <div class="table-wrap"><table><thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead><tbody>
+            <tr><td>[x, y, z]</td><td>Array[number]</td><td>Rotation angles in degrees for each axis. Order: X (pitch), Y (yaw), Z (roll)</td></tr>
+            <tr><td>target</td><td>...THREE.Mesh|Brush</td><td>Mesh(es) to rotate</td></tr>
+        </tbody></table></div>
+        <div class="returns"><strong>Returns:</strong> THREE.Mesh|Brush - Rotated mesh(es) (same reference)</div>
+        <pre>// Example Usage:
+const box = cube([5, 5, 5]);
+const tilted = rotate([45, 0, 0], box);  // Tilt 45° forward (around X)
+
+// Full 3D rotation
+const oriented = rotate([90, 45, 180], cylinder({ d: 2, h: 10 }));
+
+// Create radial pattern
+const arms = [];
+for (let i = 0; i < 6; i++) {
+  arms.push(rotate([0, 0, i * 60], cube([2, 10, 1])));
+}
+const wheel = union(...arms);
+
+// Rotate around custom pivot: translate to origin, rotate, translate back
+const pivotRotate = (obj, angle, axis, pivot) => {
+  return translate(pivot, rotate([0,0,0].map((_,i)=>i===axis?angle:0), translate(pivot.map(v=>-v), obj)));
+};</pre>
+        <a href="#index" class="back">⬆ Back to Index</a>
+    </section>
+
+    <section id="scale" class="section">
+        <h3>scale() <span class="badge xf">Transform</span></h3>
+        <div class="sig">scale([x, y, z], ...target)</div>
+        <div class="desc"><strong>Description:</strong> Scales mesh(es) by factors along each axis. Values > 1 enlarge, < 1 shrink. Applied directly to geometry using THREE.BufferGeometry.scale(). Non-uniform scaling supported.</div>
+        <div class="table-wrap"><table><thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead><tbody>
+            <tr><td>[x, y, z]</td><td>Array[number]</td><td>Scale factors for each axis. 1.0 = no change, 2.0 = double size</td></tr>
+            <tr><td>target</td><td>...THREE.Mesh|Brush</td><td>Mesh(es) to scale</td></tr>
+        </tbody></table></div>
+        <div class="returns"><strong>Returns:</strong> THREE.Mesh|Brush - Scaled mesh(es) (same reference)</div>
+        <pre>// Example Usage:
+const box = cube([5, 5, 5]);
+const doubled = scale([2, 2, 2], box);  // 2× larger in all dimensions
+
+// Non-uniform scaling
+const flattened = scale([1, 0.5, 1], sphere({ r: 5 }));  // Squashed sphere
+const stretched = scale([3, 1, 1], cylinder({ r: 2, h: 5 }));  // Elongated cylinder
+
+// Create tapered effect by scaling parts
+const taperedPost = union(
+  scale([1, 1, 0.8], cylinder({ r: 3, h: 5 })),
+  translate([0, 0, 4], scale([0.7, 0.7, 1], cylinder({ r: 3, h: 5 })))
+);</pre>
+        <a href="#index" class="back">⬆ Back to Index</a>
+    </section>
+
+    <section id="color" class="section">
+        <h3>color() <span class="badge xf">Transform</span></h3>
+        <div class="sig">color(c, ...target)</div>
+        <div class="desc"><strong>Description:</strong> Applies a new material with specified color to mesh(es). Creates MeshStandardMaterial with consistent properties (metalness: 0.2, roughness: 0.6, flatShading: true, side: DoubleSide).</div>
+        <div class="table-wrap"><table><thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead><tbody>
+            <tr><td>c</td><td>number|string</td><td>Color value: hex number (0xff0000), CSS string ('red', '#f00', 'rgb(255,0,0)')</td></tr>
+            <tr><td>target</td><td>...THREE.Mesh|Brush</td><td>Mesh(es) to color</td></tr>
+        </tbody></table></div>
+        <div class="returns"><strong>Returns:</strong> THREE.Mesh|Brush - Mesh(es) with new material applied (same reference)</div>
+        <pre>// Example Usage:
+const box = cube([5, 5, 5]);
+const redBox = color(0xff0000, box);  // Hex number
+
+// CSS color strings
+const blueBox = color('blue', cube([5, 5, 5]));
+const greenBox = color('#00ff00', cube([5, 5, 5]));
+const rgbBox = color('rgb(0, 255, 128)', cube([5, 5, 5]));
+
+// Color different parts of assembly
+const assembly = union(
+  color(0x888888, cube([20, 20, 2])),  // Gray base
+  color(0xff6600, translate([5, 5, 2], cylinder({ r: 2, h: 8 }))),  // Orange post
+  color(0x3399ff, translate([15, 15, 2], cylinder({ r: 2, h: 8 })))   // Blue post
+);</pre>
+        <a href="#index" class="back">⬆ Back to Index</a>
+    </section>
+
+    <section id="subdivide" class="section">
+        <h3>subdivide() <span class="badge xf">Transform</span></h3>
+        <div class="sig">subdivide({ resolution = 0.2 }, ...target)</div>
+        <div class="desc"><strong>Description:</strong> Subdivides mesh geometry to increase resolution. Iteratively splits faces until all edge lengths are below specified resolution. Uses edge-length-based subdivision with vertex deduplication.</div>
+        <div class="table-wrap"><table><thead><tr><th>Parameter</th><th>Type</th><th>Default</th><th>Description</th></tr></thead><tbody>
+            <tr><td>resolution</td><td>number</td><td>0.2</td><td>Maximum edge length in mm. Lower = more detail, higher polygon count</td></tr>
+            <tr><td>target</td><td>...THREE.Mesh|Brush</td><td>-</td><td>Mesh(es) to subdivide</td></tr>
+        </tbody></table></div>
+        <div class="returns"><strong>Returns:</strong> THREE.Mesh|Brush - Subdivided mesh(es) with higher polygon count</div>
+        <div class="note">📝 <strong>Note:</strong> Requires indexed BufferGeometry. Maximum 10 iterations for safety. Use before boolean operations for cleaner results.</div>
+        <pre>// Example Usage:
+const roughSphere = sphere({ r: 5, fn: 8 });  // Low-poly sphere
+const smoothSphere = subdivide({ resolution: 0.1 }, roughSphere);  // Smoothed
+
+// Higher detail for critical parts
+const ultraSmooth = subdivide({ resolution: 0.05 }, roughSphere);
+
+// Subdivide before boolean for cleaner cuts
+const detailedBase = subdivide({ resolution: 0.3 }, cube([20, 20, 20]));
+const cleanHole = difference(
+  detailedBase,
+  cylinder({ r: 3, h: 25 })
+);
+
+// Performance tip: Only subdivide where needed
+const selective = union(
+  subdivide({ resolution: 0.1 }, sphere({ r: 5 })),  // Smooth sphere
+  cube([10, 10, 10])  // Keep cube low-poly
+);</pre>
+        <a href="#index" class="back">⬆ Back to Index</a>
+    </section>
+
+    <section id="scaleTo" class="section">
+        <h3>scaleTo() <span class="badge xf">Transform</span></h3>
+        <div class="sig">scaleTo(config = {}, ...target)</div>
+        <div class="desc"><strong>Description:</strong> Scales mesh(es) to match specific dimension. Uniformly scales based on one axis measurement. Priority: z > y > x (first defined wins).</div>
+        <div class="table-wrap"><table><thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead><tbody>
+            <tr><td>config.x</td><td>number</td><td>Target width in mm</td></tr>
+            <tr><td>config.y</td><td>number</td><td>Target height in mm</td></tr>
+            <tr><td>config.z</td><td>number</td><td>Target depth in mm</td></tr>
+            <tr><td>target</td><td>...THREE.Mesh|Brush</td><td>Mesh(es) to scale</td></tr>
+        </tbody></table></div>
+        <div class="returns"><strong>Returns:</strong> THREE.Mesh|Brush - Scaled mesh(es) (same reference)</div>
+        <pre>// Example Usage:
+const box = cube([5, 5, 5]);
+const sized = scaleTo({ z: 10 }, box);  // Scale to 10mm tall (uniform scale)
+
+// Priority: z > y > x (first defined wins)
+scaleTo({ x: 20, z: 10 }, box);  // Uses z: 10, ignores x: 20
+
+// Fit object to specific dimension
+const fitted = scaleTo({ y: 50 }, importedPart);
+
+// Create standardized parts
+const standardPost = scaleTo({ z: 15 }, cylinder({ r: 2, h: 10 }));</pre>
+        <a href="#index" class="back">⬆ Back to Index</a>
+    </section>
+
+    <section id="scaleAdd" class="section">
+        <h3>scaleAdd() <span class="badge xf">Transform</span></h3>
+        <div class="sig">scaleAdd(config = {}, ...target)</div>
+        <div class="desc"><strong>Description:</strong> Adds dimensions to mesh bounding box. Increases size by specified amounts on each axis. Calculates scale factor as (current + add) / current.</div>
+        <div class="table-wrap"><table><thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead><tbody>
+            <tr><td>config.x</td><td>number</td><td>Amount to add to width in mm</td></tr>
+            <tr><td>config.y</td><td>number</td><td>Amount to add to height in mm</td></tr>
+            <tr><td>config.z</td><td>number</td><td>Amount to add to depth in mm</td></tr>
+            <tr><td>target</td><td>...THREE.Mesh|Brush</td><td>Mesh(es) to expand</td></tr>
+        </tbody></table></div>
+        <div class="returns"><strong>Returns:</strong> THREE.Mesh|Brush - Expanded mesh(es) (same reference)</div>
+        <pre>// Example Usage:
+const box = cube([10, 10, 10]);
+const thicker = scaleAdd({ z: 5 }, box);  // Add 5mm to depth (now 15mm)
+
+// All axes
+const bigger = scaleAdd({ x: 2, y: 2, z: 2 }, box);  // 12×12×12
+
+// Create clearance/tolerance
+const clearance = scaleAdd({ x: 0.2, y: 0.2 }, holeCutter);  // Slightly larger hole
+
+// Add wall thickness
+const outer = scaleAdd({ x: 2, y: 2, z: 2 }, innerCavity);</pre>
+        <a href="#index" class="back">⬆ Back to Index</a>
+    </section>
+
+    <section id="expand" class="section">
+        <h3>expand() <span class="badge util">Utility</span></h3>
+        <div class="sig">expand(...target)</div>
+        <div class="desc"><strong>Description:</strong> Extracts all meshes from target object(s) into a flat array. Recursively traverses arrays, objects, and nested structures to find THREE.Mesh or Brush instances.</div>
+        <div class="table-wrap"><table><thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead><tbody>
+            <tr><td>target</td><td>...any</td><td>Objects containing meshes: arrays, objects, single meshes, nested structures</td></tr>
+        </tbody></table></div>
+        <div class="returns"><strong>Returns:</strong> Array[THREE.Mesh] - Flat array of all meshes found (no nesting)</div>
+        <pre>// Example Usage:
+const assembly = [cube([5, 5, 5]), sphere({ r: 3 })];
+const allMeshes = expand(assembly);  // [cube, sphere]
+
+// Works with nested structures
+const complex = { parts: [part1, part2], extras: [part3] };
+const extracted = expand(complex);  // [part1, part2, part3]
+
+// Flatten result of union for individual manipulation
+const combined = union(obj1, obj2, obj3);
+const parts = expand(combined);  // Get individual meshes back
+
+// Process all meshes in scene
+const sceneMeshes = expand(sceneChildren);
+sceneMeshes.forEach(mesh => mesh.material.transparent = true);</pre>
+        <a href="#index" class="back">⬆ Back to Index</a>
+    </section>
+
+    <section id="floor" class="section">
+        <h3>floor() <span class="badge xf">Transform</span></h3>
+        <div class="sig">floor(...target)</div>
+        <div class="desc"><strong>Description:</strong> Translates mesh(es) so their bottom surface (min Z) sits at Z=0. Useful for placing objects on build plate/ground plane. Uses boundingBox() internally.</div>
+        <div class="table-wrap"><table><thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead><tbody>
+            <tr><td>target</td><td>...THREE.Mesh|Brush</td><td>Mesh(es) to floor</td></tr>
+        </tbody></table></div>
+        <div class="returns"><strong>Returns:</strong> THREE.Mesh|Brush - Floored mesh(es) (same reference)</div>
+        <pre>// Example Usage:
+const floatingBox = translate([0, 0, 10], cube([5, 5, 5]));
+const groundedBox = floor(floatingBox);  // Now sits at Z=0
+
+// Multiple objects
+floor(obj1, obj2, obj3);
+
+// Typical workflow: create, then floor
+const part = union(cube([10, 10, 2]), cylinder({ r: 2, h: 5 }));
+const printReady = floor(part);
+
+// Floor after transformations
+const positioned = floor(translate([5, 5, 0], rotate([0, 0, 45], cube([10, 10, 10]))));</pre>
+        <a href="#index" class="back">⬆ Back to Index</a>
+    </section>
+
+    <section id="convexHull" class="section">
+        <h3>convexHull() <span class="badge util">Utility</span></h3>
+        <div class="sig">convexHull(...target)</div>
+        <div class="desc"><strong>Description:</strong> Creates convex hull around mesh(es) using THREE.ConvexGeometry. Generates smallest convex shape containing all vertices. Useful for collision bounds, packaging, or simplification.</div>
+        <div class="table-wrap"><table><thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead><tbody>
+            <tr><td>target</td><td>...THREE.Mesh|Brush</td><td>Mesh(es) to wrap. Vertices are transformed to world space first.</td></tr>
+        </tbody></table></div>
+        <div class="returns"><strong>Returns:</strong> THREE.Mesh - Convex hull mesh with defaultMaterial, or null if < 4 vertices</div>
+        <div class="warning">⚠️ <strong>Warning:</strong> Requires at least 4 vertices total. Uses world-space positions.</div>
+        <pre>// Example Usage:
+const scattered = [cube([2, 2, 2]), sphere({ r: 1.5 })];
+const wrapper = convexHull(...scattered);  // Wraps both objects
+
+// Single object simplification
+const hull = convexHull(complexShape);  // Simplified convex version
+
+// Create packaging/enclosure
+const contents = union(part1, part2, part3);
+const package = scaleAdd({ x: 2, y: 2, z: 2 }, convexHull(contents));
+
+// Collision proxy for physics
+const collisionShape = convexHull(characterModel);</pre>
+        <a href="#index" class="back">⬆ Back to Index</a>
+    </section>
+
+    <section id="align" class="section">
+        <h3>align() <span class="badge xf">Transform</span></h3>
+        <div class="sig">align(config = {}, ...target)</div>
+        <div class="desc"><strong>Description:</strong> Aligns mesh(es) to specified positions based on bounding box edges or center. Only one alignment per axis is used (first defined wins).</div>
+        <div class="table-wrap"><table><thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead><tbody>
+            <tr><td>config.lx</td><td>number</td><td>Align left (min X) to this position</td></tr>
+            <tr><td>config.rx</td><td>number</td><td>Align right (max X) to this position</td></tr>
+            <tr><td>config.cx</td><td>number</td><td>Align center X to this position</td></tr>
+            <tr><td>config.uy</td><td>number</td><td>Align up (max Y) to this position</td></tr>
+            <tr><td>config.dy</td><td>number</td><td>Align down (min Y) to this position</td></tr>
+            <tr><td>config.cy</td><td>number</td><td>Align center Y to this position</td></tr>
+            <tr><td>config.bz</td><td>number</td><td>Align bottom (min Z) to this position</td></tr>
+            <tr><td>config.tz</td><td>number</td><td>Align top (max Z) to this position</td></tr>
+            <tr><td>config.cz</td><td>number</td><td>Align center Z to this position</td></tr>
+        </tbody></table></div>
+        <div class="returns"><strong>Returns:</strong> THREE.Mesh|Brush - Aligned mesh(es) (same reference)</div>
+        <pre>// Example Usage:
+const box = cube([5, 5, 5]);
+
+// Center at origin
+const centered = align({ cx: 0, cy: 0, cz: 0 }, box);
+
+// Floor alignment (common for 3D printing)
+const onGround = align({ bz: 0 }, box);
+
+// Edge alignment
+const leftAligned = align({ lx: 0 }, box);  // Left edge at X=0
+
+// Align to build area
+const centeredOnPlate = align({ cx: 0, cy: 0, bz: 0 }, model);
+
+// Multiple alignments (only first per axis used)
+align({ lx: 0, cx: 10 }, box);  // Uses lx: 0, ignores cx: 10</pre>
+        <a href="#index" class="back">⬆ Back to Index</a>
+    </section>
+
+    <section id="show" class="section">
+        <h3>show() <span class="badge util">Utility</span></h3>
+        <div class="sig">show(...target)</div>
+        <div class="desc"><strong>Description:</strong> Marks mesh(es) as visible by setting userData.$csgShow = true. Used for visibility control in CSG workflows. Does not affect THREE.Mesh.visible property directly.</div>
+        <div class="table-wrap"><table><thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead><tbody>
+            <tr><td>target</td><td>...THREE.Mesh|Brush</td><td>Mesh(es) to show</td></tr>
+        </tbody></table></div>
+        <div class="returns"><strong>Returns:</strong> THREE.Mesh|Brush - Mesh(es) with visibility flag set (same reference)</div>
+        <pre>// Example Usage:
+const hiddenBox = hide(cube([5, 5, 5]));
+const visibleBox = show(hiddenBox);  // Toggle back to visible
+
+// Toggle visibility
+show(obj1, obj2, obj3);
+
+// Debugging: show/hide construction steps
+const debug = hide(intermediateStep);
+const final = show(result);
+
+// Conditional visibility
+const optionalPart = condition ? show(part) : hide(part);</pre>
+        <a href="#index" class="back">⬆ Back to Index</a>
+    </section>
+
+    <section id="hide" class="section">
+        <h3>hide() <span class="badge util">Utility</span></h3>
+        <div class="sig">hide(...target)</div>
+        <div class="desc"><strong>Description:</strong> Marks mesh(es) as hidden by setting userData.$csgShow = false. Used for visibility control in CSG workflows. Does not affect THREE.Mesh.visible property directly.</div>
+        <div class="table-wrap"><table><thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead><tbody>
+            <tr><td>target</td><td>...THREE.Mesh|Brush</td><td>Mesh(es) to hide</td></tr>
+        </tbody></table></div>
+        <div class="returns"><strong>Returns:</strong> THREE.Mesh|Brush - Mesh(es) with visibility flag set (same reference)</div>
+        <pre>// Example Usage:
+const box = cube([5, 5, 5]);
+const hiddenBox = hide(box);  // Mark as hidden
+
+// Hide multiple
+hide(obj1, obj2, obj3);
+
+// Hide construction geometry
+const cutter = hide(cylinder({ r: 2, h: 10 }));  // Don't render cutter
+const result = difference(base, cutter);
+
+// Debugging: hide intermediate steps
+const step1 = hide(union(partA, partB));
+const step2 = hide(difference(step1, partC));
+const final = show(step2);  // Only show final result</pre>
+        <a href="#index" class="back">⬆ Back to Index</a>
+    </section>
+
+    <section id="boundingBox" class="section">
+        <h3>boundingBox() <span class="badge util">Utility</span></h3>
+        <div class="sig">boundingBox(...target)</div>
+        <div class="desc"><strong>Description:</strong> Calculates collective world-space bounding box for mesh(es). Uses THREE.Box3 and applies object matrices for world-space coordinates. Returns min/max in 3D printer coordinates (Z-up).</div>
+        <div class="table-wrap"><table><thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead><tbody>
+            <tr><td>target</td><td>...THREE.Mesh|Brush</td><td>Mesh(es) to measure. Supports multiple objects for combined bounds.</td></tr>
+        </tbody></table></div>
+        <div class="returns"><strong>Returns:</strong> Object {min: {x, y, z}, max: {x, y, z}} | null - Bounding box coordinates in mm, or null if empty</div>
+        <pre>// Example Usage:
+const box = cube([10, 10, 10]);
+const bbox = boundingBox(box);
+console.log(bbox.min);  // {x: -5, y: -5, z: -5}
+console.log(bbox.max);  // {x: 5, y: 5, z: 5}
+
+// Multiple objects (combined bounds)
+const combinedBbox = boundingBox(obj1, obj2, obj3);
+
+// Calculate size
+const size = {
+  x: bbox.max.x - bbox.min.x,
+  y: bbox.max.y - bbox.min.y,
+  z: bbox.max.z - bbox.min.z
+};
+
+// Center object at origin
+const center = {
+  x: (bbox.min.x + bbox.max.x) / 2,
+  y: (bbox.min.y + bbox.max.y) / 2,
+  z: (bbox.min.z + bbox.max.z) / 2
+};
+const centered = translate(center.map(v => -v), obj);</pre>
+        <a href="#index" class="back">⬆ Back to Index</a>
+    </section>
+
+    <section id="placement" class="section">
+        <h3>placement() <span class="badge xf">Transform</span></h3>
+        <div class="sig">placement(offsets = {}, obj, ...target)</div>
+        <div class="desc"><strong>Description:</strong> Aligns and translates target objects relative to a reference object using three-character command structure. Reference object (obj) position unchanged; targets are moved.</div>
+        <div class="table-wrap"><table><thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead><tbody>
+            <tr><td>offsets</td><td>Object</td><td>Commands like {'ttx': 10} - see table below for full list</td></tr>
+            <tr><td>obj</td><td>THREE.Mesh</td><td>Reference object (position unchanged, used for alignment reference)</td></tr>
+            <tr><td>target</td><td>...THREE.Mesh</td><td>Objects to move (aligned relative to obj)</td></tr>
+        </tbody></table></div>
+        <div class="returns"><strong>Returns:</strong> Array - [obj, ...target] after placement (for chaining)</div>
+        <div class="note">📝 <strong>Command Structure:</strong> [REF-ANCHOR][TARGET-ALIGN][AXIS]<br>
+        <strong>X-axis:</strong> l=left(min), r=right(max), c=center → llx, lrx, lcx, rlx, rrx, rcx, clx, crx, ccx<br>
+        <strong>Y-axis:</strong> d=down(min), u=up(max), c=center → ldy, luy, lcy, rdy, ruy, rcy, cdy, cuy, ccy<br>
+        <strong>Z-axis:</strong> b=bottom(min), t=top(max), c=center → lbz, ltz, lcz, rbz, rtz, rcz, cbz, ctz, ccz<br>
+        Example: 'ttz' = align obj's top (max Z) with target's top (max Z) on Z-axis</div>
+        <pre>// Example Usage:
+const base = cube([10, 10, 2]);
+const top = cube([5, 5, 5]);
+
+// Stack on top with no offset
+placement({'ttz': 0}, base, top);  // Target's bottom to obj's top
+
+// Side by side with 1mm gap
+placement({'lrx': 1}, base, top);  // Target's left to obj's right + 1mm
+
+// Center on top
+placement({'ccz': 2}, base, top);  // Center-to-center on Z, +2mm offset
+
+// Complex assembly
+const plate = cube([50, 50, 3]);
+const mount = cylinder({ r: 3, h: 8 });
+
+// Place mount at corner
+placement({'lbl': 0, 'lbd': 0, 'bbz': 0}, plate, mount);
+
+// Place another at opposite corner
+placement({'rbr': 0, 'rbu': 0, 'bbz': 0}, plate, clone(mount));</pre>
+        <a href="#index" class="back">⬆ Back to Index</a>
+    </section>
+
+    <!-- PATH CLASSES -->
+    <h2 id="path-classes" style="color:white;margin:2rem 0 1rem;text-align:center">🧱 Path Classes</h2>
+
+    <section id="Path2d" class="section">
+        <h3>Path2d() <span class="badge class">Class</span></h3>
+        <div class="sig">new Path2d()</div>
+        <div class="desc"><strong>Description:</strong> Class for creating and manipulating 2D paths with method chaining. Supports lines, bezier curves, arcs with automatic tessellation. Y-up coordinate system. Use getPoints() to get tessellated shape data for shape() function.</div>
+        
+        <h4>Constructor & Properties</h4>
+        <div class="table-wrap"><table><thead><tr><th>Property</th><th>Type</th><th>Description</th></tr></thead><tbody>
+            <tr><td>_path</td><td>Array</td><td>Internal: stores sequence of path commands</td></tr>
+            <tr><td>_fn</td><td>number</td><td>Internal: default segments for curves (default: 20)</td></tr>
+            <tr><td>_cp</td><td>[x, y]</td><td>Internal: current point position</td></tr>
+            <tr><td>_atn</td><td>number</td><td>Internal: segments for next command (set by 'n' command)</td></tr>
+        </tbody></table></div>
+
+        <h4>Configuration Methods</h4>
+        <div class="method-list">
+            <div class="method-item"><code>fn(v)</code> - Set tessellation factor for curves. Returns <code>this</code> for chaining.</div>
+            <div class="method-item"><code>path(data)</code> - Set path from array or convert from Path3d. Returns <code>this</code>.</div>
+        </div>
+
+        <h4>Path Commands (All return <code>this</code> for chaining)</h4>
+        <div class="table-wrap"><table><thead><tr><th>Method</th><th>Parameters</th><th>Description</th></tr></thead><tbody>
+            <tr><td>m(x, y)</td><td>number, number</td><td>Move to absolute position</td></tr>
+            <tr><td>mr(x, y)</td><td>number, number</td><td>Move to relative offset</td></tr>
+            <tr><td>l(x, y)</td><td>number, number</td><td>Line to absolute position</td></tr>
+            <tr><td>lr(x, y)</td><td>number, number</td><td>Line to relative offset</td></tr>
+            <tr><td>q(cpx, cpy, x, y)</td><td>4 numbers</td><td>Quadratic bezier curve (absolute)</td></tr>
+            <tr><td>qr(cpx, cpy, x, y)</td><td>4 numbers</td><td>Quadratic bezier (relative)</td></tr>
+            <tr><td>c(cp1x, cp1y, cp2x, cp2y, x, y)</td><td>6 numbers</td><td>Cubic bezier curve (absolute)</td></tr>
+            <tr><td>cr(cp1x, cp1y, cp2x, cp2y, x, y)</td><td>6 numbers</td><td>Cubic bezier (relative)</td></tr>
+            <tr><td>x(cpx, cpy, x, y)</td><td>4 numbers</td><td>Arc via control point (absolute)</td></tr>
+            <tr><td>xr(cpx, cpy, x, y)</td><td>4 numbers</td><td>Arc via control point (relative)</td></tr>
+            <tr><td>n(segments)</td><td>number</td><td>Set segment count for next curve command</td></tr>
+        </tbody></table></div>
+
+        <h4>Result Methods</h4>
+        <div class="method-list">
+            <div class="method-item"><code>getPoints()</code> - Tessellate path and return shape data array with hole detection. Returns <code>Array[{outerPoints: [], holePoints: []}]</code>.</div>
+            <div class="method-item"><code>boundingBox()</code> - Calculate 2D bounding box. Returns <code>{min: {x, y}, max: {x, y}}</code>.</div>
+        </div>
+
+        <div class="returns"><strong>Returns:</strong> Path2d instance (methods chainable)</div>
+        <pre>// Example Usage - Method Chaining:
+const path = new Path2d()
+    .fn(32)                    // High resolution curves
+    .m(0, 0)                   // Start at origin
+    .l(50, 0)                  // Line right
+    .q(55, 0, 55, 5)          // Rounded corner (quadratic bezier)
+    .l(55, 45)                 // Line up
+    .q(55, 50, 50, 50)        // Rounded corner
+    .l(0, 50)                  // Line left
+    .q(-5, 50, -5, 45)        // Rounded corner
+    .l(-5, 5)                  // Line down
+    .q(-5, 0, 0, 0)           // Close with rounded corner
+    .n(16)                     // Next curve uses 16 segments
+    .q(2, 2, 4, 4);           // Small detail curve
+
+// Get tessellated shape data for extrusion
+const shapeData = path.getPoints();
+const shapes = shape(shapeData);
+
+// Get bounding box for alignment
+const bbox = path.boundingBox();
+console.log(`Width: ${bbox.max.x - bbox.min.x}mm`);
+
+// Convert from Path3d
+const path3d = new Path3d().m(0, 0, 0).l(10, 10, 0);
+const path2d = new Path2d().path(path3d);  // Drops Z coordinates
+
+// Set path from array
+const pathFromArray = new Path2d().path(['m', 0, 0, 'l', 10, 10]);</pre>
+        <a href="#index" class="back">⬆ Back to Index</a>
+    </section>
+
+    <section id="Path3d" class="section">
+        <h3>Path3d() <span class="badge class">Class</span></h3>
+        <div class="sig">new Path3d()</div>
+        <div class="desc"><strong>Description:</strong> Class for creating and manipulating 3D paths with method chaining. Supports 3D lines, bezier curves, arcs with rotation and scale interpolation along the path. Z-up coordinate system. Use getPoints() to get processed path data for extrusion functions.</div>
+        
+        <h4>Constructor & Properties</h4>
+        <div class="table-wrap"><table><thead><tr><th>Property</th><th>Type</th><th>Description</th></tr></thead><tbody>
+            <tr><td>_path</td><td>Array</td><td>Internal: stores sequence of path commands</td></tr>
+            <tr><td>_fn</td><td>number</td><td>Internal: default segments for curves (default: 20)</td></tr>
+            <tr><td>_cp</td><td>[x, y, z]</td><td>Internal: current point position</td></tr>
+            <tr><td>_cr</td><td>number</td><td>Internal: current rotation (degrees)</td></tr>
+            <tr><td>_cs</td><td>[sx, sy]</td><td>Internal: current 2D scale factors</td></tr>
+            <tr><td>_atr</td><td>number</td><td>Internal: target rotation for interpolation</td></tr>
+            <tr><td>_ats</td><td>[sx, sy]</td><td>Internal: target scale for interpolation</td></tr>
+            <tr><td>_close</td><td>boolean</td><td>Whether path should be treated as closed loop</td></tr>
+            <tr><td>_xyInitAng</td><td>boolean</td><td>Use XY plane angle for initial normal calculation</td></tr>
+        </tbody></table></div>
+
+        <h4>Configuration Methods (return <code>this</code>)</h4>
+        <div class="method-list">
+            <div class="method-item"><code>fn(v)</code> - Set tessellation factor for curves.</div>
+            <div class="method-item"><code>close(v)</code> - Set whether path is closed loop (affects cap generation).</div>
+            <div class="method-item"><code>xyInitAng(v)</code> - Use XY plane angle for initial normal calculation.</div>
+            <div class="method-item"><code>path(data)</code> - Set path from array or convert from Path2d (adds Z=0).</div>
+        </div>
+
+        <h4>Path Commands (All return <code>this</code> for chaining)</h4>
+        <div class="table-wrap"><table><thead><tr><th>Method</th><th>Parameters</th><th>Description</th></tr></thead><tbody>
+            <tr><td>m(x, y, z)</td><td>3 numbers</td><td>Move to absolute 3D position</td></tr>
+            <tr><td>mr(x, y, z)</td><td>3 numbers</td><td>Move to relative 3D offset</td></tr>
+            <tr><td>l(x, y, z)</td><td>3 numbers</td><td>Line to absolute 3D position</td></tr>
+            <tr><td>lr(x, y, z)</td><td>3 numbers</td><td>Line to relative 3D offset</td></tr>
+            <tr><td>q(cpx, cpy, cpz, x, y, z)</td><td>6 numbers</td><td>Quadratic bezier curve 3D</td></tr>
+            <tr><td>qr(cpx, cpy, cpz, x, y, z)</td><td>6 numbers</td><td>Quadratic bezier 3D (relative)</td></tr>
+            <tr><td>c(cp1x..z, cp2x..z, x, y, z)</td><td>9 numbers</td><td>Cubic bezier curve 3D</td></tr>
+            <tr><td>cr(cp1x..z, cp2x..z, x, y, z)</td><td>9 numbers</td><td>Cubic bezier 3D (relative)</td></tr>
+            <tr><td>x(cpx, cpy, cpz, x, y, z)</td><td>6 numbers</td><td>Arc via control point 3D</td></tr>
+            <tr><td>xr(cpx, cpy, cpz, x, y, z)</td><td>6 numbers</td><td>Arc 3D (relative)</td></tr>
+            <tr><td>n(segments)</td><td>number</td><td>Set segment count for next curve</td></tr>
+            <tr><td>r(rotation)</td><td>number</td><td>Set target rotation (degrees) for interpolation</td></tr>
+            <tr><td>s(sx, sy)</td><td>2 numbers</td><td>Set target 2D scale factors for interpolation</td></tr>
+        </tbody></table></div>
+
+        <h4>Result Method</h4>
+        <div class="method-list">
+            <div class="method-item"><code>getPoints()</code> - Process path and return structured data. Returns <code>{p: [], r: [], s: [], n: [], close, xyInitAng}</code> where:<br>
+            <code>p</code>: array of [x,y,z] points<br>
+            <code>r</code>: array of rotation values (degrees)<br>
+            <code>s</code>: array of [sx,sy] scale factors<br>
+            <code>n</code>: array of normal/tangent vectors<br>
+            </div>
+        </div>
+
+        <div class="returns"><strong>Returns:</strong> Path3d instance (methods chainable)</div>
+        <pre>// Example Usage - Complex 3D Path:
 const path3d = new Path3d()
-.fn(16)
-.m(0, 0, 0)
-.r(0)
-.l(0, 0, 10)
-.r(90)
-.l(10, 0, 10)
-.close(true);
+    .fn(32)                    // High resolution
+    .close(true)              // Closed loop for tube
+    .xyInitAng(true)          // Use XY angle for initial orientation
+    .m(0, 0, 0)               // Start at origin
+    .r(0)                     // Initial rotation: 0°
+    .s(1, 1)                  // Initial scale: 1×1
+    .l(0, 0, 10)              // Straight up 10mm
+    .r(90)                    // Rotate to 90° at end of segment
+    .l(10, 0, 10)             // Move right 10mm at Z=10
+    .r(180)                   // Rotate to 180°
+    .l(10, 10, 10)            // Diagonal move
+    .s(1.5, 1.5)              // Scale up to 1.5×
+    .q(15, 15, 10, 20, 20, 10, 10, 5)  // 3D quadratic curve
+    .r(0)                     // Rotate back to 0°
+    .s(1, 1);                 // Scale back to 1×
 
-// Get processed points
-const points2d = path2d.getPoints();
-const points3d = path3d.getPoints();
+// Get processed path data
+const pathData = path3d.getPoints();
+console.log(`Path has ${pathData.p.length} points`);
 
-// Convert between 2D and 3D
-const path2dFrom3d = new Path2d().path(path3d);
-const path3dFrom2d = new Path3d().path(path2d);
+// Use for extrusion
+const profile = new Path2d().m(0, 0).l(2, 0).l(2, 2).l(0, 2).l(0, 0);
+const extruded = extrude3d({profile}, path3d);
 
-return path2d;</code></pre>
-</div>
+// Convert from Path2d (adds Z=0 to all points)
+const path2d = new Path2d().m(0, 0).l(10, 10);
+const path3dFrom2d = new Path3d().path(path2d).l(0, 0, 5);  // Now has Z dimension
 
-<h3 id="extrusions">2D to 3D Extrusion</h3>
-<table>
-<thead>
-<tr><th>Function</th><th>Parameters</th><th>Description</th></tr>
-</thead>
-<tbody>
-<tr><td><code>shape()</code></td><td><code>shapeDataPath</code></td><td>Generates THREE.Shape array with hole detection</td></tr>
-<tr><td><code>linePaths3d()</code></td><td><code>target, commandPath</code></td><td>Extrudes Shape along 3D path (scale/rotation support)</td></tr>
-<tr><td><code>extrude3d()</code></td><td><code>target, commandPath</code></td><td>Extrudes Path2d along 3D path (advanced)</td></tr>
-<tr><td><code>sweep3d()</code></td><td><code>circularPath, wallPath, holeWallPath</code></td><td>Sweeps geometry along circular path</td></tr>
-<tr><td><code>arcPath3d()</code></td><td><code>{ startAng, endAng, r, d, fn }</code></td><td>Helper for curved 3D paths</td></tr>
-</tbody>
-</table>
-<div class="example-block">
-<div class="example-title">Extrusion Examples</div>
-<pre><code>// Simple straight extrusion
+// Create helical path
+const helix = new Path3d().fn(64);
+for (let i = 0; i <= 64; i++) {
+    const t = i / 64;
+    const angle = t * Math.PI * 4;  // 2 full rotations
+    helix.l(
+        Math.cos(angle) * 10,
+        Math.sin(angle) * 10,
+        t * 20  // Rise 20mm over the helix
+    );
+}</pre>
+        <a href="#index" class="back">⬆ Back to Index</a>
+    </section>
+
+    <!-- PATH FUNCTIONS -->
+    <h2 id="path-funcs" style="color:white;margin:2rem 0 1rem;text-align:center">🛤️ Path Functions</h2>
+
+    <section id="extrude3d" class="section">
+        <h3>extrude3d() <span class="badge path">Path</span></h3>
+        <div class="sig">extrude3d(target, commandPath)</div>
+        <div class="desc"><strong>Description:</strong> Extrudes 2D Path2d shapes along a 3D path. Creates complex swept geometry with rotation and scale interpolation. Extracts Path2d instances from target, tessellates them, then sweeps along commandPath with per-point rotation/scale.</div>
+        <div class="table-wrap"><table><thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead><tbody>
+            <tr><td>target</td><td>Object</td><td>Object containing Path2d instances (cross-section profile). Can be single Path2d, array, or nested structure.</td></tr>
+            <tr><td>commandPath</td><td>Path3d</td><td>3D path to extrude along. Must have getPoints() method returning {p, r, s, n} structure.</td></tr>
+        </tbody></table></div>
+        <div class="returns"><strong>Returns:</strong> Array[THREE.Mesh] - Array of extruded meshes (one per Path2d shape with holes)</div>
+        <pre>// Example Usage - Straight Extrusion:
 const profile = new Path2d()
-.fn(32)
-.m(0, 0)
-.l(10, 0)
-.l(10, 10)
-.l(0, 10)
-.l(0, 0);
+    .fn(32)
+    .m(0, 0)
+    .l(5, 0)
+    .l(5, 5)
+    .l(0, 5)
+    .l(0, 0);  // Square profile
 
+const straightPath = new Path3d()
+    .fn(1)  // No curve tessellation needed for straight line
+    .m(0, 0, 0)
+    .l(0, 0, 20);  // Extrude 20mm along Z
+
+const extruded = extrude3d({profile}, straightPath);
+return union(extruded);
+
+// Example - Curved Path with Rotation:
+const curvedPath = new Path3d()
+    .fn(32)
+    .m(0, 0, 0)
+    .r(0)
+    .q(10, 0, 0, 20, 0, 10, 0, 0)  // 3D quadratic curve
+    .r(90);  // Rotate profile 90° along the curve
+
+const curvedExtrusion = extrude3d({profile}, curvedPath);
+
+// Example - Tapered Extrusion (scale interpolation):
+const taperedPath = new Path3d()
+    .fn(16)
+    .m(0, 0, 0)
+    .s(1, 1)  // Start at 1× scale
+    .l(0, 0, 10)
+    .s(0.5, 0.5)  // End at 0.5× scale (tapered)
+    .l(0, 0, 20);
+
+const tapered = extrude3d({profile}, taperedPath);
+
+// Multiple profiles in one target:
+const profiles = {
+    outer: new Path2d().m(0,0).l(10,0).l(10,10).l(0,10).l(0,0),
+    inner: new Path2d().m(2,2).l(8,2).l(8,8).l(2,8).l(2,2)  // Hole
+};
+const hollow = extrude3d(profiles, straightPath);</pre>
+        <a href="#index" class="back">⬆ Back to Index</a>
+    </section>
+
+    <section id="sweep3d" class="section">
+        <h3>sweep3d() <span class="badge path">Path</span></h3>
+        <div class="sig">sweep3d(circularPath, wallPath, holeWallPath)</div>
+        <div class="desc"><strong>Description:</strong> Creates swept geometry with wall and hole profiles along a circular path. Generates caps automatically. Specialized for creating tubes, rings, and circular extrusions with proper cap generation and hole handling.</div>
+        <div class="table-wrap"><table><thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead><tbody>
+            <tr><td>circularPath</td><td>Path2d</td><td>Path defining the sweep trajectory (2D, will be treated as circular in XY plane)</td></tr>
+            <tr><td>wallPath</td><td>Path2d</td><td>Outer wall profile (cross-section) to sweep along circularPath</td></tr>
+            <tr><td>holeWallPath</td><td>Path2d|null</td><td>Inner hole profile (optional). Creates hollow tube if provided.</td></tr>
+        </tbody></table></div>
+        <div class="returns"><strong>Returns:</strong> THREE.Mesh - Combined sweep mesh with caps (union of wall and optional hole)</div>
+        <pre>// Example Usage - Simple Ring:
+const circle = new Path2d()
+    .fn(64)  // High resolution circle
+    .m(20, 0)  // Start at radius 20
+    .x(20, 0, 20, 0);  // Full circle via control point
+
+const wallProfile = new Path2d()
+    .fn(16)
+    .m(0, 0)
+    .l(0, 3)   // Wall height 3mm
+    .l(2, 3)   // Wall thickness 2mm
+    .l(2, 0)
+    .l(0, 0);  // Rectangular cross-section
+
+const ring = sweep3d(circle, wallProfile, null);  // Solid ring
+
+// Example - Hollow Tube:
+const tube = sweep3d(
+    circle,
+    wallProfile,  // Outer wall
+    new Path2d().fn(16).m(0.5, 0.5).l(0.5, 2.5).l(1.5, 2.5).l(1.5, 0.5).l(0.5, 0.5)  // Inner hole
+);
+
+// Example - Custom Profile on Circular Path:
+const starProfile = new Path2d().fn(4);
+// ... define star shape ...
+const starRing = sweep3d(circle, starProfile, null);
+
+// Example - Elliptical Path (approximated):
+const ellipse = new Path2d().fn(64);
+for (let i = 0; i <= 64; i++) {
+    const t = i / 64;
+    const angle = t * Math.PI * 2;
+    ellipse.l(30 * Math.cos(angle), 15 * Math.sin(angle));  // 30×15 ellipse
+}
+const ellipticalTube = sweep3d(ellipse, wallProfile, null);</pre>
+        <a href="#index" class="back">⬆ Back to Index</a>
+    </section>
+
+    <section id="linePaths3d" class="section">
+        <h3>linePaths3d() <span class="badge path">Path</span></h3>
+        <div class="sig">linePaths3d(target, commandPath)</div>
+        <div class="desc"><strong>Description:</strong> Extrudes THREE.Shape objects along a 3D path. Similar to extrude3d but uses native THREE.Shape objects (from shape() function) instead of Path2d. Supports rotation and scale interpolation along the path.</div>
+        <div class="table-wrap"><table><thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead><tbody>
+            <tr><td>target</td><td>Object</td><td>Object containing THREE.Shape instances. Can be single Shape, array, or result from shape() function.</td></tr>
+            <tr><td>commandPath</td><td>Path3d|Array</td><td>3D path data for extrusion. Can be Path3d instance or raw {path: [], fn: number} object.</td></tr>
+        </tbody></table></div>
+        <div class="returns"><strong>Returns:</strong> Array[THREE.Mesh] - Array of extruded meshes</div>
+        <pre>// Example Usage - Basic Extrusion:
+// Create shape from path
+const profilePath = {
+    path: ['m', 0, 0, 'l', 5, 0, 'l', 5, 5, 'l', 0, 5, 'l', 0, 0],
+    fn: 32
+};
+const shapes = shape(profilePath);  // Returns array of THREE.Shape
+
+// Create extrusion path
 const extrusionPath = new Path3d()
-.fn(1)
-.m(0, 0, 0)
-.l(0, 0, 5);
+    .fn(1)
+    .m(0, 0, 0)
+    .l(0, 0, 10);  // 10mm straight extrusion
 
-const shapes = shape(profile);
 const extruded = linePaths3d(shapes, extrusionPath);
+return union(extruded);
 
-// Curved extrusion
-const curvedPath = arcPath3d({
-startAng: 0,
-endAng: 90,
-r: 20,
-fn: 32
-});
+// Example - Curved Path with Initial Rotation:
+const curvedPath = new Path3d()
+    .fn(32)
+    .xyInitAng(true)  // Use XY angle for initial orientation
+    .m(0, 0, 0)
+    .q(10, 0, 0, 20, 0, 10, 0, 0);  // 3D quadratic curve
+
 const curvedExtrusion = linePaths3d(shapes, curvedPath);
 
-// Sweep for tubes/rings
-const circularPath = new Path2d().fn(64).m(20, 0).l(20, 0);
-const wallProfile = new Path2d().fn(16).m(0, 0).l(0, 3).l(2, 3).l(2, 0).l(0, 0);
-const swept = sweep3d(circularPath, wallProfile, null);
+// Example - Multiple Shapes (with holes):
+const complexPath = {
+    path: [
+        'm', 0, 0, 'l', 10, 0, 'l', 10, 10, 'l', 0, 10, 'l', 0, 0,  // Outer
+        'm', 2, 2, 'l', 8, 2, 'l', 8, 8, 'l', 2, 8, 'l', 2, 2   // Hole
+    ],
+    fn: 32
+};
+const complexShapes = shape(complexPath);  // Shape with hole detected
+const hollowExtrusion = linePaths3d(complexShapes, extrusionPath);
 
-return extruded;</code></pre>
-</div>
+// Example - Using Path3d with rotation/scale:
+const dynamicPath = new Path3d()
+    .fn(16)
+    .m(0, 0, 0)
+    .r(0).s(1, 1)
+    .l(0, 0, 5)
+    .r(45).s(1.2, 1.2)  // Rotate 45°, scale up
+    .l(5, 0, 10)
+    .r(90).s(0.8, 0.8); // Rotate 90°, scale down
 
-<h3 id="2d-path-manipulation">2D Path Manipulation</h3>
-<table>
-<thead>
-<tr><th>Function</th><th>Parameters</th><th>Description</th></tr>
-</thead>
-<tbody>
-<tr><td><code>translatePath()</code></td><td><code>[x, y], pathObject</code></td><td>Moves 2D path by offset</td></tr>
-<tr><td><code>rotatePath()</code></td><td><code>angle, pathObject</code></td><td>Rotates 2D path around origin</td></tr>
-<tr><td><code>scalePath()</code></td><td><code>[sx, sy], pathObject</code></td><td>Scales 2D path from origin</td></tr>
-<tr><td><code>scaleToPath()</code></td><td><code>{ x, y }, pathObject</code></td><td>Scales to target dimension</td></tr>
-<tr><td><code>scaleAddPath()</code></td><td><code>{ x, y }, pathObject</code></td><td>Adds to dimensions</td></tr>
-<tr><td><code>alignPath()</code></td><td><code>{ bx, tx, cx, by, ty, cy }, pathObject</code></td><td>Aligns by bounding box</td></tr>
-<tr><td><code>convertTo2d()</code></td><td><code>pathObject3d</code></td><td>Converts 3D path to 2D</td></tr>
-<tr><td><code>convertTo3d()</code></td><td><code>pathObject2d, z</code></td><td>Converts 2D path to 3D</td></tr>
-<tr><td><code>boundingBoxPath()</code></td><td><code>pathObject</code></td><td>Calculates 2D bounding box</td></tr>
-</tbody>
-</table>
-<div class="example-block">
-<div class="example-title">Path Manipulation Examples</div>
-<pre><code>const base = new Path2d().fn(32).m(0, 0).l(10, 0).l(10, 10).l(0, 10).l(0, 0);
+const dynamicExtrusion = linePaths3d(shapes, dynamicPath);</pre>
+        <a href="#index" class="back">⬆ Back to Index</a>
+    </section>
 
-// Translate 5mm right, 3mm up
-const moved = translatePath([5, 3], new Path2d().path(base));
-
-// Rotate 45 degrees
-const rotated = rotatePath(45, new Path2d().path(base));
-
-// Scale to 50mm width
-const sized = scaleToPath({ x: 50 }, new Path2d().path(base));
-
-// Add 5mm to all sides
-const expanded = scaleAddPath({ x: 5, y: 5 }, new Path2d().path(base));
-
-// Get bounding box
-const bbox = boundingBoxPath(base);
-
-// Convert between 2D and 3D
-const path3d = convertTo3d(base, 0);
+    <section id="convertTo2d" class="section">
+        <h3>convertTo2d() <span class="badge path">Path</span></h3>
+        <div class="sig">convertTo2d(path)</div>
+        <div class="desc"><strong>Description:</strong> Converts 3D path commands to 2D by ignoring Z coordinates. Useful for creating 2D profiles from 3D paths or extracting XY projections. Preserves all command types and parameters except Z values.</div>
+        <div class="table-wrap"><table><thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead><tbody>
+            <tr><td>path</td><td>Array</td><td>3D path command array (e.g., ['m', x, y, z, 'l', x, y, z, ...])</td></tr>
+        </tbody></table></div>
+        <div class="returns"><strong>Returns:</strong> Array - 2D path command array with Z values removed</div>
+        <pre>// Example Usage:
+const path3d = ['m', 0, 0, 0, 'l', 10, 10, 5, 'q', 5, 5, 3, 15, 15, 8];
 const path2d = convertTo2d(path3d);
+// Result: ['m', 0, 0, 'l', 10, 10, 'q', 5, 5, 15, 15]
 
-return base;</code></pre>
-</div>
+// Extract XY profile from 3D extrusion path
+const extrusionPath3d = new Path3d()
+    .m(0, 0, 0)
+    .l(10, 10, 20)
+    .q(15, 15, 10, 20, 20, 0);
 
-<h3 id="3d-imports">3D Imports (Requires <code>await</code>)</h3>
-<div class="warning">
-<p><strong>All import functions are asynchronous!</strong> Must use <code>await</code>.</p>
-</div>
-<table>
-<thead>
-<tr><th>Function</th><th>Parameters</th><th>Returns</th></tr>
-</thead>
-<tbody>
-<tr><td><code>importStl()</code></td><td><code>filepath</code></td><td><code>THREE.Mesh</code></td></tr>
-<tr><td><code>importObj()</code></td><td><code>filepath</code></td><td><code>Brush[]</code></td></tr>
-<tr><td><code>importGlb()</code></td><td><code>filepath</code></td><td><code>Brush[]</code></td></tr>
-<tr><td><code>importFbx()</code></td><td><code>filepath</code></td><td><code>Brush[]</code></td></tr>
-<tr><td><code>importSvg()</code></td><td><code>filepath</code></td><td><code>Path2d[]</code></td></tr>
-</tbody>
-</table>
-<div class="example-block">
-<div class="example-title">Import Examples</div>
-<pre><code>// Import STL and combine
-async function model() {
-const imported = await importStl("$lib/part.stl");
-const base = cube([30, 30, 5]);
-return union([imported, floor(base)]);
-}
+const xyProfile = convertTo2d(extrusionPath3d._path);
+const profile2d = new Path2d().path(xyProfile);
 
-// Import SVG and extrude
-async function logo() {
-const svgPaths = await importSvg("$lib/logo.svg");
-const shapes = svgPaths.map(p => shape(p));
-const extrusionPath = new Path3d().m(0, 0, 0).l(0, 0, 2);
-const extruded = shapes.flatMap(s => linePaths3d(s, extrusionPath));
-return union(extruded);
-}
+// Use for creating 2D patterns from 3D designs
+const topView = convertTo2d(complex3dPath);
+const topShape = shape({path: topView, fn: 32});</pre>
+        <a href="#index" class="back">⬆ Back to Index</a>
+    </section>
 
-// Import GLB with multiple meshes
-async function assembly() {
-const parts = await importGlb("$lib/assembly.glb");
-return union(parts);
-}</code></pre>
-</div>
+    <section id="convertTo3d" class="section">
+        <h3>convertTo3d() <span class="badge path">Path</span></h3>
+        <div class="sig">convertTo3d(path, z = 0)</div>
+        <div class="desc"><strong>Description:</strong> Converts 2D path commands to 3D by adding Z coordinate to all points. Useful for lifting 2D profiles to 3D space or preparing 2D paths for 3D extrusion. Preserves all command types.</div>
+        <div class="table-wrap"><table><thead><tr><th>Parameter</th><th>Type</th><th>Default</th><th>Description</th></tr></thead><tbody>
+            <tr><td>path</td><td>Array</td><td>-</td><td>2D path command array (e.g., ['m', x, y, 'l', x, y, ...])</td></tr>
+            <tr><td>z</td><td>number</td><td>0</td><td>Z coordinate to add to all points</td></tr>
+        </tbody></table></div>
+        <div class="returns"><strong>Returns:</strong> Array - 3D path command array with Z values added</div>
+        <pre>// Example Usage:
+const path2d = ['m', 0, 0, 'l', 10, 10, 'q', 5, 5, 15, 15];
+const path3d = convertTo3d(path2d, 5);
+// Result: ['m', 0, 0, 5, 'l', 10, 10, 5, 'q', 5, 5, 5, 15, 15, 5]
 
-<h3 id="text-functions">Text Functions (Requires <code>await</code>)</h3>
-<div class="warning">
-<p><strong>Text functions are asynchronous!</strong> Font loading requires <code>await</code>.</p>
-</div>
-<table>
-<thead>
-<tr><th>Function</th><th>Parameters</th><th>Returns</th></tr>
-</thead>
-<tbody>
-<tr><td><code>font()</code></td><td><code>fontPath</code></td><td><code>Promise&lt;opentype.Font&gt;</code></td></tr>
-<tr><td><code>text()</code></td><td><code>{ font, text, fontSize, fn }</code></td><td><code>Path2d</code></td></tr>
-</tbody>
-</table>
-<div class="example-block">
-<div class="example-title">Text Examples</div>
-<pre><code>async function textModel() {
-const myFont = await font("$lib/arial.ttf");
+// Lift 2D profile to 3D at specific height
+const floorPlan = ['m', 0, 0, 'l', 20, 0, 'l', 20, 15, 'l', 0, 15, 'l', 0, 0];
+const atHeight = convertTo3d(floorPlan, 2.5);  // At Z=2.5mm
 
-const textPath = text({
-font: myFont,
-text: "CSG",
-fontSize: 10,
-fn: 32
+// Prepare 2D path for 3D extrusion
+const profile2d = new Path2d().m(0,0).l(5,0).l(5,5).l(0,5).l(0,0);
+const profile3d = new Path3d().path(convertTo3d(profile2d._path, 0));
+
+// Create layered 2D designs at different heights
+const layer1 = convertTo3d(basePattern, 0);
+const layer2 = convertTo3d(detailPattern, 1);
+const layer3 = convertTo3d(topPattern, 2);</pre>
+        <a href="#index" class="back">⬆ Back to Index</a>
+    </section>
+
+    <section id="arcPath3d" class="section">
+        <h3>arcPath3d() <span class="badge path">Path</span></h3>
+        <div class="sig">arcPath3d(config)</div>
+        <div class="desc"><strong>Description:</strong> Creates a 3D arc path from angular parameters. Generates smooth arc in XY plane at Z=0. Useful for creating circular segments, curved paths, and arc-based extrusions.</div>
+        <div class="table-wrap"><table><thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead><tbody>
+            <tr><td>config.startAng</td><td>number</td><td>Start angle in degrees (0° = positive X axis)</td></tr>
+            <tr><td>config.endAng</td><td>number</td><td>End angle in degrees</td></tr>
+            <tr><td>config.d</td><td>number</td><td>Diameter of arc</td></tr>
+            <tr><td>config.r</td><td>number</td><td>Radius (used if d not provided)</td></tr>
+            <tr><td>config.fn</td><td>number</td><td>Number of segments for tessellation (default: 30)</td></tr>
+        </tbody></table></div>
+        <div class="returns"><strong>Returns:</strong> Object {path: Array, fn: number} - Path data object ready for Path3d.path()</div>
+        <pre>// Example Usage:
+const arc = arcPath3d({
+    startAng: 0,
+    endAng: 90,  // Quarter circle
+    d: 10,       // 10mm diameter
+    fn: 32       // High resolution
+});
+const path3d = new Path3d().path(arc);
+
+// Create semicircular path
+const semiCircle = arcPath3d({
+    startAng: 0,
+    endAng: 180,
+    r: 15,  // 15mm radius
+    fn: 64
 });
 
-const textShape = shape(textPath);
-const extrusionPath = new Path3d().m(0, 0, 0).l(0, 0, 2);
-const extruded = linePaths3d(textShape, extrusionPath);
+// Full circle (useful for sweep3d)
+const fullCircle = arcPath3d({
+    startAng: 0,
+    endAng: 360,
+    r: 20,
+    fn: 128
+});
 
-return union(extruded);
-}</code></pre>
-</div>
+// Use arc for extrusion
+const arcExtrusion = new Path3d()
+    .path(arcPath3d({startAng: 0, endAng: 180, r: 10, fn: 32}))
+    .l(0, 0, 5);  // Add straight segment
 
-<h3 id="utilities">Utility Functions</h3>
-<table>
-<thead>
-<tr><th>Function</th><th>Parameters</th><th>Description</th></tr>
-</thead>
-<tbody>
-<tr><td><code>color()</code></td><td><code>c, ...target</code></td><td>Applies color (hex, rgb, or name)</td></tr>
-<tr><td><code>convexHull()</code></td><td><code>...target</code></td><td>Creates convex hull around objects</td></tr>
-<tr><td><code>boundingBox()</code></td><td><code>...target</code></td><td>Calculates 3D world-space bounding box</td></tr>
-<tr><td><code>subdivide()</code></td><td><code>{ resolution }, ...target</code></td><td>Refines geometry for smoother surfaces</td></tr>
-<tr><td><code>show()</code></td><td><code>...target</code></td><td>Sets visibility to true</td></tr>
-<tr><td><code>hide()</code></td><td><code>...target</code></td><td>Sets visibility to false</td></tr>
-<tr><td><code>expand()</code></td><td><code>...target</code></td><td>Extracts meshes into array</td></tr>
-<tr><td><code>clone()</code></td><td><code>source</code></td><td>Deep clones THREE.js objects</td></tr>
-</tbody>
-</table>
-<div class="example-block">
-<div class="example-title">Utility Examples</div>
-<pre><code>// Apply color
-const redCube = color(0xff0000, cube([10, 10, 10]));
-const blueSphere = color("#0000ff", sphere({ r: 5 }));
+const profile = new Path2d().m(0,0).l(2,0).l(2,1).l(0,1).l(0,0);
+const curvedPart = extrude3d({profile}, arcExtrusion);
 
-// Convex hull
-const hull = convexHull(cube([10, 10, 10]), translate([15, 0, 0], sphere({ r: 5 })));
+// Create spiral by combining arcs
+const spiral = new Path3d().fn(16);
+for (let i = 0; i < 4; i++) {
+    const radius = 5 + i * 3;
+    spiral.path(arcPath3d({
+        startAng: i * 90,
+        endAng: (i + 1) * 90,
+        r: radius,
+        fn: 8
+    }));
+}</pre>
+        <a href="#index" class="back">⬆ Back to Index</a>
+    </section>
 
-// Bounding box
-const bbox = boundingBox(cube([10, 10, 10]), sphere({ r: 5 }));
+    <!-- PATH MANIPULATION -->
+    <h2 id="path-manip" style="color:white;margin:2rem 0 1rem;text-align:center">✏️ Path Manipulation</h2>
 
-// Subdivide for smoother booleans
-const smooth = subdivide({ resolution: 0.5 }, sphere({ r: 10, fn: 16 }));
+    <section id="translatePath" class="section">
+        <h3>translatePath() <span class="badge path">Path</span></h3>
+        <div class="sig">translatePath([x, y], pathObject)</div>
+        <div class="desc"><strong>Description:</strong> Translates 2D path data by offset. Modifies path coordinates directly. Handles all command types (m, l, q, c, x and relative variants). Returns modified Path2d instance.</div>
+        <div class="table-wrap"><table><thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead><tbody>
+            <tr><td>[x, y]</td><td>Array[number]</td><td>Translation offset in mm (X=right, Y=up)</td></tr>
+            <tr><td>pathObject</td><td>Path2d</td><td>Path to translate</td></tr>
+        </tbody></table></div>
+        <div class="returns"><strong>Returns:</strong> Path2d - Translated path object (same reference, modified)</div>
+        <pre>// Example Usage:
+const path = new Path2d().m(0, 0).l(5, 5);
+const moved = translatePath([10, 10], path);  // Move 10mm right, 10mm up
 
-// Show/hide for debugging
-const debug = hide(cube([10, 10, 10]));
-const visible = show(sphere({ r: 5 }));
+// Translate complex path
+const complex = new Path2d()
+    .m(0, 0)
+    .q(2, 2, 4, 4)
+    .c(1, 1, 3, 3, 5, 5);
+const positioned = translatePath([20, 0], complex);
 
-// Deep clone
+// Create pattern by translating copies
+const base = new Path2d().m(0,0).l(5,0).l(5,5).l(0,5).l(0,0);
+const pattern = [];
+for (let i = 0; i < 4; i++) {
+    pattern.push(translatePath([i * 6, 0], new Path2d().path(base)));
+}</pre>
+        <a href="#index" class="back">⬆ Back to Index</a>
+    </section>
+
+    <section id="rotatePath" class="section">
+        <h3>rotatePath() <span class="badge path">Path</span></h3>
+        <div class="sig">rotatePath(angle, pathObject)</div>
+        <div class="desc"><strong>Description:</strong> Rotates 2D path data around origin (0,0). Angle in degrees. Applies rotation matrix to all coordinate points. Handles all command types including curves.</div>
+        <div class="table-wrap"><table><thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead><tbody>
+            <tr><td>angle</td><td>number</td><td>Rotation angle in degrees (positive = counter-clockwise)</td></tr>
+            <tr><td>pathObject</td><td>Path2d</td><td>Path to rotate</td></tr>
+        </tbody></table></div>
+        <div class="returns"><strong>Returns:</strong> Path2d - Rotated path object (same reference)</div>
+        <pre>// Example Usage:
+const path = new Path2d().m(5, 0).l(10, 0);
+const rotated = rotatePath(90, path);  // Rotate 90° CCW
+
+// Create radial pattern
+const spoke = new Path2d().m(0,0).l(0,10);
+const wheel = [];
+for (let i = 0; i < 8; i++) {
+    wheel.push(rotatePath(i * 45, new Path2d().path(spoke)));
+}
+
+// Rotate then translate for positioning
+const oriented = translatePath(
+    [10, 10],
+    rotatePath(45, new Path2d().path(baseShape))
+);</pre>
+        <a href="#index" class="back">⬆ Back to Index</a>
+    </section>
+
+    <section id="scalePath" class="section">
+        <h3>scalePath() <span class="badge path">Path</span></h3>
+        <div class="sig">scalePath([scaleX, scaleY], pathObject)</div>
+        <div class="desc"><strong>Description:</strong> Scales 2D path data by factors from origin. Non-uniform scaling supported. Multiplies all coordinates by scale factors. Handles all command types.</div>
+        <div class="table-wrap"><table><thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead><tbody>
+            <tr><td>[scaleX, scaleY]</td><td>Array[number]</td><td>Scale factors (1.0 = no change, 2.0 = double size)</td></tr>
+            <tr><td>pathObject</td><td>Path2d</td><td>Path to scale</td></tr>
+        </tbody></table></div>
+        <div class="returns"><strong>Returns:</strong> Path2d - Scaled path object (same reference)</div>
+        <pre>// Example Usage:
+const path = new Path2d().m(0, 0).l(5, 5);
+const doubled = scalePath([2, 2], path);  // 2× larger
+const stretched = scalePath([2, 1], path);  // 2× wider, same height
+
+// Create nested outlines
+const outer = scalePath([1.2, 1.2], baseProfile);
+const inner = scalePath([0.8, 0.8], baseProfile);
+
+// Non-uniform scaling for custom shapes
+const flattened = scalePath([1, 0.5], circleProfile);  // Ellipse</pre>
+        <a href="#index" class="back">⬆ Back to Index</a>
+    </section>
+
+    <section id="scaleToPath" class="section">
+        <h3>scaleToPath() <span class="badge path">Path</span></h3>
+        <div class="sig">scaleToPath(config = {}, pathObject)</div>
+        <div class="desc"><strong>Description:</strong> Scales 2D path to specific dimensions. Maintains aspect ratio if only one dimension specified. Calculates scale factor from bounding box.</div>
+        <div class="table-wrap"><table><thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead><tbody>
+            <tr><td>config.x</td><td>number</td><td>Target width in mm</td></tr>
+            <tr><td>config.y</td><td>number</td><td>Target height in mm</td></tr>
+            <tr><td>pathObject</td><td>Path2d</td><td>Path to scale</td></tr>
+        </tbody></table></div>
+        <div class="returns"><strong>Returns:</strong> Path2d - Scaled path object (same reference)</div>
+        <pre>// Example Usage:
+const path = new Path2d().m(0, 0).l(5, 5);
+const sized = scaleToPath({ x: 10 }, path);  // Scale to 10mm wide (uniform)
+
+// Scale to specific height
+const tall = scaleToPath({ y: 20 }, path);
+
+// Both dimensions (uniform scale to fit)
+const fitted = scaleToPath({ x: 10, y: 20 }, path);  // Uses first defined
+
+// Standardize imported profiles
+const standardized = scaleToPath({ x: 50 }, importedProfile);</pre>
+        <a href="#index" class="back">⬆ Back to Index</a>
+    </section>
+
+    <section id="scaleAddPath" class="section">
+        <h3>scaleAddPath() <span class="badge path">Path</span></h3>
+        <div class="sig">scaleAddPath(config = {}, pathObject)</div>
+        <div class="desc"><strong>Description:</strong> Adds dimensions to 2D path bounding box. Expands path by specified amounts from center. Calculates scale factor as (current + add) / current.</div>
+        <div class="table-wrap"><table><thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead><tbody>
+            <tr><td>config.x</td><td>number</td><td>Amount to add to width in mm</td></tr>
+            <tr><td>config.y</td><td>number</td><td>Amount to add to height in mm</td></tr>
+            <tr><td>pathObject</td><td>Path2d</td><td>Path to expand</td></tr>
+        </tbody></table></div>
+        <div class="returns"><strong>Returns:</strong> Path2d - Expanded path object (same reference)</div>
+        <pre>// Example Usage:
+const path = new Path2d().m(0, 0).l(10, 10);
+const thicker = scaleAddPath({ x: 2, y: 2 }, path);  // Add 2mm to each dimension
+
+// Create offset/outset paths
+const offset = scaleAddPath({ x: 1, y: 1 }, original);  // 1mm outward offset
+
+// Add tolerance for 3D printing
+const withTolerance = scaleAddPath({ x: 0.2, y: 0.2 }, holeProfile);</pre>
+        <a href="#index" class="back">⬆ Back to Index</a>
+    </section>
+
+    <section id="alignPath" class="section">
+        <h3>alignPath() <span class="badge path">Path</span></h3>
+        <div class="sig">alignPath(config = {}, pathObject)</div>
+        <div class="desc"><strong>Description:</strong> Aligns 2D path to specified positions based on bounding box. Only one alignment per axis is used (first defined wins).</div>
+        <div class="table-wrap"><table><thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead><tbody>
+            <tr><td>config.bx</td><td>number</td><td>Align bottom (min X) to this position</td></tr>
+            <tr><td>config.tx</td><td>number</td><td>Align top (max X) to this position</td></tr>
+            <tr><td>config.cx</td><td>number</td><td>Align center X to this position</td></tr>
+            <tr><td>config.by</td><td>number</td><td>Align bottom (min Y) to this position</td></tr>
+            <tr><td>config.ty</td><td>number</td><td>Align top (max Y) to this position</td></tr>
+            <tr><td>config.cy</td><td>number</td><td>Align center Y to this position</td></tr>
+        </tbody></table></div>
+        <div class="returns"><strong>Returns:</strong> Path2d - Aligned path object (same reference)</div>
+        <pre>// Example Usage:
+const path = new Path2d().m(0, 0).l(10, 10);
+const centered = alignPath({ cx: 0, cy: 0 }, path);  // Center at origin
+
+// Align to build area
+const onPlate = alignPath({ bx: 0, by: 0 }, path);  // Bottom-left at origin
+
+// Edge alignment
+const leftAligned = alignPath({ bx: 0 }, path);  // Left edge at X=0
+
+// Multiple alignments (first per axis wins)
+alignPath({ bx: 0, cx: 10 }, path);  // Uses bx: 0, ignores cx: 10</pre>
+        <a href="#index" class="back">⬆ Back to Index</a>
+    </section>
+
+    <section id="boundingBoxPath" class="section">
+        <h3>boundingBoxPath() <span class="badge path">Path</span></h3>
+        <div class="sig">boundingBoxPath(pathObject)</div>
+        <div class="desc"><strong>Description:</strong> Calculates 2D bounding box for path data. Flattens curves first using path2d() for accuracy. Returns min/max coordinates in 2D space.</div>
+        <div class="table-wrap"><table><thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead><tbody>
+            <tr><td>pathObject</td><td>Object</td><td>Path data {path: Array, fn: number} or Path2d instance</td></tr>
+        </tbody></table></div>
+        <div class="returns"><strong>Returns:</strong> Object {min: {x, y}, max: {x, y}} - Bounding box coordinates</div>
+        <pre>// Example Usage:
+const path = { path: ['m', 0, 0, 'l', 10, 10], fn: 32 };
+const bbox = boundingBoxPath(path);
+console.log(bbox.min);  // {x: 0, y: 0}
+console.log(bbox.max);  // {x: 10, y: 10}
+
+// Calculate size
+const width = bbox.max.x - bbox.min.x;
+const height = bbox.max.y - bbox.min.y;
+
+// Center path at origin
+const centered = translatePath(
+    [-(bbox.min.x + width/2), -(bbox.min.y + height/2)],
+    new Path2d().path(path)
+);
+
+// Use with Path2d instance
+const path2d = new Path2d().m(0,0).l(5,5);
+const bbox2 = path2d.boundingBox();  // Method on Path2d class</pre>
+        <a href="#index" class="back">⬆ Back to Index</a>
+    </section>
+
+    <!-- SHAPE & TEXT -->
+    <h2 id="shape-text" style="color:white;margin:2rem 0 1rem;text-align:center">🔤 Shape & Text</h2>
+
+    <section id="shape" class="section">
+        <h3>shape() <span class="badge path">Path</span></h3>
+        <div class="sig">shape(shapeDataPath)</div>
+        <div class="desc"><strong>Description:</strong> Creates THREE.Shape objects from path data. Handles holes and nested contours automatically using bounding box containment and scanline testing. Converts path commands to THREE.Path and triangulates with THREE.ShapeUtils.</div>
+        <div class="table-wrap"><table><thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead><tbody>
+            <tr><td>shapeDataPath</td><td>Object</td><td>Path data {path: Array, fn: number} or result from Path2d.getPoints()</td></tr>
+        </tbody></table></div>
+        <div class="returns"><strong>Returns:</strong> Array[THREE.Shape] - Array of shape objects with holes properly assigned to .holes array</div>
+        <pre>// Example Usage:
+const pathData = {
+    path: [
+        'm', 0, 0, 'l', 10, 0, 'l', 10, 10, 'l', 0, 10, 'l', 0, 0,  // Outer
+        'm', 2, 2, 'l', 8, 2, 'l', 8, 8, 'l', 2, 8, 'l', 2, 2   // Hole
+    ],
+    fn: 32
+};
+const shapes = shape(pathData);  // Returns array with holes detected
+
+// Use with Path2d
+const path2d = new Path2d()
+    .fn(32)
+    .m(0, 0).l(10, 0).l(10, 10).l(0, 10).l(0, 0)
+    .m(2, 2).l(8, 2).l(8, 8).l(2, 8).l(2, 2);  // Hole
+
+const shapeData = path2d.getPoints();  // Tessellated with hole detection
+const threeShapes = shape(shapeData);
+
+// Extrude the shape
+const extrusionPath = new Path3d().m(0, 0, 0).l(0, 0, 5);
+const extruded = linePaths3d(threeShapes, extrusionPath);
+
+// Multiple separate shapes in one path
+const multiPath = {
+    path: [
+        'm', 0, 0, 'l', 5, 0, 'l', 5, 5, 'l', 0, 5, 'l', 0, 0,  // Square 1
+        'm', 10, 0, 'l', 15, 0, 'l', 15, 5, 'l', 10, 5, 'l', 10, 0  // Square 2
+    ],
+    fn: 32
+};
+const twoShapes = shape(multiPath);  // Returns array of 2 shapes</pre>
+        <a href="#index" class="back">⬆ Back to Index</a>
+    </section>
+
+    <section id="font" class="section">
+        <h3>font() <span class="badge path">Path</span></h3>
+        <div class="sig">async font(fontPath)</div>
+        <div class="desc"><strong>Description:</strong> Loads font file using opentype.js. Fetches binary font data via api.readFileBinary() and parses with opentype.parse(). Supports .ttf, .otf formats.</div>
+        <div class="table-wrap"><table><thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead><tbody>
+            <tr><td>fontPath</td><td>string</td><td>Path to font file (.ttf, .otf). Supports $lib/, absolute, and relative paths.</td></tr>
+        </tbody></table></div>
+        <div class="returns"><strong>Returns:</strong> Promise&lt;opentype.Font&gt; - Loaded font object for text() function</div>
+        <div class="warning">⚠️ <strong>Async:</strong> Must use <code>await</code> or .then()</div>
+        <pre>// Example Usage:
+async function textModel() {
+    const myFont = await font('/fonts/arial.ttf');
+    // or
+    const libFont = await font('$lib/roboto-bold.ttf');
+    
+    const textPath = text({
+        font: myFont,
+        text: 'Hello',
+        fontSize: 10
+    });
+    // ... continue with extrusion
+}
+
+// Error handling
+try {
+    const font = await font('$lib/custom.ttf');
+} catch (error) {
+    console.error('Font load failed:', error);
+    // Fallback to default font
+}
+
+// Load multiple fonts
+const [font1, font2] = await Promise.all([
+    font('$lib/font1.ttf'),
+    font('$lib/font2.ttf')
+]);</pre>
+        <a href="#index" class="back">⬆ Back to Index</a>
+    </section>
+
+    <section id="text" class="section">
+        <h3>text() <span class="badge path">Path</span></h3>
+        <div class="sig">text(textData)</div>
+        <div class="desc"><strong>Description:</strong> Converts text to path data using opentype.js font. All glyphs concatenated into single path array. Y coordinates inverted for Y-up 2D system. Returns Path2d instance ready for shape() or extrusion.</div>
+        <div class="table-wrap"><table><thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead><tbody>
+            <tr><td>textData.font</td><td>opentype.Font</td><td>Loaded font object from font() function</td></tr>
+            <tr><td>textData.text</td><td>string</td><td>Text string to render</td></tr>
+            <tr><td>textData.fontSize</td><td>number</td><td>Font size in mm (default: 3)</td></tr>
+            <tr><td>textData.fn</td><td>number</td><td>Tessellation factor for curves (default: 40)</td></tr>
+        </tbody></table></div>
+        <div class="returns"><strong>Returns:</strong> Path2d - Path object containing text outline, ready for shape() or getPoints()</div>
+        <pre>// Example Usage:
+async function textModel() {
+    const font = await font('/fonts/arial.ttf');
+    
+    const textPath = text({
+        font: font,
+        text: 'Hello World',
+        fontSize: 10,  // 10mm tall text
+        fn: 40         // High resolution curves
+    });
+    
+    // Convert to shape for extrusion
+    const textShape = shape(textPath);
+    
+    // Extrude to 3D
+    const extrusionPath = new Path3d().m(0, 0, 0).l(0, 0, 2);
+    const extruded = linePaths3d(textShape, extrusionPath);
+    
+    return union(extruded);
+}
+
+// Position text
+const positionedText = translatePath(
+    [5, 5],  // Offset from origin
+    text({font, text: 'Label', fontSize: 5})
+);
+
+// Multiple text elements
+const lines = ['Line 1', 'Line 2', 'Line 3'].map((line, i) => 
+    translatePath([0, -i * 6], text({font, text: line, fontSize: 5}))
+);</pre>
+        <a href="#index" class="back">⬆ Back to Index</a>
+    </section>
+
+    <!-- IMPORT FUNCTIONS -->
+    <h2 id="imports" style="color:white;margin:2rem 0 1rem;text-align:center">📥 Import Functions</h2>
+
+    <section id="importStl" class="section">
+        <h3>importStl() <span class="badge imp">Import</span></h3>
+        <div class="sig">async importStl(filePath)</div>
+        <div class="desc"><strong>Description:</strong> Imports STL file (ASCII or binary). Auto-detects format from header. Parses vertices, generates normals with computeVertexNormals(), and creates planar UVs. Returns THREE.Mesh with defaultMaterial.</div>
+        <div class="table-wrap"><table><thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead><tbody>
+            <tr><td>filePath</td><td>string</td><td>Path to STL file. Supports $lib/, absolute, and relative paths.</td></tr>
+        </tbody></table></div>
+        <div class="returns"><strong>Returns:</strong> Promise&lt;THREE.Mesh&gt; - Loaded mesh with position, normal, and uv attributes</div>
+        <div class="warning">⚠️ <strong>Async:</strong> Must use <code>await</code> or .then()</div>
+        <pre>// Example Usage:
+async function model() {
+    const part = await importStl('/models/part.stl');
+    scene.add(part);
+    
+    // Use in CSG operations
+    const combined = union(
+        cube([10, 10, 10]),
+        await importStl('/models/addon.stl')
+    );
+    
+    // Position imported part
+    const positioned = translate([5, 5, 0], await importStl('$lib/component.stl'));
+    
+    return combined;
+}
+
+// Error handling
+try {
+    const mesh = await importStl('$lib/missing.stl');
+} catch (error) {
+    console.error('STL load failed:', error);
+    // Fallback to primitive
+    return cube([10, 10, 10]);
+}
+
+// Multiple imports
+const [part1, part2, part3] = await Promise.all([
+    importStl('$lib/base.stl'),
+    importStl('$lib/mount.stl'),
+    importStl('$lib/cover.stl')
+]);
+const assembly = union(part1, part2, part3);</pre>
+        <a href="#index" class="back">⬆ Back to Index</a>
+    </section>
+
+    <section id="importGlb" class="section">
+        <h3>importGlb() <span class="badge imp">Import</span></h3>
+        <div class="sig">async importGlb(filePath)</div>
+        <div class="desc"><strong>Description:</strong> Imports GLB/GLTF file using GLTFLoader. Removes textures, applies defaultMaterial.clone() to all meshes. Ensures geometry has position, normal, and uv attributes. Returns array of Brush objects for CSG compatibility.</div>
+        <div class="table-wrap"><table><thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead><tbody>
+            <tr><td>filePath</td><td>string</td><td>Path to GLB file. Supports $lib/, absolute, and relative paths.</td></tr>
+        </tbody></table></div>
+        <div class="returns"><strong>Returns:</strong> Promise&lt;Array[Brush]&gt; - Array of Brush objects with transforms preserved</div>
+        <div class="note">📝 <strong>Note:</strong> Generates missing normals and UVs automatically. Preserves position, rotation, scale from original GLB.</div>
+        <pre>// Example Usage:
+async function assembly() {
+    const brushes = await importGlb('/models/assembly.glb');
+    
+    // Combine all parts
+    const combined = union(...brushes);
+    
+    // Or add individually to scene
+    brushes.forEach(brush => scene.add(brush));
+    
+    return combined;
+}
+
+// Position imported assembly
+const positioned = translate(
+    [10, 10, 0],
+    ...(await importGlb('$lib/component.glb'))
+);
+
+// Use in CSG with other primitives
+const hybrid = union(
+    cube([20, 20, 5]),  // Base plate
+    ...(await importGlb('$lib/mount.glb'))  // Imported mount
+);
+
+// Filter specific meshes from GLB
+const allBrushes = await importGlb('$lib/complex.glb');
+const onlyLarge = allBrushes.filter(b => 
+    boundingBox(b).max.x - boundingBox(b).min.x > 10
+);</pre>
+        <a href="#index" class="back">⬆ Back to Index</a>
+    </section>
+
+    <section id="importObj" class="section">
+        <h3>importObj() <span class="badge imp">Import</span></h3>
+        <div class="sig">async importObj(filePath)</div>
+        <div class="desc"><strong>Description:</strong> Imports OBJ file using OBJLoader. Converts meshes to Brush objects for CSG operations. Ensures geometry has required attributes. Preserves transforms from original OBJ.</div>
+        <div class="table-wrap"><table><thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead><tbody>
+            <tr><td>filePath</td><td>string</td><td>Path to OBJ file. Supports $lib/, absolute, and relative paths.</td></tr>
+        </tbody></table></div>
+        <div class="returns"><strong>Returns:</strong> Promise&lt;Array[Brush]&gt; - Array of Brush objects</div>
+        <pre>// Example Usage:
+async function model() {
+    const brushes = await importObj('/models/part.obj');
+    const result = difference(base, ...brushes);  // Use as cutters
+    return result;
+}
+
+// Combine with other imports
+const [stlPart, objPart] = await Promise.all([
+    importStl('$lib/base.stl'),
+    importObj('$lib/detail.obj')
+]);
+const combined = union(stlPart, ...objPart);</pre>
+        <a href="#index" class="back">⬆ Back to Index</a>
+    </section>
+
+    <section id="importFbx" class="section">
+        <h3>importFbx() <span class="badge imp">Import</span></h3>
+        <div class="sig">async importFbx(filePath)</div>
+        <div class="desc"><strong>Description:</strong> Imports FBX file using FBXLoader. Converts meshes to Brush objects. Handles animations and hierarchies (meshes only). Ensures geometry has required attributes.</div>
+        <div class="table-wrap"><table><thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead><tbody>
+            <tr><td>filePath</td><td>string</td><td>Path to FBX file. Supports $lib/, absolute, and relative paths.</td></tr>
+        </tbody></table></div>
+        <div class="returns"><strong>Returns:</strong> Promise&lt;Array[Brush]&gt; - Array of Brush objects</div>
+        <pre>// Example Usage:
+async function model() {
+    const brushes = await importFbx('/models/character.fbx');
+    const mesh = union(...brushes);  // Combine all meshes
+    return mesh;
+}
+
+// Use FBX as reference for CSG
+const reference = await importFbx('$lib/reference.fbx');
+const customPart = difference(cube([20, 20, 20]), ...reference);</pre>
+        <a href="#index" class="back">⬆ Back to Index</a>
+    </section>
+
+    <section id="importSvg" class="section">
+        <h3>importSvg() <span class="badge imp">Import</span></h3>
+        <div class="sig">async importSvg(filePath)</div>
+        <div class="desc"><strong>Description:</strong> Imports SVG file. Converts path, circle, rect, ellipse, line, polygon, polyline elements to Path2d objects. Uses fn=32 default tessellation. Arcs approximated with bezier curves.</div>
+        <div class="table-wrap"><table><thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead><tbody>
+            <tr><td>filePath</td><td>string</td><td>Path to SVG file. Supports $lib/, absolute, and relative paths.</td></tr>
+        </tbody></table></div>
+        <div class="returns"><strong>Returns:</strong> Promise&lt;Array[Path2d]&gt; - Array of Path2d objects ready for shape() or extrusion</div>
+        <div class="note">📝 <strong>Note:</strong> Default tessellation factor: 32. Arcs approximated with bezier curves. Supports common SVG elements.</div>
+        <pre>// Example Usage:
+async function svgModel() {
+    const paths = await importSvg('/designs/logo.svg');
+    
+    // Extrude all paths
+    const extrusionPath = new Path3d().m(0, 0, 0).l(0, 0, 2);
+    const extruded = paths.flatMap(path => 
+        linePaths3d(shape(path), extrusionPath)
+    );
+    
+    return union(extruded);
+}
+
+// Filter and process specific paths
+const allPaths = await importSvg('$lib/design.svg');
+const largePaths = allPaths.filter(p => 
+    p.boundingBox().max.x - p.boundingBox().min.x > 10
+);
+
+// Position imported SVG elements
+const positioned = allPaths.map((path, i) => 
+    translatePath([i * 15, 0], path)
+);
+
+// Combine with text
+async function labeledLogo() {
+    const [logoPaths, font] = await Promise.all([
+        importSvg('$lib/logo.svg'),
+        font('$lib/arial.ttf')
+    ]);
+    
+    const label = text({font, text: 'Brand', fontSize: 5});
+    const allShapes = [...logoPaths, label].map(p => shape(p));
+    
+    return union(...allShapes.flatMap(s => 
+        linePaths3d(s, new Path3d().m(0,0,0).l(0,0,2))
+    ));
+}</pre>
+        <a href="#index" class="back">⬆ Back to Index</a>
+    </section>
+
+    <!-- UTILITIES -->
+    <h2 id="utilities" style="color:white;margin:2rem 0 1rem;text-align:center">🛠️ Utilities</h2>
+
+    <section id="clone" class="section">
+        <h3>clone() <span class="badge util">Utility</span></h3>
+        <div class="sig">clone(source)</div>
+        <div class="desc"><strong>Description:</strong> Deep clones THREE.js objects including Mesh, Shape, Brush, BufferGeometry. Handles nested children and attributes properly. Special handling for BufferAttribute data arrays to ensure true deep copy of vertex/index data.</div>
+        <div class="table-wrap"><table><thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead><tbody>
+            <tr><td>source</td><td>THREE.Mesh|Shape|Brush|Array|Object</td><td>Object to clone. Supports meshes, shapes, arrays, and generic objects.</td></tr>
+        </tbody></table></div>
+        <div class="returns"><strong>Returns:</strong> THREE.Mesh|Shape|Brush|Array|Object - Deep cloned copy with independent geometry data</div>
+        <div class="note">📝 <strong>Note:</strong> Uses targeted geometry cloning for BufferGeometry to ensure vertex/index arrays are truly independent.</div>
+        <pre>// Example Usage:
 const original = cube([10, 10, 10]);
-const copy1 = clone(original);
-const copy2 = clone(original);
-translate([15, 0, 0], copy1);
-translate([-15, 0, 0], copy2);
-const cloned = union([original, copy1, copy2]);
+const copy = clone(original);
+translate([15, 0, 0], copy);  // Move copy without affecting original
 
-// Expand nested structures
-const meshes = expand(union(cube([10, 10, 10]), sphere({ r: 5 })));
+// Clone arrays
+const originalArray = [mesh1, mesh2];
+const copiedArray = clone(originalArray);  // Deep copy of array and contents
 
-return cloned;</code></pre>
-</div>
+// Clone complex structures
+const assembly = {
+    base: cube([20, 20, 2]),
+    posts: [cylinder({r:2,h:10}), cylinder({r:2,h:10})]
+};
+const duplicate = clone(assembly);
 
-<h3 id="three-access">Three.js Access</h3>
-<div class="note">
-<p>Direct access to Three.js namespace for advanced operations.</p>
-</div>
-<div class="example-block">
-<div class="example-title">Three.js Access Example</div>
-<pre><code>// Create custom geometry
-const customGeom = new THREE.TorusGeometry(10, 3, 16, 100);
-const customMesh = new THREE.Mesh(customGeom, defaultMaterial.clone());
+// Create pattern with clones
+const base = cube([5, 5, 5]);
+const grid = [];
+for (let x = 0; x < 3; x++) {
+    for (let y = 0; y < 3; y++) {
+        const instance = clone(base);
+        translate([x * 7, y * 7, 0], instance);
+        grid.push(instance);
+    }
+}
+return union(...grid);
 
-// Use any THREE function
-const vector = new THREE.Vector3(1, 2, 3);
-const quaternion = new THREE.Quaternion();
+// Clone before modification
+const template = sphere({r: 5});
+const red = color(0xff0000, clone(template));
+const blue = color(0x0000ff, clone(template));
+const green = color(0x00ff00, clone(template));</pre>
+        <a href="#index" class="back">⬆ Back to Index</a>
+    </section>
 
-return customMesh;</code></pre>
-</div>
-</section>
-
-<hr />
-<div class="nav-buttons">
-<a href="#examples" class="nav-button">Next: Examples &rarr;</a>
-<a href="#top" class="nav-button">↑ Top</a>
-</div>
-
-<section id="examples">
-<h2>7. Complete Examples</h2>
-
-<div class="example-block" id="example-basic-assembly">
-<div class="example-title">Basic Assembly with Placement</div>
-<pre><code>// Base plate with mounted components
+    <!-- EXAMPLES -->
+    <section id="examples" class="section">
+        <h2>7. Complete Examples</h2>
+        
+        <h3>Basic Assembly with Placement</h3>
+        <pre>// Base plate with mounted components
 const basePlate = cube([50, 50, 3]);
 const mount1 = cylinder({ r: 5, h: 10 });
 const mount2 = cylinder({ r: 5, h: 10 });
 
-// Place mounts on corners
+// Place mounts on corners using placement commands
 placement({ 'lbl': 0, 'lbd': 0, 'bbz': 0 }, basePlate, mount1);
 placement({ 'rbr': 0, 'rbu': 0, 'bbz': 0 }, basePlate, mount2);
 
@@ -1007,12 +2140,10 @@ const holeCutter = cylinder({ r: 2, h: 15 });
 const mountWithHole1 = difference(mount1, translate([0, 0, -2.5], holeCutter));
 const mountWithHole2 = difference(mount2, translate([0, 0, -2.5], clone(holeCutter)));
 
-return union([basePlate, mountWithHole1, mountWithHole2]);</code></pre>
-</div>
+return union([basePlate, mountWithHole1, mountWithHole2]);</pre>
 
-<div class="example-block" id="example-parametric-box">
-<div class="example-title">Parametric Box with Wall Thickness</div>
-<pre><code>// Parameters
+        <h3>Parametric Box with Wall Thickness</h3>
+        <pre>// Parameters
 const outerW = 40, outerD = 30, outerH = 20, wallThickness = 2;
 
 // Outer box
@@ -1020,32 +2151,30 @@ const outer = cube([outerW, outerD, outerH]);
 
 // Inner box (subtracted to create hollow)
 const inner = cube([
-outerW - wallThickness * 2,
-outerD - wallThickness * 2,
-outerH - wallThickness
+  outerW - wallThickness * 2,
+  outerD - wallThickness * 2,
+  outerH - wallThickness
 ]);
 
-// Position inner box
+// Position inner box (centered with offset for walls)
 const positionedInner = translate([wallThickness, wallThickness, wallThickness], inner);
 
 // Create hollow box
 const hollowBox = difference(outer, positionedInner);
 
-// Add lid
+// Add lid with slight overhang
 const lid = cube([outerW + 1, outerD + 1, 2]);
 const positionedLid = translate([0, 0, outerH], lid);
 
-return union([hollowBox, positionedLid]);</code></pre>
-</div>
+return union([hollowBox, positionedLid]);</pre>
 
-<div class="example-block" id="example-custom-profile">
-<div class="example-title">Custom Profile Extrusion</div>
-<pre><code>// I-beam profile
+        <h3>Custom Profile Extrusion with Path2d</h3>
+        <pre>// I-beam profile using Path2d class
 const profile = new Path2d()
-.fn(4)
-.m(-10, 5).l(10, 5).l(10, 3).l(3, 3).l(3, -3)
-.l(10, -3).l(10, -5).l(-10, -5).l(-10, -3)
-.l(-3, -3).l(-3, 3).l(-10, 3).l(-10, 5);
+  .fn(4)  // Low resolution for straight edges
+  .m(-10, 5).l(10, 5).l(10, 3).l(3, 3).l(3, -3)
+  .l(10, -3).l(10, -5).l(-10, -5).l(-10, -3)
+  .l(-3, -3).l(-3, 3).l(-10, 3).l(-10, 5);
 
 // Extrude along straight path
 const extrusionPath = new Path3d().fn(1).m(0, 0, 0).l(0, 0, 100);
@@ -1053,46 +2182,42 @@ const extrusionPath = new Path3d().fn(1).m(0, 0, 0).l(0, 0, 100);
 const shapes = shape(profile);
 const beam = linePaths3d(shapes, extrusionPath);
 
-return union(beam);</code></pre>
-</div>
+return union(beam);</pre>
 
-<div class="example-block" id="example-curved-tube">
-<div class="example-title">Curved Tube with Varying Diameter</div>
-<pre><code>// Circular profile
+        <h3>Curved Tube with Varying Diameter</h3>
+        <pre>// Circular profile for tube wall
 const tubeProfile = new Path2d().fn(32).m(5, 0).l(5, 0);
 
-// Curved path with scale variation
+// Curved path with scale variation for tapered tube
 const curvedPath = new Path3d()
-.fn(32)
-.m(0, 0, 0)
-.s(1, 1)
-.x(20, 0, 20)
-.s(1.5, 1.5)
-.x(40, 0, 0)
-.s(1, 1);
+  .fn(32)
+  .m(0, 0, 0)
+  .s(1, 1)  // Start at 1× scale
+  .x(20, 0, 20)  // Arc to (20, 0, 20)
+  .s(1.5, 1.5)  // Scale up to 1.5×
+  .x(40, 0, 0)  // Arc back to Z=0
+  .s(1, 1);  // Scale back to 1×
 
 const shapes = shape(tubeProfile);
 const tube = linePaths3d(shapes, curvedPath);
 
-return union(tube);</code></pre>
-</div>
+return union(tube);</pre>
 
-<div class="example-block" id="example-modular-design">
-<div class="example-title">Modular Design with Clone</div>
-<pre><code>// Create base module
+        <h3>Modular Design with Clone</h3>
+        <pre>// Create base module function
 function createModule() {
-const base = cube([20, 20, 5]);
-const post = cylinder({ r: 3, h: 10 });
-const positionedPost = translate([10, 10, 5], post);
-return union([base, positionedPost]);
+  const base = cube([20, 20, 5]);
+  const post = cylinder({ r: 3, h: 10 });
+  const positionedPost = translate([10, 10, 5], post);
+  return union([base, positionedPost]);
 }
 
-// Create multiple instances
+// Create multiple instances using clone
 const module1 = createModule();
 const module2 = clone(module1);
 const module3 = clone(module1);
 
-// Arrange in row
+// Arrange in row with spacing
 translate([0, 0, 0], module1);
 translate([25, 0, 0], module2);
 translate([50, 0, 0], module3);
@@ -1101,30 +2226,32 @@ translate([50, 0, 0], module3);
 const plate = cube([75, 20, 2]);
 const positionedPlate = translate([0, 0, 15], plate);
 
-return union([module1, module2, module3, positionedPlate]);</code></pre>
-</div>
+return union([module1, module2, module3, positionedPlate]);</pre>
 
-<div class="example-block" id="example-lattice-structure">
-<div class="example-title">Lattice Structure with Subdivide</div>
-<pre><code>// Lattice unit
+        <h3>Lattice Structure with Subdivide</h3>
+        <pre>// Lattice unit function
 function latticeUnit(size) {
-const strut = cylinder({ r: 1, h: size, fn: 8 });
-const xStrut = rotate([0, 90, 0], strut);
-const yStrut = rotate([90, 0, 0], strut);
-const zStrut = strut;
-return union([xStrut, translate([0, size/2, 0], yStrut), translate([0, 0, size/2], zStrut)]);
+  const strut = cylinder({ r: 1, h: size, fn: 8 });
+  const xStrut = rotate([0, 90, 0], strut);
+  const yStrut = rotate([90, 0, 0], strut);
+  const zStrut = strut;
+  return union([
+    xStrut, 
+    translate([0, size/2, 0], yStrut), 
+    translate([0, 0, size/2], zStrut)
+  ]);
 }
 
 // Create lattice array
 const units = [];
 const unitSize = 10, count = 3;
 for (let x = 0; x < count; x++) {
-for (let y = 0; y < count; y++) {
-for (let z = 0; z < count; z++) {
-const unit = latticeUnit(unitSize);
-units.push(translate([x * unitSize, y * unitSize, z * unitSize], unit));
-}
-}
+  for (let y = 0; y < count; y++) {
+    for (let z = 0; z < count; z++) {
+      const unit = latticeUnit(unitSize);
+      units.push(translate([x * unitSize, y * unitSize, z * unitSize], unit));
+    }
+  }
 }
 
 // Subdivide for smoother struts
@@ -1135,79 +2262,92 @@ const frame = cube([count * unitSize, count * unitSize, count * unitSize]);
 const innerFrame = cube([count * unitSize - 2, count * unitSize - 2, count * unitSize - 2]);
 const hollowFrame = difference(frame, translate([1, 1, 1], innerFrame));
 
-return union([lattice, hollowFrame]);</code></pre>
-</div>
+return union([lattice, hollowFrame]);</pre>
 
-<div class="example-block" id="example-svg-text">
-<div class="example-title">SVG Import with Text</div>
-<pre><code>async function svgTextModel() {
-// Load font
-const myFont = await font("$lib/arial.ttf");
+        <h3>SVG Import with Text</h3>
+        <pre>async function svgTextModel() {
+  // Load font and SVG in parallel
+  const [myFont, svgPaths] = await Promise.all([
+    font("$lib/arial.ttf"),
+    importSvg("$lib/logo.svg")
+  ]);
 
-// Create text path
-const textPath = text({ font: myFont, text: "CSG", fontSize: 10, fn: 32 });
+  // Create text path
+  const textPath = text({ font: myFont, text: "CSG", fontSize: 10, fn: 32 });
 
-// Load SVG logo
-const svgPaths = await importSvg("$lib/logo.svg");
+  // Convert all paths to shapes
+  const textShape = shape(textPath);
+  const svgShapes = svgPaths.map(p => shape(p));
 
-// Combine text and SVG
-const textShape = shape(textPath);
-const svgShapes = svgPaths.map(p => shape(p));
+  // Extrude all with same path
+  const extrusionPath = new Path3d().m(0, 0, 0).l(0, 0, 2);
+  const textExtruded = linePaths3d(textShape, extrusionPath);
+  const svgExtruded = svgShapes.flatMap(s => linePaths3d(s, extrusionPath));
 
-// Extrude all
-const extrusionPath = new Path3d().m(0, 0, 0).l(0, 0, 2);
-const textExtruded = linePaths3d(textShape, extrusionPath);
-const svgExtruded = svgShapes.flatMap(s => linePaths3d(s, extrusionPath));
+  // Position and combine
+  translate([0, 0, 0], textExtruded);
+  translate([0, 15, 0], svgExtruded);
 
-// Position and combine
-translate([0, 0, 0], textExtruded);
-translate([0, 15, 0], svgExtruded);
+  return union([...textExtruded, ...svgExtruded]);
+}</pre>
+    </section>
 
-return union([...textExtruded, ...svgExtruded]);
-}</code></pre>
-</div>
-</section>
+    <footer style="background:var(--surface);padding:2rem;border-radius:var(--radius);margin:2rem 0;text-align:center;box-shadow:var(--shadow)">
+        <h3 style="color:var(--primary);margin-bottom:1rem">📚 scadCSG.js Documentation</h3>
+        <p style="color:var(--text-muted);margin-bottom:0.5rem">Complete API reference for browser-based CSG operations</p>
+        <p style="color:#94a3b8;font-size:0.85rem">Built with three-bvh-csg and Three.js</p>
+    </footer>
 
-<hr />
-<div class="nav-buttons">
-<a href="#top" class="nav-button">↑ Top</a>
-</div>
-
-<button id="jump-back-btn">&#x21A9; Jump Back</button>
+</main>
 
 <script>
-const scrollHistory = []
-const jumpBackBtn = document.getElementById('jump-back-btn')
+    // Menu toggle logic
+    const menuBtn = document.getElementById('menuToggle');
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('overlay');
+    const links = sidebar.querySelectorAll('a');
 
-document.querySelectorAll('a[href^="#"]').forEach((anchor) => {
-anchor.addEventListener('click', function (e) {
-e.preventDefault()
-const targetId = this.getAttribute('href')
-const targetElement = document.querySelector(targetId)
-if (targetElement) {
-scrollHistory.push(window.scrollY)
-updateJumpBackButton()
-window.scrollTo({
-top: targetElement.offsetTop - 20,
-behavior: 'smooth'
-})
-}
-})
-})
+    function toggleMenu() {
+        sidebar.classList.toggle('active');
+        overlay.classList.toggle('active');
+        document.body.style.overflow = sidebar.classList.contains('active') ? 'hidden' : '';
+    }
 
-jumpBackBtn.addEventListener('click', () => {
-if (scrollHistory.length > 0) {
-const prevPos = scrollHistory.pop()
-window.scrollTo({ top: prevPos, behavior: 'smooth' })
-updateJumpBackButton()
-}
-})
+    function closeMenu() {
+        sidebar.classList.remove('active');
+        overlay.classList.remove('active');
+        document.body.style.overflow = '';
+    }
 
-function updateJumpBackButton() {
-jumpBackBtn.style.display = scrollHistory.length > 0 ? 'block' : 'none'
-}
+    menuBtn.addEventListener('click', (e) => { e.stopPropagation(); toggleMenu(); });
+    overlay.addEventListener('click', closeMenu);
 
-updateJumpBackButton()
+    // Close menu when link clicked (mobile)
+    links.forEach(link => {
+        link.addEventListener('click', () => {
+            if (window.innerWidth <= 768) closeMenu();
+        });
+    });
+
+    // Handle resize
+    window.addEventListener('resize', () => {
+        if (window.innerWidth > 768) closeMenu();
+    });
+
+    // Smooth scroll for anchor links
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener('click', function(e) {
+            const href = this.getAttribute('href');
+            if (href.length > 1) {
+                e.preventDefault();
+                const target = document.querySelector(href);
+                if (target) {
+                    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            }
+        });
+    });
 </script>
+
 </body>
 </html>
