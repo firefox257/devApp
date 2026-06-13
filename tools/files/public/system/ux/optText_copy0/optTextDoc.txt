@@ -1,0 +1,406 @@
+================================================================================
+                          optText DEVELOPER DOCUMENTATION
+================================================================================
+
+OVERVIEW
+--------
+optText is a high-performance, canvas-based text editor component designed for 
+web applications. It bypasses traditional contenteditable limitations by using 
+a Canvas rendering engine, providing smooth scrolling, touch-friendly selection 
+handles, multi-context (tabbed) support, and a robust undo/redo history with 
+smart coalescing. It features a modular "Addition" (extension) system for 
+custom toolbars, dropdowns, and UI overlays.
+
+================================================================================
+1. QUICK START: HTML & JS IMPLEMENTATION
+================================================================================
+
+OPTION A: Pure JavaScript Initialization
+----------------------------------------
+Import the factory function and initialize it on a target element.
+
+  <div id="my-editor-container" style="width: 100%; height: 400px;"></div>
+
+  <script type="module">
+    import { newOptText } from './system/ux/optText.js';
+
+    const editor = newOptText('#my-editor-container', {
+      contexts: [
+        { 
+          name: 'main.js', 
+          lines: ['console.log("Hello, optText!");', 'function test() {}'] 
+        }
+      ],
+      extensions: ['saveButton', 'searchTool'] // Optional: Filter active additions
+    });
+
+    // Access instance properties
+    console.log(editor.value); 
+  </script>
+
+OPTION B: Declarative HTML Custom Tag (Auto-Detected)
+-----------------------------------------------------
+optText includes a MutationObserver that automatically replaces `<opttext>` tags.
+
+  <!DOCTYPE html>
+  <html>
+  <head>
+    <script type="module">
+      import './system/ux/optText.js'; // Imports trigger auto-detection
+      
+      // Optional: Define extensions globally if referenced by name in HTML
+      window.myEditorExtensions = ['saveButton', 'autoIndent'];
+    </script>
+  </head>
+  <body>
+    <!-- The MutationObserver will replace this tag with the editor instance -->
+    <opttext 
+      id="my-declarative-editor" 
+      extensions='["saveButton", "searchTool"]'
+      style="width: 100%; height: 500px;">
+    </opttext>
+
+    <script type="module">
+      // Access the instance after it has been processed
+      const editor = document.getElementById('my-declarative-editor');
+      editor.addEventListener('optText:change', () => {
+        console.log('Content changed!');
+      });
+    </script>
+  </body>
+  </html>
+
+================================================================================
+2. INITIALIZATION OPTIONS
+================================================================================
+
+newOptText(target, initialData)
+
+- target: 
+  * string: CSS selector (e.g., '#editor')
+  * HTMLElement: The DOM element to replace/augment
+  * null: Creates a floating dialog wrapper (useful for modals/popups)
+  * object: If an object is passed as the first argument, it is treated as 
+    `initialData`, and `target` defaults to null.
+
+- initialData (Object):
+  * contexts: Array of context objects. Each object can have:
+    - name: string (Tab/File name)
+    - lines: array of strings (The text content, split by line)
+    - options: object (e.g., { historyConfig: { maxEntries: 500 } })
+  * dataManager: An existing TextDataManager instance (for sharing state across 
+    multiple editor instances).
+  * extensions: Array of strings. IDs of additions to load. If omitted, ALL 
+    registered additions are loaded.
+
+================================================================================
+3. CORE INSTANCE API
+================================================================================
+
+Once initialized, the returned `editor` instance exposes the following:
+
+[PROPERTIES]
+- editor.value: (Getter/Setter) Gets or sets the entire text content as a 
+  single newline-separated string. Setting this pushes a diff to the history.
+- editor.cursor: Object { line: Number, col: Number, visible: Boolean }
+- editor.selection: Object { active: Boolean, anchor: {line, col}, focus: {line, col} }
+- editor.dataManager: The underlying TextDataManager instance.
+- editor.extensions: (Reactive) Array of active addition IDs. Updating this 
+  array dynamically injects/removes addition UI.
+- editor.values: A plain object for storing custom, arbitrary data attached 
+  to this specific editor instance.
+- editor.contextId: (Getter/Setter) Gets or sets the active context by ID. 
+  Setting a new ID switches to it (or creates it if it doesn't exist).
+
+[METHODS]
+- editor.addContext(name, initialLines, options): Adds a new tab/file. 
+  Returns the new context ID.
+- editor.switchContext(identifier): Switches to a context by ID, name, or 
+  index. Returns boolean.
+- editor.removeContext(identifier): Removes a context. Throws error if it's 
+  the last remaining context.
+- editor.listContexts(): Returns an array of context metadata 
+  ({ id, name, isActive, lineCount, modifiedAt }).
+- editor.toJSON(): Serializes the current state of all contexts and history 
+  lengths for saving to a database/localStorage.
+- editor.defineProperty(name, descriptor): Safely defines a custom property 
+  or getter/setter on the instance without conflicting with protected optText 
+  properties.
+
+[EVENTS]
+Listen via `editor.addEventListener('eventName', callback)`:
+- 'optText:change': Fired when text content changes (including undo/redo).
+- 'optText:cursor:set': Fired when cursor position is programmatically changed.
+- 'optText:selection:set': Fired when text selection changes.
+- 'optText:scroll:to': Fired when the view is scrolled to a specific line.
+
+================================================================================
+4. DATA MANAGEMENT & HISTORY
+================================================================================
+
+optText uses a Command Pattern for history management.
+- History is stored per-context in `editor.dataManager.current.history`.
+- Smart Coalescing: Rapid typing on the same line is automatically grouped 
+  into a single undo step (threshold: 400ms).
+- To programmatically insert text with history support, use the Addition API 
+  `api.editor.setLines()` or `api.editor.augmentLines()`, which safely creates 
+  diff commands.
+
+================================================================================
+5. THE ADDITION (EXTENSION) SYSTEM
+================================================================================
+
+Additions allow you to add custom buttons to the toolbar, items to the 
+dropdown menu, or complex overlay tools. They are managed by the 
+`additionManager`.
+
+[REGISTERING AN ADDITION: BASIC TEMPLATE]
+Import `additionManager` and call `.register(definition)`.
+
+  import { additionManager } from './system/ux/optTextAdditions.js';
+
+  additionManager.register({
+    id: 'myCustomAddition', // REQUIRED: Unique string identifier
+    
+    // 1. Toolbar Button (Optional)
+    toolbarButton: {
+      label: 'My Tool',
+      icon: '🛠️', // Can be an emoji or an SVG string
+      action: (api, container) => {
+        // Simple click action
+        api.ui.toast('Toolbar button clicked!');
+      }
+    },
+
+    // 2. Dropdown Menu Item (Optional)
+    dropdownItem: {
+      label: 'Run My Tool',
+      icon: '🚀'
+    },
+
+    // 3. Custom Tool UI (Optional)
+    // If defined, clicking the toolbar button activates this UI instead of 
+    // running the `action` function. It replaces the toolbar contents.
+    toolUI: (api) => {
+      return `
+        <div style="display:flex; gap:8px; align-items:center; flex:1;">
+          <span style="font-size:12px;">Custom Tool Active</span>
+          <button class="opt-text-toolbar-btn" onclick="/* custom logic */">Do Something</button>
+        </div>
+      `;
+    },
+
+    // 4. Lifecycle Hooks (Optional)
+    init: (api, container, dataManager) => {
+      // Runs when the addition is injected into the DOM, OR when toolUI is activated.
+      console.log('Addition initialized');
+    },
+    
+    cleanup: () => {
+      // Runs when the tool is deactivated (if toolUI was used).
+      // Remove event listeners here to prevent memory leaks.
+    },
+
+    // 5. Reactive State Configuration (Optional)
+    // Allows HTML attributes like `mycustomaddition-disabled="true"` to reactively 
+    // disable/hide the addition's DOM elements.
+    stateConfig: {
+      disabled: {
+        attribute: 'mycustomaddition-disabled',
+        property: 'isMyCustomAdditionDisabled'
+      },
+      hidden: {
+        attribute: 'mycustomaddition-hidden',
+        property: 'isMyCustomAdditionHidden'
+      }
+    }
+  });
+
+[EXAMPLE 1: Simple Toolbar Button Addition]
+  additionManager.register({
+    id: 'insertDate',
+    toolbarButton: {
+      label: 'Insert Date',
+      icon: '📅',
+      action: (api) => {
+        const dateStr = new Date().toLocaleString();
+        api.editor.augmentLines((lines) => {
+          const ctx = api.context.getCurrent();
+          const currentLine = lines[api.editor.getCursor().line] || '';
+          lines[api.editor.getCursor().line] = currentLine + dateStr;
+          return lines;
+        });
+        api.ui.toast('Date inserted!');
+      }
+    }
+  });
+
+[EXAMPLE 2: Dropdown Menu Item Addition]
+  additionManager.register({
+    id: 'showStats',
+    dropdownItem: {
+      label: 'Show Document Stats',
+      icon: '📊'
+    },
+    init: (api) => {
+      // You can still attach global listeners or setup state here
+      console.log('Stats addition loaded');
+    },
+    // Note: If you only have a dropdownItem, clicking it will activate the 
+    // addition. You can provide a toolUI to show something, or just use init 
+    // to trigger a one-off action (though toolUI is preferred for UX).
+    toolUI: (api) => {
+      const lines = api.editor.getLines();
+      const words = lines.join(' ').trim().split(/\s+/).filter(w => w).length;
+      return `<div style="padding:4px 8px; font-size:12px;">Words: ${words} | Lines: ${lines.length}</div>`;
+    }
+  });
+
+[THE ADDITION API OBJECT]
+When `action`, `toolUI`, or `init` are called, they receive an `api` object:
+
+api.context:
+  - .switch(id): Switch to a different context.
+  - .getCurrent(): Get the current TextContext object.
+  - .list(): List all contexts.
+  - .activeId: Getter/Setter for the current context ID.
+  - .remove(id): Remove a context.
+  - .defineProperty(name, descriptor): Define custom properties.
+  - .values: Access the editor's custom values object.
+
+api.editor:
+  - .getLines(): Returns a copy of the current lines array.
+  - .setLines(newLines, reason): Replaces content AND pushes a diff to history.
+  - .augmentLines(transformFn): Passes current lines to a function. If the 
+    function returns a new array, it applies it with history tracking.
+    Example: api.editor.augmentLines(lines => lines.map(l => l.toUpperCase()));
+  - .getMode(): Returns 'selection' or 'cursor'.
+  - .getCursor() / .setCursor(line, col)
+  - .getSelection() / .setSelection(anchor, focus)
+  - .scrollToCursor() / .scrollToAnchor() / .scrollToFocus()
+  - .focus(): Focuses the hidden input to capture keyboard/IME events.
+  - .defineProperty(name, descriptor): Define custom properties.
+  - .values: Access the editor's custom values object.
+
+api.ui:
+  - .toast(message): Shows a temporary toast notification.
+  - .exit(): Deactivates the current addition tool UI.
+  - .modal.show(config): Shows a modal. Config: { title, message, content, 
+    showCancel, cancelText, confirmText }. Returns a Promise resolving to 
+    { action: 'confirm' | 'cancel' }.
+  - .modal.hide(): Closes all modals.
+
+[FILTERING ADDITIONS]
+You can control which additions load per instance:
+1. Via JS: `newOptText('#el', { extensions: ['saveButton', 'searchTool'] })`
+2. Via HTML: `<opttext extensions='["saveButton"]'></opttext>`
+3. Reactively: `editor.extensions = ['beautifyCode'];` (This will dynamically 
+   inject the new additions and remove the old ones).
+
+================================================================================
+6. KEYBOARD SHORTCUTS
+================================================================================
+
+- Ctrl/Cmd + Z       : Undo
+- Ctrl/Cmd + Y       : Redo
+- Ctrl/Cmd + Shift+Z : Redo
+- Ctrl/Cmd + A       : Select All
+- Ctrl/Cmd + C       : Copy
+- Ctrl/Cmd + X       : Cut
+- Ctrl/Cmd + V       : Paste
+- Ctrl/Cmd + G       : Open "Go to Line" modal
+- Tab                : Insert tab character (or spaces, based on CONFIG.tabSize)
+- Escape             : Clear current selection
+
+================================================================================
+7. THEMING & CSS VARIABLES
+================================================================================
+
+optText injects its own styles dynamically. You can override the look by 
+defining CSS variables in your global stylesheet or on the 
+`.opt-text-container-wrapper` element.
+
+  :root {
+    /* Backgrounds */
+    --ot-bg-container: #ffffff;
+    --ot-bg-canvas: #ffffff;
+    --ot-bg-toolbar: rgba(255, 255, 255, 0.95);
+    --ot-bg-dropdown: #ffffff;
+    
+    /* Borders & Text */
+    --ot-border-toolbar: rgba(0,0,0,0.08);
+    --ot-text-toolbar: #444;
+    --ot-text-dropdown: #333;
+    
+    /* States */
+    --ot-hover-toolbar: rgba(0,0,0,0.06);
+    --ot-active-toolbar: rgba(26, 115, 232, 0.12);
+    --ot-danger: #dc3545;
+    
+    /* Cursors & Scrollbars */
+    --ot-cursor: #0066cc;
+    --ot-scrollbar-thumb: rgba(0, 0, 0, 0.3);
+  }
+
+  /* To change the font globally for optText: */
+  .opt-text-container-wrapper {
+    font-family: 'Fira Code', monospace !important;
+    font-size: 14px !important;
+  }
+
+================================================================================
+8. ADVANCED: CREATING A CUSTOM "FORMAT CODE" ADDITION
+================================================================================
+
+Here is a complete, copy-pasteable example of a custom addition that modifies 
+text safely while preserving undo history:
+
+  import { additionManager } from './system/ux/optTextAdditions.js';
+
+  additionManager.register({
+    id: 'formatCode',
+    toolbarButton: {
+      label: 'Format',
+      icon: '✨',
+      action: async (api) => {
+        api.ui.toast('Formatting...');
+        
+        // Use augmentLines to safely modify text and record history
+        api.editor.augmentLines((lines) => {
+          return lines.map(line => {
+            // Simple mock formatting: trim trailing spaces
+            return line.trimEnd();
+          });
+        });
+        
+        api.ui.toast('Code formatted!');
+      }
+    },
+    dropdownItem: {
+      label: 'Format Document',
+      icon: '✨'
+    }
+  });
+
+================================================================================
+9. TROUBLESHOOTING & BEST PRACTICES
+================================================================================
+
+1. Canvas Rendering: Because text is drawn on a canvas, native browser text 
+   selection does not work. Always use `api.editor.getSelection()` or the 
+   provided touch selection handles.
+2. Hidden Input: optText uses a 1x1px hidden input (`opt-text-hidden-input`) 
+   to capture mobile keyboard and IME (Input Method Editor) events. Do not 
+   hide this element with `display: none`, or typing will break on mobile.
+3. State Management: If you need to store custom state for your addition, 
+   attach it to `api.context.values.myAdditionState` rather than global 
+   variables, ensuring it persists correctly if the user switches tabs.
+4. Performance: For massive files, use `api.editor.augmentLines` carefully. 
+   Avoid replacing the entire document if only a few lines changed.
+5. Extension Loading Order: Ensure `optTextAdditionsRegistry.js` (or your 
+   custom registry) is imported *before* you instantiate `newOptText`, so the 
+   additions are registered in the manager before the editor tries to inject them.
+
+================================================================================
+End of Documentation
+================================================================================

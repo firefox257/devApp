@@ -1,4 +1,4 @@
-// ./ux/aichat.js
+// ./system/ux/aichat.js
 const API_BASE_URL = "https://gen.pollinations.ai/v1";
 const MODELS_URL = `${API_BASE_URL}/models`;
 const CHAT_COMPLETIONS_URL = `${API_BASE_URL}/chat/completions`;

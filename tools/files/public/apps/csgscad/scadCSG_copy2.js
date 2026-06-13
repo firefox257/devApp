@@ -385,7 +385,7 @@ function _align(config = {}, ...target) {
 // @param {number} path.fn - The default number of segments for curves.
 // @returns {object} An object containing the new path points (p), rotations (r), scales (s), and normals (n).
 
-//deprecated use Path3d class
+
 function path3d(path) {
 	const paths = path.path
 	const fn = path.fn
@@ -2917,23 +2917,39 @@ class Path3d {
 
 	/// Processes the path commands, tessellating curves and interpolating r/s/st.
 	/// @private
-	/// Processes the path commands, tessellating curves and interpolating r/s/st.
-	/// @private
 	_tessellateAndProcess() {
 		const paths = this._path
 		const fn = this._fn
 
-		// =========================================================================
-		// PASS 1: Build segments and resolve keyframe states
-		// =========================================================================
-		const segments = []
-		let currentPoint = {
-			p: [0, 0, 0],
-			r: 0,
-			s: [1, 1],
-			st: [null, null]
+		// Reset current internal state
+		this._cp = [0, 0, 0]
+		this._cr = 0
+		this._cs = [1, 1]
+		this._cst = [null, null]
+		this._atn = 1
+		this._atr = 0
+		this._ats = [1, 1]
+		this._atst = [null, null]
+
+		const newPath = {
+			p: [],
+			r: [],
+			s: [],
+			st: [],
+			n: [],
+			close: this._close,
+			xyInitAng: this._xyInitAng
 		}
-		let atn = 1
+
+		// Use local copies for interpolation variables
+		let cp = this._cp.slice()
+		let cr = this._cr
+		let cs = this._cs.slice()
+		let cst = this._cst.slice()
+		let atn = this._atn
+		let atr = this._atr
+		let ats = this._ats.slice()
+		let atst = this._atst.slice()
 
 		let i = 0
 		while (i < paths.length) {
@@ -2942,104 +2958,270 @@ class Path3d {
 
 			switch (command) {
 				case 'm':
-				currentPoint.p = [paths[i + 1], paths[i + 2], paths[i + 3]]
+				cp = [paths[i + 1], paths[i + 2], paths[i + 3]]
+				newPath.p.push([...cp])
+				newPath.r.push(atr)
+				newPath.s.push([...ats])
+				newPath.st.push([...atst])
 				commandLength = 4
 				break
 				case 'mr':
-				currentPoint.p = [
-					currentPoint.p[0] + paths[i + 1],
-					currentPoint.p[1] + paths[i + 2],
-					currentPoint.p[2] + paths[i + 3]
+				cp = [
+					cp[0] + paths[i + 1],
+					cp[1] + paths[i + 2],
+					cp[2] + paths[i + 3]
 				]
+				newPath.p.push([...cp])
+				newPath.r.push(atr)
+				newPath.s.push([...ats])
+				newPath.st.push([...atst]) // Added for consistency
 				commandLength = 4
 				break
-				case 'l':
-				case 'lr':
-				case 'q':
-				case 'qr':
-				case 'c':
-				case 'cr':
-				case 'x':
-				case 'xr': {
-					// Create the next point, inheriting the current state
-					const nextPoint = {
-						p: [...currentPoint.p],
-						r: currentPoint.r,
-						s: [...currentPoint.s],
-						st: [...currentPoint.st]
+				case 'l': {
+					const atp = [paths[i + 1], paths[i + 2], paths[i + 3]]
+					const segmentsToUse = atn > 1 ? atn : 1
+					for (let v = 1; v <= segmentsToUse; v++) {
+						const t = v / segmentsToUse
+						const ix = cp[0] * (1 - t) + atp[0] * t
+						const iy = cp[1] * (1 - t) + atp[1] * t
+						const iz = cp[2] * (1 - t) + atp[2] * t
+						const ir = cr * (1 - t) + atr * t
+						const isx = cs[0] * (1 - t) + ats[0] * t
+						const isy = cs[1] * (1 - t) + ats[1] * t
+
+						// Independent interpolation for X and Y scale-to
+						let istx = atst[0] !== null ? (cst[0] !== null ? cst[0] * (1 - t) + atst[0] * t : atst[0]) : cst[0];
+						let isty = atst[1] !== null ? (cst[1] !== null ? cst[1] * (1 - t) + atst[1] * t : atst[1]) : cst[1];
+
+						newPath.p.push([ix, iy, iz])
+						newPath.r.push(ir)
+						newPath.s.push([isx, isy])
+						newPath.st.push([istx, isty])
 					}
+					cp = atp
+					cr = atr
+					cs = ats
+					cst = atst
+					atn = 1
+					commandLength = 4
+					break
+				}
+				case 'lr': {
+					const endPoint_lr = [
+						cp[0] + paths[i + 1],
+						cp[1] + paths[i + 2],
+						cp[2] + paths[i + 3]
+					]
+					const segmentsToUse = atn > 1 ? atn : 1
+					for (let v = 1; v <= segmentsToUse; v++) {
+						const t = v / segmentsToUse
+						const ix = cp[0] * (1 - t) + endPoint_lr[0] * t
+						const iy = cp[1] * (1 - t) + endPoint_lr[1] * t
+						const iz = cp[2] * (1 - t) + endPoint_lr[2] * t
+						const ir = cr * (1 - t) + atr * t
+						const isx = cs[0] * (1 - t) + ats[0] * t
+						const isy = cs[1] * (1 - t) + ats[1] * t
 
-					// Determine end position and command length based on command type
-					if (command === 'l') {
-						nextPoint.p = [paths[i + 1], paths[i + 2], paths[i + 3]]
-						commandLength = 4
-					} else if (command === 'lr') {
-						nextPoint.p = [
-							currentPoint.p[0] + paths[i + 1],
-							currentPoint.p[1] + paths[i + 2],
-							currentPoint.p[2] + paths[i + 3]
-						]
-						commandLength = 4
-					} else if (command === 'q') {
-						nextPoint.p = [paths[i + 4], paths[i + 5], paths[i + 6]]
-						commandLength = 7
-					} else if (command === 'qr') {
-						nextPoint.p = [
-							currentPoint.p[0] + paths[i + 4],
-							currentPoint.p[1] + paths[i + 5],
-							currentPoint.p[2] + paths[i + 6]
-						]
-						commandLength = 7
-					} else if (command === 'c') {
-						nextPoint.p = [paths[i + 7], paths[i + 8], paths[i + 9]]
-						commandLength = 10
-					} else if (command === 'cr') {
-						nextPoint.p = [
-							currentPoint.p[0] + paths[i + 7],
-							currentPoint.p[1] + paths[i + 8],
-							currentPoint.p[2] + paths[i + 9]
-						]
-						commandLength = 10
-					} else if (command === 'x') {
-						nextPoint.p = [paths[i + 4], paths[i + 5], paths[i + 6]]
-						commandLength = 7
-					} else if (command === 'xr') {
-						nextPoint.p = [
-							currentPoint.p[0] + paths[i + 4],
-							currentPoint.p[1] + paths[i + 5],
-							currentPoint.p[2] + paths[i + 6]
-						]
-						commandLength = 7
+						let istx = atst[0] !== null ? (cst[0] !== null ? cst[0] * (1 - t) + atst[0] * t : atst[0]) : cst[0];
+						let isty = atst[1] !== null ? (cst[1] !== null ? cst[1] * (1 - t) + atst[1] * t : atst[1]) : cst[1];
+
+						newPath.p.push([ix, iy, iz])
+						newPath.r.push(ir)
+						newPath.s.push([isx, isy])
+						newPath.st.push([istx, isty])
 					}
+					cp = endPoint_lr
+					cr = atr
+					cs = ats
+					cst = atst
+					atn = 1
+					commandLength = 4
+					break
+				}
+				case 'q': {
+					const endPoint = [paths[i + 4], paths[i + 5], paths[i + 6]]
+					const controlPoints = [[paths[i + 1], paths[i + 2], paths[i + 3]]]
+					const segmentsToUse = atn > 1 ? atn : fn
+					const segmentPoints = this._getPointsAtEqualDistance(
+						cp, endPoint, controlPoints, segmentsToUse
+					)
 
-					const isCurve = command.startsWith('q') || command.startsWith('c') || command.startsWith('x')
-					const segmentsToUse = atn > 1 ? atn : (isCurve ? fn : 1)
+					segmentPoints.forEach((p, j) => {
+							const t = (j + 1) / segmentsToUse
+							newPath.p.push([...p])
+							newPath.r.push(cr * (1 - t) + atr * t)
+							newPath.s.push([cs[0] * (1 - t) + ats[0] * t, cs[1] * (1 - t) + ats[1] * t])
 
-					// Push the segment. Note: 'nextPoint' is a reference, so if we update
-					// 'currentPoint' later, it updates this segment's end state!
-					segments.push({
-							type: command,
-							params: paths.slice(i + 1, i + commandLength),
-							start: currentPoint,
-							end: nextPoint,
-							n: segmentsToUse
+							let istx = atst[0] !== null ? (cst[0] !== null ? cst[0] * (1 - t) + atst[0] * t : atst[0]) : cst[0];
+							let isty = atst[1] !== null ? (cst[1] !== null ? cst[1] * (1 - t) + atst[1] * t : atst[1]) : cst[1];
+							newPath.st.push([istx, isty])
 						})
 
-					// The next point becomes the current point for subsequent commands
-					currentPoint = nextPoint
+					cp = endPoint
+					cr = atr
+					cs = ats
+					cst = atst
 					atn = 1
+					commandLength = 7
+					break
+				}
+				case 'qr': {
+					const endPoint = [cp[0] + paths[i + 4], cp[1] + paths[i + 5], cp[2] + paths[i + 6]]
+					const controlPoints = [[cp[0] + paths[i + 1], cp[1] + paths[i + 2], cp[2] + paths[i + 3]]]
+					const segmentsToUse = atn > 1 ? atn : fn
+					const segmentPoints = this._getPointsAtEqualDistance(
+						cp, endPoint, controlPoints, segmentsToUse
+					)
+
+					segmentPoints.forEach((p, j) => {
+							const t = (j + 1) / segmentsToUse
+							newPath.p.push([...p])
+							newPath.r.push(cr * (1 - t) + atr * t)
+							newPath.s.push([cs[0] * (1 - t) + ats[0] * t, cs[1] * (1 - t) + ats[1] * t])
+
+							let istx = atst[0] !== null ? (cst[0] !== null ? cst[0] * (1 - t) + atst[0] * t : atst[0]) : cst[0];
+							let isty = atst[1] !== null ? (cst[1] !== null ? cst[1] * (1 - t) + atst[1] * t : atst[1]) : cst[1];
+							newPath.st.push([istx, isty])
+						})
+
+					cp = endPoint
+					cr = atr
+					cs = ats
+					cst = atst
+					atn = 1
+					commandLength = 7
+					break
+				}
+				case 'c': {
+					const endPoint = [paths[i + 7], paths[i + 8], paths[i + 9]]
+					const controlPoints = [
+						[paths[i + 1], paths[i + 2], paths[i + 3]],
+						[paths[i + 4], paths[i + 5], paths[i + 6]]
+					]
+					const segmentsToUse = atn > 1 ? atn : fn
+					const segmentPoints = this._getPointsAtEqualDistance(
+						cp, endPoint, controlPoints, segmentsToUse
+					)
+
+					segmentPoints.forEach((p, j) => {
+							const t = (j + 1) / segmentsToUse
+							newPath.p.push([...p])
+							newPath.r.push(cr * (1 - t) + atr * t)
+							newPath.s.push([cs[0] * (1 - t) + ats[0] * t, cs[1] * (1 - t) + ats[1] * t])
+
+							let istx = atst[0] !== null ? (cst[0] !== null ? cst[0] * (1 - t) + atst[0] * t : atst[0]) : cst[0];
+							let isty = atst[1] !== null ? (cst[1] !== null ? cst[1] * (1 - t) + atst[1] * t : atst[1]) : cst[1];
+							newPath.st.push([istx, isty])
+						})
+
+					cp = endPoint
+					cr = atr
+					cs = ats
+					cst = atst
+					atn = 1
+					commandLength = 10
+					break
+				}
+				case 'cr': {
+					const endPoint = [cp[0] + paths[i + 7], cp[1] + paths[i + 8], cp[2] + paths[i + 9]]
+					const controlPoints = [
+						[cp[0] + paths[i + 1], cp[1] + paths[i + 2], cp[2] + paths[i + 3]],
+						[cp[0] + paths[i + 4], cp[1] + paths[i + 5], cp[2] + paths[i + 6]]
+					]
+					const segmentsToUse = atn > 1 ? atn : fn
+					const segmentPoints = this._getPointsAtEqualDistance(
+						cp, endPoint, controlPoints, segmentsToUse
+					)
+
+					segmentPoints.forEach((p, j) => {
+							const t = (j + 1) / segmentsToUse
+							newPath.p.push([...p])
+							newPath.r.push(cr * (1 - t) + atr * t)
+							newPath.s.push([cs[0] * (1 - t) + ats[0] * t, cs[1] * (1 - t) + ats[1] * t])
+
+							let istx = atst[0] !== null ? (cst[0] !== null ? cst[0] * (1 - t) + atst[0] * t : atst[0]) : cst[0];
+							let isty = atst[1] !== null ? (cst[1] !== null ? cst[1] * (1 - t) + atst[1] * t : atst[1]) : cst[1];
+							newPath.st.push([istx, isty])
+						})
+
+					cp = endPoint
+					cr = atr
+					cs = ats
+					cst = atst
+					atn = 1
+					commandLength = 10
+					break
+				}
+				case 'x': {
+					const controlPoint = [paths[i + 1], paths[i + 2], paths[i + 3]]
+					const endPoint = [paths[i + 4], paths[i + 5], paths[i + 6]]
+					const segmentsToUse = atn > 1 ? atn : fn
+
+					this._getArcSegmentPoints3D(cp, controlPoint, endPoint, segmentsToUse).forEach((p, j) => {
+							const t = (j + 1) / segmentsToUse
+							newPath.p.push([...p])
+							newPath.r.push(cr * (1 - t) + atr * t)
+							newPath.s.push([cs[0] * (1 - t) + ats[0] * t, cs[1] * (1 - t) + ats[1] * t])
+
+							let istx = atst[0] !== null ? (cst[0] !== null ? cst[0] * (1 - t) + atst[0] * t : atst[0]) : cst[0];
+							let isty = atst[1] !== null ? (cst[1] !== null ? cst[1] * (1 - t) + atst[1] * t : atst[1]) : cst[1];
+							newPath.st.push([istx, isty])
+						})
+
+					// Explicitly push the final endpoint (P2)
+					newPath.p.push([...endPoint])
+					newPath.r.push(atr)
+					newPath.s.push([...ats])
+					newPath.st.push([...atst]) // Added for consistency
+
+					cp = endPoint
+					cr = atr
+					cs = ats
+					cst = atst
+					atn = 1
+					commandLength = 7
+					break
+				}
+				case 'xr': {
+					const controlPoint = [cp[0] + paths[i + 1], cp[1] + paths[i + 2], cp[2] + paths[i + 3]]
+					const endPoint = [cp[0] + paths[i + 4], cp[1] + paths[i + 5], cp[2] + paths[i + 6]]
+					const segmentsToUse = atn > 1 ? atn : fn
+
+					this._getArcSegmentPoints3D(cp, controlPoint, endPoint, segmentsToUse).forEach((p, j) => {
+							const t = (j + 1) / segmentsToUse
+							newPath.p.push([...p])
+							newPath.r.push(cr * (1 - t) + atr * t)
+							newPath.s.push([cs[0] * (1 - t) + ats[0] * t, cs[1] * (1 - t) + ats[1] * t])
+
+							let istx = atst[0] !== null ? (cst[0] !== null ? cst[0] * (1 - t) + atst[0] * t : atst[0]) : cst[0];
+							let isty = atst[1] !== null ? (cst[1] !== null ? cst[1] * (1 - t) + atst[1] * t : atst[1]) : cst[1];
+							newPath.st.push([istx, isty])
+						})
+
+					// Explicitly push the final endpoint (P2)
+					newPath.p.push([...endPoint])
+					newPath.r.push(atr)
+					newPath.s.push([...ats])
+					newPath.st.push([...atst]) // Added for consistency
+
+					cp = endPoint
+					cr = atr
+					cs = ats
+					cst = atst
+					atn = 1
+					commandLength = 7
 					break
 				}
 				case 'r':
-				currentPoint.r = paths[i + 1]
+				atr = paths[i + 1]
 				commandLength = 2
 				break
 				case 's':
-				currentPoint.s = [paths[i + 1], paths[i + 2]]
+				ats = [paths[i + 1], paths[i + 2]]
 				commandLength = 3
 				break
 				case 'st':
-				currentPoint.st = [paths[i + 1], paths[i + 2]]
+				atst = [paths[i + 1], paths[i + 2]]
 				commandLength = 3
 				break
 				case 'n':
@@ -3051,116 +3233,6 @@ class Path3d {
 				break
 			}
 			i += commandLength
-		}
-
-		// =========================================================================
-		// PASS 2: Tessellate segments and interpolate states
-		// =========================================================================
-		const newPath = {
-			p: [],
-			r: [],
-			s: [],
-			st: [],
-			n: [],
-			close: this._close,
-			xyInitAng: this._xyInitAng
-		}
-
-		if (segments.length === 0) {
-			newPath.p.push([...currentPoint.p])
-			newPath.r.push(currentPoint.r)
-			newPath.s.push([...currentPoint.s])
-			newPath.st.push([...currentPoint.st])
-			this._pathData = newPath
-			return
-		}
-
-		// Add the start point of the very first segment
-		const firstSeg = segments[0]
-		newPath.p.push([...firstSeg.start.p])
-		newPath.r.push(firstSeg.start.r)
-		newPath.s.push([...firstSeg.start.s])
-		newPath.st.push([...firstSeg.start.st])
-
-		// Helper to interpolate and push state for a given t
-		const pushInterpolatedState = (seg, t) => {
-			newPath.r.push(seg.start.r * (1 - t) + seg.end.r * t)
-			newPath.s.push([
-					seg.start.s[0] * (1 - t) + seg.end.s[0] * t,
-					seg.start.s[1] * (1 - t) + seg.end.s[1] * t
-				])
-
-			// Interpolate 'st' safely handling nulls
-			let stx = null, sty = null
-			if (seg.start.st[0] !== null && seg.end.st[0] !== null) stx = seg.start.st[0] * (1 - t) + seg.end.st[0] * t
-			else if (seg.end.st[0] !== null) stx = seg.end.st[0]
-			else stx = seg.start.st[0]
-
-			if (seg.start.st[1] !== null && seg.end.st[1] !== null) sty = seg.start.st[1] * (1 - t) + seg.end.st[1] * t
-			else if (seg.end.st[1] !== null) sty = seg.end.st[1]
-			else sty = seg.start.st[1]
-
-			newPath.st.push([stx, sty])
-		}
-
-		for (const seg of segments) {
-			const segmentsToUse = seg.n
-
-			if (seg.type === 'l' || seg.type === 'lr') {
-				for (let v = 1; v <= segmentsToUse; v++) {
-					const t = v / segmentsToUse
-					newPath.p.push([
-							seg.start.p[0] * (1 - t) + seg.end.p[0] * t,
-							seg.start.p[1] * (1 - t) + seg.end.p[1] * t,
-							seg.start.p[2] * (1 - t) + seg.end.p[2] * t
-						])
-					pushInterpolatedState(seg, t)
-				}
-			} else if (seg.type === 'x' || seg.type === 'xr') {
-				// 3D Arc commands
-				let controlPoint = seg.type === 'x'
-				? [seg.params[0], seg.params[1], seg.params[2]]
-				: [seg.start.p[0] + seg.params[0], seg.start.p[1] + seg.params[1], seg.start.p[2] + seg.params[2]]
-
-				const arcPoints = this._getArcSegmentPoints3D(seg.start.p, controlPoint, seg.end.p, segmentsToUse)
-
-				arcPoints.forEach((p, j) => {
-						const t = (j + 1) / segmentsToUse
-						newPath.p.push([...p])
-						pushInterpolatedState(seg, t)
-					})
-
-				// Explicitly push the final endpoint for arcs
-				newPath.p.push([...seg.end.p])
-				newPath.r.push(seg.end.r)
-				newPath.s.push([...seg.end.s])
-				newPath.st.push([...seg.end.st])
-			} else {
-				// Bezier curves: q, qr, c, cr
-				let controlPoints = []
-				if (seg.type === 'q') {
-					controlPoints = [[seg.params[0], seg.params[1], seg.params[2]]]
-				} else if (seg.type === 'qr') {
-					controlPoints = [[seg.start.p[0] + seg.params[0], seg.start.p[1] + seg.params[1], seg.start.p[2] + seg.params[2]]]
-				} else if (seg.type === 'c') {
-					controlPoints = [
-						[seg.params[0], seg.params[1], seg.params[2]],
-						[seg.params[3], seg.params[4], seg.params[5]]
-					]
-				} else if (seg.type === 'cr') {
-					controlPoints = [
-						[seg.start.p[0] + seg.params[0], seg.start.p[1] + seg.params[1], seg.start.p[2] + seg.params[2]],
-						[seg.start.p[0] + seg.params[3], seg.start.p[1] + seg.params[4], seg.start.p[2] + seg.params[5]]
-					]
-				}
-
-				const segmentPoints = this._getPointsAtEqualDistance(seg.start.p, seg.end.p, controlPoints, segmentsToUse)
-				segmentPoints.forEach((p, j) => {
-						const t = (j + 1) / segmentsToUse
-						newPath.p.push([...p])
-						pushInterpolatedState(seg, t)
-					})
-			}
 		}
 
 		this._pathData = newPath
@@ -3282,739 +3354,652 @@ const isClockwise = (points) => getSignedArea(points) < 0
  * @returns {THREE.Mesh[]} An array of THREE.js meshes.
  */
 function extrude3d(target, commandPath) {
-	const bboxPath = boundingBoxPath(target);
-	if (!bboxPath || !bboxPath.min || !bboxPath.max) {
-		console.warn("Invalid bounding box for target in extrude3d");
-		return [];
-	}
 
-	const bboxPathW = (bboxPath.max.x - bboxPath.min.x) || 1;
-	const bboxPathH = (bboxPath.max.y - bboxPath.min.y) || 1;
 
-	var path = commandPath.getPoints();
-	let close = path.close;
-	const numPoints = path.p.length;
+	const bboxPath =boundingBoxPath(target);
+	//alert(JSON.stringify(bboxPath));
+	const bboxPathW= bboxPath.max.x-bboxPath.min.x;
+	const bboxPathH= bboxPath.max.y-bboxPath.min.y;
 
-	// ========================================================================
-	// ROBUST: Guarantee arrays match path.p length to prevent undefined crashes
-	// ========================================================================
-	const stScales = Array.from({ length: numPoints }, (_, i) => {
-			const st = path.st && path.st[i];
-			return [
-				(st && st[0] !== null && st[0] !== undefined) ? st[0] / bboxPathW : null,
-				(st && st[1] !== null && st[1] !== undefined) ? st[1] / bboxPathH : null
-			];
-		});
 
-	const sScales = Array.from({ length: numPoints }, (_, i) => {
-			const s = path.s && path.s[i];
-			return [
-				(s && s[0] !== null && s[0] !== undefined) ? s[0] : null,
-				(s && s[1] !== null && s[1] !== undefined) ? s[1] : null
-			];
-		});
+	// 1. Process the 3D path data
+	var path = commandPath.getPoints() //path3d(commandPath)
+	let close = path.close
 
-	const interpolateScaleArray = (targetArray) => {
-		const len = targetArray.length;
-		if (len === 0) return;
-
-		const interpolateDim = (dim) => {
-			let firstNonNull = -1;
-			for (let i = 0; i < len; i++) {
-				if (targetArray[i][dim] !== null) {
-					firstNonNull = i;
-					break;
-				}
-			}
-
-			if (firstNonNull === -1) {
-				for (let i = 0; i < len; i++) targetArray[i][dim] = 1.0;
-				return;
-			}
-
-			for (let i = 0; i < firstNonNull; i++) {
-				const firstVal = targetArray[firstNonNull][dim];
-				targetArray[i][dim] = 1.0 + (firstVal - 1.0) * (i / firstNonNull);
-			}
-
-			let lastNonNull = firstNonNull;
-			for (let i = firstNonNull + 1; i < len; i++) {
-				if (targetArray[i][dim] !== null) {
-					const startVal = targetArray[lastNonNull][dim];
-					const endVal = targetArray[i][dim];
-					const steps = i - lastNonNull;
-					for (let j = 1; j < steps; j++) {
-						const t = j / steps;
-						targetArray[lastNonNull + j][dim] = startVal + (endVal - startVal) * t;
-					}
-					lastNonNull = i;
-				}
-			}
-
-			if (lastNonNull < len - 1) {
-				const startVal = targetArray[lastNonNull][dim];
-				const endVal = 1.0;
-				const steps = len - 1 - lastNonNull;
-				for (let j = 1; j <= steps; j++) {
-					const t = j / steps;
-					targetArray[lastNonNull + j][dim] = startVal + (endVal - startVal) * t;
-				}
-			}
-		};
-
-		interpolateDim(0);
-		interpolateDim(1);
-	};
-
-	interpolateScaleArray(stScales);
-	interpolateScaleArray(sScales);
-	// ========================================================================
-
-	var path2dTargets = [];
+	// 2. Extract all Path2d instances from the target object
+	var path2dTargets = []
 	applyToPath2d(target, (item) => {
-			path2dTargets.push(item);
-		});
+			path2dTargets.push(item)
+		})
 
 	if (path2dTargets.length === 0) {
-		return [];
+		return []
 	}
 
-	var points3d = [];
-	var preCalc = [];
-	var upVector = new THREE.Vector3(0, 0, 1);
+	var points3d = []
+	var preCalc = []
+	var upVector = new THREE.Vector3(0, 0, 1)
 
-	const p1 = path.p[0];
-	const p2 = path.p[1];
-	let dx = p2[0] - p1[0];
-	let dy = p2[1] - p1[1];
-	let initialRotationRadians = 0;
+	// --- Calculation for Initial Rotation from path.p ---
+	const p1 = path.p[0]
+	const p2 = path.p[1]
+	let dx = p2[0] - p1[0]
+	let dy = p2[1] - p1[1]
+
+	let initialRotationRadians = 0
+
 	if (path.xyInitAng) {
-		initialRotationRadians = Math.atan2(dy, dx) + Math.PI / 2;
+		initialRotationRadians = Math.atan2(dy, dx) + Math.PI / 2
 	} else {
-		initialRotationRadians = Math.PI / 2;
+		initialRotationRadians = Math.PI / 2
 	}
-	const cosR = Math.cos(initialRotationRadians);
-	const sinR = Math.sin(initialRotationRadians);
 
+	const cosR = Math.cos(initialRotationRadians)
+	const sinR = Math.sin(initialRotationRadians)
+	// --- End of Calculation ---
+
+	// 3. Pre-calculate rotations and quaternions for each path segment
 	for (var i = 0; i < path.p.length; i++) {
-		points3d.push(...[0, 0, i]);
-		const rotation = path.r[i];
-		var o = {};
-		o.cosR = Math.cos((rotation / 180) * Math.PI);
-		o.sinR = Math.sin((rotation / 180) * Math.PI);
-		const normal = new THREE.Vector3().fromArray(path.n[i]);
-		o.quaternion = new THREE.Quaternion().setFromUnitVectors(upVector, normal);
-		applyQuaternion(upVector, o.quaternion);
-		preCalc.push(o);
+		points3d.push(...[0, 0, i])
+		const rotation = path.r[i]
+		var o = {}
+		o.cosR = Math.cos((rotation / 180) * Math.PI)
+		o.sinR = Math.sin((rotation / 180) * Math.PI)
+		const normal = new THREE.Vector3().fromArray(path.n[i])
+		o.quaternion = new THREE.Quaternion().setFromUnitVectors(
+			upVector,
+			normal
+		)
+		// Note: applyQuaternion called here is part of the original logic flow
+		applyQuaternion(upVector, o.quaternion)
+
+		preCalc.push(o)
 	}
 
-	const meshes = [];
+	const meshes = []
+
 	if (!points3d || points3d.length < 6) {
-		return [];
+		return []
 	}
 
+	// --- Helper function to generate geometry from one ShapeData object (Solid + Holes) ---
 	const getScaleFromPath = (i) => {
-		return [
-			stScales[i][0] * sScales[i][0],
-			stScales[i][1] * sScales[i][1]
-		];
-	};
+		let sx;
+		if (path.st[i][0] != null) {
+			sx = path.st[i][0] / bboxPathW;
+		} else {
+			sx = path.s[i][0];
+		}
+
+		let sy;
+		if (path.st[i][1] != null) {
+			sy = path.st[i][1] / bboxPathH;
+		} else {
+			sy = path.s[i][1];
+		}
+
+		return [sx, sy];
+	}
 
 	const genFromShapeData = (shapeData) => {
-		var geometry = new THREE.BufferGeometry();
-		var vertices = [];
-		var indices = [];
-		var uvs = [];
-		let vertexCount = 0;
+		var geometry = new THREE.BufferGeometry()
+		var vertices = []
+		var indices = []
+		var uvs = []
+		let vertexCount = 0
 
-		const convertToVector2 = (p) => new THREE.Vector2(p.x, p.y);
-		const contourPoints = shapeData.outerPoints.map(convertToVector2);
-		const holePoints = shapeData.holePoints.map((hole) => hole.map(convertToVector2));
+		// Convert Path2d's {x, y} Points to THREE.Vector2
+		const convertToVector2 = (p) => new THREE.Vector2(p.x, p.y)
+		const contourPoints = shapeData.outerPoints.map(convertToVector2)
+		const holePoints = shapeData.holePoints.map((hole) =>
+			hole.map(convertToVector2)
+		)
 
-		const capTriangles = THREE.ShapeUtils.triangulateShape(contourPoints, holePoints);
-		const allPoints = [contourPoints, ...holePoints].flat();
+		/*
+		// 🌟 CRITICAL STEP: Apply Initial Rotation to the cross-section points (Replicating linePaths3d)
+		const rotatePoints = (points) => {
+			for (const point of points) {
+				const x = point.x
+				const y = point.y
+				// Application of cosR and sinR (derived from initialRotationRadians)
+				point.x = x * cosR - y * sinR
+				point.y = x * sinR + y * cosR
+			}
+		}
+		rotatePoints(contourPoints)
+		holePoints.forEach(rotatePoints)
+		// 🌟 END CRITICAL STEP
+		//*/
 
-		const minX = Math.min(...allPoints.map((p) => p.x));
-		const maxX = Math.max(...allPoints.map((p) => p.x));
-		const minY = Math.min(...allPoints.map((p) => p.y));
-		const maxY = Math.max(...allPoints.map((p) => p.y));
-		const width = maxX - minX;
-		const height = maxY - minY;
-		const segments = points3d.length / 3 - 1;
+		// Triangulate the 2D shape for the caps
+		const capTriangles = THREE.ShapeUtils.triangulateShape(
+			contourPoints,
+			holePoints
+		)
+		const allPoints = [contourPoints, ...holePoints].flat()
+		const minX = Math.min(...allPoints.map((p) => p.x))
+		const maxX = Math.max(...allPoints.map((p) => p.x))
+		const minY = Math.min(...allPoints.map((p) => p.y))
+		const maxY = Math.max(...allPoints.map((p) => p.y))
+		const width = maxX - minX
+		const height = maxY - minY
+		const segments = points3d.length / 3 - 1
 
+		// Calculation of Final 3D Point with Cumulative Rotation (Unchanged)
 		const calcFinalPoint = (point, i, scale) => {
-			var x = point.x;
-			var y = point.y;
-			var z = 0;
+			var x = point.x
+			var y = point.y
+			var z = 0
 
-			x = x * scale[0];
-			y = y * scale[1];
+			// Apply path.s for scale
 
-			const prex = x;
-			const prey = y;
-			x = prex * cosR - prey * sinR;
-			y = prex * sinR + prey * cosR;
+			x = x * scale[0]//path.s[i][0]
+			y = y * scale[1]//path.s[i][1]
 
-			var o = preCalc[i];
-			let rotatedX = x * o.cosR - y * o.sinR;
-			let rotatedY = x * o.sinR + y * o.cosR;
-			x = rotatedX;
-			y = rotatedY;
+			//apply prerotation for algnment extrusion
+			const prex=x;
+			const prey=y;
+			x=prex*cosR - prey * sinR;
+			y=prex * sinR + prey * cosR
+			//*/
 
-			const ppoint = new THREE.Vector3(x, y, z);
 
+			// Apply 2D rotation (path.r)
+			var o = preCalc[i]
+			let rotatedX = x * o.cosR - y * o.sinR
+			let rotatedY = x * o.sinR + y * o.cosR
+			x = rotatedX
+			y = rotatedY
+
+			const ppoint = new THREE.Vector3(x, y, z)
+
+			// Apply the 3D rotation CUMULATIVELY
 			for (var k = 0; k <= i; k++) {
-				applyQuaternion(ppoint, preCalc[k].quaternion);
+				applyQuaternion(ppoint, preCalc[k].quaternion)
 			}
 
-			ppoint.x += path.p[i][0];
-			ppoint.y += path.p[i][1];
-			ppoint.z += path.p[i][2];
-			return ppoint;
-		};
+			// Apply the 3D translation
+			ppoint.x += path.p[i][0]
+			ppoint.y += path.p[i][1]
+			ppoint.z += path.p[i][2]
+			return ppoint
+		}
 
+		// --- DEFINITION 1: Cap Generation (Unchanged) ---
 		const addCap = (isTop) => {
-			const capStartVertexCount = vertexCount;
-			const i = isTop ? segments : 0;
+			const capStartVertexCount = vertexCount
+			const i = isTop ? segments : 0
+
 			const scale = getScaleFromPath(i);
 
+			// 1. Add Vertices and Cap UVs
 			for (const point of allPoints) {
-				var ppoint = calcFinalPoint(point, i, scale);
-				vertices.push(ppoint.x, ppoint.y, ppoint.z);
-				vertexCount++;
-				uvs.push((point.x - minX) / width, (point.y - minY) / height);
+				var ppoint = calcFinalPoint(point, i,scale);
+				vertices.push(ppoint.x, ppoint.y, ppoint.z)
+				vertexCount++
+				uvs.push((point.x - minX) / width, (point.y - minY) / height)
 			}
 
+			// 2. Add Indices
 			for (const tri of capTriangles) {
-				const v1 = capStartVertexCount + tri[0];
-				const v2 = capStartVertexCount + tri[1];
-				const v3 = capStartVertexCount + tri[2];
+				const v1 = capStartVertexCount + tri[0]
+				const v2 = capStartVertexCount + tri[1]
+				const v3 = capStartVertexCount + tri[2]
+
 				if (isTop) {
-					indices.push(v1, v2, v3);
+					indices.push(v1, v2, v3)
 				} else {
-					indices.push(v1, v3, v2);
+					indices.push(v1, v3, v2)
 				}
 			}
-		};
+		}
 
+		// --- DEFINITION 2: Side Wall Generation (Unchanged) ---
 		const extrudeContour = (points, reverseWinding) => {
-			const contourStartVertexCount = vertexCount;
-			const numPoints = points.length;
+			const contourStartVertexCount = vertexCount
+			const numPoints = points.length
 
-			let contourLength = 0;
+			// 1. Calculate total length of this contour for side UVs (U coordinate)
+			let contourLength = 0
 			for (let i = 0; i < numPoints; i++) {
-				const p1 = points[i];
-				const p2 = points[(i + 1) % numPoints];
-				contourLength += p1.distanceTo(p2);
+				const p1 = points[i]
+				const p2 = points[(i + 1) % numPoints]
+				contourLength += p1.distanceTo(p2)
 			}
 
-			let u_current = 0;
+			// 2. Generate Vertices and UVs for the side walls
+			let u_current = 0
 			for (let i = 0; i <= segments; i++) {
+
 				let scale = getScaleFromPath(i);
-				const v = 1 - i / segments;
-				u_current = 0;
+				// Loop path depth (V coordinate)
+				const v = 1 - i / segments
+				u_current = 0
+
 				for (let j = 0; j < numPoints; j++) {
-					const point = points[j];
-					var ppoint = calcFinalPoint(point, i, scale);
-					vertices.push(ppoint.x, ppoint.y, ppoint.z);
-					uvs.push(u_current / contourLength, v);
-					vertexCount++;
-					const p1 = points[j];
-					const p2 = points[(j + 1) % numPoints];
-					u_current += p1.distanceTo(p2);
+					// Loop 2D points (U coordinate)
+					const point = points[j]
+					var ppoint = calcFinalPoint(point, i, scale)
+
+					vertices.push(ppoint.x, ppoint.y, ppoint.z)
+					uvs.push(u_current / contourLength, v)
+					vertexCount++
+
+					const p1 = points[j]
+					const p2 = points[(j + 1) % numPoints]
+					u_current += p1.distanceTo(p2)
 				}
 			}
 
+			// 3. Generate Indices (Faces)
 			for (let i = 0; i < segments; i++) {
 				for (let j = 0; j < numPoints; j++) {
-					const idx_a = contourStartVertexCount + i * numPoints + j;
-					const idx_b = contourStartVertexCount + i * numPoints + ((j + 1) % numPoints);
-					const idx_c = contourStartVertexCount + (i + 1) * numPoints + ((j + 1) % numPoints);
-					const idx_d = contourStartVertexCount + (i + 1) * numPoints + j;
+					const idx_a = contourStartVertexCount + i * numPoints + j
+					const idx_b =
+					contourStartVertexCount +
+					i * numPoints +
+					((j + 1) % numPoints)
+					const idx_c =
+					contourStartVertexCount +
+					(i + 1) * numPoints +
+					((j + 1) % numPoints)
+					const idx_d =
+					contourStartVertexCount + (i + 1) * numPoints + j
 
-					if (reverseWinding) {
-						indices.push(idx_a, idx_d, idx_c);
-						indices.push(idx_a, idx_c, idx_b);
-					} else {
-						indices.push(idx_a, idx_b, idx_c);
-						indices.push(idx_a, idx_c, idx_d);
+					if (reverseWinding)
+					{
+						indices.push(idx_a, idx_d, idx_c)
+						indices.push(idx_a, idx_c, idx_b)
+					}
+					else
+					{
+						indices.push(idx_a, idx_b, idx_c)
+						indices.push(idx_a, idx_c, idx_d)
 					}
 				}
 			}
-		};
+		}
 
+		// --- Execution (Calling the Defined Helpers) ---
 		if (!close) {
-			addCap(true);
-			addCap(false);
+			addCap(true) // Add the top cap
+			addCap(false) // Add the bottom cap
 		}
-		extrudeContour(contourPoints, isClockwise(contourPoints));
+
+
+
+		extrudeContour(contourPoints, isClockwise(contourPoints)) // Extrude main outline
 		for (const hole of holePoints) {
-			extrudeContour(hole, !isClockwise(hole));
+			extrudeContour(hole, !isClockwise(hole)) // Extrude holes with reversed winding
 		}
 
-		geometry.setIndex(indices);
-		geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
-		geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
-		geometry.computeVertexNormals();
-		return new THREE.Mesh(geometry, defaultMaterial.clone());
-	};
+		// Finalize Geometry
+		geometry.setIndex(indices)
+		geometry.setAttribute(
+			'position',
+			new THREE.Float32BufferAttribute(vertices, 3)
+		)
+		geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2))
+		geometry.computeVertexNormals()
 
+		return new THREE.Mesh(geometry, defaultMaterial.clone())
+	}
+
+	// 4. Generate Meshes for all extracted Path2d targets
 	for (const path2dInstance of path2dTargets) {
-		const shapeDataArray = path2dInstance.getPoints();
+		const shapeDataArray = path2dInstance.getPoints()
+
 		for (const shapeData of shapeDataArray) {
-			meshes.push(genFromShapeData(shapeData));
+			meshes.push(genFromShapeData(shapeData))
 		}
 	}
-	return meshes;
+
+	return meshes
 }
 
-
-
-
-
-
-
-/**
- * Creates a 3D swept geometry by extruding a 2D wall profile along a circular/loop path.
- * This function generates walls with automatic end caps on the top and bottom.
- * 
- * @param {Path2d} circularPath - The closed 2D path that defines the sweep trajectory.
- *   - MUST BE CLOSED: The path should form a complete loop (start point === end point)
- *   - Defines the circular/loop shape that the wall will follow
- *   - Example: A circle, rectangle, or any closed polygon
- *   - The path's fn (tessellation factor) controls the smoothness of curves
- * 
- * @param {Path2d} wallPath - The open 2D path that defines the wall's cross-sectional profile.
- *   - MUST BE OPEN: The path should NOT be closed (start point !== end point)
- *   - Defines the vertical profile/shape of the wall
- *   - Typically a vertical line or profile showing the wall's height and thickness
- *   - The first point should be at the bottom, last point at the top
- *   - This openness allows the function to create end caps automatically
- * 
- * @param {Path2d} [holeWallPath] - Optional open 2D path that defines inner wall/void profile.
- *   - MUST BE OPEN (if provided): Same requirement as wallPath
- *   - Defines the inner boundary for hollow walls or cutouts
- *   - Creates a void/hole inside the main wall structure
- *   - Should be smaller than and contained within wallPath
- *   - If undefined or null, the wall will be solid (no holes)
- * 
- * @returns {THREE.Mesh[]} An array of Three.js meshes representing:
- *   - The swept wall geometry (side walls)
- *   - Top cap mesh (closes the top opening)
- *   - Bottom cap mesh (closes the bottom opening)
- *   - Hole wall geometry (if holeWallPath provided)
- *   - Hole caps (if holeWallPath provided)
- * 
- * @throws {Error} If wallPath has invalid bounding box
- * 
- * @example
- * // Create a circular wall (like a cylinder wall)
- * const circularPath = new Path2d()
- *   .m(50, 0)
- *   .n(32)
- *   .x(0, 0, -50, 0)  // Arc to create circle
- *   .x(0, 0, 50, 0)
- *   .fn(32);
- * 
- * // Create vertical wall profile (open path)
- * const wallPath = new Path2d()
- *   .m(0, 0)    // Start at bottom
- *   .l(0, 20)   // Go up 20 units
- *   .fn(2);
- * 
- * // Create inner wall profile for hollow section (optional)
- * const holeWallPath = new Path2d()
- *   .m(2, 0)    // Start at bottom, inset by 2 units
- *   .l(2, 20)   // Go up 20 units
- *   .fn(2);
- * 
- * const meshes = sweep3d(circularPath, wallPath, holeWallPath);
- * 
- * @caveats
- * 1. CIRCULAR_PATH MUST BE CLOSED:
- *    - The circularPath must form a complete loop
- *    - The start and end points should coincide
- *    - If not closed, the sweep will not form a complete shape
- * 
- * 2. WALL_PATH MUST BE OPEN:
- *    - The wallPath must NOT be closed
- *    - This allows the function to create top and bottom end caps
- *    - If closed, the capping logic will fail or produce incorrect geometry
- * 
- * 3. HOLEWALL_PATH MUST BE OPEN (if provided):
- *    - Same requirement as wallPath
- *    - Must be open to create proper hole caps
- * 
- * 4. PATH ORIENTATION:
- *    - wallPath should typically go from bottom to top
- *    - The function may reverse points based on Y-coordinate comparison
- *    - See code: `if (v2.y < v1.y) return v.reverse()`
- * 
- * 5. BOUNDING BOX REQUIREMENTS:
- *    - wallPath must have a valid bounding box
- *    - Width and height are used for scaling calculations
- *    - Defaults to 1 if width/height is 0
- * 
- * 6. SCALE INTERPOLATION:
- *    - The function interpolates scale values (path.s and path.st) along the sweep
- *    - Null values are automatically interpolated between defined values
- * 
- * 7. MATERIAL:
- *    - All generated meshes use defaultMaterial.clone()
- *    - To customize materials, modify meshes after creation
- * 
- * 8. GEOMETRY MERGING:
- *    - The function returns union(meshes) at the end
- *    - This combines all generated parts into unified meshes
- *    - May affect performance for complex geometries
- * 
- * @see Path2d - For creating 2D paths with methods like m(), l(), x(), etc.
- * @see union - For the final mesh combination operation
- */
+//
 function sweep3d(circularPath, wallPath, holeWallPath) {
-	let close = false;
+	// 1. Process the 3D path data
+	let close = false
 
+	// 🌟 NEW: Calculate bounding box of the profile (wallPath) to support .st() scaling
 	const bboxProfile = boundingBoxPath(wallPath);
-	if (!bboxProfile || !bboxProfile.min || !bboxProfile.max) {
-		console.warn("Invalid bounding box for wallPath in sweep3d");
-		return [];
-	}
-	const bboxPathW = (bboxProfile.max.x - bboxProfile.min.x) || 1;
+	const bboxPathW = (bboxProfile.max.x - bboxProfile.min.x) || 1; // Prevent division by zero
 	const bboxPathH = (bboxProfile.max.y - bboxProfile.min.y) || 1;
 
-	const convertToVector2 = (p) => new THREE.Vector2(p.x, p.y);
+	// 2. Extract all Path2d instances from the target object
+	const convertToVector2 = (p) => new THREE.Vector2(p.x, p.y)
+
 	var wallPoints = () => {
-		var v = wallPath.getPoints()[0].outerPoints.map(convertToVector2);
+		var v = wallPath.getPoints()[0].outerPoints.map(convertToVector2)
 		var v1 = v[0];
 		var v2 = v[v.length - 1];
 		if (v2.y < v1.y) return v.reverse();
 		return v;
 	};
+
 	var holeWallPoints = () => {
-		var v = holeWallPath.getPoints()[0].outerPoints.map(convertToVector2);
+		var v = holeWallPath.getPoints()[0].outerPoints.map(convertToVector2)
 		var v1 = v[0];
 		var v2 = v[v.length - 1];
 		if (v2.y < v1.y) return v.reverse();
 		return v;
 	};
 
-	const meshes = [];
-	var topCapPoints = [];
-	var bottomCapPoints = [];
-	var topHolePointArrays = [];
-	var bottomHolePointArrays = [];
+	const meshes = []
 
+	var topCapPoints = []
+	var bottomCapPoints = []
+	var topHolePointArrays = []
+	var bottomHolePointArrays = []
+
+	// --- Helper function to generate geometry from one ShapeData object ---
 	const genFromShapeData = (path2d, isHole) => {
-		var upVector = new THREE.Vector3(0, 0, 1);
-		var path3dObj = new Path3d().path(path2d);
-		var path = path3dObj.getPoints();
-		const numPoints = path.p.length;
+		var upVector = new THREE.Vector3(0, 0, 1)
 
-		const stScales = Array.from({ length: numPoints }, (_, i) => {
-				const st = path.st && path.st[i];
-				return [
-					(st && st[0] !== null && st[0] !== undefined) ? st[0] / bboxPathW : null,
-					(st && st[1] !== null && st[1] !== undefined) ? st[1] / bboxPathH : null
-				];
-			});
+		var path3d = new Path3d().path(path2d)
+		var path = path3d.getPoints()
 
-		const sScales = Array.from({ length: numPoints }, (_, i) => {
-				const s = path.s && path.s[i];
-				return [
-					(s && s[0] !== null && s[0] !== undefined) ? s[0] : null,
-					(s && s[1] !== null && s[1] !== undefined) ? s[1] : null
-				];
-			});
+		const p1 = path.p[0]
+		const p2 = path.p[1]
+		let dx = p2[0] - p1[0]
+		let dy = p2[1] - p1[1]
 
-		const interpolateScaleArray = (targetArray) => {
-			const len = targetArray.length;
-			if (len === 0) return;
-			const interpolateDim = (dim) => {
-				let firstNonNull = -1;
-				for (let i = 0; i < len; i++) {
-					if (targetArray[i][dim] !== null) {
-						firstNonNull = i;
-						break;
-					}
-				}
-				if (firstNonNull === -1) {
-					for (let i = 0; i < len; i++) targetArray[i][dim] = 1.0;
-					return;
-				}
-				for (let i = 0; i < firstNonNull; i++) {
-					const firstVal = targetArray[firstNonNull][dim];
-					targetArray[i][dim] = 1.0 + (firstVal - 1.0) * (i / firstNonNull);
-				}
-				let lastNonNull = firstNonNull;
-				for (let i = firstNonNull + 1; i < len; i++) {
-					if (targetArray[i][dim] !== null) {
-						const startVal = targetArray[lastNonNull][dim];
-						const endVal = targetArray[i][dim];
-						const steps = i - lastNonNull;
-						for (let j = 1; j < steps; j++) {
-							const t = j / steps;
-							targetArray[lastNonNull + j][dim] = startVal + (endVal - startVal) * t;
-						}
-						lastNonNull = i;
-					}
-				}
-				if (lastNonNull < len - 1) {
-					const startVal = targetArray[lastNonNull][dim];
-					const endVal = 1.0;
-					const steps = len - 1 - lastNonNull;
-					for (let j = 1; j <= steps; j++) {
-						const t = j / steps;
-						targetArray[lastNonNull + j][dim] = startVal + (endVal - startVal) * t;
-					}
-				}
-			};
-			interpolateDim(0);
-			interpolateDim(1);
-		};
+		let initialRotationRadians = 0
 
-		interpolateScaleArray(stScales);
-		interpolateScaleArray(sScales);
-
-		const p1 = path.p[0];
-		const p2 = path.p[1];
-		let dx = p2[0] - p1[0];
-		let dy = p2[1] - p1[1];
-		let initialRotationRadians = 0;
 		if (path.xyInitAng) {
-			initialRotationRadians = Math.atan2(dy, dx) + Math.PI / 2;
+			initialRotationRadians = Math.atan2(dy, dx) + Math.PI / 2
 		} else {
-			initialRotationRadians = Math.PI / 2;
+			initialRotationRadians = Math.PI / 2
 		}
-		const cosR = Math.cos(initialRotationRadians);
-		const sinR = Math.sin(initialRotationRadians);
 
-		var points3d = [];
-		var preCalc = [];
+		const cosR = Math.cos(initialRotationRadians)
+		const sinR = Math.sin(initialRotationRadians)
 
+		var points3d = []
+		var preCalc = []
+
+		// 3. Pre-calculate rotations and quaternions for each path segment
 		for (var i = 0; i < path.p.length; i++) {
-			points3d.push(...[0, 0, i]);
-			const rotation = path.r[i];
-			var o = {};
-			o.cosR = Math.cos((rotation / 180) * Math.PI);
-			o.sinR = Math.sin((rotation / 180) * Math.PI);
-			const normal = new THREE.Vector3().fromArray(path.n[i]);
-			o.quaternion = new THREE.Quaternion().setFromUnitVectors(upVector, normal);
-			applyQuaternion(upVector, o.quaternion);
-			preCalc.push(o);
+			points3d.push(...[0, 0, i])
+			const rotation = path.r[i]
+			var o = {}
+			o.cosR = Math.cos((rotation / 180) * Math.PI)
+			o.sinR = Math.sin((rotation / 180) * Math.PI)
+			const normal = new THREE.Vector3().fromArray(path.n[i])
+			o.quaternion = new THREE.Quaternion().setFromUnitVectors(
+				upVector,
+				normal
+			)
+			applyQuaternion(upVector, o.quaternion)
+			preCalc.push(o)
 		}
 
-		var finalMeshes = [];
-		const segments = points3d.length / 3 - 1;
+		var finalMeshes = []
+		const segments = points3d.length / 3 - 1
+
 		let contourPoints;
 		if (isHole && holeWallPath) {
 			contourPoints = holeWallPoints();
 		} else {
-			contourPoints = wallPoints();
+			contourPoints = wallPoints()
 		}
 
+		// Apply Initial Rotation
 		const rotatePoints = (points) => {
 			for (const point of points) {
-				const x = point.x;
-				const y = point.y;
-				point.x = x * cosR - y * sinR;
-				point.y = x * sinR + y * cosR;
+				const x = point.x
+				const y = point.y
+				point.x = x * cosR - y * sinR
+				point.y = x * sinR + y * cosR
 			}
-		};
-		rotatePoints(contourPoints);
+		}
 
+		rotatePoints(contourPoints)
+
+		// Calculation of Final 3D Point with Cumulative Rotation
 		const calcFinalPoint = (point, i) => {
-			var x = point.x;
-			var y = point.y;
-			var z = 0;
+			var x = point.x
+			var y = point.y
+			var z = 0
 
-			let scaleX = stScales[i][0] * sScales[i][0];
-			let scaleY = stScales[i][1] * sScales[i][1];
+			// 🌟 UPDATED: Apply path.s OR path.st for scale
+			let scaleX = path.s[i][0];
+			let scaleY = path.s[i][1];
+
+			if (path.st[i][0] != null) {
+				scaleX = path.st[i][0] / bboxPathW;
+			}
+			if (path.st[i][1] != null) {
+				scaleY = path.st[i][1] / bboxPathH;
+			}
 
 			x = x * scaleX;
 			y = y * scaleY;
 
-			var o = preCalc[i];
-			let rotatedX = x * o.cosR - y * o.sinR;
-			let rotatedY = x * o.sinR + y * o.cosR;
-			x = rotatedX;
-			y = rotatedY;
+			// Apply 2D rotation (path.r)
+			var o = preCalc[i]
+			let rotatedX = x * o.cosR - y * o.sinR
+			let rotatedY = x * o.sinR + y * o.cosR
+			x = rotatedX
+			y = rotatedY
 
-			const ppoint = new THREE.Vector3(x, y, z);
+			const ppoint = new THREE.Vector3(x, y, z)
 
+			// Apply the 3D rotation CUMULATIVELY
 			for (var k = 0; k <= i; k++) {
-				applyQuaternion(ppoint, preCalc[k].quaternion);
+				applyQuaternion(ppoint, preCalc[k].quaternion)
 			}
 
-			ppoint.x += path.p[i][0];
-			ppoint.y += path.p[i][1];
-			ppoint.z += path.p[i][2];
-			return ppoint;
-		};
+			// Apply the 3D translation
+			ppoint.x += path.p[i][0]
+			ppoint.y += path.p[i][1]
+			ppoint.z += path.p[i][2]
+			return ppoint
+		}
 
+		// --- Side Wall Generation ---
 		const extrudeContour = (points, isHole) => {
-			const contourStartVertexCount = 0;
-			const numPoints = points.length;
-			const numWallSegments = numPoints - 1;
-			var r = { vertices: [], indices: [], uvs: [], vertexCount: 0 };
+			const contourStartVertexCount = 0
+			const numPoints = points.length
+			const numWallSegments = numPoints - 1
 
-			let contourLength = 0;
-			for (let i = 0; i < numWallSegments; i++) {
-				contourLength += points[i].distanceTo(points[i + 1]);
+			var r = {
+				vertices: [],
+				indices: [],
+				uvs: [],
+				vertexCount: 0
 			}
 
-			let u_current = 0;
-			const currentCapPoints = [];
-			const currentTopPoints = [];
+			let contourLength = 0
+			for (let i = 0; i < numWallSegments; i++) {
+				contourLength += points[i].distanceTo(points[i + 1])
+			}
+
+			let u_current = 0
+			const currentCapPoints = []
+			const currentTopPoints = []
 
 			for (let i = 0; i <= segments; i++) {
-				const v = 1 - i / segments;
-				u_current = 0;
+				const v = 1 - i / segments
+				u_current = 0
+
 				for (let j = 0; j < numPoints; j++) {
-					const point = points[j];
-					var ppoint = calcFinalPoint(point, i);
-					r.vertices.push(ppoint.x, ppoint.y, ppoint.z);
-					r.vertexCount++;
+					const point = points[j]
+					var ppoint = calcFinalPoint(point, i)
 
-					if (j == 0) currentCapPoints.push(ppoint.x, ppoint.y, ppoint.z);
-					if (j == numPoints - 1) currentTopPoints.push(ppoint.x, ppoint.y, ppoint.z);
+					r.vertices.push(ppoint.x, ppoint.y, ppoint.z)
+					r.vertexCount++
 
-					let u_val = u_current / contourLength;
-					if (j === numPoints - 1) u_val = 1.0;
+					if (j == 0) {
+						currentCapPoints.push(ppoint.x, ppoint.y, ppoint.z)
+					}
+					if (j == numPoints - 1) {
+						currentTopPoints.push(ppoint.x, ppoint.y, ppoint.z)
+					}
 
-					r.uvs.push(u_val, v);
+					let u_val = u_current / contourLength
+					if (j === numPoints - 1) {
+						u_val = 1.0
+					}
+					r.uvs.push(u_val, v)
 
 					if (j < numWallSegments) {
-						const p1 = points[j];
-						const p2 = points[j + 1];
-						u_current += p1.distanceTo(p2);
+						const p1 = points[j]
+						const p2 = points[j + 1]
+						u_current += p1.distanceTo(p2)
 					}
 				}
 			}
 
 			if (isHole) {
-				bottomHolePointArrays.push(currentCapPoints);
-				topHolePointArrays.push(currentTopPoints);
+				bottomHolePointArrays.push(currentCapPoints)
+				topHolePointArrays.push(currentTopPoints)
 			} else {
-				bottomCapPoints.push(...currentCapPoints);
-				topCapPoints.push(...currentTopPoints);
+				bottomCapPoints.push(...currentCapPoints)
+				topCapPoints.push(...currentTopPoints)
 			}
 
 			for (let i = 0; i < segments; i++) {
 				for (let j = 0; j < numWallSegments; j++) {
-					const idx_a = contourStartVertexCount + i * numPoints + j;
-					const idx_b = contourStartVertexCount + i * numPoints + (j + 1);
-					const idx_c = contourStartVertexCount + (i + 1) * numPoints + (j + 1);
-					const idx_d = contourStartVertexCount + (i + 1) * numPoints + j;
-					r.indices.push(idx_a, idx_b, idx_c);
-					r.indices.push(idx_a, idx_c, idx_d);
+					const idx_a = contourStartVertexCount + i * numPoints + j
+					const idx_b = contourStartVertexCount + i * numPoints + (j + 1)
+					const idx_c = contourStartVertexCount + (i + 1) * numPoints + (j + 1)
+					const idx_d = contourStartVertexCount + (i + 1) * numPoints + j
+
+					r.indices.push(idx_a, idx_b, idx_c)
+					r.indices.push(idx_a, idx_c, idx_d)
 				}
 			}
-			return r;
-		};
+			return r
+		}
 
-		finalMeshes.push(extrudeContour(contourPoints, isHole));
+		finalMeshes.push(extrudeContour(contourPoints, isHole))
 
 		for (var i = 0; i < finalMeshes.length; i++) {
-			var geometry = new THREE.BufferGeometry();
-			geometry.setIndex(finalMeshes[i].indices);
-			geometry.setAttribute('position', new THREE.Float32BufferAttribute(finalMeshes[i].vertices, 3));
-			geometry.setAttribute('uv', new THREE.Float32BufferAttribute(finalMeshes[i].uvs, 2));
-			geometry.computeVertexNormals();
-			const wallMesh = new THREE.Mesh(geometry, defaultMaterial.clone());
-			meshes.push(wallMesh);
-		}
-	};
+			var geometry = new THREE.BufferGeometry()
+			geometry.setIndex(finalMeshes[i].indices)
+			geometry.setAttribute(
+				'position',
+				new THREE.Float32BufferAttribute(finalMeshes[i].vertices, 3)
+			)
+			geometry.setAttribute(
+				'uv',
+				new THREE.Float32BufferAttribute(finalMeshes[i].uvs, 2)
+			)
+			geometry.computeVertexNormals()
 
-	var cirPaths = circularPath.getPoints();
+			const wallMesh = new THREE.Mesh(geometry, defaultMaterial.clone())
+			meshes.push(wallMesh)
+		}
+	}
+
+	var cirPaths = circularPath.getPoints()
+
 	for (var v = 0; v < cirPaths.length; v++) {
-		var lpath = [];
-		var apath = cirPaths[v].outerPoints;
+		var lpath = []
+		var apath = cirPaths[v].outerPoints
 		for (var i = 0; i < apath.length; i++) {
-			if (i == 0) lpath.push('m', apath[i].x, apath[i].y);
-			else lpath.push('l', apath[i].x, apath[i].y);
-		}
-		var fpath = new Path2d().path(lpath).fn(circularPath._fn);
-		genFromShapeData(fpath, false);
-
-		var hpaths = cirPaths[v].holePoints;
-		for (var j = 0; j < hpaths.length; j++) {
-			lpath = [];
-			apath = hpaths[j];
-			for (var i = 0; i < apath.length; i++) {
-				if (i == 0) lpath.push('m', apath[i].x, apath[i].y);
-				else lpath.push('l', apath[i].x, apath[i].y);
+			if (i == 0) {
+				lpath.push('m', apath[i].x, apath[i].y)
+			} else {
+				lpath.push('l', apath[i].x, apath[i].y)
 			}
-			fpath = new Path2d().path(lpath).fn(circularPath._fn);
-			genFromShapeData(fpath, true);
+		}
+		var fpath = new Path2d().path(lpath).fn(circularPath._fn)
+		genFromShapeData(fpath, false)
+
+		var hpaths = cirPaths[v].holePoints
+		for (var j = 0; j < hpaths.length; j++) {
+			lpath = []
+			apath = hpaths[j]
+			for (var i = 0; i < apath.length; i++) {
+				if (i == 0) {
+					lpath.push('m', apath[i].x, apath[i].y)
+				} else {
+					lpath.push('l', apath[i].x, apath[i].y)
+				}
+			}
+			fpath = new Path2d().path(lpath).fn(circularPath._fn)
+			genFromShapeData(fpath, true)
 		}
 	}
 
 	const createCapGeometry = (outer3DPoints, hole3DPointArrays, isBottomCap) => {
-		if (outer3DPoints.length === 0) return null;
-		let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-		var contour3DPoints = [];
-		var projected2DPoints = [];
+		if (outer3DPoints.length === 0) return null
+
+		let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+		var contour3DPoints = []
+		var projected2DPoints = []
 
 		for (let i = 0; i < outer3DPoints.length; i += 3) {
-			var x = outer3DPoints[i];
-			var y = outer3DPoints[i + 1];
-			var z = outer3DPoints[i + 2];
-			var v3 = new THREE.Vector3(x, y, z);
-			contour3DPoints.push(v3);
-			projected2DPoints.push(new THREE.Vector2(x, y));
-			minX = Math.min(minX, x);
-			minY = Math.min(minY, y);
-			maxX = Math.max(maxX, x);
-			maxY = Math.max(maxY, y);
+			var x = outer3DPoints[i]
+			var y = outer3DPoints[i + 1]
+			var z = outer3DPoints[i + 2]
+			var v3 = new THREE.Vector3(x, y, z)
+			contour3DPoints.push(v3)
+			projected2DPoints.push(new THREE.Vector2(x, y))
+
+			minX = Math.min(minX, x)
+			minY = Math.min(minY, y)
+			maxX = Math.max(maxX, x)
+			maxY = Math.max(maxY, y)
 		}
 
-		const projectedHoles2D = [];
+		const projectedHoles2D = []
 		for (var hole3DPoints of hole3DPointArrays) {
-			var hole2DPoints = [];
+			var hole2DPoints = []
 			for (let i = 0; i < hole3DPoints.length; i += 3) {
-				var x = hole3DPoints[i];
-				var y = hole3DPoints[i + 1];
-				var z = hole3DPoints[i + 2];
-				var v3 = new THREE.Vector3(x, y, z);
-				contour3DPoints.push(v3);
-				hole2DPoints.push(new THREE.Vector2(x, y));
+				var x = hole3DPoints[i]
+				var y = hole3DPoints[i + 1]
+				var z = hole3DPoints[i + 2]
+				var v3 = new THREE.Vector3(x, y, z)
+				contour3DPoints.push(v3)
+				hole2DPoints.push(new THREE.Vector2(x, y))
 			}
-			projectedHoles2D.push(hole2DPoints);
+			projectedHoles2D.push(hole2DPoints)
 		}
 
-		let width = maxX - minX;
-		let height = maxY - minY;
-		if (width === 0) { maxX += 1; width = 1; }
-		if (height === 0) { maxY += 1; height = 1; }
+		let width = maxX - minX
+		let height = maxY - minY
 
-		var triangles = THREE.ShapeUtils.triangulateShape(projected2DPoints, projectedHoles2D);
-		var capVerticesFinal = [];
-		var capIndices = [];
-		var capUVs = [];
+		if (width === 0) { maxX += 1; width = 1 }
+		if (height === 0) { maxY += 1; height = 1 }
+
+		var triangles = THREE.ShapeUtils.triangulateShape(
+			projected2DPoints,
+			projectedHoles2D
+		)
+
+		var capVerticesFinal = []
+		var capIndices = []
+		var capUVs = []
 
 		for (const v of contour3DPoints) {
-			capVerticesFinal.push(v.x, v.y, v.z);
-			capUVs.push((v.x - minX) / width, (v.y - minY) / height);
+			capVerticesFinal.push(v.x, v.y, v.z)
+			capUVs.push((v.x - minX) / width, (v.y - minY) / height)
 		}
 
 		for (const triangle of triangles) {
-			var idx0 = triangle[0];
-			var idx1 = triangle[1];
-			var idx2 = triangle[2];
+			var idx0 = triangle[0]
+			var idx1 = triangle[1]
+			var idx2 = triangle[2]
+
 			if (!isBottomCap) {
-				capIndices.push(idx0, idx2, idx1);
+				capIndices.push(idx0, idx2, idx1)
 			} else {
-				capIndices.push(idx0, idx1, idx2);
+				capIndices.push(idx0, idx1, idx2)
 			}
 		}
 
-		var capGeom = new THREE.BufferGeometry();
-		capGeom.setIndex(capIndices);
-		capGeom.setAttribute('position', new THREE.Float32BufferAttribute(capVerticesFinal, 3));
-		capGeom.setAttribute('uv', new THREE.Float32BufferAttribute(capUVs, 2));
-		capGeom.computeVertexNormals();
-		return new THREE.Mesh(capGeom, defaultMaterial.clone());
-	};
+		var capGeom = new THREE.BufferGeometry()
+		capGeom.setIndex(capIndices)
+		capGeom.setAttribute('position', new THREE.Float32BufferAttribute(capVerticesFinal, 3))
+		capGeom.setAttribute('uv', new THREE.Float32BufferAttribute(capUVs, 2))
+		capGeom.computeVertexNormals()
+
+		return new THREE.Mesh(capGeom, defaultMaterial.clone())
+	}
 
 	const topCapMesh = createCapGeometry(topCapPoints, topHolePointArrays, true);
 	if (topCapMesh) { meshes.push(topCapMesh); }
@@ -4022,7 +4007,7 @@ function sweep3d(circularPath, wallPath, holeWallPath) {
 	const bottomCapMesh = createCapGeometry(bottomCapPoints, bottomHolePointArrays, false);
 	if (bottomCapMesh) { meshes.push(bottomCapMesh); }
 
-	return union(meshes);
+	return union(meshes)
 }
 
 //*/

@@ -18,8 +18,8 @@
             "apiCalls": "/system/js/apiCalls.js",
             "filePicker": "/system/ux/filePicker.js",
             "filePickerUI": "/system/ux/filePickerUI.js",
-            "optText": "/system/ux/optText/optText.js",
-            "optTextRegistry": "/system/ux/optText/optTextAdditionsRegistry.js",
+            "textCode": "/system/ux/textCode.js",
+            "textCodeUI": "/system/ux/textCodeUI.js",
             "aiChat": "/system/ux/aichat.js"
         }
     }
@@ -82,11 +82,10 @@
             display:flex; 
             align-items:center; 
             justify-content:center; 
-            font-size:14px; /* ✅ Increased slightly for the new ✕ icon */
+            font-size:11px; 
             cursor:pointer; 
             padding:0;
             margin-left:4px;
-            line-height: 1;
         }
         .close-btn:hover { background:#a50d19; }
         .close-btn:disabled { opacity:0.4; cursor:not-allowed; }
@@ -190,7 +189,7 @@
             display: block;
         }
         
-        /* Content area */
+        /* Content area - FIXED: visibility-based hiding to prevent iframe reloads */
         .content { 
             flex-grow:1; 
             position:relative; 
@@ -202,6 +201,7 @@
             left:0; 
             width:100%; 
             height:100%; 
+            /* ✅ Use visibility/opacity instead of display:none to preserve iframe state */
             visibility: hidden;
             pointer-events: none;
             opacity: 0;
@@ -602,8 +602,7 @@
                     <option value="settings">⚙️ Settings</option>
                     <option value="filepicker">📁 Files</option>
                 </select>
-                <!-- ✅ CHANGED: Trash icon replaced with a clean close (✕) icon -->
-                <button id="closePageBtn" class="close-btn" disabled title="Close tab">✕</button>
+                <button id="closePageBtn" class="close-btn" disabled title="Close tab">🗑️</button>
                 <div class="save-status" id="saveStatus"></div>
             </div>
         </div>
@@ -626,7 +625,7 @@
                         <p style="font-size:11px;line-height:1.5;">
                             Dev Environment v1.0<br>
                             • Chat: AI Assistant with voice support<br>
-                            • File Editor: Canvas-based code editing (optText)<br>
+                            • File Editor: Code editing with syntax support<br>
                             • File Viewer: Live preview with refresh<br>
                             • Settings: Persistent configuration
                         </p>
@@ -660,7 +659,7 @@
             <div class="modal-body">
                 <p>How would you like to open <span id="modalFileName" style="color:#007acc;font-weight:500;"></span>?</p>
                 <div class="modal-buttons">
-                    <button id="openInEditorBtn" class="modal-btn editor-btn">📝 Editor (optText)</button>
+                    <button id="openInEditorBtn" class="modal-btn editor-btn">📝 Editor (textCode)</button>
                     <button id="openInViewerBtn" class="modal-btn viewer-btn">👁️ Viewer (Preview)</button>
                 </div>
                 <p style="font-size:10px;color:#888;margin-top:8px;">
@@ -672,7 +671,7 @@
 
     <script type="module">
         // Load modules
-        const mods = { api: null, fp: null, optText: null, aiChat: null };
+        const mods = { api: null, fp: null, tc: null, aiChat: null };
         try {
             const apiMod = await import('apiCalls');
             mods.api = apiMod.api;
@@ -681,10 +680,9 @@
             const fpMod = await import('filePicker');
             mods.fp = fpMod.createfilePicker;
             
-            // Load optText and its registry
-            await import('optTextRegistry');
-            const optTextMod = await import('optText');
-            mods.optText = optTextMod.newOptText;
+            await import('textCodeUI');
+            const tcMod = await import('textCode');
+            mods.tc = tcMod.createTexCode;
             
             // Load AIChat component
             await import('aiChat');
@@ -772,11 +770,6 @@
                     const isDirty = tab.editor?.value !== tab.content;
                     updateSaveStatus(isDirty);
                     saveStatus.textContent = '';
-                    
-                    // Focus the canvas editor so keyboard events work
-                    if (tab.editor && typeof tab.editor.focus === 'function') {
-                        setTimeout(() => tab.editor.focus(), 50);
-                    }
                 }
             } else {
                 updateSaveStatus(false);
@@ -855,28 +848,13 @@
                 contentArea.appendChild(page);
                 
                 const editorContainer = page.firstChild;
-                
-                // Initialize optText
-                const lines = content.split('\n');
-                const editor = mods.optText(editorContainer, {
-                    contexts: [{ name: name, lines: lines }],
-                    extensions: [
-                        'autoIndent',
-                        'beautifyCode',
-                        'selectBracket',
-                        'searchTool',
-                        'save'
-                    ]
-                });
-                
-                // ✅ Manually append the returned editor instance to the DOM
+                const editor = mods.tc(content);
                 editorContainer.appendChild(editor);
                 
-                // Wire up optText callbacks
-                editor.onSave = async (container) => {
+                editor.addEventListener('save', async (e) => {
                     try {
-                        await mods.api.saveFile(path, container.value);
-                        state.tabs[id].content = container.value;
+                        await mods.api.saveFile(path, editor.value);
+                        state.tabs[id].content = editor.value;
                         if (state.currentPage === id) updateSaveStatus(false);
                         showToast(`✅ Saved: ${name}`, 'success');
                         updateStatus(`Saved: ${name}`);
@@ -884,22 +862,17 @@
                         showToast(`❌ Save failed: ${error.message}`, 'error');
                         console.error('Save error:', error);
                     }
-                };
+                });
                 
-                editor.onClose = (container) => {
-                    closeCurrent();
-                };
-                
-                editor.onOpen = (container) => {
-                    switchPage('filepicker');
-                };
-                
-                // Listen for changes to update dirty state
-                editor.addEventListener('optText:change', () => {
-                    if (state.currentPage === id) {
-                        const isDirty = editor.value !== state.tabs[id].content;
-                        updateSaveStatus(isDirty);
-                    }
+                let changeTimeout;
+                editor.addEventListener('input', () => {
+                    clearTimeout(changeTimeout);
+                    changeTimeout = setTimeout(() => {
+                        if (state.currentPage === id) {
+                            const isDirty = editor.value !== state.tabs[id].content;
+                            updateSaveStatus(isDirty);
+                        }
+                    }, 300);
                 });
                 
                 addTab(id, `📝 ${name}`, page, editor, path, content);

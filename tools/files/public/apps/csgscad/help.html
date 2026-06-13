@@ -1729,33 +1729,73 @@ alignPath({ bx: 0, cx: 10 }, path);  // Uses bx: 0, ignores cx: 10</pre>
     </section>
 
     <section id="boundingBoxPath" class="section">
-        <h3>boundingBoxPath() <span class="badge path">Path</span></h3>
-        <div class="sig">boundingBoxPath(pathObject)</div>
-        <div class="desc"><strong>Description:</strong> Calculates 2D bounding box for path data. Flattens curves first using path2d() for accuracy. Returns min/max coordinates in 2D space.</div>
-        <div class="table-wrap"><table><thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead><tbody>
-            <tr><td>pathObject</td><td>Object</td><td>Path data {path: Array, fn: number} or Path2d instance</td></tr>
-        </tbody></table></div>
-        <div class="returns"><strong>Returns:</strong> Object {min: {x, y}, max: {x, y}} - Bounding box coordinates</div>
-        <pre>// Example Usage:
-const path = { path: ['m', 0, 0, 'l', 10, 10], fn: 32 };
-const bbox = boundingBoxPath(path);
-console.log(bbox.min);  // {x: 0, y: 0}
-console.log(bbox.max);  // {x: 10, y: 10}
+        <h3 id="boundingBoxPath">`boundingBoxPath() Path`</h3>
+<p><code>boundingBoxPath(target)</code></p>
+<p><strong>Description:</strong> Calculates the collective 2D bounding box for path(s). Recursively searches for <code>Path2d</code> instances (whether passed directly, in an array, or nested inside an object) and aggregates their min/max coordinates. Maintains backward compatibility with legacy path objects <code>{ path: Array, fn: number }</code>.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Parameter</th>
+      <th>Type</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>target</code></td>
+      <td><code>Path2d</code> | <code>Array</code> | <code>Object</code></td>
+      <td>The path object(s) to evaluate. Can be a single <code>Path2d</code> instance, an array of <code>Path2d</code> instances, a nested object containing <code>Path2d</code> instances, or a legacy path object <code>{ path: Array, fn: number }</code>.</td>
+    </tr>
+  </tbody>
+</table>
+
+<p><strong>Returns:</strong> <code>Object {min: {x, y}, max: {x, y}}</code> - The collective bounding box coordinates encompassing all evaluated paths.</p>
+
+<pre><code class="language-javascript">
+// Example Usage:
+
+// 1. Single Path2d instance
+const path1 = new Path2d().m(0, 0).l(10, 10);
+const bbox1 = boundingBoxPath(path1);
+console.log(bbox1.min);  // {x: 0, y: 0}
+console.log(bbox1.max);  // {x: 10, y: 10}
+
+// 2. Array of Path2d instances
+const path2 = new Path2d().m(20, 20).l(30, 30);
+const bboxArray = boundingBoxPath([path1, path2]);
+console.log(bboxArray.min);  // {x: 0, y: 0}
+console.log(bboxArray.max);  // {x: 30, y: 30}
+
+// 3. Nested object containing Path2d instances
+const shapes = {
+    outer: new Path2d().m(0, 0).l(50, 50),
+    inner: new Path2d().m(10, 10).l(20, 20)
+};
+const bboxNested = boundingBoxPath(shapes);
+console.log(bboxNested.min);  // {x: 0, y: 0}
+console.log(bboxNested.max);  // {x: 50, y: 50}
+
+// 4. Legacy path object (backward compatibility)
+const legacyPath = { path: ['m', 0, 0, 'l', 15, 15], fn: 32 };
+const bboxLegacy = boundingBoxPath(legacyPath);
+console.log(bboxLegacy.max);  // {x: 15, y: 15}
 
 // Calculate size
-const width = bbox.max.x - bbox.min.x;
-const height = bbox.max.y - bbox.min.y;
+const width = bbox1.max.x - bbox1.min.x;
+const height = bbox1.max.y - bbox1.min.y;
 
 // Center path at origin
 const centered = translatePath(
-    [-(bbox.min.x + width/2), -(bbox.min.y + height/2)],
-    new Path2d().path(path)
+    [-(bbox1.min.x + width/2), -(bbox1.min.y + height/2)],
+    path1
 );
 
-// Use with Path2d instance
-const path2d = new Path2d().m(0,0).l(5,5);
-const bbox2 = path2d.boundingBox();  // Method on Path2d class</pre>
-        <a href="#index" class="back">⬆ Back to Index</a>
+// Note: For a single Path2d instance, you can also use the built-in method directly:
+const bboxMethod = path1.boundingBox();
+</code></pre>
+
+<p><a href="#index">[⬆ Back to Index]</a></p>
     </section>
 
     <!-- SHAPE & TEXT -->
