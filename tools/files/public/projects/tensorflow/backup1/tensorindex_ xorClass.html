@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>🧠 Browser AI Trainer (SwiGLU) - Reusable Class</title>
+<script src="tf.min.js"></script>
+<style>
+:root {
+	--primary: #6366f1; --primary-hover: #4f46e5; --bg: #0f172a;
+	--card: #1e293b; --text: #f1f5f9; --text-dim: #94a3b8;
+	--success: #22c55e; --warning: #f59e0b; --error: #ef4444;
+	--train-progress: 0%; --train-loss: 1.0;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+	font-family: 'Segoe UI', system-ui, sans-serif;
+	background: var(--bg); color: var(--text); line-height: 1.6;
+	padding: 20px; min-height: 100vh;
+}
+.container { max-width: 900px; margin: 0 auto; }
+header { text-align: center; padding: 2rem 1rem; border-bottom: 1px solid #334155; margin-bottom: 2rem; }
+h1 { font-size: 1.8rem; margin-bottom: 0.5rem;
+	background: linear-gradient(135deg, #6366f1, #a855f7);
+	-webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.subtitle { color: var(--text-dim); }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
+.card { background: var(--card); border-radius: 12px; padding: 1.5rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.3); }
+.card h3 { margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 1px solid #334155; display: flex; align-items: center; gap: 0.5rem; }
+.input-group { margin-bottom: 1rem; }
+label { display: block; margin-bottom: 0.4rem; font-size: 0.9rem; color: var(--text-dim); }
+input, select { width: 100%; padding: 0.75rem; border: 1px solid #334155; border-radius: 8px; background: #0f172a; color: var(--text); font-size: 1rem; }
+input:focus, select:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(99,102,241,0.3); }
+.btn { background: var(--primary); color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 8px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 0.5rem; width: 100%; justify-content: center; }
+.btn:hover { background: var(--primary-hover); transform: translateY(-1px); }
+.btn:disabled { background: #475569; cursor: not-allowed; transform: none; }
+.btn-row { display: flex; gap: 0.75rem; margin-top: 1rem; }
+.btn-row .btn { flex: 1; }
+.status { margin-top: 1rem; padding: 0.75rem; border-radius: 8px; font-size: 0.9rem; display: none; }
+.status.show { display: block; }
+.status.training { background: rgba(245,158,11,0.2); color: var(--warning); }
+.status.success { background: rgba(34,197,94,0.2); color: var(--success); }
+.status.error { background: rgba(239,68,68,0.2); color: var(--error); }
+.results { margin-top: 1rem; background: #0f172a; border-radius: 8px; padding: 1rem; font-family: monospace; max-height: 200px; overflow-y: auto; }
+.prediction-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.75rem; margin-top: 1rem; }
+.prediction-item { background: #0f172a; padding: 0.75rem; border-radius: 8px; text-align: center; }
+.prediction-item .input { font-size: 0.85rem; color: var(--text-dim); margin-bottom: 0.25rem; }
+.prediction-item .output { font-size: 1.2rem; font-weight: bold; color: var(--primary); }
+.loss-chart { height: 150px; background: #0f172a; border-radius: 8px; margin-top: 1rem; position: relative; overflow: hidden; }
+.loss-bar { position: absolute; bottom: 0; width: 4px; background: linear-gradient(to top, var(--primary), #a855f7); border-radius: 2px 2px 0 0; transition: height 0.1s; }
+.tester-inputs { display: flex; gap: 1rem; margin-bottom: 1rem; }
+.tester-inputs .input-group { flex: 1; }
+.result-box { background: linear-gradient(135deg, #1e293b, #334155); border-radius: 12px; padding: 1.25rem; text-align: center; margin-top: 1rem; border: 2px solid transparent; transition: border-color 0.3s; }
+.result-box.ready { border-color: var(--primary); }
+.result-box .label { font-size: 0.9rem; color: var(--text-dim); margin-bottom: 0.5rem; }
+.result-box .value { font-size: 2rem; font-weight: bold; font-family: monospace; }
+.result-box .binary { font-size: 1rem; margin-top: 0.25rem; padding: 0.25rem 0.75rem; border-radius: 20px; display: inline-block; }
+.result-box .binary.zero { background: rgba(239,68,68,0.3); color: #fca5a5; }
+.result-box .binary.one { background: rgba(34,197,94,0.3); color: #86efac; }
+.hint { font-size: 0.8rem; color: var(--text-dim); margin-top: 0.5rem; text-align: center; }
+footer { text-align: center; padding: 2rem; color: var(--text-dim); font-size: 0.9rem; border-top: 1px solid #334155; margin-top: 2rem; }
+@media (max-width: 600px) { .grid { grid-template-columns: 1fr; } .prediction-grid { grid-template-columns: 1fr 1fr; } .tester-inputs { flex-direction: column; } }
+</style>
+</head>
+<body>
+<div class="container">
+<header>
+<h1>🧠 Browser AI Trainer <span style="font-size:0.7em;vertical-align:super;color:var(--warning)">SwiGLU</span></h1>
+<p class="subtitle">Train neural networks with SwiGLU activation — TensorFlow.js in-browser!</p>
+</header>
+
+<div class="grid">
+<div class="card">
+<h3>⚙️ Train Model</h3>
+<p style="color:var(--text-dim);margin-bottom:1rem">Training XOR classifier with <strong>SwiGLU</strong> activation.</p>
+<div class="input-group">
+<label for="epochs">Epochs</label>
+<input type="number" id="epochs" value="100" min="10" max="1000" step="10">
+</div>
+<div class="input-group">
+<label for="learningRate">Learning Rate</label>
+<select id="learningRate">
+<option value="0.1">0.1 (Fast)</option>
+<option value="0.05" selected>0.05 (Balanced)</option>
+<option value="0.01">0.01 (Precise)</option>
+</select>
+</div>
+<button class="btn" id="trainBtn" onclick="trainModel()">🚀 Start Training</button>
+<div id="trainStatus" class="status"></div>
+<div class="loss-chart" id="lossChart"></div>
+<div class="results" id="trainLog">Ready to train...</div>
+</div>
+
+<div class="card">
+<h3>🔮 Run Predictions</h3>
+<p style="color:var(--text-dim);margin-bottom:1rem">Test the trained SwiGLU model with XOR inputs:</p>
+<div class="prediction-grid">
+<div class="prediction-item"><div class="input">[0, 0]</div><div class="output" id="pred00">?</div></div>
+<div class="prediction-item"><div class="input">[0, 1]</div><div class="output" id="pred01">?</div></div>
+<div class="prediction-item"><div class="input">[1, 0]</div><div class="output" id="pred10">?</div></div>
+<div class="prediction-item"><div class="input">[1, 1]</div><div class="output" id="pred11">?</div></div>
+</div>
+<div class="btn-row">
+<button class="btn" id="predictBtn" onclick="runPredictions()" disabled>▶️ Run Predictions</button>
+<button class="btn" style="background:#475569" onclick="resetModel()">🔄 Reset</button>
+</div>
+<div id="predictStatus" class="status"></div>
+</div>
+</div>
+
+<div class="card">
+<h3>🎯 Test Custom Input</h3>
+<p style="color:var(--text-dim);margin-bottom:1rem">Enter your own values to test the SwiGLU-trained model:</p>
+<div class="tester-inputs">
+<div class="input-group"><label for="inputA">Input A (0 or 1)</label><input type="number" id="inputA" min="0" max="1" step="0.01" value="0"></div>
+<div class="input-group"><label for="inputB">Input B (0 or 1)</label><input type="number" id="inputB" min="0" max="1" step="0.01" value="0"></div>
+</div>
+<button class="btn" id="testBtn" onclick="testCustomInput()" disabled>🔍 Test Input</button>
+<div class="result-box" id="resultBox">
+<div class="label">Model Output</div>
+<div class="value" id="customResult">--</div>
+<div class="binary" id="binaryResult">Waiting for prediction...</div>
+</div>
+<p class="hint">💡 Tip: Try values between 0 and 1 to see SwiGLU interpolation!</p>
+<div id="testStatus" class="status"></div>
+</div>
+
+<div class="card">
+<h3>📊 Model Architecture (SwiGLU)</h3>
+<div class="results" style="max-height:none">
+<strong>Input:</strong> 2 neurons<br>
+<strong>SwiGLU Hidden:</strong><br>
+&nbsp;&nbsp;├─ Gate: Dense(4) → Swish<br>
+&nbsp;&nbsp;├─ Value: Dense(4)<br>
+&nbsp;&nbsp;└─ Output: Swish(gate) ⊗ value<br>
+<strong>Output:</strong> 1 neuron, sigmoid<br><br>
+<strong>Optimizer:</strong> Adam | <strong>Loss:</strong> MSE
+</div>
+</div>
+
+<footer>
+<p>Built with ❤️ using <a href="https://www.tensorflow.org/js" target="_blank" style="color:var(--primary);text-decoration:none">TensorFlow.js</a></p>
+<p style="margin-top:0.5rem;font-size:0.8rem">SwiGLU: Swish(x·W) ⊗ (x·V) — used in Qwen, LLaMA, PaLM</p>
+</footer>
+</div>
+
+<script>
+/**
+ * @fileoverview Reusable AI Trainer Class for TensorFlow.js
+ * Supports SwiGLU and other custom architectures with callback hooks
+ * @version 1.0.0
+ */
+
+// ============================================
+// Core AITrainer Class
+// ============================================
+
+class AITrainer {
+  model = null;
+  modelConfig;
+  trainingConfig;
+  callbacks;
+  isTraining = false;
+  lossHistory = [];
+
+  /**
+   * Create a new AI Trainer instance
+   * @param {Object} modelConfig - Model architecture configuration
+   * @param {Object} [trainingConfig] - Training hyperparameters
+   * @param {Object} [callbacks] - Optional callback hooks
+   */
+  constructor(modelConfig, trainingConfig = {}, callbacks = {}) {
+    this.modelConfig = {
+      useBias: true,
+      swigluMultiplier: 1,
+      ...modelConfig
+    };
+    this.trainingConfig = {
+      optimizer: 'adam',
+      loss: 'meanSquaredError',
+      batchSize: 32,
+      validationSplit: 0,
+      ...trainingConfig
+    };
+    this.callbacks = callbacks;
+  }
+
+  /**
+   * Create the TensorFlow.js model based on configuration
+   * @protected
+   * @returns {tf.LayersModel}
+   */
+  _createModel() {
+    const { inputShape, outputShape, activation, hiddenUnits, useBias, swigluMultiplier } = this.modelConfig;
+    
+    const input = tf.input({ shape: [inputShape] });
+    let x = input;
+
+    // Build hidden layers
+    for (let i = 0; i < hiddenUnits.length; i++) {
+      const units = hiddenUnits[i];
+      
+      if (activation === 'swiglu') {
+        // SwiGLU: swish(gate) ⊗ value
+        const gate = tf.layers.dense({ 
+          units: units * swigluMultiplier, 
+          useBias: useBias,
+          name: `swiglu_gate_${i}` 
+        }).apply(x);
+        
+        const value = tf.layers.dense({ 
+          units: units, 
+          useBias: useBias,
+          name: `swiglu_value_${i}` 
+        }).apply(x);
+        
+        const swishGate = tf.layers.activation({ 
+          activation: 'swish',
+          name: `swiglu_swish_${i}`
+        }).apply(gate);
+        
+        x = tf.layers.multiply({ name: `swiglu_out_${i}` }).apply([swishGate, value]);
+      } else {
+        // Standard activation
+        x = tf.layers.dense({ 
+          units, 
+          activation: activation !== 'swiglu' ? activation : 'swish',
+          useBias: useBias,
+          name: `dense_${i}`
+        }).apply(x);
+      }
+    }
+
+    // Output layer
+    const output = tf.layers.dense({ 
+      units: outputShape, 
+      activation: outputShape === 1 ? 'sigmoid' : 'softmax',
+      name: 'output'
+    }).apply(x);
+
+    const model = tf.model({ inputs: input, outputs: output });
+
+    // Compile with optimizer
+    const optimizer = this._createOptimizer();
+    model.compile({
+      optimizer,
+      loss: this.trainingConfig.loss,
+      metrics: ['mse']
+    });
+
+    return model;
+  }
+
+  /**
+   * Create optimizer based on config
+   * @private
+   * @returns {tf.Optimizer}
+   */
+  _createOptimizer() {
+    const { optimizer, learningRate } = this.trainingConfig;
+    const lr = learningRate || 0.001;
+    
+    switch (optimizer) {
+      case 'sgd': return tf.train.sgd(lr);
+      case 'rmsprop': return tf.train.rmsprop(lr);
+      case 'adam':
+      default: return tf.train.adam(lr);
+    }
+  }
+
+  /**
+   * Initialize the model (call before training)
+   * @returns {Promise<void>}
+   */
+  async initialize() {
+    if (this.model) {
+      this.model.dispose();
+      this.model = null;
+    }
+    this.model = this._createModel();
+    this.lossHistory = [];
+  }
+
+  /**
+   * Train the model on provided data
+   * @param {tf.Tensor2D} xs - Input features [samples, features]
+   * @param {tf.Tensor2D} ys - Target labels [samples, outputs]
+   * @param {Object} [overrides] - Optional training config overrides
+   * @returns {Promise<tf.History>}
+   */
+  async train(xs, ys, overrides = {}) {
+    if (!this.model) await this.initialize();
+    if (this.isTraining) throw new Error('Training already in progress');
+
+    const config = { ...this.trainingConfig, ...overrides };
+    this.isTraining = true;
+    this.lossHistory = [];
+
+    try {
+      await this.callbacks.onTrainStart?.();
+
+      const history = await this.model.fit(xs, ys, {
+        epochs: config.epochs,
+        batchSize: config.batchSize,
+        validationSplit: config.validationSplit,
+        callbacks: {
+          onEpochEnd: async (epoch, logs) => {
+            const progress = {
+              epoch,
+              totalEpochs: config.epochs,
+              loss: logs.loss,
+              accuracy: logs.acc,
+              valLoss: logs.val_loss
+            };
+            
+            this.lossHistory.push(logs.loss);
+            await this.callbacks.onEpochEnd?.(progress);
+            await tf.nextFrame(); // Keep UI responsive
+          }
+        }
+      });
+
+      await this.callbacks.onTrainEnd?.();
+      return history;
+    } catch (error) {
+      await this.callbacks.onError?.(error);
+      throw error;
+    } finally {
+      this.isTraining = false;
+    }
+  }
+
+  /**
+   * Run predictions on input data
+   * @param {tf.Tensor2D | number[][]} input - Input data to predict
+   * @param {boolean} [disposeInput=true] - Whether to dispose input tensor
+   * @returns {Promise<tf.Tensor2D>}
+   */
+  async predict(input, disposeInput = true) {
+    if (!this.model) throw new Error('Model not initialized. Call initialize() or train() first.');
+    
+    const inputTensor = Array.isArray(input) 
+      ? tf.tensor2d(input) 
+      : input;
+    
+    try {
+      return this.model.predict(inputTensor);
+    } finally {
+      if (disposeInput && Array.isArray(input)) {
+        inputTensor.dispose();
+      }
+    }
+  }
+
+  /**
+   * Get prediction as plain JavaScript array
+   * @param {number[][]} input - Input data as 2D array
+   * @returns {Promise<number[][]>}
+   */
+  async predictArray(input) {
+    const prediction = await this.predict(input, true);
+    const data = await prediction.array();
+    prediction.dispose();
+    return data;
+  }
+
+  /**
+   * Get prediction as single value (for scalar outputs)
+   * @param {number[]} input - Single input as 1D array
+   * @returns {Promise<number>}
+   */
+  async predictSingle(input) {
+    const result = await this.predictArray([input]);
+    return result[0][0];
+  }
+
+  /**
+   * Evaluate model on test data
+   * @param {tf.Tensor2D} xs - Test features
+   * @param {tf.Tensor2D} ys - Test labels
+   * @returns {Promise<tf.Tensor>}
+   */
+  async evaluate(xs, ys) {
+    if (!this.model) throw new Error('Model not initialized');
+    return this.model.evaluate(xs, ys);
+  }
+
+  /**
+   * Save model to browser storage or custom sink
+   * @param {string} path - Storage path (e.g., 'localstorage://my-model')
+   * @returns {Promise<tf.io.SaveResult>}
+   */
+  async save(path) {
+    if (!this.model) throw new Error('No model to save');
+    return this.model.save(path);
+  }
+
+  /**
+   * Load model from browser storage or custom source
+   * @param {string} path - Storage path
+   * @returns {Promise<void>}
+   */
+  async load(path) {
+    if (this.model) this.model.dispose();
+    this.model = await tf.loadLayersModel(path);
+    this.model.compile({
+      optimizer: this._createOptimizer(),
+      loss: this.trainingConfig.loss,
+      metrics: ['mse']
+    });
+  }
+
+  /**
+   * Get training loss history
+   * @returns {number[]}
+   */
+  getLossHistory() {
+    return [...this.lossHistory];
+  }
+
+  /**
+   * Dispose model and free GPU memory
+   */
+  dispose() {
+    if (this.model) {
+      this.model.dispose();
+      this.model = null;
+    }
+    this.lossHistory = [];
+  }
+
+  /**
+   * Check if model is ready for predictions
+   * @returns {boolean}
+   */
+  isReady() {
+    return this.model !== null && !this.isTraining;
+  }
+}
+
+// ============================================
+// Pre-built SwiGLU Trainer (XOR Example)
+// ============================================
+
+class SwiGLUXORTrainer extends AITrainer {
+  /**
+   * Create SwiGLU trainer pre-configured for XOR-like binary classification
+   * @param {Object} [trainingConfig]
+   * @param {Object} [callbacks]
+   */
+  constructor(trainingConfig = {}, callbacks = {}) {
+    super(
+      {
+        inputShape: 2,
+        outputShape: 1,
+        activation: 'swiglu',
+        hiddenUnits: [4],
+        swigluMultiplier: 1,
+        useBias: true
+      },
+      {
+        optimizer: 'adam',
+        loss: 'meanSquaredError',
+        learningRate: 0.05,
+        epochs: 100,
+        ...trainingConfig
+      },
+      callbacks
+    );
+  }
+
+  /**
+   * Quick train on XOR dataset
+   * @param {Object} [overrides]
+   * @returns {Promise<tf.History>}
+   */
+  async trainXOR(overrides = {}) {
+    const xs = tf.tensor2d([[0, 0], [0, 1], [1, 0], [1, 1]]);
+    const ys = tf.tensor2d([[0], [1], [1], [0]]);
+    
+    try {
+      return await this.train(xs, ys, overrides);
+    } finally {
+      xs.dispose();
+      ys.dispose();
+    }
+  }
+
+  /**
+   * Test all XOR combinations and return results
+   * @returns {Promise<Array<{input: number[], output: number, prediction: number}>>}
+   */
+  async testXOR() {
+    const inputs = [[0, 0], [0, 1], [1, 0], [1, 1]];
+    const expected = [0, 1, 1, 0];
+    const results = [];
+
+    for (let i = 0; i < inputs.length; i++) {
+      const prediction = await this.predictSingle(inputs[i]);
+      results.push({
+        input: inputs[i],
+        output: expected[i],
+        prediction: Number(prediction.toFixed(4)),
+        correct: Math.round(prediction) === expected[i]
+      });
+    }
+    return results;
+  }
+}
+
+// ============================================
+// Utility Functions
+// ============================================
+
+async function tensorToArray(tensor) {
+  const data = await tensor.array();
+  tensor.dispose();
+  return data;
+}
+
+// ============================================
+// App State & UI Integration
+// ============================================
+
+let trainer = null;
+let isTraining = false;
+
+function updateLossChart(lossHistory) {
+  const chart = document.getElementById('lossChart');
+  chart.innerHTML = '';
+  if (lossHistory.length === 0) return;
+  
+  const maxLoss = Math.max(...lossHistory, 0.001);
+  const barWidth = Math.max(2, Math.floor(300 / Math.max(lossHistory.length, 50)));
+  
+  lossHistory.forEach((loss, index) => {
+    const bar = document.createElement('div');
+    bar.className = 'loss-bar';
+    bar.style.left = `${index * barWidth}px`;
+    bar.style.height = `${Math.min(100, (loss / maxLoss) * 100)}%`;
+    bar.title = `Epoch ${index + 1}: Loss ${loss.toFixed(4)}`;
+    chart.appendChild(bar);
+  });
+  
+  // Sync with CSS variable for theming
+  document.documentElement.style.setProperty('--train-loss', lossHistory[lossHistory.length - 1].toFixed(4));
+}
+
+function log(message, type = 'info') {
+  const logEl = document.getElementById('trainLog');
+  const timestamp = new Date().toLocaleTimeString();
+  const prefix = type === 'error' ? '❌' : type === 'success' ? '✅' : 'ℹ️';
+  logEl.innerHTML += `<div>[${timestamp}] ${prefix} ${message}</div>`;
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+function showStatus(elementId, message, type) {
+  const el = document.getElementById(elementId);
+  el.textContent = message;
+  el.className = `status show ${type}`;
+}
+
+async function trainModel() {
+  if (isTraining) return;
+  
+  const epochs = parseInt(document.getElementById('epochs').value);
+  const learningRate = parseFloat(document.getElementById('learningRate').value);
+  const trainBtn = document.getElementById('trainBtn');
+  const predictBtn = document.getElementById('predictBtn');
+  const testBtn = document.getElementById('testBtn');
+
+  isTraining = true;
+  trainBtn.disabled = true;
+  predictBtn.disabled = true;
+  testBtn.disabled = true;
+  document.getElementById('trainLog').innerHTML = '';
+
+  showStatus('trainStatus', 'Initializing SwiGLU model...', 'training');
+  log(`Training: ${epochs} epochs, LR: ${learningRate}`);
+
+  try {
+    // Create trainer with callbacks for UI updates
+    trainer = new SwiGLUXORTrainer(
+      { epochs, learningRate },
+      {
+        onEpochEnd: (progress) => {
+          if (progress.epoch % 10 === 0 || progress.epoch === progress.totalEpochs - 1) {
+            const history = trainer.getLossHistory();
+            updateLossChart(history);
+            log(`Epoch ${progress.epoch + 1}/${progress.totalEpochs} - Loss: ${progress.loss.toFixed(4)}`);
+            const pct = Math.round((progress.epoch + 1) / progress.totalEpochs * 100);
+            document.documentElement.style.setProperty('--train-progress', `${pct}%`);
+            showStatus('trainStatus', `${pct}% complete`, 'training');
+          }
+        },
+        onTrainStart: () => {
+          log('🚀 Training started...');
+        },
+        onTrainEnd: async () => {
+          showStatus('trainStatus', '✅ Training complete!', 'success');
+          log('🎉 Model trained successfully!', 'success');
+          predictBtn.disabled = false;
+          testBtn.disabled = false;
+          await runPredictions();
+          
+          // Auto-save to localStorage for persistence
+          try {
+            await trainer.save('localstorage://swiglu-xor-model');
+            log('💾 Model saved to localStorage');
+          } catch (e) {
+            log('⚠️ Could not save model: ' + e.message);
+          }
+        },
+        onError: (err) => {
+          console.error(err);
+          showStatus('trainStatus', `❌ Error: ${err.message}`, 'error');
+          log(`Error: ${err.message}`, 'error');
+        }
+      }
+    );
+
+    await trainer.trainXOR();
+    
+  } catch (error) {
+    console.error(error);
+    showStatus('trainStatus', `❌ Error: ${error.message}`, 'error');
+    log(`Error: ${error.message}`, 'error');
+  } finally {
+    isTraining = false;
+    trainBtn.disabled = false;
+  }
+}
+
+async function runPredictions() {
+  if (!trainer?.isReady()) { 
+    showStatus('predictStatus', '⚠️ Train model first!', 'error'); 
+    return; 
+  }
+  
+  document.getElementById('predictBtn').disabled = true;
+  showStatus('predictStatus', 'Running predictions...', 'training');
+  
+  try {
+    const testInputs = [[0, 0], [0, 1], [1, 0], [1, 1]];
+    const ids = ['pred00', 'pred01', 'pred10', 'pred11'];
+    
+    for (let i = 0; i < testInputs.length; i++) {
+      const value = await trainer.predictSingle(testInputs[i]);
+      const rounded = Math.round(value);
+      document.getElementById(ids[i]).textContent = `${value.toFixed(3)} → ${rounded}`;
+      document.getElementById(ids[i]).style.color = value > 0.5 ? 'var(--success)' : 'var(--text-dim)';
+    }
+    
+    showStatus('predictStatus', '✅ Done!', 'success');
+  } catch (error) {
+    console.error(error);
+    showStatus('predictStatus', `❌ Error: ${error.message}`, 'error');
+  } finally {
+    document.getElementById('predictBtn').disabled = false;
+  }
+}
+
+async function testCustomInput() {
+  if (!trainer?.isReady()) { 
+    showStatus('testStatus', '⚠️ Train model first!', 'error'); 
+    return; 
+  }
+  
+  const inputA = parseFloat(document.getElementById('inputA').value);
+  const inputB = parseFloat(document.getElementById('inputB').value);
+  const resultBox = document.getElementById('resultBox');
+  
+  if (isNaN(inputA) || isNaN(inputB) || inputA < 0 || inputA > 1 || inputB < 0 || inputB > 1) {
+    showStatus('testStatus', '⚠️ Values must be 0-1', 'error'); 
+    return;
+  }
+  
+  showStatus('testStatus', 'Processing...', 'training');
+  resultBox.classList.add('ready');
+  
+  try {
+    const value = await trainer.predictSingle([inputA, inputB]);
+    const binary = Math.round(value);
+    
+    document.getElementById('customResult').textContent = value.toFixed(4);
+    document.getElementById('binaryResult').textContent = `→ ${binary}`;
+    document.getElementById('binaryResult').className = `binary ${binary === 1 ? 'one' : 'zero'}`;
+    document.getElementById('customResult').style.color = 
+      value > 0.7 ? 'var(--success)' : value < 0.3 ? 'var(--error)' : 'var(--warning)';
+    
+    showStatus('testStatus', '✅ Done!', 'success');
+  } catch (error) {
+    console.error(error);
+    showStatus('testStatus', `❌ Error: ${error.message}`, 'error');
+  }
+}
+
+async function resetModel() {
+  if (trainer) { 
+    trainer.dispose(); 
+    trainer = null; 
+  }
+  
+  ['pred00','pred01','pred10','pred11'].forEach(id => {
+    document.getElementById(id).textContent = '?';
+    document.getElementById(id).style.color = 'var(--primary)';
+  });
+  
+  document.getElementById('customResult').textContent = '--';
+  document.getElementById('binaryResult').textContent = 'Waiting...';
+  document.getElementById('binaryResult').className = 'binary';
+  document.getElementById('resultBox').classList.remove('ready');
+  document.getElementById('inputA').value = '0';
+  document.getElementById('inputB').value = '0';
+  document.getElementById('lossChart').innerHTML = '';
+  document.getElementById('trainLog').innerHTML = 'Ready to train...';
+  ['trainStatus','predictStatus','testStatus'].forEach(id => 
+    document.getElementById(id).className = 'status'
+  );
+  document.getElementById('predictBtn').disabled = true;
+  document.getElementById('testBtn').disabled = true;
+  document.documentElement.style.setProperty('--train-progress', '0%');
+  document.documentElement.style.setProperty('--train-loss', '1.0');
+  
+  log('🔄 Reset complete');
+}
+
+async function loadSavedModel() {
+  try {
+    trainer = new SwiGLUXORTrainer();
+    await trainer.load('localstorage://swiglu-xor-model');
+    log('💾 Loaded saved model from localStorage');
+    document.getElementById('predictBtn').disabled = false;
+    document.getElementById('testBtn').disabled = false;
+    showStatus('trainStatus', '✅ Loaded saved model', 'success');
+    return true;
+  } catch (e) {
+    log('ℹ️ No saved model found (this is OK on first run)');
+    return false;
+  }
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
+  log('👋 TensorFlow.js + SwiGLU ready!');
+  
+  // Try to load previously saved model
+  await loadSavedModel();
+  
+  document.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && !isTraining) { 
+      e.preventDefault(); 
+      trainModel(); 
+    }
+    if (e.key === 'Enter' && (e.target.id === 'inputA' || e.target.id === 'inputB')) {
+      e.preventDefault();
+      if (!document.getElementById('testBtn').disabled) testCustomInput();
+    }
+  });
+});
+
+window.addEventListener('beforeunload', () => { 
+  if (trainer) trainer.dispose(); 
+});
+</script>
+</body>
+</html>

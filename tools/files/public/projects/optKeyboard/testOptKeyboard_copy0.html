@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Opt Keyboard System</title>
+  <style>
+    :root { --bg:#0f172a; --panel:#1e293b; --border:#334155; --text:#e2e8f0; --accent:#3b82f6; }
+    * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+    /* ✨ min-height allows body to grow. No hardcoded padding needed. */
+    body { margin:0; padding:16px; font-family:-apple-system, sans-serif; background:var(--bg); min-height:100dvh; display:flex; flex-direction:column; gap:10px; color:var(--text); }
+    .input-group { display:flex; flex-direction:column; gap:4px; }
+    label { font-size:13px; color:#94a3b8; }
+    input, textarea, [contenteditable] { width:100%; padding:12px; font-size:15px; background:var(--panel); border:1px solid var(--border); border-radius:8px; color:var(--text); outline:none; font-family:inherit; resize:none; }
+    input:focus, textarea:focus, [contenteditable]:focus { border-color:var(--accent); }
+    [contenteditable]:empty::before { content:attr(placeholder); color:#64748b; }
+    #status { padding:6px; font-size:12px; background:var(--panel); border-radius:6px; text-align:center; color:#94a3b8; }
+    #kbContainer { position:fixed; bottom:0; left:0; right:0; height:215px; background:var(--bg); box-shadow:0 -4px 12px rgba(0,0,0,0.5); display:none; z-index:1000; user-select:none; padding-bottom:env(safe-area-inset-bottom); }
+    canvas { width:100%; height:100%; display:block; touch-action:none; }
+
+    #mobileConsole { position:fixed; top:10px; left:10px; right:10px; max-height:40vh; background:rgba(15,23,42,0.95); border:1px solid #334155; border-radius:8px; font-family:'Courier New',monospace; font-size:12px; color:#cbd5e1; display:none; flex-direction:column; z-index:2000; backdrop-filter:blur(8px); }
+    #consoleHeader { display:flex; justify-content:space-between; align-items:center; padding:6px 10px; background:#1e293b; border-radius:8px 8px 0 0; font-weight:bold; font-size:13px; }
+    #consoleLog { flex:1; overflow-y:auto; padding:6px; max-height:35vh; scrollbar-width:thin; scrollbar-color:#475569 transparent; }
+    .c-entry { padding:3px 4px; border-bottom:1px solid #1e293b; white-space:pre-wrap; word-break:break-all; }
+    .c-log { color:#cbd5e1; } .c-warn { color:#fbbf24; background:rgba(251,191,36,0.08); } .c-error { color:#ef4444; background:rgba(239,68,68,0.08); }
+    .c-btn { background:#475569; color:white; border:none; padding:2px 8px; border-radius:4px; cursor:pointer; font-size:11px; }
+    #consoleToggle { position:fixed; top:10px; right:10px; z-index:2001; background:#334155; color:white; border:1px solid #475569; border-radius:50%; width:36px; height:36px; font-size:16px; display:flex; align-items:center; justify-content:center; }
+    #consoleToggle.active { background:#3b82f6; }
+  </style>
+</head>
+<body>
+  <div id="status">Tap input → Type long text → Auto-scroll to caret ✨</div>
+  
+  <div class="input-group">
+    <label>Standard Input</label>
+    <input id="input1" type="text" placeholder="Single line text..." data-opt-input="true">
+  </div>
+  
+  <div class="input-group">
+    <label>Textarea (Multiline)</label>
+    <textarea id="input2" rows="4" placeholder="Press Enter for new lines..." data-opt-input="true"></textarea>
+  </div>
+  
+  <div class="input-group">
+    <label>ContentEditable</label>
+    <div id="input3" contenteditable="true" placeholder="Rich text..." data-opt-input="true"></div>
+  </div>
+  
+  <div id="kbContainer"><canvas id="kbCanvas"></canvas></div>
+
+  <button id="consoleToggle" onclick="toggleMobileConsole()">📟</button>
+  <div id="mobileConsole">
+    <div id="consoleHeader">
+      <span>📱 Console</span>
+      <div>
+        <span id="consoleCount" style="color:#94a3b8; margin-right:8px;">0</span>
+        <button class="c-btn" onclick="clearMobileConsole()">Clear</button>
+        <button class="c-btn" onclick="toggleMobileConsole()">✕</button>
+      </div>
+    </div>
+    <div id="consoleLog"></div>
+  </div>
+
+  <script type="module">
+    import { optKeyboard } from './opt-keyboard.js';
+    import { attachOptInput } from './opt-input.js';
+    import { initCanvasKeyboard } from './canvas-kb.js';
+
+    // 1️⃣ Attach behavior to marked elements
+    document.querySelectorAll('[data-opt-input="true"]').forEach(el => attachOptInput(el));
+
+    // 2️⃣ Initialize (scroll padding handled internally!)
+    optKeyboard.init({
+      autoShow: true,
+      blurDelay: 150,
+      scrollConfig: { padding: 25, behavior: 'smooth' }
+    });
+
+    // 3️⃣ Wire canvas keyboard
+    initCanvasKeyboard('kbCanvas', 'kbContainer', optKeyboard);
+
+    // 4️⃣ Event logging
+    const statusEl = document.getElementById('status');
+    const logEvent = (e) => {
+      const { target, data, value, key, inputType, source } = e.detail;
+      const tag = target.id || target.tagName;
+      const displayData = data !== undefined ? data : (key || inputType || '');
+      statusEl.textContent = `${e.type.replace(/^opt/,'')} | ${tag} | "${displayData}" | src:${source||'native'}`;
+      console.log(`[EVENT] ${e.type.replace(/^opt/,'')} | ${tag} | "${displayData}" | src:${source||'native'}`);
+    };
+    ['Focus','Blur','Keydown','Keyup','Beforeinput','Input'].forEach(type => {
+      document.addEventListener(`opt${type}`, logEvent);
+    });
+
+    window.cleanupOptSystem = () => {
+      optKeyboard.uninit();
+      document.querySelectorAll('[data-opt-input="true"]').forEach(el => delete el.dataset.optAttached);
+      console.log('🧹 optKeyboard system torn down.');
+    };
+    console.log('🟢 optKeyboard drop-in ready.');
+  </script>
+
+  <script>
+    (function() {
+      const orig = { log: console.log, warn: console.warn, error: console.error };
+      const container = document.getElementById('mobileConsole');
+      const logEl = document.getElementById('consoleLog');
+      const countEl = document.getElementById('consoleCount');
+      const toggleBtn = document.getElementById('consoleToggle');
+      let count = 0; const MAX = 200;
+      function safeStr(v, d=0) { if(d>2) return '[Obj]'; try { return typeof v==='object'&&v!==null ? JSON.stringify(v) : String(v); } catch { return '[Err]'; } }
+      function addEntry(t, args) {
+        if(!logEl) return;
+        const d = document.createElement('div');
+        d.className = `c-entry c-${t}`;
+        d.textContent = `[${new Date().toLocaleTimeString('en-US',{hour12:false})}] ${args.map(a=>safeStr(a,0)).join(' ')}`;
+        logEl.appendChild(d); count++; countEl.textContent = count;
+        if(logEl.children.length > MAX) logEl.removeChild(logEl.firstChild);
+        logEl.scrollTop = logEl.scrollHeight;
+      }
+      console.log = (...a) => { orig.log.apply(console,a); addEntry('log',a); };
+      console.warn = (...a) => { orig.warn.apply(console,a); addEntry('warn',a); };
+      console.error = (...a) => { orig.error.apply(console,a); addEntry('error',a); };
+      window.addEventListener('error', e => console.error(`💥 ${e.message} @ ${e.filename}:${e.lineno}:${e.colno}`));
+      window.addEventListener('unhandledrejection', e => console.error(`⚠️ Promise rejected: ${e.reason}`));
+      window.toggleMobileConsole = () => { const s = container.style.display==='none'; container.style.display=s?'flex':'none'; toggleBtn.classList.toggle('active',s); if(s) logEl.scrollTop=logEl.scrollHeight; };
+      window.clearMobileConsole = () => { logEl.innerHTML=''; count=0; countEl.textContent='0'; };
+      toggleMobileConsole();
+    })();
+  </script>
+</body>
+</html>

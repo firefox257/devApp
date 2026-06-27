@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Image to Base64</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #1a1a2e; color: #eee; min-height: 100vh;
+      display: flex; flex-direction: column; align-items: center; padding: 2rem;
+    }
+    h1 { margin-bottom: 1rem; font-size: 1.8rem; }
+    .upload-area {
+      border: 2px dashed #555; border-radius: 12px; padding: 3rem 2rem;
+      text-align: center; cursor: pointer; transition: border-color 0.3s, background 0.3s;
+      width: 100%; max-width: 500px; margin-bottom: 1.5rem; outline: none;
+    }
+    .upload-area:hover, .upload-area:focus, .upload-area.dragover {
+      border-color: #00d2ff; background: rgba(0, 210, 255, 0.05);
+    }
+    .upload-area p { font-size: 1.1rem; color: #aaa; line-height: 1.6; }
+    .upload-area p span { color: #00d2ff; text-decoration: underline; }
+    #fileInput { display: none; }
+    .preview {
+      max-width: 400px; max-height: 300px; border-radius: 8px;
+      margin-bottom: 1.5rem; display: none; object-fit: contain;
+    }
+    .output-box {
+      width: 100%; max-width: 600px; position: relative; display: none;
+    }
+    .output-box textarea {
+      width: 100%; height: 150px; background: #16213e; color: #00d2ff;
+      border: 1px solid #333; border-radius: 8px; padding: 1rem;
+      font-family: 'Courier New', monospace; font-size: 0.85rem; resize: vertical;
+    }
+    .btn {
+      display: inline-block; margin-top: 1rem; padding: 0.75rem 2rem;
+      background: #00d2ff; color: #1a1a2e; border: none; border-radius: 8px;
+      font-size: 1rem; font-weight: 600; cursor: pointer; transition: background 0.3s, transform 0.1s;
+    }
+    .btn:hover { background: #00b4d8; }
+    .btn:active { transform: scale(0.97); }
+    .toast {
+      position: fixed; bottom: 2rem; left: 50%; transform: translateX(-50%) translateY(100px);
+      background: #28a745; color: #fff; padding: 0.75rem 1.5rem; border-radius: 8px;
+      font-weight: 600; opacity: 0; transition: transform 0.4s, opacity 0.4s; pointer-events: none; z-index: 10;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    .info { margin-top: 0.5rem; color: #888; font-size: 0.9rem; }
+    .hint { font-size: 0.85rem; color: #666; margin-top: 2rem; }
+  </style>
+</head>
+<body>
+
+  <h1>Image → Base64</h1>
+
+  <div class="upload-area" id="uploadArea" tabindex="0">
+    <p>Drag & drop, click to browse, or <span>Ctrl+V to paste</span> an image</p>
+    <input type="file" id="fileInput" accept="image/*">
+  </div>
+
+  <img id="preview" class="preview" alt="Preview">
+
+  <div class="output-box" id="outputBox">
+    <textarea id="base64Output" readonly></textarea>
+    <p class="info" id="info"></p>
+    <button class="btn" id="copyBtn">Copy Base64 to Clipboard</button>
+  </div>
+
+  <p class="hint">💡 Works with screenshots, copied images from web, or local files.</p>
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const uploadArea = document.getElementById('uploadArea');
+    const fileInput  = document.getElementById('fileInput');
+    const preview    = document.getElementById('preview');
+    const outputBox  = document.getElementById('outputBox');
+    const base64Out  = document.getElementById('base64Output');
+    const copyBtn    = document.getElementById('copyBtn');
+    const toast      = document.getElementById('toast');
+    const info       = document.getElementById('info');
+
+    // 1. FILE SELECTION
+    uploadArea.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', () => {
+      if (fileInput.files.length) handleImage(fileInput.files[0]);
+    });
+
+    // 2. DRAG & DROP
+    uploadArea.addEventListener('dragover', (e) => { e.preventDefault(); uploadArea.classList.add('dragover'); });
+    uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('dragover'));
+    uploadArea.addEventListener('drop', (e) => {
+      e.preventDefault(); uploadArea.classList.remove('dragover');
+      if (e.dataTransfer.files.length) handleImage(e.dataTransfer.files[0]);
+    });
+
+    // 3. CLIPBOARD PASTE
+    document.addEventListener('paste', (e) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      for (const item of items) {
+        if (item.type.startsWith('image/')) {
+          e.preventDefault(); // Prevent default paste behavior
+          const file = item.getAsFile();
+          handleImage(file);
+          return;
+        }
+      }
+    });
+
+    // CORE PROCESSING FUNCTION
+    function handleImage(file) {
+      if (!file || !file.type.startsWith('image/')) {
+        showToast('⚠️ No valid image found in clipboard/selection.');
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const base64 = e.target.result;
+
+        // Update UI
+        preview.src = base64;
+        preview.style.display = 'block';
+        base64Out.value = base64;
+        outputBox.style.display = 'block';
+        info.textContent = `Type: ${file.type} | Size: ${(file.size / 1024).toFixed(1)} KB | Length: ${base64.length.toLocaleString()} chars`;
+
+        // Auto-copy to clipboard
+        navigator.clipboard.writeText(base64).then(() => {
+          showToast('✅ Base64 copied to clipboard automatically!');
+        }).catch(() => {
+          showToast('⚠️ Auto-copy blocked. Use the button below.');
+        });
+      };
+      reader.readAsDataURL(file);
+    }
+
+    // MANUAL COPY FALLBACK
+    copyBtn.addEventListener('click', () => {
+      navigator.clipboard.writeText(base64Out.value).then(() => {
+        showToast('✅ Copied to clipboard!');
+      }).catch(() => {
+        base64Out.select();
+        document.execCommand('copy');
+        showToast('✅ Copied via fallback!');
+      });
+    });
+
+    // TOAST HELPER
+    function showToast(msg) {
+      toast.textContent = msg;
+      toast.classList.add('show');
+      clearTimeout(toast._timer);
+      toast._timer = setTimeout(() => toast.classList.remove('show'), 2500);
+    }
+  </script>
+
+</body>
+</html>

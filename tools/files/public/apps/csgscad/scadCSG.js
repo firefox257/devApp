@@ -3279,10 +3279,15 @@ const isClockwise = (points) => getSignedArea(points) < 0
  *
  * @param {object} target - The parent object from which Path2d instances are extracted.
  * @param {object} commandPath - The raw path data to be processed by path3d.
+ * @param {object} [allowAxes={x:true, y:true, z:true}] - Optional object to restrict quaternion rotation axes.
+ *   Example: { x: false, y: false, z: true } will ignore X and Y tilts, keeping the profile upright 
+ *   while still allowing Z-axis twisting (from path.r) and 3D translation.
  * @returns {THREE.Mesh[]} An array of THREE.js meshes.
  */
-function extrude3d(target, commandPath) {
+function extrude3d(target, commandPath, allowAxes = { x: true, y: true, z: true }) {
+	const needsRestriction = !allowAxes.x || !allowAxes.y || !allowAxes.z;
 	const bboxPath = boundingBoxPath(target);
+
 	if (!bboxPath || !bboxPath.min || !bboxPath.max) {
 		console.warn("Invalid bounding box for target in extrude3d");
 		return [];
@@ -3290,7 +3295,6 @@ function extrude3d(target, commandPath) {
 
 	const bboxPathW = (bboxPath.max.x - bboxPath.min.x) || 1;
 	const bboxPathH = (bboxPath.max.y - bboxPath.min.y) || 1;
-
 	var path = commandPath.getPoints();
 	let close = path.close;
 	const numPoints = path.p.length;
@@ -3305,7 +3309,6 @@ function extrude3d(target, commandPath) {
 				(st && st[1] !== null && st[1] !== undefined) ? st[1] / bboxPathH : null
 			];
 		});
-
 	const sScales = Array.from({ length: numPoints }, (_, i) => {
 			const s = path.s && path.s[i];
 			return [
@@ -3317,26 +3320,19 @@ function extrude3d(target, commandPath) {
 	const interpolateScaleArray = (targetArray) => {
 		const len = targetArray.length;
 		if (len === 0) return;
-
 		const interpolateDim = (dim) => {
 			let firstNonNull = -1;
 			for (let i = 0; i < len; i++) {
-				if (targetArray[i][dim] !== null) {
-					firstNonNull = i;
-					break;
-				}
+				if (targetArray[i][dim] !== null) { firstNonNull = i; break; }
 			}
-
 			if (firstNonNull === -1) {
 				for (let i = 0; i < len; i++) targetArray[i][dim] = 1.0;
 				return;
 			}
-
 			for (let i = 0; i < firstNonNull; i++) {
 				const firstVal = targetArray[firstNonNull][dim];
 				targetArray[i][dim] = 1.0 + (firstVal - 1.0) * (i / firstNonNull);
 			}
-
 			let lastNonNull = firstNonNull;
 			for (let i = firstNonNull + 1; i < len; i++) {
 				if (targetArray[i][dim] !== null) {
@@ -3350,7 +3346,6 @@ function extrude3d(target, commandPath) {
 					lastNonNull = i;
 				}
 			}
-
 			if (lastNonNull < len - 1) {
 				const startVal = targetArray[lastNonNull][dim];
 				const endVal = 1.0;
@@ -3361,63 +3356,64 @@ function extrude3d(target, commandPath) {
 				}
 			}
 		};
-
 		interpolateDim(0);
 		interpolateDim(1);
 	};
-
 	interpolateScaleArray(stScales);
 	interpolateScaleArray(sScales);
-	// ========================================================================
 
 	var path2dTargets = [];
-	applyToPath2d(target, (item) => {
-			path2dTargets.push(item);
-		});
-
-	if (path2dTargets.length === 0) {
-		return [];
-	}
+	applyToPath2d(target, (item) => { path2dTargets.push(item); });
+	if (path2dTargets.length === 0) return [];
 
 	var points3d = [];
 	var preCalc = [];
 	var upVector = new THREE.Vector3(0, 0, 1);
-
 	const p1 = path.p[0];
 	const p2 = path.p[1];
 	let dx = p2[0] - p1[0];
 	let dy = p2[1] - p1[1];
 	let initialRotationRadians = 0;
+
 	if (path.xyInitAng) {
 		initialRotationRadians = Math.atan2(dy, dx) + Math.PI / 2;
 	} else {
 		initialRotationRadians = Math.PI / 2;
 	}
+
 	const cosR = Math.cos(initialRotationRadians);
 	const sinR = Math.sin(initialRotationRadians);
 
+	// --- PRECALCULATE QUATERNIONS WITH AXIS RESTRICTION ---
 	for (var i = 0; i < path.p.length; i++) {
 		points3d.push(...[0, 0, i]);
 		const rotation = path.r[i];
 		var o = {};
 		o.cosR = Math.cos((rotation / 180) * Math.PI);
 		o.sinR = Math.sin((rotation / 180) * Math.PI);
+
 		const normal = new THREE.Vector3().fromArray(path.n[i]);
-		o.quaternion = new THREE.Quaternion().setFromUnitVectors(upVector, normal);
+		let q = new THREE.Quaternion().setFromUnitVectors(upVector, normal);
+
+		// Apply axis restrictions if needed
+		if (needsRestriction) {
+			const euler = new THREE.Euler().setFromQuaternion(q, 'XYZ');
+			if (!allowAxes.x) euler.x = 0;
+			if (!allowAxes.y) euler.y = 0;
+			if (!allowAxes.z) euler.z = 0;
+			q = new THREE.Quaternion().setFromEuler(euler);
+		}
+
+		o.quaternion = q;
 		applyQuaternion(upVector, o.quaternion);
 		preCalc.push(o);
 	}
 
 	const meshes = [];
-	if (!points3d || points3d.length < 6) {
-		return [];
-	}
+	if (!points3d || points3d.length < 6) return [];
 
 	const getScaleFromPath = (i) => {
-		return [
-			stScales[i][0] * sScales[i][0],
-			stScales[i][1] * sScales[i][1]
-		];
+		return [ stScales[i][0] * sScales[i][0], stScales[i][1] * sScales[i][1] ];
 	};
 
 	const genFromShapeData = (shapeData) => {
@@ -3430,10 +3426,9 @@ function extrude3d(target, commandPath) {
 		const convertToVector2 = (p) => new THREE.Vector2(p.x, p.y);
 		const contourPoints = shapeData.outerPoints.map(convertToVector2);
 		const holePoints = shapeData.holePoints.map((hole) => hole.map(convertToVector2));
-
 		const capTriangles = THREE.ShapeUtils.triangulateShape(contourPoints, holePoints);
-		const allPoints = [contourPoints, ...holePoints].flat();
 
+		const allPoints = [contourPoints, ...holePoints].flat();
 		const minX = Math.min(...allPoints.map((p) => p.x));
 		const maxX = Math.max(...allPoints.map((p) => p.x));
 		const minY = Math.min(...allPoints.map((p) => p.y));
@@ -3446,15 +3441,12 @@ function extrude3d(target, commandPath) {
 			var x = point.x;
 			var y = point.y;
 			var z = 0;
-
 			x = x * scale[0];
 			y = y * scale[1];
-
 			const prex = x;
 			const prey = y;
 			x = prex * cosR - prey * sinR;
 			y = prex * sinR + prey * cosR;
-
 			var o = preCalc[i];
 			let rotatedX = x * o.cosR - y * o.sinR;
 			let rotatedY = x * o.sinR + y * o.cosR;
@@ -3462,11 +3454,9 @@ function extrude3d(target, commandPath) {
 			y = rotatedY;
 
 			const ppoint = new THREE.Vector3(x, y, z);
-
 			for (var k = 0; k <= i; k++) {
-				applyQuaternion(ppoint, preCalc[k].quaternion);
+				applyQuaternion(ppoint, preCalc[k].quaternion); // Uses the potentially restricted quaternion
 			}
-
 			ppoint.x += path.p[i][0];
 			ppoint.y += path.p[i][1];
 			ppoint.z += path.p[i][2];
@@ -3477,37 +3467,30 @@ function extrude3d(target, commandPath) {
 			const capStartVertexCount = vertexCount;
 			const i = isTop ? segments : 0;
 			const scale = getScaleFromPath(i);
-
 			for (const point of allPoints) {
 				var ppoint = calcFinalPoint(point, i, scale);
 				vertices.push(ppoint.x, ppoint.y, ppoint.z);
 				vertexCount++;
 				uvs.push((point.x - minX) / width, (point.y - minY) / height);
 			}
-
 			for (const tri of capTriangles) {
 				const v1 = capStartVertexCount + tri[0];
 				const v2 = capStartVertexCount + tri[1];
 				const v3 = capStartVertexCount + tri[2];
-				if (isTop) {
-					indices.push(v1, v2, v3);
-				} else {
-					indices.push(v1, v3, v2);
-				}
+				if (isTop) { indices.push(v1, v2, v3); }
+				else { indices.push(v1, v3, v2); }
 			}
 		};
 
 		const extrudeContour = (points, reverseWinding) => {
 			const contourStartVertexCount = vertexCount;
 			const numPoints = points.length;
-
 			let contourLength = 0;
 			for (let i = 0; i < numPoints; i++) {
 				const p1 = points[i];
 				const p2 = points[(i + 1) % numPoints];
 				contourLength += p1.distanceTo(p2);
 			}
-
 			let u_current = 0;
 			for (let i = 0; i <= segments; i++) {
 				let scale = getScaleFromPath(i);
@@ -3524,14 +3507,12 @@ function extrude3d(target, commandPath) {
 					u_current += p1.distanceTo(p2);
 				}
 			}
-
 			for (let i = 0; i < segments; i++) {
 				for (let j = 0; j < numPoints; j++) {
 					const idx_a = contourStartVertexCount + i * numPoints + j;
 					const idx_b = contourStartVertexCount + i * numPoints + ((j + 1) % numPoints);
 					const idx_c = contourStartVertexCount + (i + 1) * numPoints + ((j + 1) % numPoints);
 					const idx_d = contourStartVertexCount + (i + 1) * numPoints + j;
-
 					if (reverseWinding) {
 						indices.push(idx_a, idx_d, idx_c);
 						indices.push(idx_a, idx_c, idx_b);
@@ -3543,14 +3524,9 @@ function extrude3d(target, commandPath) {
 			}
 		};
 
-		if (!close) {
-			addCap(true);
-			addCap(false);
-		}
+		if (!close) { addCap(true); addCap(false); }
 		extrudeContour(contourPoints, isClockwise(contourPoints));
-		for (const hole of holePoints) {
-			extrudeContour(hole, !isClockwise(hole));
-		}
+		for (const hole of holePoints) { extrudeContour(hole, !isClockwise(hole)); }
 
 		geometry.setIndex(indices);
 		geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
@@ -6093,345 +6069,376 @@ function cloneGeometryData(sourceGeometry) {
 }
 
 /**
- * Imports an SVG file and returns an array of Path2d objects.
- * Supports: <path>, <circle>, <rect>, <ellipse>, <line>, <polygon>, <polyline>
- * 
- * @param {string} filePath - The path to the SVG file.
- * @returns {Promise<Path2d[]>} A Promise resolving to an array of Path2d objects.
- */
+* Imports an SVG file and returns an array of Path2d objects.
+* Supports: <path>, <circle>, <rect>, <ellipse>, <line>, <polygon>, <polyline>
+*
+* @param {string} filePath - The path to the SVG file.
+* @returns {Promise<Path2d[]>} A Promise resolving to an array of Path2d objects.
+*/
 async function importSvg(filePath) {
-	try {
-		const text = await api.readFile($path(filePath))
-		const parser = new DOMParser()
-		const svgDoc = parser.parseFromString(text, 'image/svg+xml')
+    try {
+        // 1. Safely read and decode the file to a string
+        const buffer = await api.readFileBinary($path(filePath))
+        const text = new TextDecoder().decode(buffer)
+        
+        const parser = new DOMParser()
+        const svgDoc = parser.parseFromString(text, 'image/svg+xml')
+        const path2dObjects = []
+        const fn = 32 // Default tessellation factor for curves
 
-		const path2dObjects = []
-		const fn = 32 // Default tessellation factor for curves
+        // --- ROBUST SVG PATH PARSER ---
+        const parsePathData = (d) => {
+            if (!d) return []
+            const path = []
 
-		// Helper: Parse SVG path 'd' attribute to Path2d format
-		const parsePathData = (d) => {
-			if (!d) return []
-			const path = []
-			// Normalize: add spaces before commands for easier parsing
-			const normalized = d.replace(/([A-Za-z])/g, ' $1 ').replace(/\s+/g, ' ').trim()
-			const tokens = normalized.split(' ')
+            // Robust Tokenization: handles commas, negative numbers, and implicit commands
+            const normalized = d
+                .replace(/([A-Za-z])/g, ' $1 ')      // Isolate command letters
+                .replace(/,/g, ' ')                  // Replace commas with spaces
+                .replace(/([0-9])([+-])/g, '$1 $2')  // Separate numbers from negative signs
+                .replace(/\s+/g, ' ')                // Collapse multiple spaces
+                .trim()
 
-			let i = 0
-			let lastCommand = null
-			let lastControlPoint = null // For S/T smooth commands
+            const tokens = normalized.split(' ')
+            let i = 0
+            let lastCommand = ''
+            let lastControlPoint = null
 
-			while (i < tokens.length) {
-				const cmd = tokens[i]
-				if (!cmd.match(/[A-Za-z]/)) {
-					i++
-					continue
-				}
+            const getNum = () => {
+                while (i < tokens.length && !tokens[i].match(/^-?[0-9.]/)) i++
+                if (i >= tokens.length) return 0
+                return parseFloat(tokens[i++])
+            }
 
-				const isRelative = cmd === cmd.toLowerCase()
-				const cmdUpper = cmd.toUpperCase()
-				i++
+            const getNums = (n) => {
+                const nums = []
+                for (let j = 0; j < n; j++) nums.push(getNum())
+                return nums
+            }
 
-				const getNum = () => parseFloat(tokens[i++])
-				const getNums = (n) => {
-					const nums = []
-					for (let j = 0; j < n; j++) nums.push(getNum())
-					return nums
-				}
+            while (i < tokens.length) {
+                let cmd = tokens[i]
 
-				switch (cmdUpper) {
-					case 'M': { // MoveTo
-						const [x, y] = getNums(2)
-						path.push(isRelative ? 'mr' : 'm', x, y)
-						lastCommand = 'M'
-						break
-					}
-					case 'L': { // LineTo
-						const [x, y] = getNums(2)
-						path.push(isRelative ? 'lr' : 'l', x, y)
-						lastCommand = 'L'
-						break
-					}
-					case 'H': { // Horizontal LineTo
-						const [x] = getNums(1)
-						path.push(isRelative ? 'lr' : 'l', x, 0)
-						lastCommand = 'H'
-						break
-					}
-					case 'V': { // Vertical LineTo
-						const [y] = getNums(1)
-						path.push(isRelative ? 'lr' : 'l', 0, y)
-						lastCommand = 'V'
-						break
-					}
-					case 'C': { // Cubic Bezier
-						const [cp1x, cp1y, cp2x, cp2y, x, y] = getNums(6)
-						path.push(isRelative ? 'cr' : 'c', cp1x, cp1y, cp2x, cp2y, x, y)
-						lastControlPoint = [cp2x, cp2y]
-						lastCommand = 'C'
-						break
-					}
-					case 'S': { // Smooth Cubic Bezier
-						const [cp2x, cp2y, x, y] = getNums(4)
-						// Reflect last control point if previous was C or S
-						let cp1x = 0, cp1y = 0
-						if (lastCommand === 'C' || lastCommand === 'S') {
-							// Would need current position to properly reflect
-							// Simplified: use 0,0 as first control point
-						}
-						path.push(isRelative ? 'cr' : 'c', cp1x, cp1y, cp2x, cp2y, x, y)
-						lastControlPoint = [cp2x, cp2y]
-						lastCommand = 'S'
-						break
-					}
-					case 'Q': { // Quadratic Bezier
-						const [cpx, cpy, x, y] = getNums(4)
-						path.push(isRelative ? 'qr' : 'q', cpx, cpy, x, y)
-						lastControlPoint = [cpx, cpy]
-						lastCommand = 'Q'
-						break
-					}
-					case 'T': { // Smooth Quadratic Bezier
-						const [x, y] = getNums(2)
-						let cpx = 0, cpy = 0
-						if (lastCommand === 'Q' || lastCommand === 'T') {
-							// Reflect last control point (simplified)
-						}
-						path.push(isRelative ? 'qr' : 'q', cpx, cpy, x, y)
-						lastCommand = 'T'
-						break
-					}
-					case 'A': { // Elliptical Arc
-						const [rx, ry, xAxisRot, largeArc, sweep, x, y] = getNums(7)
-						// Convert arc to cubic bezier approximation (simplified)
-						// For full arc support, use the existing arc segmentation logic
-						path.push(isRelative ? 'xr' : 'x', x, y, x, y) // Placeholder
-						lastCommand = 'A'
-						break
-					}
-					case 'Z': // ClosePath
-					path.push('n', 1) // Mark segment count
-					lastCommand = 'Z'
-					break
-				}
-			}
-			return path
-		}
+                // Check if current token is a command letter
+                if (cmd.match(/^[A-Za-z]$/)) {
+                    lastCommand = cmd
+                    i++
+                } else {
+                    // Handle implicit command repetition (e.g., M 0 0 L 10 10 20 20)
+                    if (lastCommand === 'M') lastCommand = 'L'
+                    if (lastCommand === 'm') lastCommand = 'l'
+                    cmd = lastCommand
+                }
 
-		// Helper: Convert shape elements to path data
-		const convertElementToPath = (element) => {
-			const tagName = element.tagName.toLowerCase()
-			let pathData = []
+                const isRelative = cmd === cmd.toLowerCase()
+                const cmdUpper = cmd.toUpperCase()
 
-			switch (tagName) {
-				case 'path': {
-					const d = element.getAttribute('d')
-					pathData = parsePathData(d)
-					break
-				}
-				case 'circle': {
-					const cx = parseFloat(element.getAttribute('cx')) || 0
-					const cy = parseFloat(element.getAttribute('cy')) || 0
-					const r = parseFloat(element.getAttribute('r')) || 0
-					// Create circle as 4 cubic bezier curves
-					const k = 0.5522847498 // Magic number for circle approximation
-					pathData = [
-						'm', cx + r, cy,
-						'c', cx + r, cy + r * k, cx + r * k, cy + r, cx, cy + r,
-						'c', cx - r * k, cy + r, cx - r, cy + r * k, cx - r, cy,
-						'c', cx - r, cy - r * k, cx - r * k, cy - r, cx, cy - r,
-						'c', cx + r * k, cy - r, cx + r, cy - r * k, cx + r, cy
-					]
-					break
-				}
-				case 'ellipse': {
-					const cx = parseFloat(element.getAttribute('cx')) || 0
-					const cy = parseFloat(element.getAttribute('cy')) || 0
-					const rx = parseFloat(element.getAttribute('rx')) || 0
-					const ry = parseFloat(element.getAttribute('ry')) || 0
-					const k = 0.5522847498
-					pathData = [
-						'm', cx + rx, cy,
-						'c', cx + rx, cy + ry * k, cx + rx * k, cy + ry, cx, cy + ry,
-						'c', cx - rx * k, cy + ry, cx - rx, cy + ry * k, cx - rx, cy,
-						'c', cx - rx, cy - ry * k, cx - rx * k, cy - ry, cx, cy - ry,
-						'c', cx + rx * k, cy - ry, cx + rx, cy - ry * k, cx + rx, cy
-					]
-					break
-				}
-				case 'rect': {
-					const x = parseFloat(element.getAttribute('x')) || 0
-					const y = parseFloat(element.getAttribute('y')) || 0
-					const w = parseFloat(element.getAttribute('width')) || 0
-					const h = parseFloat(element.getAttribute('height')) || 0
-					const rx = parseFloat(element.getAttribute('rx')) || 0
-					const ry = parseFloat(element.getAttribute('ry')) || rx
-					if (rx > 0 || ry > 0) {
-						// Rounded rectangle
-						const k = 0.5522847498
-						pathData = [
-							'm', x + rx, y,
-							'l', x + w - rx, y,
-							'c', x + w, y, x + w, y + ry * k, x + w, y + ry,
-							'l', x + w, y + h - ry,
-							'c', x + w, y + h, x + w - rx * k, y + h, x + w - rx, y + h,
-							'l', x + rx, y + h,
-							'c', x, y + h, x, y + h - ry * k, x, y + h - ry,
-							'l', x, y + ry,
-							'c', x, y, x + rx * k, y, x + rx, y
-						]
-					} else {
-						pathData = [
-							'm', x, y,
-							'l', x + w, y,
-							'l', x + w, y + h,
-							'l', x, y + h,
-							'l', x, y
-						]
-					}
-					break
-				}
-				case 'line': {
-					const x1 = parseFloat(element.getAttribute('x1')) || 0
-					const y1 = parseFloat(element.getAttribute('y1')) || 0
-					const x2 = parseFloat(element.getAttribute('x2')) || 0
-					const y2 = parseFloat(element.getAttribute('y2')) || 0
-					pathData = ['m', x1, y1, 'l', x2, y2]
-					break
-				}
-				case 'polygon':
-				case 'polyline': {
-					const points = element.getAttribute('points')
-					if (points) {
-						const pointPairs = points.trim().split(/[\s,]+/).map(parseFloat)
-						if (pointPairs.length >= 2) {
-							pathData = ['m', pointPairs[0], pointPairs[1]]
-							for (let i = 2; i < pointPairs.length; i += 2) {
-								pathData.push('l', pointPairs[i], pointPairs[i + 1])
-							}
-							if (tagName === 'polygon') {
-								pathData.push('l', pointPairs[0], pointPairs[1]) // Close
-							}
-						}
-					}
-					break
-				}
-			}
-			return pathData
-		}
+                switch (cmdUpper) {
+                    case 'M': {
+                        const [x, y] = getNums(2)
+                        path.push(isRelative ? 'mr' : 'm', x, y)
+                        lastCommand = isRelative ? 'l' : 'L'
+                        break
+                    }
+                    case 'L': {
+                        const [x, y] = getNums(2)
+                        path.push(isRelative ? 'lr' : 'l', x, y)
+                        break
+                    }
+                    case 'H': {
+                        const [x] = getNums(1)
+                        path.push(isRelative ? 'lr' : 'l', x, 0)
+                        break
+                    }
+                    case 'V': {
+                        const [y] = getNums(1)
+                        path.push(isRelative ? 'lr' : 'l', 0, y)
+                        break
+                    }
+                    case 'C': {
+                        const [cp1x, cp1y, cp2x, cp2y, x, y] = getNums(6)
+                        path.push(isRelative ? 'cr' : 'c', cp1x, cp1y, cp2x, cp2y, x, y)
+                        lastControlPoint = [cp2x, cp2y]
+                        break
+                    }
+                    case 'S': {
+                        const [cp2x, cp2y, x, y] = getNums(4)
+                        let cp1x = cp2x, cp1y = cp2y
+                        path.push(isRelative ? 'cr' : 'c', cp1x, cp1y, cp2x, cp2y, x, y)
+                        lastControlPoint = [cp2x, cp2y]
+                        break
+                    }
+                    case 'Q': {
+                        const [cpx, cpy, x, y] = getNums(4)
+                        path.push(isRelative ? 'qr' : 'q', cpx, cpy, x, y)
+                        lastControlPoint = [cpx, cpy]
+                        break
+                    }
+                    case 'T': {
+                        const [x, y] = getNums(2)
+                        let cpx = lastControlPoint ? lastControlPoint[0] : 0
+                        let cpy = lastControlPoint ? lastControlPoint[1] : 0
+                        path.push(isRelative ? 'qr' : 'q', cpx, cpy, x, y)
+                        break
+                    }
+                    case 'A': {
+                        const [rx, ry, xAxisRot, largeArc, sweep, x, y] = getNums(7)
+                        path.push(isRelative ? 'lr' : 'l', x, y)
+                        break
+                    }
+                    case 'Z': {
+                        break
+                    }
+                }
+            }
+            return path
+        }
 
-		// Process all path-containing elements
-		const svgElements = svgDoc.querySelectorAll('path, circle, rect, ellipse, line, polygon, polyline')
+        // --- ELEMENT CONVERTER ---
+        const convertElementToPath = (element) => {
+            const tagName = element.tagName.toLowerCase()
+            let pathData = []
 
-		svgElements.forEach((element) => {
-				const pathData = convertElementToPath(element)
-				if (pathData.length > 0) {
-					const path2d = new Path2d().path(pathData).fn(fn)
-					path2dObjects.push(path2d)
-				}
-			})
+            switch (tagName) {
+                case 'path': {
+                    const d = element.getAttribute('d')
+                    pathData = parsePathData(d)
+                    break
+                }
+                case 'circle': {
+                    const cx = parseFloat(element.getAttribute('cx')) || 0
+                    const cy = parseFloat(element.getAttribute('cy')) || 0
+                    const r = parseFloat(element.getAttribute('r')) || 0
+                    const k = 0.5522847498
+                    pathData = [
+                        'm', cx + r, cy,
+                        'c', cx + r, cy + r * k, cx + r * k, cy + r, cx, cy + r,
+                        'c', cx - r * k, cy + r, cx - r, cy + r * k, cx - r, cy,
+                        'c', cx - r, cy - r * k, cx - r * k, cy - r, cx, cy - r,
+                        'c', cx + r * k, cy - r, cx + r, cy - r * k, cx + r, cy
+                    ]
+                    break
+                }
+                case 'ellipse': {
+                    const cx = parseFloat(element.getAttribute('cx')) || 0
+                    const cy = parseFloat(element.getAttribute('cy')) || 0
+                    const rx = parseFloat(element.getAttribute('rx')) || 0
+                    const ry = parseFloat(element.getAttribute('ry')) || 0
+                    const k = 0.5522847498
+                    pathData = [
+                        'm', cx + rx, cy,
+                        'c', cx + rx, cy + ry * k, cx + rx * k, cy + ry, cx, cy + ry,
+                        'c', cx - rx * k, cy + ry, cx - rx, cy + ry * k, cx - rx, cy,
+                        'c', cx - rx, cy - ry * k, cx - rx * k, cy - ry, cx, cy - ry,
+                        'c', cx + rx * k, cy - ry, cx + rx, cy - ry * k, cx + rx, cy
+                    ]
+                    break
+                }
+                case 'rect': {
+                    const x = parseFloat(element.getAttribute('x')) || 0
+                    const y = parseFloat(element.getAttribute('y')) || 0
+                    const w = parseFloat(element.getAttribute('width')) || 0
+                    const h = parseFloat(element.getAttribute('height')) || 0
+                    const rx = parseFloat(element.getAttribute('rx')) || 0
+                    const ry = parseFloat(element.getAttribute('ry')) || rx
+                    
+                    if (rx > 0 || ry > 0) {
+                        const k = 0.5522847498
+                        pathData = [
+                            'm', x + rx, y,
+                            'l', x + w - rx, y,
+                            'c', x + w, y, x + w, y + ry * k, x + w, y + ry,
+                            'l', x + w, y + h - ry,
+                            'c', x + w, y + h, x + w - rx * k, y + h, x + w - rx, y + h,
+                            'l', x + rx, y + h,
+                            'c', x, y + h, x, y + h - ry * k, x, y + h - ry,
+                            'l', x, y + ry,
+                            'c', x, y, x + rx * k, y, x + rx, y
+                        ]
+                    } else {
+                        pathData = [
+                            'm', x, y,
+                            'l', x + w, y,
+                            'l', x + w, y + h,
+                            'l', x, y + h,
+                            'l', x, y
+                        ]
+                    }
+                    break
+                }
+                case 'line': {
+                    const x1 = parseFloat(element.getAttribute('x1')) || 0
+                    const y1 = parseFloat(element.getAttribute('y1')) || 0
+                    const x2 = parseFloat(element.getAttribute('x2')) || 0
+                    const y2 = parseFloat(element.getAttribute('y2')) || 0
+                    pathData = ['m', x1, y1, 'l', x2, y2]
+                    break
+                }
+                case 'polygon':
+                case 'polyline': {
+                    const points = element.getAttribute('points')
+                    if (points) {
+                        const pointPairs = points.trim().split(/[\s,]+/).map(parseFloat)
+                        if (pointPairs.length >= 2) {
+                            pathData = ['m', pointPairs[0], pointPairs[1]]
+                            for (let i = 2; i < pointPairs.length; i += 2) {
+                                pathData.push('l', pointPairs[i], pointPairs[i + 1])
+                            }
+                            if (tagName === 'polygon') {
+                                pathData.push('l', pointPairs[0], pointPairs[1])
+                            }
+                        }
+                    }
+                    break
+                }
+            }
+            return pathData
+        }
 
-		PrintLog(`Successfully loaded SVG from ${filePath}, found ${path2dObjects.length} path(s)`)
-		return path2dObjects
+        // Process all path-containing elements
+        const svgElements = svgDoc.querySelectorAll('path, circle, rect, ellipse, line, polygon, polyline')
+        
+        svgElements.forEach((element) => {
+            const pathData = convertElementToPath(element)
+            if (pathData.length > 0) {
+                const path2d = new Path2d().path(pathData).fn(fn)
+                path2dObjects.push(path2d)
+            }
+        })
 
-	} catch (error) {
-		PrintError('SVG loading error:', error)
-		throw error
-	}
+        if (typeof PrintLog !== 'undefined') PrintLog(`Successfully loaded SVG from ${filePath}, found ${path2dObjects.length} path(s)`)
+        else console.log(`Successfully loaded SVG from ${filePath}, found ${path2dObjects.length} path(s)`)
+        
+        return path2dObjects
+    } catch (error) {
+        if (typeof PrintError !== 'undefined') PrintError('SVG loading error:', error)
+        else console.error('SVG loading error:', error)
+        throw error
+    }
 }
 
 /**
- * Recursively deep clones a THREE.js object.
- * (Modified to use targeted geometry cloning)
+ * Recursively deep clones a THREE.js object, plain objects, arrays, and primitives.
+ * Uses Three.js internal flags (isMesh, isObject3D, etc.) for robust type checking
+ * instead of fragile constructor.name checks that break under minification.
  *
- * @param {THREE.Mesh | THREE.Shape | Brush | Array | Object} source - The object to clone.
- * @returns {THREE.Mesh | THREE.Shape | Brush | Array | Object} The cloned object.
+ * @param {any} source - The object to clone.
+ * @returns {any} The deep cloned object.
  */
 export function clone(source) {
-	// 1. Handle primitives
+	// 1. Handle primitives and null/undefined
 	if (source === null || typeof source !== 'object') {
 		return source
 	}
 
-	const typeName = source.constructor.name
-
 	// 2. Handle Arrays
 	if (Array.isArray(source)) {
-		const clonedArray = []
-		for (let i = 0; i < source.length; i++) {
-			clonedArray[i] = clone(source[i])
-		}
-		return clonedArray
+		return source.map((item) => clone(item))
 	}
 
-	// 3. Handle specific THREE.js objects
-	if (THREE_TYPES_TO_CLONE.includes(typeName)) {
-		// --- CRITICAL CASE: BufferAttribute (for Vertices and Indices data) ---
-		if (typeName === 'BufferAttribute') {
-			const sourceAttr = source
-			// Use BufferAttribute's built-in clone() for the object structure.
-			const clonedAttr = sourceAttr.clone()
+	// 3. Handle Dates and RegExps
+	if (source instanceof Date) return new Date(source.getTime())
+	if (source instanceof RegExp) return new RegExp(source.source, source.flags)
 
-			// ⚠️ Force the deepest possible copy of the underlying typed array data.
-			const dataArray = sourceAttr.array
-			const ClonedDataType = dataArray.constructor
-			// Create a new ArrayBuffer from the original data
-			clonedAttr.array = new ClonedDataType(dataArray)
+	// 4. Handle Maps and Sets
+	if (source instanceof Map) {
+		const m = new Map()
+		source.forEach((v, k) => m.set(clone(k), clone(v)))
+		return m
+	}
+	if (source instanceof Set) {
+		const s = new Set()
+		source.forEach((v) => s.add(clone(v)))
+		return s
+	}
 
-			return clonedAttr
+	// --- THREE.JS SPECIFIC CLONING ---
+	// Using Three.js internal flags is immune to minification/bundling
+
+	// BufferGeometry.clone() is already a DEEP clone in Three.js (copies attributes/index)
+	if (source.isBufferGeometry) {
+		return source.clone()
+	}
+
+	// BufferAttribute.clone() is already a DEEP clone
+	if (source.isBufferAttribute) {
+		return source.clone()
+	}
+
+	// Material and Texture clone() are deep clones
+	if (source.isMaterial || source.isTexture) {
+		return source.clone()
+	}
+
+	// Shape clone
+	if (source.isShape) {
+		return source.clone()
+	}
+
+	// Object3D (Covers Mesh, Brush, Group, Line, Points, etc.)
+	if (source.isObject3D) {
+		let clonedGeometry = null
+		let clonedMaterial = null
+
+		// Deep clone geometry if it exists
+		// THIS IS THE CRITICAL FIX: Three.js's native .clone() shares the geometry reference!
+		if (source.geometry) {
+			clonedGeometry = source.geometry.clone()
 		}
 
-		// --- Special case: THREE.Mesh (Manual construction using targeted geometry clone) ---
-		if (typeName === 'Mesh') {
-			const sourceMesh = source
-			let clonedGeometry = sourceMesh.geometry
-			let clonedMaterial = sourceMesh.material
-
-			// 1. Clone Geometry using the dedicated function
-			if (clonedGeometry) {
-				clonedGeometry = cloneGeometryData(clonedGeometry)
-			}
-
-			// 2. Clone Material(s)
-			if (Array.isArray(sourceMesh.material)) {
-				clonedMaterial = sourceMesh.material.map((m) => m.clone())
-			} else if (
-				sourceMesh.material &&
-				typeof sourceMesh.material.clone === 'function'
-			) {
-				clonedMaterial = sourceMesh.material.clone()
-			}
-
-			// 3. Create NEW Mesh instance
-			// Assuming THREE is available.
-			const clonedObject = new THREE.Mesh(clonedGeometry, clonedMaterial)
-			clonedObject.copy(sourceMesh) // Copy object properties (pos/rot/scale/etc)
-
-			// Re-assign cloned components to be absolutely sure
-			clonedObject.geometry = clonedGeometry
-			clonedObject.material = clonedMaterial
-
-			// 4. Clone children
-			for (let i = 0; i < sourceMesh.children.length; i++) {
-				clonedObject.add(clone(sourceMesh.children[i]))
-			}
-
-			return clonedObject
-		}
-
-		// --- Case for Shape/Brush/Group/Object3D ---
-		const clonedObject = source.clone()
-		// Manually replace children with deep clones
-		if (clonedObject.children) {
-			clonedObject.children.length = 0
-			for (let i = 0; i < source.children.length; i++) {
-				clonedObject.add(clone(source.children[i]))
+		// Deep clone material(s) if they exist
+		if (source.material) {
+			if (Array.isArray(source.material)) {
+				clonedMaterial = source.material.map((m) => m.clone())
+			} else {
+				clonedMaterial = source.material.clone()
 			}
 		}
+
+		// Instantiate the exact same class (e.g., Brush stays Brush, Mesh stays Mesh)
+		let clonedObject
+		try {
+			if (clonedGeometry && clonedMaterial) {
+				clonedObject = new source.constructor(clonedGeometry, clonedMaterial)
+			} else if (clonedGeometry) {
+				clonedObject = new source.constructor(clonedGeometry)
+			} else {
+				clonedObject = new source.constructor()
+			}
+		} catch (e) {
+			// Fallback if constructor requires specific args we didn't provide
+			clonedObject = source.clone()
+		}
+
+		// Copy standard Object3D properties (position, rotation, scale, matrix, etc.)
+		clonedObject.copy(source)
+
+		// Explicitly assign the deeply cloned geometry and material
+		// (copy() doesn't always overwrite these if they are null/undefined in source)
+		if (source.geometry) clonedObject.geometry = clonedGeometry
+		if (source.material) clonedObject.material = clonedMaterial
+
+		// Deep clone userData (copy() uses JSON.parse/stringify which breaks on functions/circular refs)
+		if (source.userData) {
+			clonedObject.userData = clone(source.userData)
+		}
+
+		// Deep clone children
+		// 1. Remove any default children created by the constructor
+		while (clonedObject.children.length > 0) {
+			clonedObject.remove(clonedObject.children[0])
+		}
+		// 2. Add deep cloned children from source
+		for (let i = 0; i < source.children.length; i++) {
+			clonedObject.add(clone(source.children[i]))
+		}
+
 		return clonedObject
 	}
 
-	// 4. Handle generic Objects ({} structures)
-	if (typeName === 'Object') {
+	// --- GENERIC OBJECT CLONING ---
+	// Check if it's a plain object ({})
+	if (Object.getPrototypeOf(source) === Object.prototype) {
 		const clonedObject = {}
 		for (const key in source) {
 			if (Object.prototype.hasOwnProperty.call(source, key)) {
@@ -6441,11 +6448,15 @@ export function clone(source) {
 		return clonedObject
 	}
 
-	// 5. Fallback
-	console.warn(
-		`clone: Cannot deep clone object of type: ${typeName}. Returning original reference.`
-	)
-	return source
+	// Fallback for unknown custom classes (like Path2d, Path3d): clone enumerable properties
+	const clonedInstance = Object.create(Object.getPrototypeOf(source))
+	for (const key in source) {
+		if (Object.prototype.hasOwnProperty.call(source, key)) {
+			clonedInstance[key] = clone(source[key])
+		}
+	}
+
+	return clonedInstance
 }
 
 // Private object containing all exportable functions

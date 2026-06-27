@@ -385,7 +385,7 @@ function _align(config = {}, ...target) {
 // @param {number} path.fn - The default number of segments for curves.
 // @returns {object} An object containing the new path points (p), rotations (r), scales (s), and normals (n).
 
-
+//deprecated use Path3d class
 function path3d(path) {
 	const paths = path.path
 	const fn = path.fn
@@ -2915,41 +2915,25 @@ class Path3d {
 		return segmentPoints
 	}
 
-	/// Processes the path commands, tessellating curves and interpolating r/s.
+	/// Processes the path commands, tessellating curves and interpolating r/s/st.
+	/// @private
+	/// Processes the path commands, tessellating curves and interpolating r/s/st.
 	/// @private
 	_tessellateAndProcess() {
 		const paths = this._path
 		const fn = this._fn
 
-		// Reset current internal state
-		this._cp = [0, 0, 0]
-		this._cr = 0
-		this._cs = [1, 1]
-		this._cst = [null, null]
-		this._atn = 1
-		this._atr = 0
-		this._ats = [1, 1]
-		this._atst=[null, null]
-
-		const newPath = {
-			p: [],
-			r: [],
-			s: [],
-			st:[],
-			n: [],
-			close: this._close,
-			xyInitAng: this._xyInitAng
+		// =========================================================================
+		// PASS 1: Build segments and resolve keyframe states
+		// =========================================================================
+		const segments = []
+		let currentPoint = {
+			p: [0, 0, 0],
+			r: 0,
+			s: [1, 1],
+			st: [null, null]
 		}
-
-		// Use local copies for interpolation variables
-		let cp = this._cp.slice()
-		let cr = this._cr
-		let cs = this._cs.slice()
-		let cst = this._cst.slice()
-		let atn = this._atn
-		let atr = this._atr
-		let ats = this._ats.slice()
-		let atst = this._atst.slice()
+		let atn = 1
 
 		let i = 0
 		while (i < paths.length) {
@@ -2958,364 +2942,104 @@ class Path3d {
 
 			switch (command) {
 				case 'm':
-				cp = [paths[i + 1], paths[i + 2], paths[i + 3]]
-				newPath.p.push([...cp])
-				newPath.r.push(atr)
-				newPath.s.push([...ats])
-				newPath.st.push([...atst])
+				currentPoint.p = [paths[i + 1], paths[i + 2], paths[i + 3]]
 				commandLength = 4
 				break
 				case 'mr':
-				cp = [
-					cp[0] + paths[i + 1],
-					cp[1] + paths[i + 2],
-					cp[2] + paths[i + 3]
+				currentPoint.p = [
+					currentPoint.p[0] + paths[i + 1],
+					currentPoint.p[1] + paths[i + 2],
+					currentPoint.p[2] + paths[i + 3]
 				]
-				newPath.p.push([...cp])
-				newPath.r.push(atr)
-				newPath.s.push([...ats])
 				commandLength = 4
 				break
-				case 'l': {
-					const atp = [paths[i + 1], paths[i + 2], paths[i + 3]]
-					const segmentsToUse = atn > 1 ? atn : 1
-					for (let v = 1; v <= segmentsToUse; v++) {
-						const t = v / segmentsToUse
-						const ix = cp[0] * (1 - t) + atp[0] * t
-						const iy = cp[1] * (1 - t) + atp[1] * t
-						const iz = cp[2] * (1 - t) + atp[2] * t
-						const ir = cr * (1 - t) + atr * t
-						const isx = cs[0] * (1 - t) + ats[0] * t
-						const isy = cs[1] * (1 - t) + ats[1] * t
-						var istx = null;
-						var isty = null;
-						if(cst[0]!= null && cst[1] != null && atst[0] != null && atst[1] != null) {
-							istx = cst[0] * (1 - t) + atst[0] * t
-							isty = cst[1] * (1 - t) + atst[1] * t
-						}
-
-						newPath.p.push([ix, iy, iz])
-						newPath.r.push(ir)
-						newPath.s.push([isx, isy])
-						newPath.st.push([istx, isty])
-					}
-					cp = atp
-					cr = atr
-					cs = ats
-					atn = 1
-					commandLength = 4
-					break
-				}
-				case 'lr': {
-					const endPoint_lr = [
-						cp[0] + paths[i + 1],
-						cp[1] + paths[i + 2],
-						cp[2] + paths[i + 3]
-					]
-					const segmentsToUse = atn > 1 ? atn : 1
-					for (let v = 1; v <= segmentsToUse; v++) {
-						const t = v / segmentsToUse
-						const ix = cp[0] * (1 - t) + endPoint_lr[0] * t
-						const iy = cp[1] * (1 - t) + endPoint_lr[1] * t
-						const iz = cp[2] * (1 - t) + endPoint_lr[2] * t
-						const ir = cr * (1 - t) + atr * t
-						const isx = cs[0] * (1 - t) + ats[0] * t
-						const isy = cs[1] * (1 - t) + ats[1] * t
-						var istx = null;
-						var isty = null;
-						if(cst[0]!= null && cst[1] != null && atst[0] != null && atst[1] != null) {
-							istx = cst[0] * (1 - t) + atst[0] * t
-							isty = cst[1] * (1 - t) + atst[1] * t
-						}
-
-						newPath.p.push([ix, iy, iz])
-						newPath.r.push(ir)
-						newPath.s.push([isx, isy])
-						newPath.st.push([istx, isty])
-					}
-					cp = endPoint_lr
-					cr = atr
-					cs = ats
-					atn = 1
-					commandLength = 4
-					break
-				}
-				case 'q': {
-					const endPoint = [paths[i + 4], paths[i + 5], paths[i + 6]]
-					const controlPoints = [
-						[paths[i + 1], paths[i + 2], paths[i + 3]]
-					]
-					const segmentsToUse = atn > 1 ? atn : fn
-					const segmentPoints = this._getPointsAtEqualDistance(
-						cp,
-						endPoint,
-						controlPoints,
-						segmentsToUse
-					)
-
-					segmentPoints.forEach((p, j) => {
-							const t = (j + 1) / segmentsToUse
-							newPath.p.push([...p])
-							newPath.r.push(cr * (1 - t) + atr * t)
-							newPath.s.push([
-									cs[0] * (1 - t) + ats[0] * t,
-									cs[1] * (1 - t) + ats[1] * t
-								])
-							var istx = null;
-							var isty = null;
-							if(cst[0]!= null && cst[1] != null && atst[0] != null && atst[1] != null) {
-								istx = cst[0] * (1 - t) + atst[0] * t
-								isty = cst[1] * (1 - t) + atst[1] * t
-							}
-							newPath.st.push([istx, isty])
-
-						})
-
-					cp = endPoint
-					cr = atr
-					cs = ats
-					atn = 1
-					commandLength = 7
-					break
-				}
-				case 'qr': {
-					const endPoint = [
-						cp[0] + paths[i + 4],
-						cp[1] + paths[i + 5],
-						cp[2] + paths[i + 6]
-					]
-					const controlPoints = [
-						[
-							cp[0] + paths[i + 1],
-							cp[1] + paths[i + 2],
-							cp[2] + paths[i + 3]
-						]
-					]
-					const segmentsToUse = atn > 1 ? atn : fn
-					const segmentPoints = this._getPointsAtEqualDistance(
-						cp,
-						endPoint,
-						controlPoints,
-						segmentsToUse
-					)
-
-					segmentPoints.forEach((p, j) => {
-							const t = (j + 1) / segmentsToUse
-							newPath.p.push([...p])
-							newPath.r.push(cr * (1 - t) + atr * t)
-							newPath.s.push([
-									cs[0] * (1 - t) + ats[0] * t,
-									cs[1] * (1 - t) + ats[1] * t
-								])
-							var istx = null;
-							var isty = null;
-							if(cst[0]!= null && cst[1] != null && atst[0] != null && atst[1] != null) {
-								istx = cst[0] * (1 - t) + atst[0] * t
-								isty = cst[1] * (1 - t) + atst[1] * t
-							}
-							newPath.st.push([istx, isty])
-						})
-
-					cp = endPoint
-					cr = atr
-					cs = ats
-					atn = 1
-					commandLength = 7
-					break
-				}
-				case 'c': {
-					const endPoint = [paths[i + 7], paths[i + 8], paths[i + 9]]
-					const controlPoints = [
-						[paths[i + 1], paths[i + 2], paths[i + 3]],
-						[paths[i + 4], paths[i + 5], paths[i + 6]]
-					]
-					const segmentsToUse = atn > 1 ? atn : fn
-					const segmentPoints = this._getPointsAtEqualDistance(
-						cp,
-						endPoint,
-						controlPoints,
-						segmentsToUse
-					)
-
-					segmentPoints.forEach((p, j) => {
-							const t = (j + 1) / segmentsToUse
-							newPath.p.push([...p])
-							newPath.r.push(cr * (1 - t) + atr * t)
-							newPath.s.push([
-									cs[0] * (1 - t) + ats[0] * t,
-									cs[1] * (1 - t) + ats[1] * t
-								])
-								
-							var istx = null;
-							var isty = null;
-							if(cst[0]!= null && cst[1] != null && atst[0] != null && atst[1] != null) {
-								istx = cst[0] * (1 - t) + atst[0] * t
-								isty = cst[1] * (1 - t) + atst[1] * t
-							}
-							newPath.st.push([istx, isty])
-						})
-
-					cp = endPoint
-					cr = atr
-					cs = ats
-					atn = 1
-					commandLength = 10
-					break
-				}
-				case 'cr': {
-					const endPoint = [
-						cp[0] + paths[i + 7],
-						cp[1] + paths[i + 8],
-						cp[2] + paths[i + 9]
-					]
-					const controlPoints = [
-						[
-							cp[0] + paths[i + 1],
-							cp[1] + paths[i + 2],
-							cp[2] + paths[i + 3]
-						],
-						[
-							cp[0] + paths[i + 4],
-							cp[1] + paths[i + 5],
-							cp[2] + paths[i + 6]
-						]
-					]
-					const segmentsToUse = atn > 1 ? atn : fn
-					const segmentPoints = this._getPointsAtEqualDistance(
-						cp,
-						endPoint,
-						controlPoints,
-						segmentsToUse
-					)
-
-					segmentPoints.forEach((p, j) => {
-							const t = (j + 1) / segmentsToUse
-							newPath.p.push([...p])
-							newPath.r.push(cr * (1 - t) + atr * t)
-							newPath.s.push([
-									cs[0] * (1 - t) + ats[0] * t,
-									cs[1] * (1 - t) + ats[1] * t
-								])
-								
-							var istx = null;
-							var isty = null;
-							if(cst[0]!= null && cst[1] != null && atst[0] != null && atst[1] != null) {
-								istx = cst[0] * (1 - t) + atst[0] * t
-								isty = cst[1] * (1 - t) + atst[1] * t
-							}
-							newPath.st.push([istx, isty])
-						})
-
-					cp = endPoint
-					cr = atr
-					cs = ats
-					atn = 1
-					commandLength = 10
-					break
-				}
-				case 'x': {
-					const controlPoint = [
-						paths[i + 1],
-						paths[i + 2],
-						paths[i + 3]
-					]
-					const endPoint = [paths[i + 4], paths[i + 5], paths[i + 6]]
-					const segmentsToUse = atn > 1 ? atn : fn
-
-					this._getArcSegmentPoints3D(
-						cp,
-						controlPoint,
-						endPoint,
-						segmentsToUse
-					).forEach((p, j) => {
-							const t = (j + 1) / segmentsToUse
-							newPath.p.push([...p])
-							newPath.r.push(cr * (1 - t) + atr * t)
-							newPath.s.push([
-									cs[0] * (1 - t) + ats[0] * t,
-									cs[1] * (1 - t) + ats[1] * t
-								])
-								
-							var istx = null;
-							var isty = null;
-							if(cst[0]!= null && cst[1] != null && atst[0] != null && atst[1] != null) {
-								istx = cst[0] * (1 - t) + atst[0] * t
-								isty = cst[1] * (1 - t) + atst[1] * t
-							}
-							newPath.st.push([istx, isty])
-						})
-
-					// Explicitly push the final endpoint (P2)
-					newPath.p.push([...endPoint])
-					newPath.r.push(atr)
-					newPath.s.push([...ats])
-
-					cp = endPoint
-					cr = atr
-					cs = ats
-					atn = 1
-					commandLength = 7
-					break
-				}
+				case 'l':
+				case 'lr':
+				case 'q':
+				case 'qr':
+				case 'c':
+				case 'cr':
+				case 'x':
 				case 'xr': {
-					const controlPoint = [
-						cp[0] + paths[i + 1],
-						cp[1] + paths[i + 2],
-						cp[2] + paths[i + 3]
-					]
-					const endPoint = [
-						cp[0] + paths[i + 4],
-						cp[1] + paths[i + 5],
-						cp[2] + paths[i + 6]
-					]
-					const segmentsToUse = atn > 1 ? atn : fn
+					// Create the next point, inheriting the current state
+					const nextPoint = {
+						p: [...currentPoint.p],
+						r: currentPoint.r,
+						s: [...currentPoint.s],
+						st: [...currentPoint.st]
+					}
 
-					this._getArcSegmentPoints3D(
-						cp,
-						controlPoint,
-						endPoint,
-						segmentsToUse
-					).forEach((p, j) => {
-							const t = (j + 1) / segmentsToUse
-							newPath.p.push([...p])
-							newPath.r.push(cr * (1 - t) + atr * t)
-							newPath.s.push([
-									cs[0] * (1 - t) + ats[0] * t,
-									cs[1] * (1 - t) + ats[1] * t
-								])
-								
-								
-							var istx = null;
-							var isty = null;
-							if(cst[0]!= null && cst[1] != null && atst[0] != null && atst[1] != null) {
-								istx = cst[0] * (1 - t) + atst[0] * t
-								isty = cst[1] * (1 - t) + atst[1] * t
-							}
-							newPath.st.push([istx, isty])
+					// Determine end position and command length based on command type
+					if (command === 'l') {
+						nextPoint.p = [paths[i + 1], paths[i + 2], paths[i + 3]]
+						commandLength = 4
+					} else if (command === 'lr') {
+						nextPoint.p = [
+							currentPoint.p[0] + paths[i + 1],
+							currentPoint.p[1] + paths[i + 2],
+							currentPoint.p[2] + paths[i + 3]
+						]
+						commandLength = 4
+					} else if (command === 'q') {
+						nextPoint.p = [paths[i + 4], paths[i + 5], paths[i + 6]]
+						commandLength = 7
+					} else if (command === 'qr') {
+						nextPoint.p = [
+							currentPoint.p[0] + paths[i + 4],
+							currentPoint.p[1] + paths[i + 5],
+							currentPoint.p[2] + paths[i + 6]
+						]
+						commandLength = 7
+					} else if (command === 'c') {
+						nextPoint.p = [paths[i + 7], paths[i + 8], paths[i + 9]]
+						commandLength = 10
+					} else if (command === 'cr') {
+						nextPoint.p = [
+							currentPoint.p[0] + paths[i + 7],
+							currentPoint.p[1] + paths[i + 8],
+							currentPoint.p[2] + paths[i + 9]
+						]
+						commandLength = 10
+					} else if (command === 'x') {
+						nextPoint.p = [paths[i + 4], paths[i + 5], paths[i + 6]]
+						commandLength = 7
+					} else if (command === 'xr') {
+						nextPoint.p = [
+							currentPoint.p[0] + paths[i + 4],
+							currentPoint.p[1] + paths[i + 5],
+							currentPoint.p[2] + paths[i + 6]
+						]
+						commandLength = 7
+					}
+
+					const isCurve = command.startsWith('q') || command.startsWith('c') || command.startsWith('x')
+					const segmentsToUse = atn > 1 ? atn : (isCurve ? fn : 1)
+
+					// Push the segment. Note: 'nextPoint' is a reference, so if we update
+					// 'currentPoint' later, it updates this segment's end state!
+					segments.push({
+							type: command,
+							params: paths.slice(i + 1, i + commandLength),
+							start: currentPoint,
+							end: nextPoint,
+							n: segmentsToUse
 						})
 
-					// Explicitly push the final endpoint (P2)
-					newPath.p.push([...endPoint])
-					newPath.r.push(atr)
-					newPath.s.push([...ats])
-
-					cp = endPoint
-					cr = atr
-					cs = ats
+					// The next point becomes the current point for subsequent commands
+					currentPoint = nextPoint
 					atn = 1
-					commandLength = 7
 					break
 				}
 				case 'r':
-				atr = paths[i + 1]
+				currentPoint.r = paths[i + 1]
 				commandLength = 2
 				break
 				case 's':
-				ats = [paths[i + 1], paths[i + 2]]
+				currentPoint.s = [paths[i + 1], paths[i + 2]]
 				commandLength = 3
 				break
 				case 'st':
-				atst = [paths[i + 1], paths[i + 2]]
+				currentPoint.st = [paths[i + 1], paths[i + 2]]
 				commandLength = 3
 				break
 				case 'n':
@@ -3329,8 +3053,119 @@ class Path3d {
 			i += commandLength
 		}
 
+		// =========================================================================
+		// PASS 2: Tessellate segments and interpolate states
+		// =========================================================================
+		const newPath = {
+			p: [],
+			r: [],
+			s: [],
+			st: [],
+			n: [],
+			close: this._close,
+			xyInitAng: this._xyInitAng
+		}
+
+		if (segments.length === 0) {
+			newPath.p.push([...currentPoint.p])
+			newPath.r.push(currentPoint.r)
+			newPath.s.push([...currentPoint.s])
+			newPath.st.push([...currentPoint.st])
+			this._pathData = newPath
+			return
+		}
+
+		// Add the start point of the very first segment
+		const firstSeg = segments[0]
+		newPath.p.push([...firstSeg.start.p])
+		newPath.r.push(firstSeg.start.r)
+		newPath.s.push([...firstSeg.start.s])
+		newPath.st.push([...firstSeg.start.st])
+
+		// Helper to interpolate and push state for a given t
+		const pushInterpolatedState = (seg, t) => {
+			newPath.r.push(seg.start.r * (1 - t) + seg.end.r * t)
+			newPath.s.push([
+					seg.start.s[0] * (1 - t) + seg.end.s[0] * t,
+					seg.start.s[1] * (1 - t) + seg.end.s[1] * t
+				])
+
+			// Interpolate 'st' safely handling nulls
+			let stx = null, sty = null
+			if (seg.start.st[0] !== null && seg.end.st[0] !== null) stx = seg.start.st[0] * (1 - t) + seg.end.st[0] * t
+			else if (seg.end.st[0] !== null) stx = seg.end.st[0]
+			else stx = seg.start.st[0]
+
+			if (seg.start.st[1] !== null && seg.end.st[1] !== null) sty = seg.start.st[1] * (1 - t) + seg.end.st[1] * t
+			else if (seg.end.st[1] !== null) sty = seg.end.st[1]
+			else sty = seg.start.st[1]
+
+			newPath.st.push([stx, sty])
+		}
+
+		for (const seg of segments) {
+			const segmentsToUse = seg.n
+
+			if (seg.type === 'l' || seg.type === 'lr') {
+				for (let v = 1; v <= segmentsToUse; v++) {
+					const t = v / segmentsToUse
+					newPath.p.push([
+							seg.start.p[0] * (1 - t) + seg.end.p[0] * t,
+							seg.start.p[1] * (1 - t) + seg.end.p[1] * t,
+							seg.start.p[2] * (1 - t) + seg.end.p[2] * t
+						])
+					pushInterpolatedState(seg, t)
+				}
+			} else if (seg.type === 'x' || seg.type === 'xr') {
+				// 3D Arc commands
+				let controlPoint = seg.type === 'x'
+				? [seg.params[0], seg.params[1], seg.params[2]]
+				: [seg.start.p[0] + seg.params[0], seg.start.p[1] + seg.params[1], seg.start.p[2] + seg.params[2]]
+
+				const arcPoints = this._getArcSegmentPoints3D(seg.start.p, controlPoint, seg.end.p, segmentsToUse)
+
+				arcPoints.forEach((p, j) => {
+						const t = (j + 1) / segmentsToUse
+						newPath.p.push([...p])
+						pushInterpolatedState(seg, t)
+					})
+
+				// Explicitly push the final endpoint for arcs
+				newPath.p.push([...seg.end.p])
+				newPath.r.push(seg.end.r)
+				newPath.s.push([...seg.end.s])
+				newPath.st.push([...seg.end.st])
+			} else {
+				// Bezier curves: q, qr, c, cr
+				let controlPoints = []
+				if (seg.type === 'q') {
+					controlPoints = [[seg.params[0], seg.params[1], seg.params[2]]]
+				} else if (seg.type === 'qr') {
+					controlPoints = [[seg.start.p[0] + seg.params[0], seg.start.p[1] + seg.params[1], seg.start.p[2] + seg.params[2]]]
+				} else if (seg.type === 'c') {
+					controlPoints = [
+						[seg.params[0], seg.params[1], seg.params[2]],
+						[seg.params[3], seg.params[4], seg.params[5]]
+					]
+				} else if (seg.type === 'cr') {
+					controlPoints = [
+						[seg.start.p[0] + seg.params[0], seg.start.p[1] + seg.params[1], seg.start.p[2] + seg.params[2]],
+						[seg.start.p[0] + seg.params[3], seg.start.p[1] + seg.params[4], seg.start.p[2] + seg.params[5]]
+					]
+				}
+
+				const segmentPoints = this._getPointsAtEqualDistance(seg.start.p, seg.end.p, controlPoints, segmentsToUse)
+				segmentPoints.forEach((p, j) => {
+						const t = (j + 1) / segmentsToUse
+						newPath.p.push([...p])
+						pushInterpolatedState(seg, t)
+					})
+			}
+		}
+
 		this._pathData = newPath
 	}
+
 
 	_calculateAverageTangent(p0, p1, p2) {
 		//const vsub = this._vsub, vadd = this._vadd, vnormalize = this._vnormalize
@@ -3444,715 +3279,726 @@ const isClockwise = (points) => getSignedArea(points) < 0
  *
  * @param {object} target - The parent object from which Path2d instances are extracted.
  * @param {object} commandPath - The raw path data to be processed by path3d.
+ * @param {object} [allowAxes={x:true, y:true, z:true}] - Optional object to restrict quaternion rotation axes.
+ *   Example: { x: false, y: false, z: true } will ignore X and Y tilts, keeping the profile upright 
+ *   while still allowing Z-axis twisting (from path.r) and 3D translation.
  * @returns {THREE.Mesh[]} An array of THREE.js meshes.
  */
-function extrude3d(target, commandPath) {
-	// 1. Process the 3D path data
-	var path = commandPath.getPoints() //path3d(commandPath)
-	let close = path.close
+function extrude3d(target, commandPath, allowAxes = { x: true, y: true, z: true }) {
+	const needsRestriction = !allowAxes.x || !allowAxes.y || !allowAxes.z;
+	const bboxPath = boundingBoxPath(target);
 
-	// 2. Extract all Path2d instances from the target object
-	var path2dTargets = []
-	applyToPath2d(target, (item) => {
-			path2dTargets.push(item)
-		})
-
-	if (path2dTargets.length === 0) {
-		return []
+	if (!bboxPath || !bboxPath.min || !bboxPath.max) {
+		console.warn("Invalid bounding box for target in extrude3d");
+		return [];
 	}
 
-	var points3d = []
-	var preCalc = []
-	var upVector = new THREE.Vector3(0, 0, 1)
+	const bboxPathW = (bboxPath.max.x - bboxPath.min.x) || 1;
+	const bboxPathH = (bboxPath.max.y - bboxPath.min.y) || 1;
+	var path = commandPath.getPoints();
+	let close = path.close;
+	const numPoints = path.p.length;
 
-	// --- Calculation for Initial Rotation from path.p ---
-	const p1 = path.p[0]
-	const p2 = path.p[1]
-	let dx = p2[0] - p1[0]
-	let dy = p2[1] - p1[1]
+	// ========================================================================
+	// ROBUST: Guarantee arrays match path.p length to prevent undefined crashes
+	// ========================================================================
+	const stScales = Array.from({ length: numPoints }, (_, i) => {
+			const st = path.st && path.st[i];
+			return [
+				(st && st[0] !== null && st[0] !== undefined) ? st[0] / bboxPathW : null,
+				(st && st[1] !== null && st[1] !== undefined) ? st[1] / bboxPathH : null
+			];
+		});
+	const sScales = Array.from({ length: numPoints }, (_, i) => {
+			const s = path.s && path.s[i];
+			return [
+				(s && s[0] !== null && s[0] !== undefined) ? s[0] : null,
+				(s && s[1] !== null && s[1] !== undefined) ? s[1] : null
+			];
+		});
 
-	let initialRotationRadians = 0
+	const interpolateScaleArray = (targetArray) => {
+		const len = targetArray.length;
+		if (len === 0) return;
+		const interpolateDim = (dim) => {
+			let firstNonNull = -1;
+			for (let i = 0; i < len; i++) {
+				if (targetArray[i][dim] !== null) { firstNonNull = i; break; }
+			}
+			if (firstNonNull === -1) {
+				for (let i = 0; i < len; i++) targetArray[i][dim] = 1.0;
+				return;
+			}
+			for (let i = 0; i < firstNonNull; i++) {
+				const firstVal = targetArray[firstNonNull][dim];
+				targetArray[i][dim] = 1.0 + (firstVal - 1.0) * (i / firstNonNull);
+			}
+			let lastNonNull = firstNonNull;
+			for (let i = firstNonNull + 1; i < len; i++) {
+				if (targetArray[i][dim] !== null) {
+					const startVal = targetArray[lastNonNull][dim];
+					const endVal = targetArray[i][dim];
+					const steps = i - lastNonNull;
+					for (let j = 1; j < steps; j++) {
+						const t = j / steps;
+						targetArray[lastNonNull + j][dim] = startVal + (endVal - startVal) * t;
+					}
+					lastNonNull = i;
+				}
+			}
+			if (lastNonNull < len - 1) {
+				const startVal = targetArray[lastNonNull][dim];
+				const endVal = 1.0;
+				const steps = len - 1 - lastNonNull;
+				for (let j = 1; j <= steps; j++) {
+					const t = j / steps;
+					targetArray[lastNonNull + j][dim] = startVal + (endVal - startVal) * t;
+				}
+			}
+		};
+		interpolateDim(0);
+		interpolateDim(1);
+	};
+	interpolateScaleArray(stScales);
+	interpolateScaleArray(sScales);
+
+	var path2dTargets = [];
+	applyToPath2d(target, (item) => { path2dTargets.push(item); });
+	if (path2dTargets.length === 0) return [];
+
+	var points3d = [];
+	var preCalc = [];
+	var upVector = new THREE.Vector3(0, 0, 1);
+	const p1 = path.p[0];
+	const p2 = path.p[1];
+	let dx = p2[0] - p1[0];
+	let dy = p2[1] - p1[1];
+	let initialRotationRadians = 0;
 
 	if (path.xyInitAng) {
-		initialRotationRadians = Math.atan2(dy, dx) + Math.PI / 2
+		initialRotationRadians = Math.atan2(dy, dx) + Math.PI / 2;
 	} else {
-		initialRotationRadians = Math.PI / 2
+		initialRotationRadians = Math.PI / 2;
 	}
 
-	const cosR = Math.cos(initialRotationRadians)
-	const sinR = Math.sin(initialRotationRadians)
-	// --- End of Calculation ---
+	const cosR = Math.cos(initialRotationRadians);
+	const sinR = Math.sin(initialRotationRadians);
 
-	// 3. Pre-calculate rotations and quaternions for each path segment
+	// --- PRECALCULATE QUATERNIONS WITH AXIS RESTRICTION ---
 	for (var i = 0; i < path.p.length; i++) {
-		points3d.push(...[0, 0, i])
-		const rotation = path.r[i]
-		var o = {}
-		o.cosR = Math.cos((rotation / 180) * Math.PI)
-		o.sinR = Math.sin((rotation / 180) * Math.PI)
-		const normal = new THREE.Vector3().fromArray(path.n[i])
-		o.quaternion = new THREE.Quaternion().setFromUnitVectors(
-			upVector,
-			normal
-		)
-		// Note: applyQuaternion called here is part of the original logic flow
-		applyQuaternion(upVector, o.quaternion)
+		points3d.push(...[0, 0, i]);
+		const rotation = path.r[i];
+		var o = {};
+		o.cosR = Math.cos((rotation / 180) * Math.PI);
+		o.sinR = Math.sin((rotation / 180) * Math.PI);
 
-		preCalc.push(o)
+		const normal = new THREE.Vector3().fromArray(path.n[i]);
+		let q = new THREE.Quaternion().setFromUnitVectors(upVector, normal);
+
+		// Apply axis restrictions if needed
+		if (needsRestriction) {
+			const euler = new THREE.Euler().setFromQuaternion(q, 'XYZ');
+			if (!allowAxes.x) euler.x = 0;
+			if (!allowAxes.y) euler.y = 0;
+			if (!allowAxes.z) euler.z = 0;
+			q = new THREE.Quaternion().setFromEuler(euler);
+		}
+
+		o.quaternion = q;
+		applyQuaternion(upVector, o.quaternion);
+		preCalc.push(o);
 	}
 
-	const meshes = []
+	const meshes = [];
+	if (!points3d || points3d.length < 6) return [];
 
-	if (!points3d || points3d.length < 6) {
-		return []
-	}
+	const getScaleFromPath = (i) => {
+		return [ stScales[i][0] * sScales[i][0], stScales[i][1] * sScales[i][1] ];
+	};
 
-	// --- Helper function to generate geometry from one ShapeData object (Solid + Holes) ---
 	const genFromShapeData = (shapeData) => {
-		var geometry = new THREE.BufferGeometry()
-		var vertices = []
-		var indices = []
-		var uvs = []
-		let vertexCount = 0
+		var geometry = new THREE.BufferGeometry();
+		var vertices = [];
+		var indices = [];
+		var uvs = [];
+		let vertexCount = 0;
 
-		// Convert Path2d's {x, y} Points to THREE.Vector2
-		const convertToVector2 = (p) => new THREE.Vector2(p.x, p.y)
-		const contourPoints = shapeData.outerPoints.map(convertToVector2)
-		const holePoints = shapeData.holePoints.map((hole) =>
-			hole.map(convertToVector2)
-		)
+		const convertToVector2 = (p) => new THREE.Vector2(p.x, p.y);
+		const contourPoints = shapeData.outerPoints.map(convertToVector2);
+		const holePoints = shapeData.holePoints.map((hole) => hole.map(convertToVector2));
+		const capTriangles = THREE.ShapeUtils.triangulateShape(contourPoints, holePoints);
 
-		// 🌟 CRITICAL STEP: Apply Initial Rotation to the cross-section points (Replicating linePaths3d)
-		const rotatePoints = (points) => {
-			for (const point of points) {
-				const x = point.x
-				const y = point.y
-				// Application of cosR and sinR (derived from initialRotationRadians)
-				point.x = x * cosR - y * sinR
-				point.y = x * sinR + y * cosR
-			}
-		}
-		rotatePoints(contourPoints)
-		holePoints.forEach(rotatePoints)
-		// 🌟 END CRITICAL STEP
+		const allPoints = [contourPoints, ...holePoints].flat();
+		const minX = Math.min(...allPoints.map((p) => p.x));
+		const maxX = Math.max(...allPoints.map((p) => p.x));
+		const minY = Math.min(...allPoints.map((p) => p.y));
+		const maxY = Math.max(...allPoints.map((p) => p.y));
+		const width = maxX - minX;
+		const height = maxY - minY;
+		const segments = points3d.length / 3 - 1;
 
-		// Triangulate the 2D shape for the caps
-		const capTriangles = THREE.ShapeUtils.triangulateShape(
-			contourPoints,
-			holePoints
-		)
-		const allPoints = [contourPoints, ...holePoints].flat()
-		const minX = Math.min(...allPoints.map((p) => p.x))
-		const maxX = Math.max(...allPoints.map((p) => p.x))
-		const minY = Math.min(...allPoints.map((p) => p.y))
-		const maxY = Math.max(...allPoints.map((p) => p.y))
-		const width = maxX - minX
-		const height = maxY - minY
-		const segments = points3d.length / 3 - 1
+		const calcFinalPoint = (point, i, scale) => {
+			var x = point.x;
+			var y = point.y;
+			var z = 0;
+			x = x * scale[0];
+			y = y * scale[1];
+			const prex = x;
+			const prey = y;
+			x = prex * cosR - prey * sinR;
+			y = prex * sinR + prey * cosR;
+			var o = preCalc[i];
+			let rotatedX = x * o.cosR - y * o.sinR;
+			let rotatedY = x * o.sinR + y * o.cosR;
+			x = rotatedX;
+			y = rotatedY;
 
-		// Calculation of Final 3D Point with Cumulative Rotation (Unchanged)
-		const calcFinalPoint = (point, i) => {
-			var x = point.x
-			var y = point.y
-			var z = 0
-
-			// Apply path.s for scale
-			x = x * path.s[i][0]
-			y = y * path.s[i][1]
-
-			// Apply 2D rotation (path.r)
-			var o = preCalc[i]
-			let rotatedX = x * o.cosR - y * o.sinR
-			let rotatedY = x * o.sinR + y * o.cosR
-			x = rotatedX
-			y = rotatedY
-
-			const ppoint = new THREE.Vector3(x, y, z)
-
-			// Apply the 3D rotation CUMULATIVELY
+			const ppoint = new THREE.Vector3(x, y, z);
 			for (var k = 0; k <= i; k++) {
-				applyQuaternion(ppoint, preCalc[k].quaternion)
+				applyQuaternion(ppoint, preCalc[k].quaternion); // Uses the potentially restricted quaternion
 			}
+			ppoint.x += path.p[i][0];
+			ppoint.y += path.p[i][1];
+			ppoint.z += path.p[i][2];
+			return ppoint;
+		};
 
-			// Apply the 3D translation
-			ppoint.x += path.p[i][0]
-			ppoint.y += path.p[i][1]
-			ppoint.z += path.p[i][2]
-			return ppoint
-		}
-
-		// --- DEFINITION 1: Cap Generation (Unchanged) ---
 		const addCap = (isTop) => {
-			const capStartVertexCount = vertexCount
-			const i = isTop ? segments : 0
-
-			// 1. Add Vertices and Cap UVs
+			const capStartVertexCount = vertexCount;
+			const i = isTop ? segments : 0;
+			const scale = getScaleFromPath(i);
 			for (const point of allPoints) {
-				var ppoint = calcFinalPoint(point, i)
-				vertices.push(ppoint.x, ppoint.y, ppoint.z)
-				vertexCount++
-				uvs.push((point.x - minX) / width, (point.y - minY) / height)
+				var ppoint = calcFinalPoint(point, i, scale);
+				vertices.push(ppoint.x, ppoint.y, ppoint.z);
+				vertexCount++;
+				uvs.push((point.x - minX) / width, (point.y - minY) / height);
 			}
-
-			// 2. Add Indices
 			for (const tri of capTriangles) {
-				const v1 = capStartVertexCount + tri[0]
-				const v2 = capStartVertexCount + tri[1]
-				const v3 = capStartVertexCount + tri[2]
-
-				if (isTop) {
-					indices.push(v1, v2, v3)
-				} else {
-					indices.push(v1, v3, v2)
-				}
+				const v1 = capStartVertexCount + tri[0];
+				const v2 = capStartVertexCount + tri[1];
+				const v3 = capStartVertexCount + tri[2];
+				if (isTop) { indices.push(v1, v2, v3); }
+				else { indices.push(v1, v3, v2); }
 			}
-		}
+		};
 
-		// --- DEFINITION 2: Side Wall Generation (Unchanged) ---
 		const extrudeContour = (points, reverseWinding) => {
-			const contourStartVertexCount = vertexCount
-			const numPoints = points.length
-
-			// 1. Calculate total length of this contour for side UVs (U coordinate)
-			let contourLength = 0
+			const contourStartVertexCount = vertexCount;
+			const numPoints = points.length;
+			let contourLength = 0;
 			for (let i = 0; i < numPoints; i++) {
-				const p1 = points[i]
-				const p2 = points[(i + 1) % numPoints]
-				contourLength += p1.distanceTo(p2)
+				const p1 = points[i];
+				const p2 = points[(i + 1) % numPoints];
+				contourLength += p1.distanceTo(p2);
 			}
-
-			// 2. Generate Vertices and UVs for the side walls
-			let u_current = 0
+			let u_current = 0;
 			for (let i = 0; i <= segments; i++) {
-				// Loop path depth (V coordinate)
-				const v = 1 - i / segments
-				u_current = 0
-
+				let scale = getScaleFromPath(i);
+				const v = 1 - i / segments;
+				u_current = 0;
 				for (let j = 0; j < numPoints; j++) {
-					// Loop 2D points (U coordinate)
-					const point = points[j]
-					var ppoint = calcFinalPoint(point, i)
-
-					vertices.push(ppoint.x, ppoint.y, ppoint.z)
-					uvs.push(u_current / contourLength, v)
-					vertexCount++
-
-					const p1 = points[j]
-					const p2 = points[(j + 1) % numPoints]
-					u_current += p1.distanceTo(p2)
+					const point = points[j];
+					var ppoint = calcFinalPoint(point, i, scale);
+					vertices.push(ppoint.x, ppoint.y, ppoint.z);
+					uvs.push(u_current / contourLength, v);
+					vertexCount++;
+					const p1 = points[j];
+					const p2 = points[(j + 1) % numPoints];
+					u_current += p1.distanceTo(p2);
 				}
 			}
-
-			// 3. Generate Indices (Faces)
 			for (let i = 0; i < segments; i++) {
 				for (let j = 0; j < numPoints; j++) {
-					const idx_a = contourStartVertexCount + i * numPoints + j
-					const idx_b =
-					contourStartVertexCount +
-					i * numPoints +
-					((j + 1) % numPoints)
-					const idx_c =
-					contourStartVertexCount +
-					(i + 1) * numPoints +
-					((j + 1) % numPoints)
-					const idx_d =
-					contourStartVertexCount + (i + 1) * numPoints + j
-
-					if (reverseWinding)
-					{
-						indices.push(idx_a, idx_d, idx_c)
-						indices.push(idx_a, idx_c, idx_b)
-					}
-					else
-					{
-						indices.push(idx_a, idx_b, idx_c)
-						indices.push(idx_a, idx_c, idx_d)
+					const idx_a = contourStartVertexCount + i * numPoints + j;
+					const idx_b = contourStartVertexCount + i * numPoints + ((j + 1) % numPoints);
+					const idx_c = contourStartVertexCount + (i + 1) * numPoints + ((j + 1) % numPoints);
+					const idx_d = contourStartVertexCount + (i + 1) * numPoints + j;
+					if (reverseWinding) {
+						indices.push(idx_a, idx_d, idx_c);
+						indices.push(idx_a, idx_c, idx_b);
+					} else {
+						indices.push(idx_a, idx_b, idx_c);
+						indices.push(idx_a, idx_c, idx_d);
 					}
 				}
 			}
-		}
+		};
 
-		// --- Execution (Calling the Defined Helpers) ---
-		if (!close) {
-			addCap(true) // Add the top cap
-			addCap(false) // Add the bottom cap
-		}
+		if (!close) { addCap(true); addCap(false); }
+		extrudeContour(contourPoints, isClockwise(contourPoints));
+		for (const hole of holePoints) { extrudeContour(hole, !isClockwise(hole)); }
 
+		geometry.setIndex(indices);
+		geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+		geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+		geometry.computeVertexNormals();
+		return new THREE.Mesh(geometry, defaultMaterial.clone());
+	};
 
-
-		extrudeContour(contourPoints, isClockwise(contourPoints)) // Extrude main outline
-		for (const hole of holePoints) {
-			extrudeContour(hole, !isClockwise(hole)) // Extrude holes with reversed winding
-		}
-
-		// Finalize Geometry
-		geometry.setIndex(indices)
-		geometry.setAttribute(
-			'position',
-			new THREE.Float32BufferAttribute(vertices, 3)
-		)
-		geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2))
-		geometry.computeVertexNormals()
-
-		return new THREE.Mesh(geometry, defaultMaterial.clone())
-	}
-
-	// 4. Generate Meshes for all extracted Path2d targets
 	for (const path2dInstance of path2dTargets) {
-		const shapeDataArray = path2dInstance.getPoints()
-
+		const shapeDataArray = path2dInstance.getPoints();
 		for (const shapeData of shapeDataArray) {
-			meshes.push(genFromShapeData(shapeData))
+			meshes.push(genFromShapeData(shapeData));
 		}
 	}
-
-	return meshes
+	return meshes;
 }
 
-//
 
+
+
+
+
+
+/**
+ * Creates a 3D swept geometry by extruding a 2D wall profile along a circular/loop path.
+ * This function generates walls with automatic end caps on the top and bottom.
+ * 
+ * @param {Path2d} circularPath - The closed 2D path that defines the sweep trajectory.
+ *   - MUST BE CLOSED: The path should form a complete loop (start point === end point)
+ *   - Defines the circular/loop shape that the wall will follow
+ *   - Example: A circle, rectangle, or any closed polygon
+ *   - The path's fn (tessellation factor) controls the smoothness of curves
+ * 
+ * @param {Path2d} wallPath - The open 2D path that defines the wall's cross-sectional profile.
+ *   - MUST BE OPEN: The path should NOT be closed (start point !== end point)
+ *   - Defines the vertical profile/shape of the wall
+ *   - Typically a vertical line or profile showing the wall's height and thickness
+ *   - The first point should be at the bottom, last point at the top
+ *   - This openness allows the function to create end caps automatically
+ * 
+ * @param {Path2d} [holeWallPath] - Optional open 2D path that defines inner wall/void profile.
+ *   - MUST BE OPEN (if provided): Same requirement as wallPath
+ *   - Defines the inner boundary for hollow walls or cutouts
+ *   - Creates a void/hole inside the main wall structure
+ *   - Should be smaller than and contained within wallPath
+ *   - If undefined or null, the wall will be solid (no holes)
+ * 
+ * @returns {THREE.Mesh[]} An array of Three.js meshes representing:
+ *   - The swept wall geometry (side walls)
+ *   - Top cap mesh (closes the top opening)
+ *   - Bottom cap mesh (closes the bottom opening)
+ *   - Hole wall geometry (if holeWallPath provided)
+ *   - Hole caps (if holeWallPath provided)
+ * 
+ * @throws {Error} If wallPath has invalid bounding box
+ * 
+ * @example
+ * // Create a circular wall (like a cylinder wall)
+ * const circularPath = new Path2d()
+ *   .m(50, 0)
+ *   .n(32)
+ *   .x(0, 0, -50, 0)  // Arc to create circle
+ *   .x(0, 0, 50, 0)
+ *   .fn(32);
+ * 
+ * // Create vertical wall profile (open path)
+ * const wallPath = new Path2d()
+ *   .m(0, 0)    // Start at bottom
+ *   .l(0, 20)   // Go up 20 units
+ *   .fn(2);
+ * 
+ * // Create inner wall profile for hollow section (optional)
+ * const holeWallPath = new Path2d()
+ *   .m(2, 0)    // Start at bottom, inset by 2 units
+ *   .l(2, 20)   // Go up 20 units
+ *   .fn(2);
+ * 
+ * const meshes = sweep3d(circularPath, wallPath, holeWallPath);
+ * 
+ * @caveats
+ * 1. CIRCULAR_PATH MUST BE CLOSED:
+ *    - The circularPath must form a complete loop
+ *    - The start and end points should coincide
+ *    - If not closed, the sweep will not form a complete shape
+ * 
+ * 2. WALL_PATH MUST BE OPEN:
+ *    - The wallPath must NOT be closed
+ *    - This allows the function to create top and bottom end caps
+ *    - If closed, the capping logic will fail or produce incorrect geometry
+ * 
+ * 3. HOLEWALL_PATH MUST BE OPEN (if provided):
+ *    - Same requirement as wallPath
+ *    - Must be open to create proper hole caps
+ * 
+ * 4. PATH ORIENTATION:
+ *    - wallPath should typically go from bottom to top
+ *    - The function may reverse points based on Y-coordinate comparison
+ *    - See code: `if (v2.y < v1.y) return v.reverse()`
+ * 
+ * 5. BOUNDING BOX REQUIREMENTS:
+ *    - wallPath must have a valid bounding box
+ *    - Width and height are used for scaling calculations
+ *    - Defaults to 1 if width/height is 0
+ * 
+ * 6. SCALE INTERPOLATION:
+ *    - The function interpolates scale values (path.s and path.st) along the sweep
+ *    - Null values are automatically interpolated between defined values
+ * 
+ * 7. MATERIAL:
+ *    - All generated meshes use defaultMaterial.clone()
+ *    - To customize materials, modify meshes after creation
+ * 
+ * 8. GEOMETRY MERGING:
+ *    - The function returns union(meshes) at the end
+ *    - This combines all generated parts into unified meshes
+ *    - May affect performance for complex geometries
+ * 
+ * @see Path2d - For creating 2D paths with methods like m(), l(), x(), etc.
+ * @see union - For the final mesh combination operation
+ */
 function sweep3d(circularPath, wallPath, holeWallPath) {
-	// 1. Process the 3D path data
+	let close = false;
 
+	const bboxProfile = boundingBoxPath(wallPath);
+	if (!bboxProfile || !bboxProfile.min || !bboxProfile.max) {
+		console.warn("Invalid bounding box for wallPath in sweep3d");
+		return [];
+	}
+	const bboxPathW = (bboxProfile.max.x - bboxProfile.min.x) || 1;
+	const bboxPathH = (bboxProfile.max.y - bboxProfile.min.y) || 1;
 
-	let close = false
-
-	// 2. Extract all Path2d instances from the target object
-	//var path2dTargets = [wallPath]
-
-	const convertToVector2 = (p) => new THREE.Vector2(p.x, p.y)
+	const convertToVector2 = (p) => new THREE.Vector2(p.x, p.y);
 	var wallPoints = () => {
-		var v= wallPath.getPoints()[0].outerPoints.map(convertToVector2)//.reverse()
-		var v1=v[0];
-		var v2=v[v.length-1];
-		if(v2.y<v1.y) return v.reverse();
+		var v = wallPath.getPoints()[0].outerPoints.map(convertToVector2);
+		var v1 = v[0];
+		var v2 = v[v.length - 1];
+		if (v2.y < v1.y) return v.reverse();
 		return v;
 	};
-
-
 	var holeWallPoints = () => {
-		var v = holeWallPath.getPoints()[0].outerPoints.map(convertToVector2)//.reverse()
-		var v1=v[0];
-		var v2=v[v.length-1];
-		if(v2.y<v1.y) return v.reverse();
+		var v = holeWallPath.getPoints()[0].outerPoints.map(convertToVector2);
+		var v1 = v[0];
+		var v2 = v[v.length - 1];
+		if (v2.y < v1.y) return v.reverse();
 		return v;
 	};
 
+	const meshes = [];
+	var topCapPoints = [];
+	var bottomCapPoints = [];
+	var topHolePointArrays = [];
+	var bottomHolePointArrays = [];
 
-
-
-	const meshes = []
-
-	var topCapPoints = []
-	var bottomCapPoints = []
-	// ⭐ NEW: Arrays to hold 3D points for all hole contours
-	var topHolePointArrays = []
-	var bottomHolePointArrays = []
-
-	// --- Helper function to generate geometry from one ShapeData object ---
 	const genFromShapeData = (path2d, isHole) => {
+		var upVector = new THREE.Vector3(0, 0, 1);
+		var path3dObj = new Path3d().path(path2d);
+		var path = path3dObj.getPoints();
+		const numPoints = path.p.length;
 
-		//shapeData is wall points
-		var upVector = new THREE.Vector3(0, 0, 1)
+		const stScales = Array.from({ length: numPoints }, (_, i) => {
+				const st = path.st && path.st[i];
+				return [
+					(st && st[0] !== null && st[0] !== undefined) ? st[0] / bboxPathW : null,
+					(st && st[1] !== null && st[1] !== undefined) ? st[1] / bboxPathH : null
+				];
+			});
 
-		var path3d = new Path3d().path(path2d)
-		var path = path3d.getPoints()
+		const sScales = Array.from({ length: numPoints }, (_, i) => {
+				const s = path.s && path.s[i];
+				return [
+					(s && s[0] !== null && s[0] !== undefined) ? s[0] : null,
+					(s && s[1] !== null && s[1] !== undefined) ? s[1] : null
+				];
+			});
 
-		const p1 = path.p[0]
-		const p2 = path.p[1]
-		let dx = p2[0] - p1[0]
-		let dy = p2[1] - p1[1]
+		const interpolateScaleArray = (targetArray) => {
+			const len = targetArray.length;
+			if (len === 0) return;
+			const interpolateDim = (dim) => {
+				let firstNonNull = -1;
+				for (let i = 0; i < len; i++) {
+					if (targetArray[i][dim] !== null) {
+						firstNonNull = i;
+						break;
+					}
+				}
+				if (firstNonNull === -1) {
+					for (let i = 0; i < len; i++) targetArray[i][dim] = 1.0;
+					return;
+				}
+				for (let i = 0; i < firstNonNull; i++) {
+					const firstVal = targetArray[firstNonNull][dim];
+					targetArray[i][dim] = 1.0 + (firstVal - 1.0) * (i / firstNonNull);
+				}
+				let lastNonNull = firstNonNull;
+				for (let i = firstNonNull + 1; i < len; i++) {
+					if (targetArray[i][dim] !== null) {
+						const startVal = targetArray[lastNonNull][dim];
+						const endVal = targetArray[i][dim];
+						const steps = i - lastNonNull;
+						for (let j = 1; j < steps; j++) {
+							const t = j / steps;
+							targetArray[lastNonNull + j][dim] = startVal + (endVal - startVal) * t;
+						}
+						lastNonNull = i;
+					}
+				}
+				if (lastNonNull < len - 1) {
+					const startVal = targetArray[lastNonNull][dim];
+					const endVal = 1.0;
+					const steps = len - 1 - lastNonNull;
+					for (let j = 1; j <= steps; j++) {
+						const t = j / steps;
+						targetArray[lastNonNull + j][dim] = startVal + (endVal - startVal) * t;
+					}
+				}
+			};
+			interpolateDim(0);
+			interpolateDim(1);
+		};
 
-		let initialRotationRadians = 0
+		interpolateScaleArray(stScales);
+		interpolateScaleArray(sScales);
 
+		const p1 = path.p[0];
+		const p2 = path.p[1];
+		let dx = p2[0] - p1[0];
+		let dy = p2[1] - p1[1];
+		let initialRotationRadians = 0;
 		if (path.xyInitAng) {
-			initialRotationRadians = Math.atan2(dy, dx) + Math.PI / 2
+			initialRotationRadians = Math.atan2(dy, dx) + Math.PI / 2;
 		} else {
-			initialRotationRadians = Math.PI / 2
+			initialRotationRadians = Math.PI / 2;
 		}
+		const cosR = Math.cos(initialRotationRadians);
+		const sinR = Math.sin(initialRotationRadians);
 
-		//here
-		const cosR = Math.cos(initialRotationRadians)
-		const sinR = Math.sin(initialRotationRadians)
+		var points3d = [];
+		var preCalc = [];
 
-		//calc path stuff
-
-		var points3d = []
-		var preCalc = []
-
-		// 3. Pre-calculate rotations and quaternions for each path segment (Unchanged)
 		for (var i = 0; i < path.p.length; i++) {
-			points3d.push(...[0, 0, i])
-			const rotation = path.r[i]
-			var o = {}
-			o.cosR = Math.cos((rotation / 180) * Math.PI)
-			o.sinR = Math.sin((rotation / 180) * Math.PI)
-			const normal = new THREE.Vector3().fromArray(path.n[i])
-			o.quaternion = new THREE.Quaternion().setFromUnitVectors(
-				upVector,
-				normal
-			)
-			applyQuaternion(upVector, o.quaternion)
-
-			preCalc.push(o)
+			points3d.push(...[0, 0, i]);
+			const rotation = path.r[i];
+			var o = {};
+			o.cosR = Math.cos((rotation / 180) * Math.PI);
+			o.sinR = Math.sin((rotation / 180) * Math.PI);
+			const normal = new THREE.Vector3().fromArray(path.n[i]);
+			o.quaternion = new THREE.Quaternion().setFromUnitVectors(upVector, normal);
+			applyQuaternion(upVector, o.quaternion);
+			preCalc.push(o);
 		}
 
-		/////end cald stuff
-
-		var finalMeshes = []
-
-
-		const segments = points3d.length / 3 - 1
-
-		const convertToVector2 = (p) => new THREE.Vector2(p.x, p.y)
+		var finalMeshes = [];
+		const segments = points3d.length / 3 - 1;
 		let contourPoints;
-
-
-		if(isHole && holeWallPath)	{
-
-			contourPoints=holeWallPoints();
-
+		if (isHole && holeWallPath) {
+			contourPoints = holeWallPoints();
 		} else {
-			contourPoints=wallPoints()
+			contourPoints = wallPoints();
 		}
-		// ⭐ MODIFIED: Convert hole points to THREE.Vector2 arrays
-		//const holeContours = shapeData.holePoints.map(hole => hole.map(convertToVector2));
 
-		// Apply Initial Rotation
 		const rotatePoints = (points) => {
 			for (const point of points) {
-				const x = point.x
-				const y = point.y
-				point.x = x * cosR - y * sinR
-				point.y = x * sinR + y * cosR
+				const x = point.x;
+				const y = point.y;
+				point.x = x * cosR - y * sinR;
+				point.y = x * sinR + y * cosR;
 			}
-		}
+		};
+		rotatePoints(contourPoints);
 
-		// Rotate outer and hole contours
-		rotatePoints(contourPoints)
-		//holeContours.forEach(rotatePoints);
-
-		// Calculation of Final 3D Point with Cumulative Rotation (Unchanged)
 		const calcFinalPoint = (point, i) => {
-			var x = point.x
-			var y = point.y
-			var z = 0
+			var x = point.x;
+			var y = point.y;
+			var z = 0;
 
-			// Apply path.s for scale
-			x = x * path.s[i][0]
-			y = y * path.s[i][1]
+			let scaleX = stScales[i][0] * sScales[i][0];
+			let scaleY = stScales[i][1] * sScales[i][1];
 
-			// Apply 2D rotation (path.r)
-			var o = preCalc[i]
-			let rotatedX = x * o.cosR - y * o.sinR
-			let rotatedY = x * o.sinR + y * o.cosR
-			x = rotatedX
-			y = rotatedY
+			x = x * scaleX;
+			y = y * scaleY;
 
-			const ppoint = new THREE.Vector3(x, y, z)
+			var o = preCalc[i];
+			let rotatedX = x * o.cosR - y * o.sinR;
+			let rotatedY = x * o.sinR + y * o.cosR;
+			x = rotatedX;
+			y = rotatedY;
 
-			// Apply the 3D rotation CUMULATIVELY
+			const ppoint = new THREE.Vector3(x, y, z);
+
 			for (var k = 0; k <= i; k++) {
-				applyQuaternion(ppoint, preCalc[k].quaternion)
+				applyQuaternion(ppoint, preCalc[k].quaternion);
 			}
 
-			// Apply the 3D translation
-			ppoint.x += path.p[i][0]
-			ppoint.y += path.p[i][1]
-			ppoint.z += path.p[i][2]
-			return ppoint
-		}
+			ppoint.x += path.p[i][0];
+			ppoint.y += path.p[i][1];
+			ppoint.z += path.p[i][2];
+			return ppoint;
+		};
 
-		// --- DEFINITION 2: Side Wall Generation (MODIFIED for CAP POINT COLLECTION) ---
-		// Extrude ALL contours (outer and holes) to create the side walls.
 		const extrudeContour = (points, isHole) => {
-			const contourStartVertexCount = 0 //vertexCount
-			const numPoints = points.length
-			const numWallSegments = numPoints - 1
-			const reverseWinding = isHole // Holes need reversed winding for the wall
+			const contourStartVertexCount = 0;
+			const numPoints = points.length;
+			const numWallSegments = numPoints - 1;
+			var r = { vertices: [], indices: [], uvs: [], vertexCount: 0 };
 
-			var r = {
-				vertices: [],
-				indices: [],
-				uvs: [],
-				vertexCount: 0
-			}
-
-			// 1. Calculate total length for U coordinate
-			let contourLength = 0
+			let contourLength = 0;
 			for (let i = 0; i < numWallSegments; i++) {
-				contourLength += points[i].distanceTo(points[i + 1])
+				contourLength += points[i].distanceTo(points[i + 1]);
 			}
 
-			// 2. Generate Vertices and UVs
-			let u_current = 0
-
-			// ⭐ Capture point array reference for the cap points
-			const currentCapPoints = []
-			const currentTopPoints = []
+			let u_current = 0;
+			const currentCapPoints = [];
+			const currentTopPoints = [];
 
 			for (let i = 0; i <= segments; i++) {
-				const v = 1 - i / segments
-				u_current = 0
-
+				const v = 1 - i / segments;
+				u_current = 0;
 				for (let j = 0; j < numPoints; j++) {
-					const point = points[j]
-					var ppoint = calcFinalPoint(point, i)
+					const point = points[j];
+					var ppoint = calcFinalPoint(point, i);
+					r.vertices.push(ppoint.x, ppoint.y, ppoint.z);
+					r.vertexCount++;
 
-					// Add to the WALL geometry vertices
-					r.vertices.push(ppoint.x, ppoint.y, ppoint.z)
-					r.vertexCount++
+					if (j == 0) currentCapPoints.push(ppoint.x, ppoint.y, ppoint.z);
+					if (j == numPoints - 1) currentTopPoints.push(ppoint.x, ppoint.y, ppoint.z);
 
-					// ⭐ Collect 3D points for the Caps
-					if (j == 0) {
-						// At the start of the path (Bottom)
-						currentCapPoints.push(ppoint.x, ppoint.y, ppoint.z)
-					}
-					if (j == numPoints - 1) {
-						// At the end of the path (Top)
-						currentTopPoints.push(ppoint.x, ppoint.y, ppoint.z)
-					}
+					let u_val = u_current / contourLength;
+					if (j === numPoints - 1) u_val = 1.0;
 
-					let u_val = u_current / contourLength
-					if (j === numPoints - 1) {
-						u_val = 1.0
-					}
-					r.uvs.push(u_val, v)
+					r.uvs.push(u_val, v);
 
 					if (j < numWallSegments) {
-						const p1 = points[j]
-						const p2 = points[j + 1]
-						u_current += p1.distanceTo(p2)
+						const p1 = points[j];
+						const p2 = points[j + 1];
+						u_current += p1.distanceTo(p2);
 					}
 				}
 			}
 
-			// ⭐ Store 3D points based on contour type
 			if (isHole) {
-				bottomHolePointArrays.push(currentCapPoints)
-				topHolePointArrays.push(currentTopPoints)
+				bottomHolePointArrays.push(currentCapPoints);
+				topHolePointArrays.push(currentTopPoints);
 			} else {
-				// This is the outer contour
-				bottomCapPoints.push(...currentCapPoints)
-				topCapPoints.push(...currentTopPoints)
+				bottomCapPoints.push(...currentCapPoints);
+				topCapPoints.push(...currentTopPoints);
 			}
 
-			// 3. Generate Indices (Faces)
 			for (let i = 0; i < segments; i++) {
-				// Loop only up to numWallSegments to prevent closing
 				for (let j = 0; j < numWallSegments; j++) {
-					const idx_a = contourStartVertexCount + i * numPoints + j
-					const idx_b =
-					contourStartVertexCount + i * numPoints + (j + 1)
-					const idx_c =
-					contourStartVertexCount + (i + 1) * numPoints + (j + 1)
-					const idx_d =
-					contourStartVertexCount + (i + 1) * numPoints + j
-
-					//if (!reverseWinding) {
-					//r.indices.push(idx_a, idx_d, idx_c)
-					//r.indices.push(idx_a, idx_c, idx_b)
-					//} else {
-					// Reverse winding for holes
-					r.indices.push(idx_a, idx_b, idx_c)
-					r.indices.push(idx_a, idx_c, idx_d)
-					//}
+					const idx_a = contourStartVertexCount + i * numPoints + j;
+					const idx_b = contourStartVertexCount + i * numPoints + (j + 1);
+					const idx_c = contourStartVertexCount + (i + 1) * numPoints + (j + 1);
+					const idx_d = contourStartVertexCount + (i + 1) * numPoints + j;
+					r.indices.push(idx_a, idx_b, idx_c);
+					r.indices.push(idx_a, idx_c, idx_d);
 				}
 			}
-			return r
-		}
+			return r;
+		};
 
-		//here1
-		// --- Execution ---
-
-		// 1. Generate all vertices and wall indices for the outer contour
-		finalMeshes.push(extrudeContour(contourPoints, isHole))
-
-		// 2. Generate all vertices and wall indices for the hole contours
+		finalMeshes.push(extrudeContour(contourPoints, isHole));
 
 		for (var i = 0; i < finalMeshes.length; i++) {
-			var geometry = new THREE.BufferGeometry()
-			geometry.setIndex(finalMeshes[i].indices)
-			geometry.setAttribute(
-				'position',
-				new THREE.Float32BufferAttribute(finalMeshes[i].vertices, 3)
-			)
-			geometry.setAttribute(
-				'uv',
-				new THREE.Float32BufferAttribute(finalMeshes[i].uvs, 2)
-			)
-			geometry.computeVertexNormals()
-
-			// Create the Wall Mesh
-			const wallMesh = new THREE.Mesh(geometry, defaultMaterial.clone())
-			meshes.push(wallMesh)
+			var geometry = new THREE.BufferGeometry();
+			geometry.setIndex(finalMeshes[i].indices);
+			geometry.setAttribute('position', new THREE.Float32BufferAttribute(finalMeshes[i].vertices, 3));
+			geometry.setAttribute('uv', new THREE.Float32BufferAttribute(finalMeshes[i].uvs, 2));
+			geometry.computeVertexNormals();
+			const wallMesh = new THREE.Mesh(geometry, defaultMaterial.clone());
+			meshes.push(wallMesh);
 		}
+	};
 
-
-	}
-
-	// ⭐ MODIFIED: Helper function to create cap geometry (handles holes)
-	const createCapGeometry = (
-		outer3DPoints,
-		hole3DPointArrays,
-		isBottomCap
-	) => {
-		if (outer3DPoints.length === 0) return null
-
-		// 1. Extract 3D Vector points and find the planar projection (e.g., on XY plane)
-		let minX = Infinity,
-		minY = Infinity,
-		maxX = -Infinity,
-		maxY = -Infinity
-		var contour3DPoints = []
-		var projected2DPoints = [] // Outer contour for THREE.Shape
-
-		// Process Outer Contour
-		for (let i = 0; i < outer3DPoints.length; i += 3) {
-			var x = outer3DPoints[i]
-			var y = outer3DPoints[i + 1]
-			var z = outer3DPoints[i + 2]
-			var v3 = new THREE.Vector3(x, y, z)
-			contour3DPoints.push(v3)
-
-			projected2DPoints.push(new THREE.Vector2(x, y))
-
-			minX = Math.min(minX, x)
-			minY = Math.min(minY, y)
-			maxX = Math.max(maxX, x)
-			maxY = Math.max(maxY, y)
-		}
-
-		// Process Hole Contours (needed for THREE.ShapeUtils.triangulateShape)
-		const projectedHoles2D = []
-
-		for (var hole3DPoints of hole3DPointArrays) {
-			var hole2DPoints = []
-			for (let i = 0; i < hole3DPoints.length; i += 3) {
-				var x = hole3DPoints[i]
-				var y = hole3DPoints[i + 1]
-				var z = hole3DPoints[i + 2]
-				var v3 = new THREE.Vector3(x, y, z)
-
-				// Add hole 3D point to the main vertex array
-				contour3DPoints.push(v3)
-
-				hole2DPoints.push(new THREE.Vector2(x, y))
-			}
-			projectedHoles2D.push(hole2DPoints)
-		}
-
-		let width = maxX - minX
-		let height = maxY - minY
-
-		// Handle zero width/height case for UVs
-		if (width === 0) {
-			maxX += 1
-			width = 1
-		}
-		if (height === 0) {
-			maxY += 1
-			height = 1
-		}
-
-		// 2. Triangulate the 2D Shape - PASSING THE HOLES ARRAY
-		var triangles = THREE.ShapeUtils.triangulateShape(
-			projected2DPoints,
-			projectedHoles2D // <--- Pass 2D hole contours for triangulation
-		)
-
-		// 3. Setup Final Vertices, Indices, and UVs arrays
-		var capVerticesFinal = []
-		var capIndices = []
-		var capUVs = []
-
-		// Add all 3D contour (outer and holes) vertices to the final array
-		for (const v of contour3DPoints) {
-			capVerticesFinal.push(v.x, v.y, v.z)
-
-			// Simple planar UV mapping (using World X/Y)
-			capUVs.push((v.x - minX) / width, (v.y - minY) / height)
-		}
-
-		// 4. Generate Indices from the Triangulation result
-		for (const triangle of triangles) {
-			// The indices from triangulateShape refer to the indices in contour3DPoints.
-			var idx0 = triangle[0]
-			var idx1 = triangle[1]
-			var idx2 = triangle[2]
-
-			if (!isBottomCap) {
-				// Reverse winding for the bottom cap
-				capIndices.push(idx0, idx2, idx1)
-			} else {
-				// Standard winding for the top cap
-				capIndices.push(idx0, idx1, idx2)
-			}
-		}
-
-		var capGeom = new THREE.BufferGeometry()
-		capGeom.setIndex(capIndices)
-		capGeom.setAttribute(
-			'position',
-			new THREE.Float32BufferAttribute(capVerticesFinal, 3)
-		)
-		capGeom.setAttribute('uv', new THREE.Float32BufferAttribute(capUVs, 2))
-		capGeom.computeVertexNormals()
-
-		// NOTE: 'defaultMaterial' must be defined and available in the scope.
-		return new THREE.Mesh(capGeom, defaultMaterial.clone())
-	}
-
-	// 4. Generate Meshes for all extracted Path2d targets (Unchanged)
-
-	var cirPaths = circularPath.getPoints()
-	//jlog("cirPaths",cirPaths)
-
+	var cirPaths = circularPath.getPoints();
 	for (var v = 0; v < cirPaths.length; v++) {
-		var lpath = []
-		var apath = cirPaths[v].outerPoints
-		//jlog("aparh",apath)
+		var lpath = [];
+		var apath = cirPaths[v].outerPoints;
 		for (var i = 0; i < apath.length; i++) {
-			if (i == 0) {
-				lpath.push('m', apath[i].x, apath[i].y)
-				//jlog('apath[i]', apath[i])
-			} else {
-				lpath.push('l', apath[i].x, apath[i].y)
-			}
+			if (i == 0) lpath.push('m', apath[i].x, apath[i].y);
+			else lpath.push('l', apath[i].x, apath[i].y);
 		}
-		var fpath = new Path2d().path(lpath).fn(circularPath._fn)
+		var fpath = new Path2d().path(lpath).fn(circularPath._fn);
+		genFromShapeData(fpath, false);
 
-		genFromShapeData(fpath, false)
-
-		var hpaths = cirPaths[v].holePoints
+		var hpaths = cirPaths[v].holePoints;
 		for (var j = 0; j < hpaths.length; j++) {
-			lpath = []
-			apath = hpaths[j]
+			lpath = [];
+			apath = hpaths[j];
 			for (var i = 0; i < apath.length; i++) {
-				if (i == 0) {
-					lpath.push('m', apath[i].x, apath[i].y)
-					//jlog('apath[i]', apath[i])
-				} else {
-					lpath.push('l', apath[i].x, apath[i].y)
-				}
+				if (i == 0) lpath.push('m', apath[i].x, apath[i].y);
+				else lpath.push('l', apath[i].x, apath[i].y);
 			}
-			fpath = new Path2d().path(lpath).fn(circularPath._fn)
-
-			genFromShapeData(fpath, true)
+			fpath = new Path2d().path(lpath).fn(circularPath._fn);
+			genFromShapeData(fpath, true);
 		}
 	}
 
+	const createCapGeometry = (outer3DPoints, hole3DPointArrays, isBottomCap) => {
+		if (outer3DPoints.length === 0) return null;
+		let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+		var contour3DPoints = [];
+		var projected2DPoints = [];
 
-	// TOP CAP (Pass outer points and hole arrays)
-	const topCapMesh = createCapGeometry(topCapPoints, topHolePointArrays, true); // isBottomCap = false
+		for (let i = 0; i < outer3DPoints.length; i += 3) {
+			var x = outer3DPoints[i];
+			var y = outer3DPoints[i + 1];
+			var z = outer3DPoints[i + 2];
+			var v3 = new THREE.Vector3(x, y, z);
+			contour3DPoints.push(v3);
+			projected2DPoints.push(new THREE.Vector2(x, y));
+			minX = Math.min(minX, x);
+			minY = Math.min(minY, y);
+			maxX = Math.max(maxX, x);
+			maxY = Math.max(maxY, y);
+		}
+
+		const projectedHoles2D = [];
+		for (var hole3DPoints of hole3DPointArrays) {
+			var hole2DPoints = [];
+			for (let i = 0; i < hole3DPoints.length; i += 3) {
+				var x = hole3DPoints[i];
+				var y = hole3DPoints[i + 1];
+				var z = hole3DPoints[i + 2];
+				var v3 = new THREE.Vector3(x, y, z);
+				contour3DPoints.push(v3);
+				hole2DPoints.push(new THREE.Vector2(x, y));
+			}
+			projectedHoles2D.push(hole2DPoints);
+		}
+
+		let width = maxX - minX;
+		let height = maxY - minY;
+		if (width === 0) { maxX += 1; width = 1; }
+		if (height === 0) { maxY += 1; height = 1; }
+
+		var triangles = THREE.ShapeUtils.triangulateShape(projected2DPoints, projectedHoles2D);
+		var capVerticesFinal = [];
+		var capIndices = [];
+		var capUVs = [];
+
+		for (const v of contour3DPoints) {
+			capVerticesFinal.push(v.x, v.y, v.z);
+			capUVs.push((v.x - minX) / width, (v.y - minY) / height);
+		}
+
+		for (const triangle of triangles) {
+			var idx0 = triangle[0];
+			var idx1 = triangle[1];
+			var idx2 = triangle[2];
+			if (!isBottomCap) {
+				capIndices.push(idx0, idx2, idx1);
+			} else {
+				capIndices.push(idx0, idx1, idx2);
+			}
+		}
+
+		var capGeom = new THREE.BufferGeometry();
+		capGeom.setIndex(capIndices);
+		capGeom.setAttribute('position', new THREE.Float32BufferAttribute(capVerticesFinal, 3));
+		capGeom.setAttribute('uv', new THREE.Float32BufferAttribute(capUVs, 2));
+		capGeom.computeVertexNormals();
+		return new THREE.Mesh(capGeom, defaultMaterial.clone());
+	};
+
+	const topCapMesh = createCapGeometry(topCapPoints, topHolePointArrays, true);
 	if (topCapMesh) { meshes.push(topCapMesh); }
 
-	// BOTTOM CAP (Pass outer points and hole arrays)
-	const bottomCapMesh = createCapGeometry(bottomCapPoints, bottomHolePointArrays, false); // isBottomCap = true (reversed winding)
+	const bottomCapMesh = createCapGeometry(bottomCapPoints, bottomHolePointArrays, false);
 	if (bottomCapMesh) { meshes.push(bottomCapMesh); }
 
-
-	return union( meshes)
+	return union(meshes);
 }
 
 //*/
@@ -4849,59 +4695,78 @@ function boundingBox(...target) {
 }
 
 /**
- * Calculates the bounding box of a path by first flattening curves
- * into line segments using path2d.
- * * @param {object} pathObject - An object with {path: Array, fn: number}.
- * @returns {object} An object containing the min and max {x, y} coordinates.
- */
-function boundingBoxPath(pathObject) {
-	// 1. Flatten the path using path2d to ensure all segments are 'm' or 'l'
-	const { path: flattenedPath } = path2d(pathObject)
+Calculates the collective bounding box of path(s).
+Works with:
+- A single Path2d instance
+- An array of Path2d instances
+- An object containing Path2d instances (recursively searched)
+- Legacy path object { path: Array, fn: number }
+@param {any} target - The path object(s) to evaluate.
+@returns {object} An object containing the collective min and max {x, y} coordinates.
+*/
+function boundingBoxPath(target) {
+	let minX = Infinity;
+	let minY = Infinity;
+	let maxX = -Infinity;
+	let maxY = -Infinity;
+	let found = false;
 
-	// Initialize min/max values
-	let minX = Infinity
-	let minY = Infinity
-	let maxX = -Infinity
-	let maxY = -Infinity
+	const updateBox = (box) => {
+		if (box && box.min && box.max) {
+			minX = Math.min(minX, box.min.x);
+			minY = Math.min(minY, box.min.y);
+			maxX = Math.max(maxX, box.max.x);
+			maxY = Math.max(maxY, box.max.y);
+			found = true;
+		}
+	};
 
-	// 2. Iterate through the flattened path
-	let i = 0
-	while (i < flattenedPath.length) {
-		const command = flattenedPath[i]
-		i++
+	// Helper to check if item is a Path2d instance
+	const isPath2d = (item) => item && item instanceof Path2d;
 
-		if (command === 'm' || command === 'l') {
-			const x = flattenedPath[i]
-			const y = flattenedPath[i + 1]
+	// Use applyFilter to recursively find all Path2d instances in the target
+	applyFilter(target, isPath2d, (item) => {
+			const box = item.boundingBox(); // Path2d has a built-in boundingBox() method
+			updateBox(box);
+		});
 
-			// Update min/max
-			minX = Math.min(minX, x)
-			minY = Math.min(minY, y)
-			maxX = Math.max(maxX, x)
-			maxY = Math.max(maxY, y)
-
-			i += 2
-		} else if (command === 'n' || command === 'r' || command === 's') {
-			// Skip non-coordinate commands (n: 1 arg, r: 1 arg, s: 2 args)
-			const numArgs =
-			command === 'n' || command === 'r' ? 1 : command === 's' ? 2 : 0
-			i += numArgs
-		} else {
-			// Since path2d should only return 'm', 'l', 'n', 'r', 's',
-			// any other command here is an error or a command with arguments
-			// that path2d failed to remove/flatten.
-			// In a robust implementation, you might log a warning or handle
-			// the coordinate counts for the original commands (e.g., q, c, x).
-			// For this design, we trust path2d.
-			break
+	// Fallback for legacy {path: Array, fn: number} format if no Path2d instances are found
+	if (!found && target && Array.isArray(target.path)) {
+		const { path: flattenedPath } = path2d(target);
+		let i = 0;
+		while (i < flattenedPath.length) {
+			const command = flattenedPath[i];
+			i++;
+			if (command === 'm' || command === 'l') {
+				const x = flattenedPath[i];
+				const y = flattenedPath[i + 1];
+				minX = Math.min(minX, x);
+				minY = Math.min(minY, y);
+				maxX = Math.max(maxX, x);
+				maxY = Math.max(maxY, y);
+				found = true;
+				i += 2;
+			} else if (command === 'n' || command === 'r' || command === 's') {
+				const numArgs = command === 'n' || command === 'r' ? 1 : command === 's' ? 2 : 0;
+				i += numArgs;
+			} else {
+				break;
+			}
 		}
 	}
 
-	// 3. Return the bounding box object
+	// Return a default empty box if nothing was found
+	if (!found) {
+		return {
+			min: { x: 0, y: 0 },
+			max: { x: 0, y: 0 }
+		};
+	}
+
 	return {
 		min: { x: minX, y: minY },
 		max: { x: maxX, y: maxY }
-	}
+	};
 }
 
 // Function definitions for 'boundingBox', 'align', 'translate', and 'applyToMesh'
@@ -6204,345 +6069,376 @@ function cloneGeometryData(sourceGeometry) {
 }
 
 /**
- * Imports an SVG file and returns an array of Path2d objects.
- * Supports: <path>, <circle>, <rect>, <ellipse>, <line>, <polygon>, <polyline>
- * 
- * @param {string} filePath - The path to the SVG file.
- * @returns {Promise<Path2d[]>} A Promise resolving to an array of Path2d objects.
- */
+* Imports an SVG file and returns an array of Path2d objects.
+* Supports: <path>, <circle>, <rect>, <ellipse>, <line>, <polygon>, <polyline>
+*
+* @param {string} filePath - The path to the SVG file.
+* @returns {Promise<Path2d[]>} A Promise resolving to an array of Path2d objects.
+*/
 async function importSvg(filePath) {
-	try {
-		const text = await api.readFile($path(filePath))
-		const parser = new DOMParser()
-		const svgDoc = parser.parseFromString(text, 'image/svg+xml')
+    try {
+        // 1. Safely read and decode the file to a string
+        const buffer = await api.readFileBinary($path(filePath))
+        const text = new TextDecoder().decode(buffer)
+        
+        const parser = new DOMParser()
+        const svgDoc = parser.parseFromString(text, 'image/svg+xml')
+        const path2dObjects = []
+        const fn = 32 // Default tessellation factor for curves
 
-		const path2dObjects = []
-		const fn = 32 // Default tessellation factor for curves
+        // --- ROBUST SVG PATH PARSER ---
+        const parsePathData = (d) => {
+            if (!d) return []
+            const path = []
 
-		// Helper: Parse SVG path 'd' attribute to Path2d format
-		const parsePathData = (d) => {
-			if (!d) return []
-			const path = []
-			// Normalize: add spaces before commands for easier parsing
-			const normalized = d.replace(/([A-Za-z])/g, ' $1 ').replace(/\s+/g, ' ').trim()
-			const tokens = normalized.split(' ')
+            // Robust Tokenization: handles commas, negative numbers, and implicit commands
+            const normalized = d
+                .replace(/([A-Za-z])/g, ' $1 ')      // Isolate command letters
+                .replace(/,/g, ' ')                  // Replace commas with spaces
+                .replace(/([0-9])([+-])/g, '$1 $2')  // Separate numbers from negative signs
+                .replace(/\s+/g, ' ')                // Collapse multiple spaces
+                .trim()
 
-			let i = 0
-			let lastCommand = null
-			let lastControlPoint = null // For S/T smooth commands
+            const tokens = normalized.split(' ')
+            let i = 0
+            let lastCommand = ''
+            let lastControlPoint = null
 
-			while (i < tokens.length) {
-				const cmd = tokens[i]
-				if (!cmd.match(/[A-Za-z]/)) {
-					i++
-					continue
-				}
+            const getNum = () => {
+                while (i < tokens.length && !tokens[i].match(/^-?[0-9.]/)) i++
+                if (i >= tokens.length) return 0
+                return parseFloat(tokens[i++])
+            }
 
-				const isRelative = cmd === cmd.toLowerCase()
-				const cmdUpper = cmd.toUpperCase()
-				i++
+            const getNums = (n) => {
+                const nums = []
+                for (let j = 0; j < n; j++) nums.push(getNum())
+                return nums
+            }
 
-				const getNum = () => parseFloat(tokens[i++])
-				const getNums = (n) => {
-					const nums = []
-					for (let j = 0; j < n; j++) nums.push(getNum())
-					return nums
-				}
+            while (i < tokens.length) {
+                let cmd = tokens[i]
 
-				switch (cmdUpper) {
-					case 'M': { // MoveTo
-						const [x, y] = getNums(2)
-						path.push(isRelative ? 'mr' : 'm', x, y)
-						lastCommand = 'M'
-						break
-					}
-					case 'L': { // LineTo
-						const [x, y] = getNums(2)
-						path.push(isRelative ? 'lr' : 'l', x, y)
-						lastCommand = 'L'
-						break
-					}
-					case 'H': { // Horizontal LineTo
-						const [x] = getNums(1)
-						path.push(isRelative ? 'lr' : 'l', x, 0)
-						lastCommand = 'H'
-						break
-					}
-					case 'V': { // Vertical LineTo
-						const [y] = getNums(1)
-						path.push(isRelative ? 'lr' : 'l', 0, y)
-						lastCommand = 'V'
-						break
-					}
-					case 'C': { // Cubic Bezier
-						const [cp1x, cp1y, cp2x, cp2y, x, y] = getNums(6)
-						path.push(isRelative ? 'cr' : 'c', cp1x, cp1y, cp2x, cp2y, x, y)
-						lastControlPoint = [cp2x, cp2y]
-						lastCommand = 'C'
-						break
-					}
-					case 'S': { // Smooth Cubic Bezier
-						const [cp2x, cp2y, x, y] = getNums(4)
-						// Reflect last control point if previous was C or S
-						let cp1x = 0, cp1y = 0
-						if (lastCommand === 'C' || lastCommand === 'S') {
-							// Would need current position to properly reflect
-							// Simplified: use 0,0 as first control point
-						}
-						path.push(isRelative ? 'cr' : 'c', cp1x, cp1y, cp2x, cp2y, x, y)
-						lastControlPoint = [cp2x, cp2y]
-						lastCommand = 'S'
-						break
-					}
-					case 'Q': { // Quadratic Bezier
-						const [cpx, cpy, x, y] = getNums(4)
-						path.push(isRelative ? 'qr' : 'q', cpx, cpy, x, y)
-						lastControlPoint = [cpx, cpy]
-						lastCommand = 'Q'
-						break
-					}
-					case 'T': { // Smooth Quadratic Bezier
-						const [x, y] = getNums(2)
-						let cpx = 0, cpy = 0
-						if (lastCommand === 'Q' || lastCommand === 'T') {
-							// Reflect last control point (simplified)
-						}
-						path.push(isRelative ? 'qr' : 'q', cpx, cpy, x, y)
-						lastCommand = 'T'
-						break
-					}
-					case 'A': { // Elliptical Arc
-						const [rx, ry, xAxisRot, largeArc, sweep, x, y] = getNums(7)
-						// Convert arc to cubic bezier approximation (simplified)
-						// For full arc support, use the existing arc segmentation logic
-						path.push(isRelative ? 'xr' : 'x', x, y, x, y) // Placeholder
-						lastCommand = 'A'
-						break
-					}
-					case 'Z': // ClosePath
-					path.push('n', 1) // Mark segment count
-					lastCommand = 'Z'
-					break
-				}
-			}
-			return path
-		}
+                // Check if current token is a command letter
+                if (cmd.match(/^[A-Za-z]$/)) {
+                    lastCommand = cmd
+                    i++
+                } else {
+                    // Handle implicit command repetition (e.g., M 0 0 L 10 10 20 20)
+                    if (lastCommand === 'M') lastCommand = 'L'
+                    if (lastCommand === 'm') lastCommand = 'l'
+                    cmd = lastCommand
+                }
 
-		// Helper: Convert shape elements to path data
-		const convertElementToPath = (element) => {
-			const tagName = element.tagName.toLowerCase()
-			let pathData = []
+                const isRelative = cmd === cmd.toLowerCase()
+                const cmdUpper = cmd.toUpperCase()
 
-			switch (tagName) {
-				case 'path': {
-					const d = element.getAttribute('d')
-					pathData = parsePathData(d)
-					break
-				}
-				case 'circle': {
-					const cx = parseFloat(element.getAttribute('cx')) || 0
-					const cy = parseFloat(element.getAttribute('cy')) || 0
-					const r = parseFloat(element.getAttribute('r')) || 0
-					// Create circle as 4 cubic bezier curves
-					const k = 0.5522847498 // Magic number for circle approximation
-					pathData = [
-						'm', cx + r, cy,
-						'c', cx + r, cy + r * k, cx + r * k, cy + r, cx, cy + r,
-						'c', cx - r * k, cy + r, cx - r, cy + r * k, cx - r, cy,
-						'c', cx - r, cy - r * k, cx - r * k, cy - r, cx, cy - r,
-						'c', cx + r * k, cy - r, cx + r, cy - r * k, cx + r, cy
-					]
-					break
-				}
-				case 'ellipse': {
-					const cx = parseFloat(element.getAttribute('cx')) || 0
-					const cy = parseFloat(element.getAttribute('cy')) || 0
-					const rx = parseFloat(element.getAttribute('rx')) || 0
-					const ry = parseFloat(element.getAttribute('ry')) || 0
-					const k = 0.5522847498
-					pathData = [
-						'm', cx + rx, cy,
-						'c', cx + rx, cy + ry * k, cx + rx * k, cy + ry, cx, cy + ry,
-						'c', cx - rx * k, cy + ry, cx - rx, cy + ry * k, cx - rx, cy,
-						'c', cx - rx, cy - ry * k, cx - rx * k, cy - ry, cx, cy - ry,
-						'c', cx + rx * k, cy - ry, cx + rx, cy - ry * k, cx + rx, cy
-					]
-					break
-				}
-				case 'rect': {
-					const x = parseFloat(element.getAttribute('x')) || 0
-					const y = parseFloat(element.getAttribute('y')) || 0
-					const w = parseFloat(element.getAttribute('width')) || 0
-					const h = parseFloat(element.getAttribute('height')) || 0
-					const rx = parseFloat(element.getAttribute('rx')) || 0
-					const ry = parseFloat(element.getAttribute('ry')) || rx
-					if (rx > 0 || ry > 0) {
-						// Rounded rectangle
-						const k = 0.5522847498
-						pathData = [
-							'm', x + rx, y,
-							'l', x + w - rx, y,
-							'c', x + w, y, x + w, y + ry * k, x + w, y + ry,
-							'l', x + w, y + h - ry,
-							'c', x + w, y + h, x + w - rx * k, y + h, x + w - rx, y + h,
-							'l', x + rx, y + h,
-							'c', x, y + h, x, y + h - ry * k, x, y + h - ry,
-							'l', x, y + ry,
-							'c', x, y, x + rx * k, y, x + rx, y
-						]
-					} else {
-						pathData = [
-							'm', x, y,
-							'l', x + w, y,
-							'l', x + w, y + h,
-							'l', x, y + h,
-							'l', x, y
-						]
-					}
-					break
-				}
-				case 'line': {
-					const x1 = parseFloat(element.getAttribute('x1')) || 0
-					const y1 = parseFloat(element.getAttribute('y1')) || 0
-					const x2 = parseFloat(element.getAttribute('x2')) || 0
-					const y2 = parseFloat(element.getAttribute('y2')) || 0
-					pathData = ['m', x1, y1, 'l', x2, y2]
-					break
-				}
-				case 'polygon':
-				case 'polyline': {
-					const points = element.getAttribute('points')
-					if (points) {
-						const pointPairs = points.trim().split(/[\s,]+/).map(parseFloat)
-						if (pointPairs.length >= 2) {
-							pathData = ['m', pointPairs[0], pointPairs[1]]
-							for (let i = 2; i < pointPairs.length; i += 2) {
-								pathData.push('l', pointPairs[i], pointPairs[i + 1])
-							}
-							if (tagName === 'polygon') {
-								pathData.push('l', pointPairs[0], pointPairs[1]) // Close
-							}
-						}
-					}
-					break
-				}
-			}
-			return pathData
-		}
+                switch (cmdUpper) {
+                    case 'M': {
+                        const [x, y] = getNums(2)
+                        path.push(isRelative ? 'mr' : 'm', x, y)
+                        lastCommand = isRelative ? 'l' : 'L'
+                        break
+                    }
+                    case 'L': {
+                        const [x, y] = getNums(2)
+                        path.push(isRelative ? 'lr' : 'l', x, y)
+                        break
+                    }
+                    case 'H': {
+                        const [x] = getNums(1)
+                        path.push(isRelative ? 'lr' : 'l', x, 0)
+                        break
+                    }
+                    case 'V': {
+                        const [y] = getNums(1)
+                        path.push(isRelative ? 'lr' : 'l', 0, y)
+                        break
+                    }
+                    case 'C': {
+                        const [cp1x, cp1y, cp2x, cp2y, x, y] = getNums(6)
+                        path.push(isRelative ? 'cr' : 'c', cp1x, cp1y, cp2x, cp2y, x, y)
+                        lastControlPoint = [cp2x, cp2y]
+                        break
+                    }
+                    case 'S': {
+                        const [cp2x, cp2y, x, y] = getNums(4)
+                        let cp1x = cp2x, cp1y = cp2y
+                        path.push(isRelative ? 'cr' : 'c', cp1x, cp1y, cp2x, cp2y, x, y)
+                        lastControlPoint = [cp2x, cp2y]
+                        break
+                    }
+                    case 'Q': {
+                        const [cpx, cpy, x, y] = getNums(4)
+                        path.push(isRelative ? 'qr' : 'q', cpx, cpy, x, y)
+                        lastControlPoint = [cpx, cpy]
+                        break
+                    }
+                    case 'T': {
+                        const [x, y] = getNums(2)
+                        let cpx = lastControlPoint ? lastControlPoint[0] : 0
+                        let cpy = lastControlPoint ? lastControlPoint[1] : 0
+                        path.push(isRelative ? 'qr' : 'q', cpx, cpy, x, y)
+                        break
+                    }
+                    case 'A': {
+                        const [rx, ry, xAxisRot, largeArc, sweep, x, y] = getNums(7)
+                        path.push(isRelative ? 'lr' : 'l', x, y)
+                        break
+                    }
+                    case 'Z': {
+                        break
+                    }
+                }
+            }
+            return path
+        }
 
-		// Process all path-containing elements
-		const svgElements = svgDoc.querySelectorAll('path, circle, rect, ellipse, line, polygon, polyline')
+        // --- ELEMENT CONVERTER ---
+        const convertElementToPath = (element) => {
+            const tagName = element.tagName.toLowerCase()
+            let pathData = []
 
-		svgElements.forEach((element) => {
-				const pathData = convertElementToPath(element)
-				if (pathData.length > 0) {
-					const path2d = new Path2d().path(pathData).fn(fn)
-					path2dObjects.push(path2d)
-				}
-			})
+            switch (tagName) {
+                case 'path': {
+                    const d = element.getAttribute('d')
+                    pathData = parsePathData(d)
+                    break
+                }
+                case 'circle': {
+                    const cx = parseFloat(element.getAttribute('cx')) || 0
+                    const cy = parseFloat(element.getAttribute('cy')) || 0
+                    const r = parseFloat(element.getAttribute('r')) || 0
+                    const k = 0.5522847498
+                    pathData = [
+                        'm', cx + r, cy,
+                        'c', cx + r, cy + r * k, cx + r * k, cy + r, cx, cy + r,
+                        'c', cx - r * k, cy + r, cx - r, cy + r * k, cx - r, cy,
+                        'c', cx - r, cy - r * k, cx - r * k, cy - r, cx, cy - r,
+                        'c', cx + r * k, cy - r, cx + r, cy - r * k, cx + r, cy
+                    ]
+                    break
+                }
+                case 'ellipse': {
+                    const cx = parseFloat(element.getAttribute('cx')) || 0
+                    const cy = parseFloat(element.getAttribute('cy')) || 0
+                    const rx = parseFloat(element.getAttribute('rx')) || 0
+                    const ry = parseFloat(element.getAttribute('ry')) || 0
+                    const k = 0.5522847498
+                    pathData = [
+                        'm', cx + rx, cy,
+                        'c', cx + rx, cy + ry * k, cx + rx * k, cy + ry, cx, cy + ry,
+                        'c', cx - rx * k, cy + ry, cx - rx, cy + ry * k, cx - rx, cy,
+                        'c', cx - rx, cy - ry * k, cx - rx * k, cy - ry, cx, cy - ry,
+                        'c', cx + rx * k, cy - ry, cx + rx, cy - ry * k, cx + rx, cy
+                    ]
+                    break
+                }
+                case 'rect': {
+                    const x = parseFloat(element.getAttribute('x')) || 0
+                    const y = parseFloat(element.getAttribute('y')) || 0
+                    const w = parseFloat(element.getAttribute('width')) || 0
+                    const h = parseFloat(element.getAttribute('height')) || 0
+                    const rx = parseFloat(element.getAttribute('rx')) || 0
+                    const ry = parseFloat(element.getAttribute('ry')) || rx
+                    
+                    if (rx > 0 || ry > 0) {
+                        const k = 0.5522847498
+                        pathData = [
+                            'm', x + rx, y,
+                            'l', x + w - rx, y,
+                            'c', x + w, y, x + w, y + ry * k, x + w, y + ry,
+                            'l', x + w, y + h - ry,
+                            'c', x + w, y + h, x + w - rx * k, y + h, x + w - rx, y + h,
+                            'l', x + rx, y + h,
+                            'c', x, y + h, x, y + h - ry * k, x, y + h - ry,
+                            'l', x, y + ry,
+                            'c', x, y, x + rx * k, y, x + rx, y
+                        ]
+                    } else {
+                        pathData = [
+                            'm', x, y,
+                            'l', x + w, y,
+                            'l', x + w, y + h,
+                            'l', x, y + h,
+                            'l', x, y
+                        ]
+                    }
+                    break
+                }
+                case 'line': {
+                    const x1 = parseFloat(element.getAttribute('x1')) || 0
+                    const y1 = parseFloat(element.getAttribute('y1')) || 0
+                    const x2 = parseFloat(element.getAttribute('x2')) || 0
+                    const y2 = parseFloat(element.getAttribute('y2')) || 0
+                    pathData = ['m', x1, y1, 'l', x2, y2]
+                    break
+                }
+                case 'polygon':
+                case 'polyline': {
+                    const points = element.getAttribute('points')
+                    if (points) {
+                        const pointPairs = points.trim().split(/[\s,]+/).map(parseFloat)
+                        if (pointPairs.length >= 2) {
+                            pathData = ['m', pointPairs[0], pointPairs[1]]
+                            for (let i = 2; i < pointPairs.length; i += 2) {
+                                pathData.push('l', pointPairs[i], pointPairs[i + 1])
+                            }
+                            if (tagName === 'polygon') {
+                                pathData.push('l', pointPairs[0], pointPairs[1])
+                            }
+                        }
+                    }
+                    break
+                }
+            }
+            return pathData
+        }
 
-		PrintLog(`Successfully loaded SVG from ${filePath}, found ${path2dObjects.length} path(s)`)
-		return path2dObjects
+        // Process all path-containing elements
+        const svgElements = svgDoc.querySelectorAll('path, circle, rect, ellipse, line, polygon, polyline')
+        
+        svgElements.forEach((element) => {
+            const pathData = convertElementToPath(element)
+            if (pathData.length > 0) {
+                const path2d = new Path2d().path(pathData).fn(fn)
+                path2dObjects.push(path2d)
+            }
+        })
 
-	} catch (error) {
-		PrintError('SVG loading error:', error)
-		throw error
-	}
+        if (typeof PrintLog !== 'undefined') PrintLog(`Successfully loaded SVG from ${filePath}, found ${path2dObjects.length} path(s)`)
+        else console.log(`Successfully loaded SVG from ${filePath}, found ${path2dObjects.length} path(s)`)
+        
+        return path2dObjects
+    } catch (error) {
+        if (typeof PrintError !== 'undefined') PrintError('SVG loading error:', error)
+        else console.error('SVG loading error:', error)
+        throw error
+    }
 }
 
 /**
- * Recursively deep clones a THREE.js object.
- * (Modified to use targeted geometry cloning)
+ * Recursively deep clones a THREE.js object, plain objects, arrays, and primitives.
+ * Uses Three.js internal flags (isMesh, isObject3D, etc.) for robust type checking
+ * instead of fragile constructor.name checks that break under minification.
  *
- * @param {THREE.Mesh | THREE.Shape | Brush | Array | Object} source - The object to clone.
- * @returns {THREE.Mesh | THREE.Shape | Brush | Array | Object} The cloned object.
+ * @param {any} source - The object to clone.
+ * @returns {any} The deep cloned object.
  */
 export function clone(source) {
-	// 1. Handle primitives
+	// 1. Handle primitives and null/undefined
 	if (source === null || typeof source !== 'object') {
 		return source
 	}
 
-	const typeName = source.constructor.name
-
 	// 2. Handle Arrays
 	if (Array.isArray(source)) {
-		const clonedArray = []
-		for (let i = 0; i < source.length; i++) {
-			clonedArray[i] = clone(source[i])
-		}
-		return clonedArray
+		return source.map((item) => clone(item))
 	}
 
-	// 3. Handle specific THREE.js objects
-	if (THREE_TYPES_TO_CLONE.includes(typeName)) {
-		// --- CRITICAL CASE: BufferAttribute (for Vertices and Indices data) ---
-		if (typeName === 'BufferAttribute') {
-			const sourceAttr = source
-			// Use BufferAttribute's built-in clone() for the object structure.
-			const clonedAttr = sourceAttr.clone()
+	// 3. Handle Dates and RegExps
+	if (source instanceof Date) return new Date(source.getTime())
+	if (source instanceof RegExp) return new RegExp(source.source, source.flags)
 
-			// ⚠️ Force the deepest possible copy of the underlying typed array data.
-			const dataArray = sourceAttr.array
-			const ClonedDataType = dataArray.constructor
-			// Create a new ArrayBuffer from the original data
-			clonedAttr.array = new ClonedDataType(dataArray)
+	// 4. Handle Maps and Sets
+	if (source instanceof Map) {
+		const m = new Map()
+		source.forEach((v, k) => m.set(clone(k), clone(v)))
+		return m
+	}
+	if (source instanceof Set) {
+		const s = new Set()
+		source.forEach((v) => s.add(clone(v)))
+		return s
+	}
 
-			return clonedAttr
+	// --- THREE.JS SPECIFIC CLONING ---
+	// Using Three.js internal flags is immune to minification/bundling
+
+	// BufferGeometry.clone() is already a DEEP clone in Three.js (copies attributes/index)
+	if (source.isBufferGeometry) {
+		return source.clone()
+	}
+
+	// BufferAttribute.clone() is already a DEEP clone
+	if (source.isBufferAttribute) {
+		return source.clone()
+	}
+
+	// Material and Texture clone() are deep clones
+	if (source.isMaterial || source.isTexture) {
+		return source.clone()
+	}
+
+	// Shape clone
+	if (source.isShape) {
+		return source.clone()
+	}
+
+	// Object3D (Covers Mesh, Brush, Group, Line, Points, etc.)
+	if (source.isObject3D) {
+		let clonedGeometry = null
+		let clonedMaterial = null
+
+		// Deep clone geometry if it exists
+		// THIS IS THE CRITICAL FIX: Three.js's native .clone() shares the geometry reference!
+		if (source.geometry) {
+			clonedGeometry = source.geometry.clone()
 		}
 
-		// --- Special case: THREE.Mesh (Manual construction using targeted geometry clone) ---
-		if (typeName === 'Mesh') {
-			const sourceMesh = source
-			let clonedGeometry = sourceMesh.geometry
-			let clonedMaterial = sourceMesh.material
-
-			// 1. Clone Geometry using the dedicated function
-			if (clonedGeometry) {
-				clonedGeometry = cloneGeometryData(clonedGeometry)
-			}
-
-			// 2. Clone Material(s)
-			if (Array.isArray(sourceMesh.material)) {
-				clonedMaterial = sourceMesh.material.map((m) => m.clone())
-			} else if (
-				sourceMesh.material &&
-				typeof sourceMesh.material.clone === 'function'
-			) {
-				clonedMaterial = sourceMesh.material.clone()
-			}
-
-			// 3. Create NEW Mesh instance
-			// Assuming THREE is available.
-			const clonedObject = new THREE.Mesh(clonedGeometry, clonedMaterial)
-			clonedObject.copy(sourceMesh) // Copy object properties (pos/rot/scale/etc)
-
-			// Re-assign cloned components to be absolutely sure
-			clonedObject.geometry = clonedGeometry
-			clonedObject.material = clonedMaterial
-
-			// 4. Clone children
-			for (let i = 0; i < sourceMesh.children.length; i++) {
-				clonedObject.add(clone(sourceMesh.children[i]))
-			}
-
-			return clonedObject
-		}
-
-		// --- Case for Shape/Brush/Group/Object3D ---
-		const clonedObject = source.clone()
-		// Manually replace children with deep clones
-		if (clonedObject.children) {
-			clonedObject.children.length = 0
-			for (let i = 0; i < source.children.length; i++) {
-				clonedObject.add(clone(source.children[i]))
+		// Deep clone material(s) if they exist
+		if (source.material) {
+			if (Array.isArray(source.material)) {
+				clonedMaterial = source.material.map((m) => m.clone())
+			} else {
+				clonedMaterial = source.material.clone()
 			}
 		}
+
+		// Instantiate the exact same class (e.g., Brush stays Brush, Mesh stays Mesh)
+		let clonedObject
+		try {
+			if (clonedGeometry && clonedMaterial) {
+				clonedObject = new source.constructor(clonedGeometry, clonedMaterial)
+			} else if (clonedGeometry) {
+				clonedObject = new source.constructor(clonedGeometry)
+			} else {
+				clonedObject = new source.constructor()
+			}
+		} catch (e) {
+			// Fallback if constructor requires specific args we didn't provide
+			clonedObject = source.clone()
+		}
+
+		// Copy standard Object3D properties (position, rotation, scale, matrix, etc.)
+		clonedObject.copy(source)
+
+		// Explicitly assign the deeply cloned geometry and material
+		// (copy() doesn't always overwrite these if they are null/undefined in source)
+		if (source.geometry) clonedObject.geometry = clonedGeometry
+		if (source.material) clonedObject.material = clonedMaterial
+
+		// Deep clone userData (copy() uses JSON.parse/stringify which breaks on functions/circular refs)
+		if (source.userData) {
+			clonedObject.userData = clone(source.userData)
+		}
+
+		// Deep clone children
+		// 1. Remove any default children created by the constructor
+		while (clonedObject.children.length > 0) {
+			clonedObject.remove(clonedObject.children[0])
+		}
+		// 2. Add deep cloned children from source
+		for (let i = 0; i < source.children.length; i++) {
+			clonedObject.add(clone(source.children[i]))
+		}
+
 		return clonedObject
 	}
 
-	// 4. Handle generic Objects ({} structures)
-	if (typeName === 'Object') {
+	// --- GENERIC OBJECT CLONING ---
+	// Check if it's a plain object ({})
+	if (Object.getPrototypeOf(source) === Object.prototype) {
 		const clonedObject = {}
 		for (const key in source) {
 			if (Object.prototype.hasOwnProperty.call(source, key)) {
@@ -6552,11 +6448,15 @@ export function clone(source) {
 		return clonedObject
 	}
 
-	// 5. Fallback
-	console.warn(
-		`clone: Cannot deep clone object of type: ${typeName}. Returning original reference.`
-	)
-	return source
+	// Fallback for unknown custom classes (like Path2d, Path3d): clone enumerable properties
+	const clonedInstance = Object.create(Object.getPrototypeOf(source))
+	for (const key in source) {
+		if (Object.prototype.hasOwnProperty.call(source, key)) {
+			clonedInstance[key] = clone(source[key])
+		}
+	}
+
+	return clonedInstance
 }
 
 // Private object containing all exportable functions

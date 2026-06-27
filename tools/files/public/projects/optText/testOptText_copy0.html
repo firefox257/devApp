@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>optText Component Test Suite</title>
+<style>
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+body {
+	margin: 0; padding: 0;
+	font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+	background: #f5f5f7;
+	height: 100dvh;
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+}
+
+/* Header */
+.test-header {
+	background: #fff;
+	padding: 8px 12px;
+	border-bottom: 1px solid #ddd;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	flex-wrap: wrap;
+	z-index: 10;
+}
+.test-header h1 {
+	font-size: 14px; margin: 0; font-weight: 600; color: #333;
+}
+.test-btn {
+	padding: 6px 12px;
+	font-size: 12px;
+	border: 1px solid #ccc;
+	background: #fff;
+	border-radius: 6px;
+	cursor: pointer;
+	transition: background 0.15s;
+}
+.test-btn:hover { background: #f0f0f0; }
+.test-btn:active { transform: scale(0.98); }
+.test-btn.primary { background: #007aff; color: #fff; border-color: #007aff; }
+.test-btn.primary:hover { background: #0066cc; }
+.test-btn.danger { background: #ff3b30; color: #fff; border-color: #ff3b30; }
+.test-btn.danger:hover { background: #cc2f26; }
+
+/* Tabs */
+.tab-bar {
+	display: flex;
+	background: #fff;
+	border-bottom: 1px solid #ddd;
+	z-index: 9;
+}
+.tab-btn {
+	flex: 1;
+	padding: 10px 8px;
+	border: none;
+	background: #f5f5f7;
+	cursor: pointer;
+	font-size: 12px;
+	font-weight: 600;
+	color: #666;
+	border-bottom: 2px solid transparent;
+	transition: all 0.2s;
+}
+.tab-btn.active {
+	background: #fff;
+	color: #007aff;
+	border-bottom: 2px solid #007aff;
+}
+
+/* Tab Content */
+.tab-content {
+	display: none;
+	flex: 1;
+	min-height: 0;
+	flex-direction: column;
+	background: #fff;
+}
+.tab-content.active {
+	display: flex;
+}
+
+/* Editor Area */
+.editor-host {
+	flex: 1;
+	min-height: 0;
+	background: #fff;
+	position: relative;
+}
+
+/* Console Panel */
+#console-panel {
+	background: #1e1e1e;
+	color: #d4d4d4;
+	font-family: 'Menlo', 'Consolas', monospace;
+	font-size: 11px;
+	max-height: 40vh;
+	overflow-y: auto;
+	border-top: 1px solid #444;
+	display: none;
+}
+#console-panel.visible { display: block; }
+.console-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	padding: 6px 10px;
+	background: #2d2d2d;
+	border-bottom: 1px solid #444;
+	position: sticky;
+	top: 0;
+}
+.console-header span { font-weight: 600; color: #fff; }
+.console-clear {
+	background: none; border: none; color: #888; cursor: pointer; font-size: 11px;
+}
+.console-clear:hover { color: #fff; }
+.console-entries { padding: 4px 10px; }
+.console-entry {
+	padding: 3px 0;
+	border-bottom: 1px solid #333;
+	display: flex;
+	gap: 8px;
+	white-space: pre-wrap;
+	word-break: break-word;
+}
+.console-entry.log { color: #d4d4d4; }
+.console-entry.warn { color: #ffa500; }
+.console-entry.error { color: #ff6b6b; }
+.console-time { color: #666; min-width: 50px; flex-shrink: 0; }
+.console-msg { flex: 1; }
+
+/* Controls Panel */
+#controls-panel {
+	background: #fff;
+	padding: 8px 12px;
+	border-top: 1px solid #ddd;
+	display: none;
+	max-height: 30vh;
+	overflow-y: auto;
+}
+#controls-panel.visible { display: block; }
+.control-row {
+	display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap;
+}
+.control-row input, .control-row textarea {
+	flex: 1; min-width: 120px;
+	padding: 6px 8px;
+	font-size: 12px;
+	border: 1px solid #ccc;
+	border-radius: 4px;
+}
+.control-row textarea { min-height: 60px; resize: vertical; }
+.control-label {
+	font-size: 11px; color: #666; margin-bottom: 2px; display: block;
+}
+
+/* Toast for feedback */
+.test-toast {
+	position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+	background: rgba(0,0,0,0.85); color: #fff;
+	padding: 10px 18px; border-radius: 8px; font-size: 13px;
+	z-index: 9999; animation: toast-fade 2s ease; pointer-events: none;
+}
+@keyframes toast-fade {
+	0%,100% { opacity: 0; transform: translateX(-50%) translateY(10px); }
+	15%,85% { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+	.test-header { padding: 6px 8px; }
+	.test-btn { padding: 5px 10px; font-size: 11px; }
+	.tab-btn { font-size: 11px; padding: 8px 4px; }
+}
+</style>
+</head>
+<body>
+<div class="test-header">
+<h1>optText Test Suite</h1>
+<button class="test-btn primary" id="btn-toggle-console">📋 Console</button>
+<button class="test-btn" id="btn-toggle-controls">⚙️ Controls</button>
+<button class="test-btn" id="btn-load-sample">📄 Load Sample</button>
+<button class="test-btn" id="btn-clear">🗑️ Clear</button>
+<button class="test-btn danger" id="btn-destroy">🔥 Destroy</button>
+</div>
+
+<!-- Tab Navigation -->
+<div class="tab-bar">
+<button class="tab-btn active" data-tab="tab-js">1. JS Init</button>
+<button class="tab-btn" data-tab="tab-html-nosave">2. HTML (No Save)</button>
+<button class="tab-btn" data-tab="tab-html-nobeautify">3. HTML (No Beautify)</button>
+<button class="tab-btn" data-tab="tab-html-global">4. HTML (Global Var)</button>
+</div>
+
+<!-- Tab 1: Programmatic JS Init -->
+<div id="tab-js" class="tab-content active">
+<div id="editor-host-js" class="editor-host"></div>
+</div>
+
+<!-- Tab 2: HTML Tag with extensions (No Save) -->
+<div id="tab-html-nosave" class="tab-content">
+<!-- The optText.js auto-init will find this and replace it. Notice the extensions attribute filtering out saveButton -->
+<opttext id="html-editor-nosave" extensions='["searchTool", "beautifyCode", "selectBracket", "pagesManager", "autoIndent"]' class="editor-host"></opttext>
+</div>
+
+<!-- Tab 3: HTML Tag with extensions (No Beautify) -->
+<div id="tab-html-nobeautify" class="tab-content">
+<opttext id="html-editor-nobeautify" onSave="alert('hi');" extensions='["searchTool", "saveButton", "selectBracket", "pagesManager"]' class="editor-host"></opttext>
+</div>
+
+<!-- Tab 4: HTML Tag with global variable extensions -->
+<div id="tab-html-global" class="tab-content">
+<!-- References window.minimalConfig defined in the global script block -->
+<opttext id="html-editor-global" extensions="minimalConfig" class="editor-host" savebutton-disabled="true"  beautifycode-disabled="true" pagesmanager-disabled="true"></opttext>
+</div>
+
+<!-- Controls Panel -->
+<div id="controls-panel">
+<div class="control-row">
+<div style="flex:1">
+<label class="control-label">Set Value (Applies to active tab)</label>
+<textarea id="input-set-value" placeholder="Paste text here..."></textarea>
+</div>
+<button class="test-btn primary" id="btn-apply-value" style="align-self:flex-end">Apply</button>
+</div>
+<div class="control-row">
+<button class="test-btn" id="btn-get-value">📋 Get Value</button>
+<button class="test-btn" id="btn-get-selection">🔲 Get Selection</button>
+<button class="test-btn" id="btn-start-select">✏️ Start Select</button>
+</div>
+</div>
+
+<!-- Console Panel -->
+<div id="console-panel">
+<div class="console-header">
+<span>Console Output</span>
+<button class="console-clear" id="btn-clear-console">Clear</button>
+</div>
+<div class="console-entries" id="console-entries"></div>
+</div>
+
+<script>
+// ====================================================================
+// GLOBAL CONFIG FOR TAB 4
+// ====================================================================
+window.minimalConfig = ["saveButton","beautifyCode","pagesManager"];
+
+// ====================================================================
+// GLOBAL SAVE HANDLER (For HTML Attribute Test)
+// ====================================================================
+window.globalSaveHandler = function(editorInstance) {
+	const content = editorInstance.value;
+	const contextName = editorInstance.dataManager?.current?.name || 'default';
+	const msg = `✅ HTML Save Triggered! Context: '${contextName}' | Length: ${content.length} chars`;
+	console.log(msg);
+	showToast(msg);
+};
+
+function showToast(msg) {
+	const existing = document.querySelector('.test-toast');
+	if (existing) existing.remove();
+	const toast = document.createElement('div');
+	toast.className = 'test-toast';
+	toast.textContent = msg;
+	document.body.appendChild(toast);
+	setTimeout(() => toast.remove(), 2000);
+}
+</script>
+
+<script type="module">
+// ====================================================================
+// CONSOLE CAPTURE (For iPhone / No DevTools)
+// ====================================================================
+const ConsoleCapture = (() => {
+		const original = {
+			log: console.log,
+			warn: console.warn,
+			error: console.error,
+			info: console.info
+		};
+		const entries = [];
+		const maxEntries = 200;
+
+		function formatTime() {
+			const now = new Date();
+			return `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}:${now.getSeconds().toString().padStart(2,'0')}`;
+		}
+
+		function add(level, args) {
+			const entry = {
+				time: formatTime(),
+				level,
+				message: args.map(a => {
+						try {
+							return typeof a === 'object' ? JSON.stringify(a, null, 2) : String(a);
+						} catch { return String(a); }
+					}).join(' ')
+			};
+			entries.push(entry);
+			if (entries.length > maxEntries) entries.shift();
+			render();
+		}
+
+		function render() {
+			const container = document.getElementById('console-entries');
+			if (!container) return;
+			container.innerHTML = entries.map(e => `
+				<div class="console-entry ${e.level}">
+				<span class="console-time">${e.time}</span>
+				<span class="console-msg">${e.message}</span>
+				</div>
+				`).join('');
+			container.scrollTop = container.scrollHeight;
+		}
+
+		function hook() {
+			console.log = (...args) => { original.log(...args); add('log', args); };
+			console.warn = (...args) => { original.warn(...args); add('warn', args); };
+			console.error = (...args) => { original.error(...args); add('error', args); };
+			console.info = (...args) => { original.info(...args); add('log', args); };
+		}
+
+		function clear() { entries.length = 0; render(); }
+		function toggle() {
+			const panel = document.getElementById('console-panel');
+			panel?.classList.toggle('visible');
+		}
+
+		return { hook, clear, toggle, render };
+	})();
+
+ConsoleCapture.hook();
+
+// ====================================================================
+// TEST SAMPLE DATA
+// ====================================================================
+const SAMPLE_DATA = `// optText Component - Test Sample
+// Generated: ${new Date().toISOString()}
+
+function greet(name) {
+return \`Hello, \${name}!\`;
+}
+
+const users = [
+{ id: 1, name: "Alice", role: "admin" },
+{ id: 2, name: "Bob", role: "user" }
+];
+
+// More content to enable scrolling...
+${Array.from({length: 50}, (_, i) => `// Line ${i + 1}: Lorem ipsum dolor sit amet, consectetur adipiscing elit.`).join('\n')}
+
+// End of sample`;
+
+// ====================================================================
+// TEST CONTROLLER
+// ====================================================================
+
+function getActiveEditor() {
+	const activeTab = document.querySelector('.tab-content.active');
+	return activeTab ? activeTab.querySelector('.opt-text-container-wrapper') : null;
+}
+
+function initJSEditor() {
+	const host = document.getElementById('editor-host-js');
+	if (host.querySelector('.opt-text-container-wrapper')) return; // Already init
+
+	import('./optText.js').then(({ setupOptTextInstance }) => {
+			const editor = setupOptTextInstance();
+			editor.extensions=['saveButton'];
+			// Assign onSave programmatically
+			editor.onSave = function(instance) {
+				const content = instance.value;
+				const msg = `💾 JS Save Triggered! Length: ${content.length} chars`;
+				console.log(msg);
+				showToast(msg);
+			};
+
+			editor.onchange = (e) => console.log('✓ onchange fired', { length: e.target.value.length });
+
+			host.appendChild(editor);
+			console.log('JS optText instance initialized (All extensions loaded by default)');
+		}).catch(err => {
+			console.error('Failed to load optText:', err);
+			showToast('Load failed - check console');
+		});
+}
+
+function destroyActiveEditor() {
+	const editor = getActiveEditor();
+	if (editor?.parentNode) {
+		editor.parentNode.removeChild(editor);
+		console.log('Active editor destroyed');
+		showToast('Editor destroyed');
+	}
+}
+
+function loadSample() {
+	const editor = getActiveEditor();
+	if (!editor) {
+		const activeTab = document.querySelector('.tab-content.active');
+		if (activeTab.id === 'tab-js') initJSEditor();
+		return;
+	}
+	editor.value = SAMPLE_DATA;
+	console.log('Sample data loaded:', SAMPLE_DATA.split('\n').length, 'lines');
+	showToast('Sample loaded');
+}
+
+function clearEditor() {
+	const editor = getActiveEditor();
+	if (editor) {
+		editor.value = '';
+		console.log('Editor cleared');
+		showToast('Cleared');
+	}
+}
+
+function applyValue() {
+	const input = document.getElementById('input-set-value');
+	const editor = getActiveEditor();
+	if (editor && input.value) {
+		editor.value = input.value;
+		console.log('Value applied:', input.value.length, 'chars');
+		showToast('Value applied');
+		input.value = '';
+	}
+}
+
+function getValue() {
+	const editor = getActiveEditor();
+	if (editor) {
+		const val = editor.value;
+		console.log('Current value:', val);
+		console.log('Stats:', { lines: val.split('\n').length, chars: val.length });
+		showToast('Value logged to console');
+	}
+}
+
+function getSelection() {
+	const editor = getActiveEditor();
+	if (editor) {
+		console.log('Selection state:', editor.selection);
+		showToast('Selection logged');
+	}
+}
+
+function startSelect() {
+	const editor = getActiveEditor();
+	if (editor) {
+		editor.selection.active = true;
+		editor.selection.anchor = { ...editor.cursor };
+		editor.selection.focus = { ...editor.cursor };
+		editor.dispatchEvent(new Event('optText:change'));
+		console.log('Selection started at cursor');
+		showToast('Selection started');
+	}
+}
+
+// ====================================================================
+// UI EVENT BINDINGS
+// ====================================================================
+document.addEventListener('DOMContentLoaded', () => {
+		// Initialize JS editor on load
+		initJSEditor();
+
+		// Tab switching
+		document.querySelectorAll('.tab-btn').forEach(btn => {
+				btn.addEventListener('click', () => {
+						document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+						document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+
+						btn.classList.add('active');
+						const tabId = btn.dataset.tab;
+						document.getElementById(tabId).classList.add('active');
+
+						// Trigger resize so the newly visible editor can measure itself and draw
+						window.dispatchEvent(new Event('resize'));
+					});
+			});
+
+		// Header buttons
+		document.getElementById('btn-toggle-console').addEventListener('click', ConsoleCapture.toggle);
+		document.getElementById('btn-toggle-controls').addEventListener('click', () => {
+				document.getElementById('controls-panel')?.classList.toggle('visible');
+			});
+		document.getElementById('btn-load-sample').addEventListener('click', loadSample);
+		document.getElementById('btn-clear').addEventListener('click', clearEditor);
+		document.getElementById('btn-destroy').addEventListener('click', destroyActiveEditor);
+
+		// Console panel
+		document.getElementById('btn-clear-console').addEventListener('click', () => {
+				ConsoleCapture.clear();
+				showToast('Console cleared');
+			});
+
+		// Controls panel
+		document.getElementById('btn-apply-value').addEventListener('click', applyValue);
+		document.getElementById('btn-get-value').addEventListener('click', getValue);
+		document.getElementById('btn-get-selection').addEventListener('click', getSelection);
+		document.getElementById('btn-start-select').addEventListener('click', startSelect);
+
+		console.log('Test page initialized');
+		console.log('Tab 1: JS Init (All extensions by default)');
+		console.log('Tab 2: HTML Tag (No Save button)');
+		console.log('Tab 3: HTML Tag (No Beautify button)');
+		console.log('Tab 4: HTML Tag (Global variable config - only Save)');
+	});
+</script>
+</body>
+</html>

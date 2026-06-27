@@ -1,0 +1,641 @@
+OPTTEXT ADDITION EXTENSIONS: DEVELOPER GUIDE
+============================================
+VERSION: 1.6
+BASED ON: optText.js, optTextUI.js, optTextAdditions.js, optTextData.js
+LAST UPDATED: 2024-05-24
+
+1. OVERVIEW
+-----------
+optText uses a modular "Addition" system to extend editor functionality without
+modifying core engine files. Extensions are registered via a singleton manager,
+which injects UI elements, exposes a standardized API, and manages lifecycle
+states. All additions must be imported into the registry manifest to load.
+
+2. FILE STRUCTURE & REGISTRATION
+--------------------------------
+Place your extension in the additions directory:
+/system/ux/
+|-- optTextAdditions.js          (Core manager - DO NOT MODIFY)
+|-- optTextAdditionsRegistry.js  (Manifest - ADD IMPORTS HERE)
+|-- additions/
+    |-- yourExtension.js         (Your extension file)
+
+Step-by-step registration:
+1. Create a .js file in /system/ux/additions/
+2. Import the manager: import { additionManager } from '../optTextAdditions.js';
+3. Call additionManager.register({ ... });
+4. Add import line to optTextAdditionsRegistry.js:
+   import './additions/yourExtension.js';
+5. Reload the editor. The manager auto-injects on initialization.
+
+3. EXTENSION DEFINITION SCHEMA
+------------------------------
+The register() method accepts a configuration object with the following properties:
+
+REQUIRED:
+id          (String)  Unique identifier for the extension.
+init        (Function) Lifecycle hook. Runs when tool UI is created or
+                       extension is activated. Signature: (api, container, dataManager)
+
+OPTIONAL UI/BEHAVIOR FLAGS:
+attribute        (String)  Optional. The HTML attribute name to look for on the
+                           <opttext> tag (e.g., 'onsave').
+property         (String)  Optional. The property name to attach the parsed
+                           callback to on the editor `container` (e.g., 'onSave').
+                           Must be used in conjunction with `attribute`.
+dropdownItem     (Object)  If provided, injects a menu item into the dropdown.
+                           Properties: { label (String), icon (String/Emoji) }
+toolUI           (Function) Returns an HTML string injected into the toolbar.
+                           Called during activation. Signature: (api) => String
+cleanup          (Function) Called when the tool is closed or editor unmounts.
+                           Use for removing global listeners, clearing timers,
+                           or resetting state.
+                           ⚠️ MUST NOT throw errors. Variables accessed here
+                           MUST be declared at module scope.
+isStaticToolbarButton (Boolean) If true, injects a button directly into toolbar.
+toolbarButton    (Object) Config for static toolbar button: { icon, label, action? }
+isAutoInit       (Boolean) If true, runs `init()` immediately upon editor load
+                           without requiring user interaction (e.g., auto-indent).
+
+4. EXTENSION TYPES & BEHAVIORS
+------------------------------
+Type A: Dropdown-Only Action (Immediate Execution)
+- Only appears in the ☰ menu
+- Click opens the tool panel, but init() immediately executes and closes it
+- Provide dropdownItem + init()
+- Inside init(), run your logic and call api.ui.exit() to close immediately
+
+Type B: Dropdown Item + Tool Menu
+- Appears in ☰ menu
+- Click opens a custom toolbar panel (#opt-addition-active-tool)
+- Panel stays open until ✕ is clicked or another addition activates
+- Provide dropdownItem + toolUI()
+
+Type C: Toolbar Button + Tool Menu
+- Injects button directly into toolbar DOM
+- Click toggles tool panel
+- Provide isStaticToolbarButton: true + toolbarButton: { icon, label }
+
+Type D: Toolbar Button Direct Action
+- Button in toolbar, no dropdown, no tool panel
+- Click runs toolbarButton.action() immediately
+
+Type E: Auto-Init / Background Extension
+- Runs silently in the background on editor load
+- Provide isAutoInit: true + init()
+- Ideal for key interceptors, auto-indent, or background telemetry.
+
+5. UI & LAYOUT CONSTRAINTS
+--------------------------
+Toolbar Dimensions:
+- Height: Fixed 28px
+- Background: --ot-bg-toolbar
+- Layout: Flex row, align-items: center, padding: 0 8px
+- Buttons: Fixed 24x24px, margin-right: 4px
+- Icons: Max 12x12px viewBox inside buttons
+
+Tool Container (#opt-addition-active-tool):
+- Injected at end of toolbar
+- CSS: display:flex; align-items:center; gap:8px; overflow-x:auto; flex:1;
+- Automatically appended with an "Exit" close button
+
+Dropdown Menu (.opt-text-dropdown):
+- Position: Absolute, top: 28px, left: 8px
+- Min-width: 180px, z-index: 201
+- Items: Full width, padding 8px 14px, font-size 12px
+- Hover/Active states handled via CSS variables
+
+Z-Index Stack:
+- Canvas/Scrollbars: 100
+- Toolbar: 200
+- Dropdown: 201
+- Toasts: 1001
+- Modals: 2000
+
+6. AVAILABLE API REFERENCE
+--------------------------
+The `api` object passed to init(), action(), and toolUI() contains:
+
+api.context:
+switch(id)              -> Boolean | Switch active document/context
+getCurrent()            -> TextContext | Active context object
+list()                  -> Array | List all available contexts
+get activeId()          -> String | Gets the ID of the currently active context
+set activeId(id)        -> Void | Switches to a context by ID (creates if missing)
+remove(id)              -> Void | Removes a context by ID
+defineProperty(n, desc) -> Void | Safely define custom properties on container
+values                  -> Any | Direct access to the container's `values` property
+
+api.editor:
+// === TEXT CONTENT ===
+getLines()                   -> String[] | Returns copy of current document lines
+setLines(lines, reason)      -> Void | Replaces document. Auto-pushes to history.
+augmentLines(transformFn)    -> Array | Maps lines via transformFn. Auto-pushes to history.
+
+// === CURSOR & SELECTION ===
+getCursor()                  -> { line: Number, col: Number } | Current insertion cursor position
+setCursor(line, col)         -> Void | Sets cursor position + auto-scrolls to keep visible
+getSelection()               -> { active, anchor: {line,col}, focus: {line,col} } | Selection state
+setSelection(anchor, focus)  -> Void | Sets selection range (anchor=blue, focus=orange)
+getMode()                    -> 'cursor' | 'selection' | Current interaction mode
+focus()                      -> Void | Focuses hidden input for IME/keyboard
+
+// === SCROLL & VIEWPORT NAVIGATION ===
+scrollToCursor()             -> Void | Scrolls viewport to main insertion cursor
+scrollToAnchor()             -> Void | Scrolls viewport to blue anchor handle (selection start)
+scrollToFocus()              -> Void | Scrolls viewport to orange focus handle (selection end)
+
+// === EXTENSION PROPERTIES ===
+defineProperty(n, desc)      -> Void | Safely define custom properties on container
+values                       -> Any | Direct access to the container's `values` property
+
+api.ui:
+toast(msg)          -> Void | Shows 2s fade toast notification
+exit()              -> Void | Closes current tool menu
+modal.show(cfg)     -> Promise<{ action: 'confirm' | 'cancel' }>
+                       cfg: { title, message, content, confirmText, cancelText, showCancel }
+modal.hide()        -> Void | Removes all open modal overlays
+
+7. EXTENSION-DEFINED CONTAINER PROPERTIES (RECOMMENDED PATTERN)
+---------------------------------------------------------------
+Instead of scattering configuration across nested objects or global variables,
+extensions should define properties directly on the `container` during `init()`.
+This creates a clean, discoverable API for the host application.
+
+Why use this pattern?
+✅ Self-documenting: Property appears directly on the editor instance
+✅ Validation: Setter can enforce type checks before accepting config
+✅ Zero-Boilerplate: Host app assigns functions/objects directly
+✅ Namespace-safe: Protected properties list prevents accidental overwrites
+
+Example Pattern in Extension:
+additionManager.register({
+  id: 'my-feature',
+  init: (api, container) => {
+    if (!container.hasOwnProperty('myFeature')) {
+      Object.defineProperty(container, 'myFeature', {
+        get() { return this._myFeature || null; },
+        set(cfg) {
+          if (cfg && typeof cfg.handler !== 'function') {
+            throw new Error('[optText] myFeature requires a handler function');
+          }
+          this._myFeature = cfg;
+        },
+        configurable: true
+      });
+    }
+  },
+  // ... rest of config
+});
+
+App Usage:
+const editor = setupOptTextInstance();
+editor.myFeature = { handler: (data) => console.log(data), timeout: 500 };
+
+HTML Attribute Binding (Automatic)
+----------------------------------
+If an extension defines both `attribute` and `property` in its registration object,
+the core engine will automatically scan the original <opttext> HTML tag for that
+attribute. If found, it safely evaluates the attribute value (supporting global
+function names or inline JS) and assigns the resulting function to `container[property]`.
+
+Example:
+additionManager.register({
+  id: 'save-button',
+  attribute: 'onsave',
+  property: 'onSave',
+  // ...
+});
+// Usage in HTML: <opttext onsave="mySaveFunction"></opttext>
+// The core engine automatically sets: container.onSave = mySaveFunction;
+
+8. LIFECYCLE FLOW
+-----------------
+1. Load: Registry imports run -> additionManager.register()
+2. Inject: optText.js calls injectDropdownItems() -> DOM menu items created
+3. Activate: User clicks dropdown item or toolbar button -> activate() called
+   - Creates #opt-addition-active-tool container
+   - Injects HTML from toolUI(api)
+   - Appends close button
+   - Calls init(api, container, dataManager)
+4. Interact: Extension binds listeners inside init() to tool DOM
+5. Deactivate: User clicks close (✕) or another addition activates -> deactivate()
+   - Calls cleanup()
+   - Removes tool DOM from toolbar
+   - Resets activeId to null
+
+⚠️ CRITICAL TEARDOWN RULE: If cleanup() throws ANY exception (ReferenceError,
+TypeError, etc.), the manager's teardown sequence ABORTS. The tool UI will remain
+stuck in the DOM, the active state will not reset, and subsequent tools will fail
+to open. Always ensure cleanup() runs silently.
+
+9. EVENT FILTERING & FLOW CONTROL FOR ADDITIONS
+-----------------------------------------------
+Additions often need to intercept DOM events (keydown, input, click, etc.). Because 
+multiple additions and the core engine (optText.js) may listen to the same container, 
+strict event filtering is required to prevent conflicts, double-processing, or UI lockups.
+
+9.1 PRIORITY: USE CAPTURE PHASE
+Always attach key/mouse listeners in the capture phase (`useCapture: true`) so your 
+addition runs BEFORE the core editor processes the event.
+✅ CORRECT: container.addEventListener('keydown', handler, true);
+❌ INCORRECT: container.addEventListener('keydown', handler, false); // May fire after core consumes it
+
+9.2 TARGET FILTERING
+Only process events that originate from the editor canvas/container. Ignore toolbar 
+buttons, dropdowns, modals, or internal handles.
+if (e.target !== container) return;
+
+9.3 KEY & MODIFIER FILTERING
+Never assume a key press is valid. Explicitly check `e.key`, `e.code`, and modifier 
+states to avoid hijacking shortcuts or navigation keys.
+if (e.key !== 'Enter') return;
+if (e.ctrlKey || e.metaKey || e.altKey) return; // Ignore system/shortcut combos
+
+9.4 PROPAGATION CONTROL
+If your addition fully handles the event, block downstream listeners:
+e.preventDefault();          // Stops native/browser behavior
+e.stopImmediatePropagation();// Prevents other additions/core from seeing it
+
+9.5 RE-ENTRANCY & ASYNC GUARDS
+Synthetic DOM updates or `api.editor.augmentLines()` can trigger recursive input/keydown 
+events. Use a guard flag or microtask delay to break cycles:
+let isProcessing = false;
+const handler = (e) => {
+  if (isProcessing) return;
+  isProcessing = true;
+  try {
+    // ... event logic ...
+  } finally {
+    // Release after core render/input cycle completes (1 frame)
+    setTimeout(() => isProcessing = false, 16);
+  }
+};
+
+9.6 CLEANUP
+ALWAYS return a cleanup function from `init()` that removes your listeners. Failure to 
+do so causes memory leaks and duplicate event firing on context switches.
+return () => {
+  container.removeEventListener('keydown', handler, true);
+};
+
+9.7 COMPLETE FILTERING TEMPLATE
+init: (api, container) => {
+  const handleEvent = (e) => {
+    // 1. Ignore child elements (toolbar, modals, etc.)
+    if (e.target !== container) return;
+    // 2. Filter keys/modifiers
+    if (e.key !== 'Enter' || e.ctrlKey || e.metaKey) return;
+
+    // 3. Take control
+    e.preventDefault();
+    e.stopImmediatePropagation();
+
+    // 4. Safe execution with history tracking
+    api.editor.augmentLines(lines => {
+      // Modify lines...
+      return lines;
+    });
+  };
+
+  container.addEventListener('keydown', handleEvent, true);
+
+  // 5. Cleanup on deactivation/context switch
+  return () => container.removeEventListener('keydown', handleEvent, true);
+}
+
+10. BEST PRACTICES & GOTCHAS
+----------------------------
+• History: ALWAYS use api.editor.augmentLines() or setLines(). Direct mutation
+  of context.lines BYPASSES undo/redo.
+• Event Binding: Query tool elements inside init(), NOT toolUI(). The DOM is
+  not ready until init() executes.
+• Memory Leaks: Remove document/window listeners in cleanup().
+• Toggle Behavior: Toolbar buttons automatically toggle open/close if they have
+  a toolUI defined. No manual toggle logic needed.
+• Async Modals: api.ui.modal.show() returns a Promise. Await it before branching.
+• Large Documents: augmentLines() clones the array. For >100k lines, use
+  setLines() with chunked updates or Web Workers.
+• Styling: Use CSS variables (--ot-*) inside toolUI strings. Do not override
+  .opt-text-toolbar-btn dimensions. Wrap controls in a container div.
+• Validation: Missing `id` or non-function `init` throws an error on register().
+• Scroll Navigation: Use scrollTo*() methods AFTER modifying cursor/selection
+  to ensure the new position is visible. Example:
+  api.editor.setCursor(100, 0);
+  api.editor.scrollToCursor(); // Ensures line 101 is in viewport
+• Selection Handles: anchor = blue handle (selection start), focus = orange handle
+  (selection end / typing cursor). Use scrollToAnchor()/scrollToFocus() to navigate
+  to specific handles during multi-cursor editing.
+• Cleanup Scope Safety (⚠️ MOST COMMON PITFALL): Variables used in cleanup() MUST
+  be declared at module scope (outside register()). If cleanup() throws a
+  ReferenceError, the teardown sequence halts and the tool UI stays open.
+  Correct Pattern:
+  let debounceTimer = null; // ✅ Module scope
+  additionManager.register({ cleanup: () => { clearTimeout(debounceTimer); } });
+  Incorrect Pattern:
+  additionManager.register({
+    init: () => { let debounceTimer = null; }, // ❌ Block scope
+    cleanup: () => { clearTimeout(debounceTimer); } // ❌ ReferenceError → UI stuck
+  });
+• Simplified Callbacks: For host-to-extension communication, prefer direct
+  property assignment on the container: `editor.onSave = function(optTextDomObj){}`.
+  Avoid nested config objects unless complex validation is required.
+
+11. COMPLETE EXAMPLES
+---------------------
+
+Example 1: Dropdown-Only Quick Action (Immediate Execution)
+-----------------------------------------------------------
+import { additionManager } from '../optTextAdditions.js';
+
+additionManager.register({
+  id: 'insert-date',
+  dropdownItem: { label: 'Insert Date', icon: '📅' },
+  init: (api) => {
+    const date = new Date().toLocaleDateString();
+    api.editor.augmentLines(lines => {
+      const l = api.editor.getCursor().line;
+      lines[l] = (lines[l] || '') + ' ' + date;
+      return lines;
+    });
+    api.ui.toast('Date inserted');
+    api.ui.exit(); // Close the tool panel immediately
+  }
+});
+
+Example 2: Jump to Errors with Scroll Navigation
+-------------------------------------------------
+import { additionManager } from '../optTextAdditions.js';
+
+additionManager.register({
+  id: 'jump-to-errors',
+  dropdownItem: { label: 'Error Navigator', icon: '⚠️' },
+  toolUI: (api) => `
+    <div style="display:flex;align-items:center;gap:6px;">
+      <button class="opt-text-toolbar-btn" data-action="prev-error">↑</button>
+      <button class="opt-text-toolbar-btn" data-action="next-error">↓</button>
+      <span style="font-size:11px;color:#666;">Jump to errors</span>
+    </div>
+  `,
+  init: (api, container) => {
+    const tool = container.querySelector('#opt-addition-active-tool');
+    const errorLines = [5, 23, 47, 89];
+    let currentIndex = 0;
+    
+    const jumpToError = (idx) => {
+      const line = errorLines[idx];
+      if (line !== undefined) {
+        api.editor.setCursor(line, 0);
+        api.editor.scrollToCursor();
+        api.ui.toast(`Jumped to line ${line + 1}`);
+      }
+    };
+    
+    tool?.querySelector('[data-action="prev-error"]')?.addEventListener('click', () => {
+      currentIndex = Math.max(0, currentIndex - 1);
+      jumpToError(currentIndex);
+    });
+    tool?.querySelector('[data-action="next-error"]')?.addEventListener('click', () => {
+      currentIndex = Math.min(errorLines.length - 1, currentIndex + 1);
+      jumpToError(currentIndex);
+    });
+  },
+  cleanup: () => {}
+});
+
+Example 3: Selection Handle Navigation (Blue/Orange Cursors)
+------------------------------------------------------------
+import { additionManager } from '../optTextAdditions.js';
+
+additionManager.register({
+  id: 'selection-helpers',
+  dropdownItem: { label: 'Selection Tools', icon: '🎯' },
+  toolUI: (api) => `
+    <div style="display:flex;gap:4px;">
+      <button class="opt-text-toolbar-btn" data-action="to-anchor" title="Scroll to blue handle">🔵</button>
+      <button class="opt-text-toolbar-btn" data-action="to-focus" title="Scroll to orange handle">🟠</button>
+      <button class="opt-text-toolbar-btn" data-action="swap" title="Swap anchor/focus">⇄</button>
+    </div>
+  `,
+  init: (api, container) => {
+    const tool = container.querySelector('#opt-addition-active-tool');
+    
+    tool?.querySelector('[data-action="to-anchor"]')?.addEventListener('click', () => {
+      api.editor.scrollToAnchor();
+      api.ui.toast('Scrolled to selection start');
+    });
+    tool?.querySelector('[data-action="to-focus"]')?.addEventListener('click', () => {
+      api.editor.scrollToFocus();
+      api.ui.toast('Scrolled to selection end');
+    });
+    tool?.querySelector('[data-action="swap"]')?.addEventListener('click', () => {
+      const sel = api.editor.getSelection();
+      if (sel.active) {
+        api.editor.setSelection(sel.focus, sel.anchor);
+        api.editor.scrollToFocus();
+        api.ui.toast('Selection direction reversed');
+      }
+    });
+  }
+});
+
+Example 4: Modal Confirmation + Scroll to Result
+------------------------------------------------
+import { additionManager } from '../optTextAdditions.js';
+
+additionManager.register({
+  id: 'find-and-scroll',
+  dropdownItem: { label: 'Find & Jump', icon: '🔍' },
+  init: async (api) => {
+    const searchTerm = prompt('Search for:');
+    if (!searchTerm) return;
+    
+    const lines = api.editor.getLines();
+    let foundLine = -1;
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].includes(searchTerm)) {
+        foundLine = i;
+        break;
+      }
+    }
+    
+    if (foundLine >= 0) {
+      api.editor.setCursor(foundLine, lines[foundLine].indexOf(searchTerm));
+      api.editor.scrollToCursor();
+      api.ui.toast(`Found at line ${foundLine + 1}`);
+    } else {
+      api.ui.toast('Not found');
+    }
+  }
+});
+
+Example 5: Simplified Save Button with HTML Attribute Binding
+-------------------------------------------------------------
+import { additionManager } from '../optTextAdditions.js';
+
+let editorInstance = null; // Module-scope reference
+
+additionManager.register({
+  id: 'save-button',
+  isStaticToolbarButton: true,
+  attribute: 'onsave',
+  property: 'onSave',
+  toolbarButton: {
+    icon: '💾',
+    label: 'Save',
+    action: () => {
+      if (!editorInstance) return;
+      const callback = editorInstance.onSave;
+      if (typeof callback === 'function') {
+        callback(editorInstance); // Passes the full optText container
+      }
+    }
+  },
+  init: (api, container) => {
+    editorInstance = container;
+  }
+});
+
+// Host App Usage (HTML): <opttext id="my-editor" onsave="handleSave"></opttext>
+// Host App Usage (JS): 
+// function handleSave(editor) { console.log('Saving:', editor.value); }
+
+Example 6: Custom Key Handler with Event Filtering (Auto-Indent Pattern)
+------------------------------------------------------------------------
+// Demonstrates capture phase, target filtering, re-entrancy locks, and cleanup.
+import { additionManager } from '../optTextAdditions.js';
+
+let isHandlingEnter = false; // ✅ MUST be module scope for cleanup safety
+
+additionManager.register({
+  id: 'auto-indent',
+  name: 'Auto Indent',
+  isAutoInit: true, // Runs silently on load
+  
+  init: (api, container) => {
+    const hiddenInput = container.querySelector('.opt-text-hidden-input');
+    
+    const handleKeyDown = (e) => {
+      // 1. Target Filtering: Ignore events from modals, dropdowns, or toolbar
+      if (e.target !== container) return;
+      
+      // 2. Key & Modifier Filtering: Only intercept raw Enter
+      if ((e.key === 'Enter' || e.keyCode === 13) && !e.ctrlKey && !e.metaKey) {
+        
+        // 3. Re-entrancy Guard: Block duplicate synthetic events
+        if (isHandlingEnter) {
+          e.preventDefault();
+          e.stopPropagation();
+          return;
+        }
+
+        isHandlingEnter = true;
+        
+        // 4. Propagation Control: Stop core editor from adding a raw newline
+        e.preventDefault();
+        e.stopImmediatePropagation();
+
+        // Clear hidden input to squash buffered IME/input events
+        if (hiddenInput) hiddenInput.value = '';
+
+        // 5. Async Deferral: Wait 1 frame (16ms) to let mobile browsers flush input
+        setTimeout(() => {
+          try {
+            const cursorPos = api.editor.getCursor();
+            const lines = api.editor.getLines();
+            const lineIdx = cursorPos.line;
+            const col = cursorPos.col;
+            const currentLine = lines[lineIdx] || '';
+
+            const before = currentLine.slice(0, col);
+            const after = currentLine.slice(col);
+
+            // Calculate indent based on tabs and brackets
+            const leadingTabs = (before.match(/^\t+/) || [''])[0].length;
+            const openBrackets = (before.match(/[{[(]/g) || []).length;
+            const closeBrackets = (before.match(/[}\])]/g) || []).length;
+            let indentLevel = leadingTabs + (openBrackets - closeBrackets);
+
+            if (before.trim().endsWith('{') || before.trim().endsWith('[') || before.trim().endsWith('(')) {
+              indentLevel = Math.max(indentLevel, leadingTabs + 1);
+            }
+
+            if (/^\s*[}\])]/.test(after)) {
+              indentLevel = Math.max(0, indentLevel - 1);
+            }
+
+            const newIndent = '\t'.repeat(Math.max(0, indentLevel));
+
+            // 6. Safe Execution: Use augmentLines for automatic history tracking
+            api.editor.augmentLines((currentLines) => {
+              const newLines = [...currentLines];
+              newLines[lineIdx] = before;
+              newLines.splice(lineIdx + 1, 0, newIndent + after);
+              return newLines;
+            });
+
+            // Move cursor to start of new indent
+            api.editor.setCursor(lineIdx + 1, newIndent.length);
+
+          } catch (err) {
+            console.error("[AutoIndent] Error:", err);
+          } finally {
+            // 7. Release Lock
+            isHandlingEnter = false;
+          }
+        }, 16);
+      }
+    };
+
+    // 8. Capture Phase Attachment
+    container.addEventListener('keydown', handleKeyDown, true);
+
+    // 9. Cleanup Function
+    return () => {
+      container.removeEventListener('keydown', handleKeyDown, true);
+    };
+  }
+});
+
+12. COORDINATE SYSTEM REFERENCE
+-------------------------------
+All cursor/selection positions use 0-based indexing:
+• line: 0 = first line, lines.length - 1 = last line
+• col: 0 = start of line, line.length = end of line (after last char)
+
+Example: Setting cursor to end of document
+const lines = api.editor.getLines();
+const lastLineIdx = lines.length - 1;
+const lastCol = lines[lastLineIdx]?.length || 0;
+api.editor.setCursor(lastLineIdx, lastCol);
+api.editor.scrollToCursor();
+
+Example: Selecting entire document
+api.editor.setSelection(
+  { line: 0, col: 0 },
+  { line: lines.length - 1, col: lines[lines.length - 1]?.length || 0 }
+);
+api.editor.scrollToFocus();
+
+13. TROUBLESHOOTING
+-------------------
+Q: My custom property isn't updating the UI.
+A: Custom properties defined via defineProperty() are reactive for getters, but
+   you must manually trigger needsRender = true or dispatch 'optText:change' if
+   the property affects visual state.
+
+Q: The save button does nothing when clicked.
+A: Ensure the `save-button` addition is imported in the registry. Also, ensure
+   the `onsave` attribute on the `<opttext>` tag points to a valid global
+   function or valid inline JavaScript.
+
+Q: My addon's cleanup() causes the UI to freeze.
+A: cleanup() threw an error. Wrap teardown logic in try/catch and ensure all
+   variables referenced are declared at module scope, not inside init().
+
+Q: My key interceptor is firing twice or causing infinite loops.
+A: Ensure you are using `e.stopImmediatePropagation()` and a re-entrancy guard 
+   (like `isHandlingEnter`) to prevent `augmentLines()` from triggering synthetic 
+   input events that bubble back to your listener.
+
+END OF DOCUMENTATION

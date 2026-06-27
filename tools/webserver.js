@@ -1,3 +1,4 @@
+//webserver.js
 const http = require('http');
 const https = require('https');
 const fs = require('fs');
@@ -129,7 +130,8 @@ const _mimetype = {
     '.webm': 'video/webm',
     '.wat': 'text/plain',
     '.pdf': 'application/pdf',
-	'.wasm': 'application/wasm'
+	'.wasm': 'application/wasm',
+	".onnx": ' application/octet-stream'
 };
 
 // ==========================================================
@@ -193,7 +195,7 @@ function computeAcceptKey(key) {
 function parseWebSocketFrame(buffer) {
     if (buffer.length < 2) return null;
     const opcode = buffer[0] & 0x0F;
-    if (opcode !== 1) return null;
+    if (opcode !== 1) return null; // Only handling text frames (opcode 1) for simplicity
     const isMasked = (buffer[1] & 0x80) === 0x80;
     if (!isMasked) return null;
     let payloadLen = buffer[1] & 0x7F;
@@ -223,7 +225,7 @@ function createWebSocketFrame(message) {
     if (len > 65535) headerLen += 8;
     else if (len > 125) headerLen += 2;
     const buffer = Buffer.allocUnsafe(headerLen + len);
-    buffer[0] = 0x81;
+    buffer[0] = 0x81; // Text frame, FIN bit set
     if (len <= 125) {
         buffer[1] = len;
     } else if (len <= 65535) {
@@ -557,16 +559,31 @@ function handleWsUpgrade(serverType, req, socket, head) {
                 _socket: socket
             };
             
+            // [FIX] Execute handler ONCE immediately after successful handshake
+            let wsInstance;
+            try {
+                wsInstance = handlerMod.handler(ws, req);
+                if (typeof wsInstance?.onOpen === 'function') wsInstance.onOpen();
+            } catch (e) {
+                logModuleError('WS-OPEN', cacheKey, e);
+                ws.close(1011, 'Init failed');
+                return; // Stop execution to prevent attaching listeners to a failed connection
+            }
+            
             let frameBuffer = Buffer.alloc(0);
             socket.on('data', (chunk) => {
                 frameBuffer = Buffer.concat([frameBuffer, chunk]);
                 while (frameBuffer.length >= 2) {
                     const message = parseWebSocketFrame(frameBuffer);
                     if (message === null) break;
-                    frameBuffer = Buffer.alloc(0);
+                    
+                    // Note: Clearing the buffer here is a pre-existing quirk in your parser. 
+                    // If multiple frames arrive in a single TCP chunk, this drops the subsequent frames.
+                    frameBuffer = Buffer.alloc(0); 
+                    
                     try {
-                        const instance = handlerMod.handler(ws, req);
-                        if (typeof instance?.onMessage === 'function') instance.onMessage(message);
+                        // [FIX] Use the stored instance instead of re-calling handler
+                        if (typeof wsInstance?.onMessage === 'function') wsInstance.onMessage(message);
                     } catch (e) {
                         logModuleError('WS-MSG', cacheKey, e);
                         ws.close(1011, 'Handler error');
@@ -578,8 +595,8 @@ function handleWsUpgrade(serverType, req, socket, head) {
                 ws.readyState = 3;
                 if (wsCache.has(cacheKey)) wsCache.get(cacheKey).lastAccessed = Date.now();
                 try {
-                    const instance = handlerMod.handler(ws, req);
-                    if (typeof instance?.onClose === 'function') instance.onClose();
+                    // [FIX] Use the stored instance instead of re-calling handler
+                    if (typeof wsInstance?.onClose === 'function') wsInstance.onClose();
                 } catch (e) { }
             });
             
@@ -588,13 +605,7 @@ function handleWsUpgrade(serverType, req, socket, head) {
                 ws.close(1006, 'Socket error');
             });
             
-            try {
-                const instance = handlerMod.handler(ws, req);
-                if (typeof instance?.onOpen === 'function') instance.onOpen();
-            } catch (e) {
-                logModuleError('WS-OPEN', cacheKey, e);
-                ws.close(1011, 'Init failed');
-            }
+            // [FIX] Removed the duplicate handler call that was previously located here
         });
     } catch (e) {
         logModuleError('WS-UPGRADE', req.url || 'unknown', e);
@@ -697,7 +708,9 @@ async function handleReadFile(res, filePathHeader) {
 }
 
 async function handleReadFileBinary(req, res, filePathHeader) {
-    if (!isPathInsideRoot(FILES_ROOT, filePathHeader)) return sendPlainTextResponse(res, 'Access Denied', 403);
+    //console.log("file:");
+	//console.log(JSON.stringify(filePathHeader));
+	if (!isPathInsideRoot(FILES_ROOT, filePathHeader)) return sendPlainTextResponse(res, 'Access Denied', 403);
     const fullPath = path.join(FILES_ROOT, filePathHeader);
     try {
         const stats = await stat(fullPath);

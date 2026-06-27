@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>🔢 SwiGLU Integer Array Predictor</title>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.21.0/dist/tf.min.js"></script>
+<style>
+:root {
+	--primary: #6366f1; --primary-hover: #4f46e5; --bg: #0f172a;
+	--card: #1e293b; --text: #f1f5f9; --text-dim: #94a3b8;
+	--success: #22c55e; --warning: #f59e0b; --error: #ef4444;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+	font-family: 'Segoe UI', system-ui, sans-serif;
+	background: var(--bg); color: var(--text); line-height: 1.6;
+	padding: 20px; min-height: 100vh;
+}
+.container { max-width: 1100px; margin: 0 auto; }
+header { text-align: center; padding: 2rem 1rem; border-bottom: 1px solid #334155; margin-bottom: 2rem; }
+h1 { font-size: 1.8rem; margin-bottom: 0.5rem;
+	background: linear-gradient(135deg, #6366f1, #a855f7);
+	-webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.subtitle { color: var(--text-dim); }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
+.card { background: var(--card); border-radius: 12px; padding: 1.5rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.3); }
+.card h3 { margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 1px solid #334155; display: flex; align-items: center; gap: 0.5rem; }
+.input-group { margin-bottom: 1rem; }
+label { display: block; margin-bottom: 0.4rem; font-size: 0.9rem; color: var(--text-dim); }
+input, select, textarea { width: 100%; padding: 0.75rem; border: 1px solid #334155; border-radius: 8px; background: #0f172a; color: var(--text); font-size: 0.95rem; font-family: monospace; }
+input:focus, select:focus, textarea:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(99,102,241,0.3); }
+textarea { min-height: 100px; resize: vertical; white-space: pre; }
+.btn { background: var(--primary); color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 8px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 0.5rem; width: 100%; justify-content: center; }
+.btn:hover { background: var(--primary-hover); transform: translateY(-1px); }
+.btn:disabled { background: #475569; cursor: not-allowed; transform: none; }
+.btn-row { display: flex; gap: 0.75rem; margin-top: 1rem; }
+.btn-row .btn { flex: 1; }
+.status { margin-top: 1rem; padding: 0.75rem; border-radius: 8px; font-size: 0.9rem; display: none; }
+.status.show { display: block; }
+.status.training { background: rgba(245,158,11,0.2); color: var(--warning); }
+.status.success { background: rgba(34,197,94,0.2); color: var(--success); }
+.status.error { background: rgba(239,68,68,0.2); color: var(--error); }
+.results { margin-top: 1rem; background: #0f172a; border-radius: 8px; padding: 1rem; font-family: monospace; font-size: 0.85rem; max-height: 250px; overflow-y: auto; white-space: pre-wrap; }
+.loss-chart { height: 150px; background: #0f172a; border-radius: 8px; margin-top: 1rem; position: relative; overflow: hidden; }
+.loss-bar { position: absolute; bottom: 0; width: 4px; background: linear-gradient(to top, var(--primary), #a855f7); border-radius: 2px 2px 0 0; transition: height 0.1s; }
+.sample-block { background: #0f172a; border-radius: 8px; padding: 1rem; margin-bottom: 1rem; border: 1px solid #334155; }
+.sample-row { display: flex; gap: 0.5rem; margin-bottom: 0.5rem; align-items: flex-start; }
+.sample-row .field { flex: 1; position: relative; }
+.sample-row .field label { font-size: 0.85rem; color: var(--text-dim); margin-bottom: 0.3rem; }
+.sample-row textarea { min-height: 60px; font-size: 0.9rem; padding: 0.5rem; width: 100%; }
+.size-badge { position: absolute; top: -8px; right: -8px; background: #334155; color: var(--text); font-size: 0.7rem; padding: 2px 6px; border-radius: 10px; font-weight: bold; }
+.sample-row .remove-btn { background: var(--error); color: white; border: none; width: 32px; height: 32px; border-radius: 6px; cursor: pointer; font-weight: bold; margin-top: 4px; }
+.sample-row .remove-btn:hover { background: #dc2626; }
+.add-sample-btn { background: #334155; color: var(--text); border: none; padding: 0.5rem 1rem; border-radius: 8px; cursor: pointer; margin: 0.5rem 0; font-size: 0.9rem; }
+.add-sample-btn:hover { background: #475569; }
+.prediction-item { background: #0f172a; padding: 0.75rem; border-radius: 8px; margin-bottom: 0.75rem; }
+.prediction-item .input { font-size: 0.8rem; color: var(--text-dim); margin-bottom: 0.3rem; word-break: break-all; }
+.prediction-item .output { font-size: 1rem; font-weight: bold; color: var(--primary); font-family: monospace; word-break: break-all; transition: color 0.2s; }
+.tester-input { margin-bottom: 1rem; }
+.tester-input textarea { min-height: 70px; }
+.result-box { background: linear-gradient(135deg, #1e293b, #334155); border-radius: 12px; padding: 1.25rem; text-align: center; margin-top: 1rem; border: 2px solid transparent; transition: border-color 0.3s; }
+.result-box.ready { border-color: var(--primary); }
+.result-box .label { font-size: 0.9rem; color: var(--text-dim); margin-bottom: 0.5rem; }
+.result-box .value { font-size: 1.3rem; font-weight: bold; font-family: monospace; color: var(--success); word-break: break-all; }
+.result-box .stats { font-size: 0.85rem; color: var(--text-dim); margin-top: 0.5rem; }
+.hint { font-size: 0.8rem; color: var(--text-dim); margin-top: 0.5rem; text-align: center; }
+.arch-code { font-size: 0.85rem; line-height: 1.5; }
+.arch-code strong { color: var(--primary); }
+.toggle-row { display: flex; align-items: center; gap: 0.5rem; margin: 0.5rem 0; }
+.toggle-row input { width: auto; }
+.epoch-counter { font-size: 0.85rem; color: var(--text-dim); margin-top: 0.75rem; text-align: center; }
+footer { text-align: center; padding: 2rem; color: var(--text-dim); font-size: 0.9rem; border-top: 1px solid #334155; margin-top: 2rem; }
+@media (max-width: 600px) { .grid { grid-template-columns: 1fr; } .btn-row { flex-direction: column; } }
+</style>
+</head>
+<body>
+<div class="container">
+<header>
+<h1>🔢 SwiGLU Integer Array Predictor</h1>
+<p class="subtitle">Learn integer mappings: <code>[1, 5, 8, 8, 9] → [8, 7, 5, 4, 3]</code></p>
+</header>
+
+<div class="grid">
+<div class="card">
+<h3>📋 Training Samples</h3>
+<p style="color:var(--text-dim);margin-bottom:1rem">⚠️ All inputs/outputs must be same length. Integers only (decimals auto-rounded).</p>
+<div id="samplesContainer"></div>
+<button class="add-sample-btn" onclick="addSampleBlock()">+ Add Sample Pair</button>
+<div class="btn-row">
+<button class="btn" style="background:#334155" onclick="generateRandomSamples(5)">🎲 Generate 5 Random</button>
+<button class="btn" style="background:#334155" onclick="clearSamples()">🗑️ Clear All</button>
+</div>
+<div class="toggle-row">
+<input type="checkbox" id="normalizeToggle" checked>
+<label for="normalizeToggle" style="margin:0;font-size:0.9rem">Normalize to [-1,1] internally (recommended)</label>
+</div>
+</div>
+
+<div class="card">
+<h3>⚙️ Train Model</h3>
+<div class="input-group">
+<label for="epochs">Epochs</label>
+<input type="number" id="epochs" value="300" min="10" max="5000" step="10">
+</div>
+<div class="input-group">
+<label for="learningRate">Learning Rate</label>
+<select id="learningRate">
+<option value="0.1">0.1 (Fast)</option>
+<option value="0.05" selected>0.05 (Balanced)</option>
+<option value="0.01">0.01 (Precise)</option>
+<option value="0.001">0.001 (Fine-tune)</option>
+</select>
+</div>
+<div class="input-group">
+<label for="earlyStopThreshold">Early Stop (MSE)</label>
+<input type="number" id="earlyStopThreshold" value="0.001" min="0.0001" max="0.1" step="0.0001">
+</div>
+<div class="input-group">
+<label for="hiddenUnits">Hidden Units (SwiGLU)</label>
+<input type="number" id="hiddenUnits" value="16" min="4" max="128" step="4">
+</div>
+<button class="btn" id="trainBtn" onclick="trainModel()">🚀 Start Training</button>
+<div id="trainStatus" class="status"></div>
+<div class="epoch-counter">Epoch: <span id="epochCounter">0</span>/<span id="epochTotal">300</span></div>
+<div class="loss-chart" id="lossChart"></div>
+<div class="results" id="trainLog">Add samples and click train...</div>
+</div>
+
+<div class="card">
+<h3>🔮 Predictions</h3>
+<p style="color:var(--text-dim);margin-bottom:1rem">Test trained model on training samples:</p>
+<div id="predictionList"></div>
+<div class="btn-row">
+<button class="btn" id="predictBtn" onclick="runPredictions()" disabled>▶️ Run Predictions</button>
+<button class="btn" style="background:#475569" onclick="resetModel()">🔄 Reset</button>
+</div>
+<div id="predictStatus" class="status"></div>
+</div>
+
+<div class="card">
+<h3>🎯 Test Custom Array</h3>
+<p style="color:var(--text-dim);margin-bottom:1rem">Enter integer array to predict output:</p>
+<div class="tester-input">
+<label for="testInput">Input Array (e.g., [1, 5, 8, 8, 9])</label>
+<textarea id="testInput" placeholder="[1, 5, 8, 8, 9]">[0, 0, 0]</textarea>
+</div>
+<button class="btn" id="testBtn" onclick="testCustomInput()" disabled>🔍 Predict</button>
+<div class="result-box" id="resultBox">
+<div class="label">Predicted Output (Rounded)</div>
+<div class="value" id="customResult">[--]</div>
+<div class="stats" id="predStats"></div>
+</div>
+<p class="hint">💡 Tip: Model learns integer patterns. Outputs are rounded to nearest whole number.</p>
+<div id="testStatus" class="status"></div>
+</div>
+
+<div class="card">
+<h3>📐 Model Info</h3>
+<div class="results arch-code" style="max-height:none">
+<strong>Input Dim:</strong> <span id="archInput">?</span><br>
+<strong>Output Dim:</strong> <span id="archOutput">?</span><br>
+<strong>SwiGLU Hidden:</strong> <span id="archHidden">16</span> units<br>
+&nbsp;&nbsp;├─ Gate: Dense → Swish<br>
+&nbsp;&nbsp;├─ Value: Dense<br>
+&nbsp;&nbsp;└─ Output: gate ⊗ value<br>
+<strong>Output Layer:</strong> Dense(<span id="archOutDim">?</span>, linear)<br><br>
+<strong>Optimizer:</strong> Adam | <strong>Loss:</strong> MSE 📉<br>
+<strong>Early Stop:</strong> MSE &lt; <span id="archThreshold">0.001</span><br>
+<span id="normStatus" style="color:var(--success)">✅ Normalization enabled</span>
+</div>
+</div>
+</div>
+
+<footer>
+<p>Built with ❤️ using <a href="https://www.tensorflow.org/js" target="_blank" style="color:var(--primary);text-decoration:none">TensorFlow.js</a></p>
+<p style="margin-top:0.5rem;font-size:0.8rem">SwiGLU for integer array mapping • Auto-rounded outputs • Fixed-length validation</p>
+</footer>
+</div>
+
+<script>
+let model = null;
+let isTraining = false;
+let inputSize = 0;
+let outputSize = 0;
+let normalization = { xMin: null, xMax: null, yMin: null, yMax: null };
+const lossHistory = [];
+let trainingData = { xs: null, ys: null, raw: null };
+
+function parseIntegerArray(str) {
+	const cleaned = str.trim().replace(/[\[\]]/g, '');
+	if (!cleaned) return [];
+	const parts = cleaned.split(',').map(s => s.trim()).filter(s => s !== '');
+	const nums = [];
+	for (const s of parts) {
+		const floatVal = parseFloat(s);
+		if (isNaN(floatVal)) return [];
+		nums.push(Math.round(floatVal));
+	}
+	return nums;
+}
+
+function formatIntegerArray(arr) {
+	return '[' + arr.map(v => Math.round(v)).join(', ') + ']';
+}
+
+function addSampleBlock(inputArr = [1,5,8], outputArr = [8,7,5,4]) {
+	const container = document.getElementById('samplesContainer');
+	const block = document.createElement('div');
+	block.className = 'sample-block';
+	block.innerHTML = `
+		<div class="sample-row">
+			<div class="field">
+				<label>Input Array</label>
+				<textarea class="sample-input" oninput="updateSizeBadges(this.closest('.sample-block'))">${formatIntegerArray(inputArr)}</textarea>
+				<div class="size-badge">[?]</div>
+			</div>
+			<div class="field">
+				<label>Output Array</label>
+				<textarea class="sample-output" oninput="updateSizeBadges(this.closest('.sample-block'))">${formatIntegerArray(outputArr)}</textarea>
+				<div class="size-badge">[?]</div>
+			</div>
+			<button class="remove-btn" onclick="this.closest('.sample-block').remove(); updateSizeBadgesAll();">×</button>
+		</div>
+	`;
+	container.appendChild(block);
+	updateSizeBadgesAll();
+}
+
+function updateSizeBadges(block) {
+	const inArr = parseIntegerArray(block.querySelector('.sample-input').value);
+	const outArr = parseIntegerArray(block.querySelector('.sample-output').value);
+	const badges = block.querySelectorAll('.size-badge');
+	badges[0].textContent = `[${inArr.length}]`;
+	badges[1].textContent = `[${outArr.length}]`;
+	badges[0].style.background = inArr.length > 0 ? '#334155' : '#475569';
+	badges[1].style.background = outArr.length > 0 ? '#334155' : '#475569';
+}
+
+function updateSizeBadgesAll() {
+	document.querySelectorAll('.sample-block').forEach(block => updateSizeBadges(block));
+}
+
+function getSamplesFromUI() {
+	const blocks = document.querySelectorAll('#samplesContainer .sample-block');
+	const samples = [];
+	for (const block of blocks) {
+		const input = parseIntegerArray(block.querySelector('.sample-input').value);
+		const output = parseIntegerArray(block.querySelector('.sample-output').value);
+		if (input.length > 0 && output.length > 0) {
+			samples.push({ input, output });
+		}
+	}
+	return samples;
+}
+
+function generateRandomSamples(count = 5) {
+	const samples = [];
+	const inSize = Math.floor(Math.random() * 5) + 2;
+	const outSize = Math.floor(Math.random() * 6) + 2;
+	for (let i = 0; i < count; i++) {
+		const input = Array.from({length: inSize}, () => Math.floor(Math.random() * 20) - 10);
+		const output = Array.from({length: outSize}, () => Math.floor(Math.random() * 20) - 10);
+		samples.push({ input, output });
+	}
+	document.getElementById('samplesContainer').innerHTML = '';
+	samples.forEach(s => addSampleBlock(s.input, s.output));
+	log(`🎲 Generated ${count} random integer samples: ${samples[0].input.length}→${samples[0].output.length}`);
+}
+
+function clearSamples() {
+	document.getElementById('samplesContainer').innerHTML = '';
+	inputSize = 0; outputSize = 0;
+	updateArchitectureDisplay();
+	log('🗑️ Samples cleared');
+}
+
+function updateArchitectureDisplay() {
+	const samples = getSamplesFromUI();
+	if (samples.length > 0) {
+		inputSize = samples[0].input.length;
+		outputSize = samples[0].output.length;
+	}
+	const hidden = parseInt(document.getElementById('hiddenUnits').value) || 16;
+	document.getElementById('archInput').textContent = inputSize || '?';
+	document.getElementById('archOutput').textContent = outputSize || '?';
+	document.getElementById('archHidden').textContent = hidden;
+	document.getElementById('archOutDim').textContent = outputSize || '?';
+	document.getElementById('archThreshold').textContent = document.getElementById('earlyStopThreshold').value;
+	document.getElementById('normStatus').textContent = document.getElementById('normalizeToggle').checked ? '✅ Normalization enabled' : '⚠️ Normalization disabled';
+	document.getElementById('normStatus').style.color = document.getElementById('normalizeToggle').checked ? 'var(--success)' : 'var(--warning)';
+	updatePredictionList();
+}
+
+function normalizeArray(arr, min, max) {
+	if (min === null || max === null || min === max) return arr.map(Number);
+	return arr.map(v => ((v - min) / (max - min)) * 2 - 1);
+}
+
+function denormalizeArray(arr, min, max) {
+	if (min === null || max === null || min === max) return arr.map(Number);
+	return arr.map(v => ((v + 1) / 2) * (max - min) + min);
+}
+
+function computeNormalization(samples) {
+	if (!document.getElementById('normalizeToggle').checked) {
+		return { xMin: null, xMax: null, yMin: null, yMax: null };
+	}
+	const allX = samples.flatMap(s => s.input);
+	const allY = samples.flatMap(s => s.output);
+	return {
+		xMin: Math.min(...allX), xMax: Math.max(...allX),
+		yMin: Math.min(...allY), yMax: Math.max(...allY)
+	};
+}
+
+function validateAndPrepareData() {
+	const samples = getSamplesFromUI();
+	if (samples.length < 2) throw new Error('Need at least 2 training samples');
+
+	const firstInputLen = samples[0].input.length;
+	const firstOutputLen = samples[0].output.length;
+
+	for (let i = 1; i < samples.length; i++) {
+		if (samples[i].input.length !== firstInputLen) {
+			throw new Error(`Input length mismatch: Sample 1 has ${firstInputLen} elements, Sample ${i+1} has ${samples[i].input.length}. All inputs must match.`);
+		}
+		if (samples[i].output.length !== firstOutputLen) {
+			throw new Error(`Output length mismatch: Sample 1 has ${firstOutputLen} elements, Sample ${i+1} has ${samples[i].output.length}. All outputs must match.`);
+		}
+	}
+
+	inputSize = firstInputLen;
+	outputSize = firstOutputLen;
+	updateArchitectureDisplay();
+
+	normalization = computeNormalization(samples);
+	const xs = samples.map(s => normalizeArray(s.input, normalization.xMin, normalization.xMax));
+	const ys = samples.map(s => normalizeArray(s.output, normalization.yMin, normalization.yMax));
+
+	return {
+		xs: tf.tensor2d(xs),
+		ys: tf.tensor2d(ys),
+		raw: { xs: samples.map(s => s.input), ys: samples.map(s => s.output) }
+	};
+}
+
+function createModel(learningRate) {
+	const hiddenUnits = parseInt(document.getElementById('hiddenUnits').value) || Math.max(16, inputSize * 4);
+	const input = tf.input({shape: [inputSize]});
+	const gate = tf.layers.dense({units: hiddenUnits, useBias: true}).apply(input);
+	const value = tf.layers.dense({units: hiddenUnits, useBias: true}).apply(input);
+	const swishGate = tf.layers.activation({activation: 'swish'}).apply(gate);
+	const swigluOutput = tf.layers.multiply().apply([swishGate, value]);
+	const output = tf.layers.dense({units: outputSize, activation: 'linear'}).apply(swigluOutput);
+	const model = tf.model({inputs: input, outputs: output});
+	model.compile({
+		optimizer: tf.train.adam(learningRate),
+		loss: 'meanSquaredError',
+		metrics: ['mae']
+	});
+	return model;
+}
+
+function updateLossChart() {
+	const chart = document.getElementById('lossChart');
+	chart.innerHTML = '';
+	if (lossHistory.length === 0) return;
+	const maxLoss = Math.max(...lossHistory, 0.001);
+	const barWidth = Math.max(2, Math.floor(300 / Math.max(lossHistory.length, 50)));
+	lossHistory.forEach((loss, index) => {
+		const bar = document.createElement('div');
+		bar.className = 'loss-bar';
+		bar.style.left = `${index * barWidth}px`;
+		bar.style.height = `${Math.min(100, (loss / maxLoss) * 100)}%`;
+		bar.title = `Epoch ${index + 1}: MSE ${loss.toFixed(5)}`;
+		chart.appendChild(bar);
+	});
+}
+
+function log(message, type = 'info') {
+	const logEl = document.getElementById('trainLog');
+	const timestamp = new Date().toLocaleTimeString();
+	const prefix = type === 'error' ? '❌' : type === 'success' ? '✅' : type === 'warning' ? '⚡' : 'ℹ️';
+	logEl.innerHTML += `[${timestamp}] ${prefix} ${message}\n`;
+	logEl.scrollTop = logEl.scrollHeight;
+}
+
+function showStatus(elementId, message, type) {
+	const el = document.getElementById(elementId);
+	el.textContent = message;
+	el.className = `status show ${type}`;
+}
+
+function updatePredictionList() {
+	const list = document.getElementById('predictionList');
+	list.innerHTML = '';
+	const samples = getSamplesFromUI().slice(0, 6);
+	if (samples.length === 0) {
+		list.innerHTML = '<div style="color:var(--text-dim);text-align:center">Add samples to see predictions</div>';
+		return;
+	}
+	samples.forEach((sample, idx) => {
+		const item = document.createElement('div');
+		item.className = 'prediction-item';
+		item.innerHTML = `
+			<div class="input">in: ${formatIntegerArray(sample.input)}</div>
+			<div class="output" id="predIdx${idx}">out: [?]</div>
+		`;
+		list.appendChild(item);
+	});
+}
+
+// 🔑 FIXED: Early stop checks AFTER fit() + uses outer loop `epoch` variable
+async function trainModel() {
+	if (isTraining) return;
+	const trainBtn = document.getElementById('trainBtn');
+	const predictBtn = document.getElementById('predictBtn');
+	const testBtn = document.getElementById('testBtn');
+
+	isTraining = true;
+	trainBtn.disabled = true;
+	predictBtn.disabled = true;
+	testBtn.disabled = true;
+	lossHistory.length = 0;
+	document.getElementById('trainLog').innerHTML = '';
+	showStatus('trainStatus', '', '');
+
+	try {
+		const data = validateAndPrepareData();
+		trainingData = data;
+		const epochs = parseInt(document.getElementById('epochs').value);
+		const learningRate = parseFloat(document.getElementById('learningRate').value);
+		const earlyStopThreshold = parseFloat(document.getElementById('earlyStopThreshold').value) || 0.001;
+
+		document.getElementById('epochCounter').textContent = '0';
+		document.getElementById('epochTotal').textContent = epochs;
+
+		showStatus('trainStatus', 'Initializing SwiGLU model...', 'training');
+		const normInfo = normalization.xMin !== null ? ` | Norm: [${normalization.xMin},${normalization.xMax}]→[${normalization.yMin},${normalization.yMax}]` : '';
+		log(`Training: ${epochs} epochs, LR: ${learningRate} | Loss: MSE`);
+		log(`📊 Samples: ${data.xs.shape[0]} | ${inputSize} → ${outputSize}${normInfo}`);
+		log(`🎯 Early stopping: MSE < ${earlyStopThreshold}`);
+
+		model = createModel(learningRate);
+		showStatus('trainStatus', 'Training...', 'training');
+
+		let earlyStopped = false;
+		// Manual loop: runs 1 epoch at a time for precise control
+		for (let epoch = 0; epoch < epochs; epoch++) {
+			if (earlyStopped) break;
+
+			const history = await model.fit(data.xs, data.ys, {
+				epochs: 1,
+				callbacks: {
+					// 🔑 FIXED: Removed 'async' and use outer `epoch` instead of callback `ep`
+					onEpochEnd: (_, logs) => {
+						lossHistory.push(logs.loss);
+						updateLossChart();
+						const mae = logs.mae ? `| MAE: ${logs.mae.toFixed(4)}` : '';
+						log(`Epoch ${epoch + 1}/${epochs} - MSE: ${logs.loss.toFixed(5)} ${mae}`);
+						
+						const counter = document.getElementById('epochCounter');
+						if (counter) counter.textContent = epoch + 1;
+						
+						showStatus('trainStatus', `${Math.round((epoch + 1) / epochs * 100)}% complete`, 'training');
+					}
+				}
+			});
+
+			// Check early stopping AFTER fit() fully resolves
+			const lastLoss = history.history.loss[0];
+			if (lastLoss < earlyStopThreshold) {
+				earlyStopped = true;
+				log(`✨ Early stop triggered! MSE: ${lastLoss.toFixed(5)}`, 'warning');
+				showStatus('trainStatus', `🎯 Early stopped at epoch ${epoch + 1}!`, 'success');
+				break;
+			}
+
+			await tf.nextFrame(); // Keep UI responsive
+		}
+
+		if (!earlyStopped) {
+			showStatus('trainStatus', '✅ Training complete!', 'success');
+			log('🎉 Model trained successfully!', 'success');
+		}
+		updatePredictionList();
+		predictBtn.disabled = false;
+		testBtn.disabled = false;
+	} catch (error) {
+		console.error(error);
+		showStatus('trainStatus', `❌ Error: ${error.message}`, 'error');
+		log(`Error: ${error.message}`, 'error');
+	} finally {
+		isTraining = false;
+		trainBtn.disabled = false;
+	}
+}
+
+async function runPredictions() {
+	if (!model || !trainingData.xs) { showStatus('predictStatus', '⚠️ Train model first!', 'error'); return; }
+	document.getElementById('predictBtn').disabled = true;
+	showStatus('predictStatus', 'Running predictions...', 'training');
+	try {
+		const samples = getSamplesFromUI();
+		const items = document.querySelectorAll('.prediction-item .output');
+		for (let i = 0; i < Math.min(samples.length, items.length); i++) {
+			let input = normalizeArray(samples[i].input, normalization.xMin, normalization.xMax);
+			const inputTensor = tf.tensor2d([input]);
+			const prediction = model.predict(inputTensor);
+			let values = await prediction.data();
+			let denorm = normalization.yMin !== null ? denormalizeArray(Array.from(values), normalization.yMin, normalization.yMax) : Array.from(values);
+			const intValues = denorm.map(v => Math.round(v));
+			const formatted = formatIntegerArray(intValues);
+
+			items[i].textContent = `out: ${formatted}`;
+
+			// 🔑 NEW: Compare prediction with actual target and color-code
+			const target = samples[i].output;
+			const isMatch = intValues.length === target.length && intValues.every((val, idx) => val === target[idx]);
+			items[i].style.color = isMatch ? '#22c55e' : '#ef4444';
+
+			inputTensor.dispose(); prediction.dispose();
+		}
+		showStatus('predictStatus', '✅ Predictions complete!', 'success');
+	} catch (error) {
+		console.error(error);
+		showStatus('predictStatus', `❌ Error: ${error.message}`, 'error');
+	} finally {
+		document.getElementById('predictBtn').disabled = false;
+	}
+}
+
+async function testCustomInput() {
+	if (!model) { showStatus('testStatus', '⚠️ Train model first!', 'error'); return; }
+	const inputStr = document.getElementById('testInput').value;
+	let input = parseIntegerArray(inputStr);
+	if (input.length === 0) {
+		showStatus('testStatus', '⚠️ Enter a valid integer array', 'error');
+		return;
+	}
+	if (input.length !== inputSize) {
+		showStatus('testStatus', `⚠️ Input size mismatch: expected ${inputSize}, got ${input.length}`, 'error');
+		return;
+	}
+	const resultBox = document.getElementById('resultBox');
+	showStatus('testStatus', 'Processing...', 'training');
+	resultBox.classList.add('ready');
+	try {
+		let normalizedInput = normalizeArray(input, normalization.xMin, normalization.xMax);
+		const inputTensor = tf.tensor2d([normalizedInput]);
+		const prediction = model.predict(inputTensor);
+		let values = await prediction.data();
+		let denorm = normalization.yMin !== null ? denormalizeArray(Array.from(values), normalization.yMin, normalization.yMax) : Array.from(values);
+		const intValues = denorm.map(v => Math.round(v));
+		const formatted = formatIntegerArray(intValues);
+		document.getElementById('customResult').textContent = formatted;
+		
+		const mse = intValues.reduce((sum, v, i) => {
+			const target = trainingData.raw?.ys?.[0]?.[i];
+			return target !== undefined ? sum + Math.pow(v - target, 2) : sum;
+		}, 0) / (intValues.length || 1);
+		document.getElementById('predStats').textContent = `Est. per-value error: ${Math.sqrt(mse).toFixed(2)} RMSE`;
+		document.getElementById('customResult').style.color = 'var(--success)';
+		showStatus('testStatus', '✅ Done!', 'success');
+		inputTensor.dispose(); prediction.dispose();
+	} catch (error) {
+		console.error(error);
+		showStatus('testStatus', `❌ Error: ${error.message}`, 'error');
+	}
+}
+
+function resetModel() {
+	if (model) { model.dispose(); model = null; }
+	if (trainingData.xs) { trainingData.xs.dispose(); trainingData.ys.dispose(); trainingData = { xs: null, ys: null, raw: null }; }
+	document.querySelectorAll('.prediction-item .output').forEach(el => {
+		el.textContent = 'out: [?]';
+		el.style.color = 'var(--primary)';
+	});
+	document.getElementById('customResult').textContent = '[--]';
+	document.getElementById('predStats').textContent = '';
+	document.getElementById('resultBox').classList.remove('ready');
+	document.getElementById('lossChart').innerHTML = '';
+	document.getElementById('trainLog').innerHTML = 'Add samples and click train...';
+	['trainStatus','predictStatus','testStatus'].forEach(id => document.getElementById(id).className = 'status');
+	document.getElementById('predictBtn').disabled = true;
+	document.getElementById('testBtn').disabled = true;
+	lossHistory.length = 0;
+	document.getElementById('epochCounter').textContent = '0';
+	log('🔄 Reset complete');
+}
+
+document.getElementById('hiddenUnits').addEventListener('change', updateArchitectureDisplay);
+document.getElementById('earlyStopThreshold').addEventListener('change', () => {
+	document.getElementById('archThreshold').textContent = document.getElementById('earlyStopThreshold').value;
+});
+document.getElementById('normalizeToggle').addEventListener('change', updateArchitectureDisplay);
+
+document.addEventListener('DOMContentLoaded', () => {
+	log('👋 SwiGLU Integer Array Predictor ready!');
+	log('💡 Tip: Use fixed-length integer arrays. Outputs are auto-rounded.');
+	addSampleBlock([1, 5, 8], [8, 7, 5, 4]);
+	addSampleBlock([2, 3, 9], [1, 8]);
+	updateSizeBadgesAll();
+	updateArchitectureDisplay();
+	document.addEventListener('keydown', (e) => {
+		if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && !isTraining) {
+			e.preventDefault(); trainModel();
+		}
+	});
+});
+
+window.addEventListener('beforeunload', () => {
+	if (model) model.dispose();
+	if (trainingData.xs) { trainingData.xs.dispose(); trainingData.ys.dispose(); }
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>🧠 Chat-Ready Browser LLM (SwiGLU + RoPE + Special Tokens)</title>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.17.0/dist/tf.min.js"></script>
+<style>
+:root {
+	--primary: #6366f1; --primary-hover: #4f46e5; --bg: #0f172a;
+	--card: #1e293b; --text: #f1f5f9; --text-dim: #94a3b8;
+	--success: #22c55e; --warning: #f59e0b; --error: #ef4444;
+	--code-bg: #020617; --border: #334155;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+	font-family: 'Segoe UI', system-ui, sans-serif;
+	background: var(--bg); color: var(--text); line-height: 1.6;
+	padding: 20px; min-height: 100vh;
+}
+.container { max-width: 1100px; margin: 0 auto; }
+header { text-align: center; padding: 2rem 1rem; border-bottom: 1px solid #334155; margin-bottom: 2rem; }
+h1 { font-size: 1.8rem; margin-bottom: 0.5rem;
+	background: linear-gradient(135deg, #6366f1, #a855f7);
+	-webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.subtitle { color: var(--text-dim); font-size: 0.95rem; }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
+.card { background: var(--card); border-radius: 12px; padding: 1.5rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.3); border: 1px solid var(--border); }
+.card h3 { margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 0.5rem; color: var(--primary); }
+
+textarea, input, select {
+	width: 100%; padding: 0.75rem; border: 1px solid var(--border);
+	border-radius: 8px; background: var(--code-bg); color: var(--text);
+	font-size: 0.95rem; font-family: 'Consolas', monospace; resize: vertical;
+}
+textarea:focus, input:focus, select:focus {
+	outline: none; border-color: var(--primary);
+	box-shadow: 0 0 0 3px rgba(99,102,241,0.3);
+}
+textarea[readonly] {
+	cursor: default; opacity: 0.85; background: #0b1120; color: #cbd5e1;
+	font-size: 0.85rem; min-height: 60px; letter-spacing: 0.02em;
+}
+#rawOutput { min-height: 180px; }
+textarea { min-height: 120px; }
+
+.input-group { margin-bottom: 1rem; }
+label { display: block; margin-bottom: 0.4rem; font-size: 0.9rem; color: var(--text-dim); }
+.checkbox-group { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem; }
+.checkbox-group input[type="checkbox"] { width: auto; margin: 0; cursor: pointer; }
+.checkbox-group label { margin: 0; cursor: pointer; color: var(--text); font-size: 0.9rem; }
+
+.btn {
+	background: var(--primary); color: white; border: none;
+	padding: 0.75rem 1.5rem; border-radius: 8px; font-size: 1rem;
+	font-weight: 600; cursor: pointer; transition: all 0.2s;
+	display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
+}
+.btn:hover { background: var(--primary-hover); transform: translateY(-1px); }
+.btn:disabled { background: #475569; cursor: not-allowed; transform: none; opacity: 0.7; }
+.btn-row { display: flex; gap: 0.75rem; margin-top: 1rem; }
+.btn-row .btn { flex: 1; }
+
+.status { margin-top: 1rem; padding: 0.75rem; border-radius: 8px; font-size: 0.9rem; display: none; }
+.status.show { display: block; }
+.status.training { background: rgba(245,158,11,0.2); color: var(--warning); }
+.status.success { background: rgba(34,197,94,0.2); color: var(--success); }
+.status.error { background: rgba(239,68,68,0.2); color: var(--error); }
+
+.log-area {
+	background: var(--code-bg); border-radius: 8px; padding: 1rem;
+	font-family: monospace; font-size: 0.85rem; max-height: 180px;
+	overflow-y: auto; border: 1px solid var(--border); white-space: pre-wrap;
+}
+
+.loss-chart { height: 120px; background: var(--code-bg); border-radius: 8px; margin-top: 1rem; position: relative; overflow: hidden; border: 1px solid var(--border); }
+.loss-bar { position: absolute; bottom: 0; width: 3px; background: linear-gradient(to top, var(--primary), #a855f7); border-radius: 2px 2px 0 0; transition: height 0.1s; }
+
+.chat-area { margin-top: 1rem; }
+.chat-input-container { display: flex; gap: 0.5rem; margin-bottom: 0.5rem; align-items: center; }
+.chat-input-container select { width: auto; min-width: 130px; flex-shrink: 0; }
+.chat-input-container input { flex: 1; }
+.chat-input-container .btn { width: auto; min-width: 120px; flex-shrink: 0; padding: 0.75rem; }
+
+.chat-output {
+	background: linear-gradient(135deg, var(--card), #334155);
+	border-radius: 12px; padding: 1.25rem; text-align: left;
+	border: 2px solid transparent; transition: border-color 0.3s;
+	min-height: 80px;
+}
+.chat-output.ready { border-color: var(--success); }
+.chat-output .role { font-weight: bold; color: var(--primary); margin-bottom: 0.25rem; }
+.chat-output .text { font-size: 1.1rem; color: var(--text); line-height: 1.5; }
+.chat-output .text span { color: var(--success); font-weight: 500; }
+
+.stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.75rem; margin-top: 1rem; }
+.stat-box { background: var(--code-bg); padding: 0.75rem; border-radius: 8px; text-align: center; }
+.stat-box .value { font-size: 1.4rem; font-weight: bold; color: var(--primary); }
+.stat-box .label { font-size: 0.8rem; color: var(--text-dim); }
+
+.tokenizer-status { display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: var(--text-dim); margin-top: 0.5rem; }
+.status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--warning); }
+.status-dot.success { background: var(--success); }
+.status-dot.error { background: var(--error); }
+
+.arch-info { font-size: 0.9rem; color: var(--text-dim); line-height: 1.8; }
+.arch-info code { background: var(--code-bg); padding: 2px 6px; border-radius: 4px; color: #a5b4fc; font-family: monospace; }
+
+/* ========== Prediction Panel ========== */
+.prediction-panel {
+    margin-top: 1rem;
+    background: var(--code-bg);
+    border-radius: 8px;
+    border: 2px solid var(--primary);
+    overflow: hidden;
+    display: none !important;
+    animation: slideDown 0.3s ease-out;
+}
+.prediction-panel.show { display: block !important; }
+@keyframes slideDown { 
+    from { opacity: 0; transform: translateY(-10px); max-height: 0; } 
+    to { opacity: 1; transform: translateY(0); max-height: 300px; } 
+}
+.prediction-header {
+    padding: 0.6rem 0.85rem;
+    background: rgba(99,102,241,0.2);
+    border-bottom: 1px solid var(--border);
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--primary);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.prediction-list {
+    max-height: 180px;
+    overflow-y: auto;
+    font-family: 'Consolas', monospace;
+    font-size: 0.85rem;
+}
+.prediction-item {
+    padding: 0.5rem 0.85rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid rgba(51,65,85,0.5);
+    cursor: pointer;
+    transition: background 0.15s;
+}
+.prediction-item:hover { background: rgba(99,102,241,0.15); }
+.prediction-item:last-child { border-bottom: none; }
+.prediction-token {
+    color: var(--text);
+    font-weight: 500;
+    white-space: pre-wrap;
+    word-break: break-all;
+    max-width: 70%;
+}
+.prediction-prob {
+    color: var(--success);
+    font-size: 0.85rem;
+    min-width: 55px;
+    text-align: right;
+    font-weight: 600;
+}
+.prediction-bar {
+    height: 6px;
+    background: linear-gradient(90deg, var(--primary), transparent);
+    border-radius: 3px;
+    margin-left: 0.75rem;
+    flex: 1;
+    max-width: 90px;
+}
+
+/* ========== Spinner Animation ========== */
+@keyframes spin { 
+  from { transform: rotate(0deg); } 
+  to { transform: rotate(360deg); } 
+}
+
+footer { text-align: center; padding: 2rem; color: var(--text-dim); font-size: 0.9rem; border-top: 1px solid var(--border); margin-top: 2rem; }
+footer a { color: var(--primary); text-decoration: none; }
+footer a:hover { text-decoration: underline; }
+
+@media (max-width: 768px) {
+	.grid { grid-template-columns: 1fr; }
+	.chat-input-container { flex-direction: column; }
+	.chat-input-container select, .chat-input-container input, .chat-input-container .btn { width: 100%; min-width: 0; }
+	.stats-grid { grid-template-columns: 1fr 1fr; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+<header>
+<h1>🧠 Chat-Ready Browser LLM <span style="font-size:0.7em;vertical-align:super;color:var(--warning)">SwiGLU + RoPE</span></h1>
+<p class="subtitle">Train a conversational model in-browser • Raw prompt mode • Autoregressive generation</p>
+</header>
+
+<div class="grid">
+<!-- Training Data -->
+<div class="card">
+<h3>📚 Chat Training Data</h3>
+<p style="color:var(--text-dim);margin-bottom:1rem;font-size:0.9rem">Use `<|user|>`, `<|assistant|>`, `<|system|>`, and `<|stop|>` tokens. Whitespace is ignored.</p>
+<textarea id="sampleText" placeholder="Enter chat examples..."><|user|>Hello, how are you?<|assistant|>I'm running smoothly in your browser! How can I help?<|stop|>
+<|user|>What is SwiGLU?<|assistant|>A gated activation that splits the feedforward layer into gate and value paths, then multiplies them.<|stop|>
+<|system|>Be concise.<|user|>Explain RoPE simply.<|assistant|>Rotary Positional Embedding rotates token vectors to encode position without adding fixed embeddings.<|stop|>
+<|user|>Can you run offline?<|assistant|>Yes! Everything happens locally. No data leaves your machine.<|stop|>
+<|user|>Thanks!<|assistant|>You're welcome! Ask me anything else.<|stop|></textarea>
+<div class="stats-grid">
+<div class="stat-box"><div class="value" id="sampleCount">5</div><div class="label">Examples</div></div>
+<div class="stat-box"><div class="value" id="vocabSize">—</div><div class="label">Vocab Size</div></div>
+</div>
+<div class="tokenizer-status">
+<span class="status-dot" id="tokDot"></span>
+<span id="tokStatus">Building tokenizer...</span>
+</div>
+<!-- ========== REBUILD TOKENIZER BUTTON ========== -->
+<div class="btn-row" style="margin-top: 0.75rem;">
+  <button class="btn" id="rebuildTokenBtn" style="background:#475569; padding: 0.5rem 1rem; font-size: 0.9rem;" disabled>
+    🔄 Rebuild Tokenizer
+  </button>
+</div>
+</div>
+
+<!-- Training Controls -->
+<div class="card">
+<h3>⚙️ Train Model</h3>
+<div class="input-group">
+<label for="epochs">Epochs</label>
+<input type="number" id="epochs" value="40" min="10" max="150" step="10">
+</div>
+<div class="input-group">
+<label for="learningRate">Learning Rate</label>
+<select id="learningRate">
+<option value="0.01">0.01 (Stable)</option>
+<option value="0.005" selected>0.005 (Balanced)</option>
+<option value="0.001">0.001 (Precise)</option>
+</select>
+</div>
+<div class="input-group">
+<label for="seqLength">Context Window</label>
+<select id="seqLength">
+<option value="8">8 tokens (Fast)</option>
+<option value="16">16 tokens (Balanced)</option>
+<option value="32">32 tokens (Deep)</option>
+<option value="64">64 tokens (Long)</option>
+<option value="128">128 tokens (Extended)</option>
+<option value="300" selected>300 tokens (⚠️ GPU Recommended)</option>
+</select>
+</div>
+<div class="checkbox-group">
+<input type="checkbox" id="enableRoPE" checked />
+<label for="enableRoPE">Enable RoPE</label>
+</div>
+<button class="btn" id="trainBtn" disabled>🔄 Building tokenizer...</button>
+<div id="trainStatus" class="status"></div>
+<div class="loss-chart" id="lossChart"></div>
+<div class="log-area" id="trainLog">Waiting for tokenizer...</div>
+</div>
+
+<!-- Architecture -->
+<div class="card">
+<h3>🏗️ Model Architecture</h3>
+<div class="arch-info">
+<strong>Input:</strong> Token IDs via chat-aware tokenizer<br>
+<strong>Special Tokens:</strong> <code>&lt;|user|&gt;</code>, <code>&lt;|assistant|&gt;</code>, <code>&lt;|system|&gt;</code>, <code>&lt;|stop|&gt;</code><br>
+<strong>Embedding:</strong> <code>Embedding(vocab+1, hidden_dim)</code> (+1 for &lt;unk&gt;)<br>
+<strong>RoPE:</strong> <span id="ropeStatus">Enabled</span><br>
+<strong>SwiGLU Blocks ×2:</strong> Residual gated MLP<br>
+<strong>Output Head:</strong> <code>Dense(vocab+1)</code> + softmax<br>
+<strong>Generation:</strong> Autoregressive loop with temperature sampling<br>
+<strong>Optimizer:</strong> Adam | <strong>Max Seq:</strong> <span id="archSeq">300</span>
+</div>
+</div>
+
+<!-- Chat Interface -->
+<div class="card">
+<h3>💬 Raw Prompt Input</h3>
+<div class="chat-area">
+<div class="chat-input-container">
+<select id="tagSelector">
+<option value="">+ Insert Tag</option>
+<option value="<|user|>"><|user|></option>
+<option value="<|assistant|>"><|assistant|></option>
+<option value="<|system|>"><|system|></option>
+<option value="<|stop|>"><|stop|></option>
+</select>
+<input type="text" id="chatInput" placeholder="Type exactly what you want to feed the model..." disabled>
+<button class="btn" id="generateBtn" disabled>🤖 Generate</button>
+</div>
+
+<!-- ========== PREDICTION PANEL ========== -->
+<div class="prediction-panel" id="predictionPanel">
+    <div class="prediction-header">
+        <span>🔮 Next Token Predictions</span>
+        <span style="font-size:0.75rem;color:var(--text-dim)" id="predictionCount">Top 5</span>
+    </div>
+    <div class="prediction-list" id="predictionList"></div>
+</div>
+
+<p style="color:var(--text-dim);font-size:0.8rem;margin-bottom:0.75rem">Predictions appear automatically after Generate. Click any token to insert it.</p>
+<div class="chat-output" id="chatOutput">
+<div class="role">🤖 Raw Output</div>
+<div class="text" id="responseText">Train the model first, then start prompting!</div>
+</div>
+<div class="input-group" style="margin-top: 1rem;">
+<label>📜 Model Generation Output (Decoded Tokens)</label>
+<textarea id="rawOutput" readonly placeholder="AI output will appear here..."></textarea>
+</div>
+<div class="btn-row">
+<button class="btn" style="background:#475569" onclick="clearChat()">🧹 Clear</button>
+<button class="btn" style="background:var(--success)" onclick="exportModel()" id="exportBtn" disabled>💾 Export</button>
+</div>
+</div>
+<div id="chatStatus" class="status"></div>
+</div>
+
+<!-- Generation Controls -->
+<div class="card">
+<h3>🎛️ Generation Settings</h3>
+<div class="input-group">
+<label for="temperature">Temperature</label>
+<input type="number" id="temperature" value="0.8" min="0.1" max="2.0" step="0.1">
+</div>
+<div class="input-group">
+<label for="maxGenTokens">Max New Tokens</label>
+<input type="number" id="maxGenTokens" value="25" min="5" max="50" step="5">
+</div>
+<div class="input-group">
+    <label for="topK">Top-K Predictions</label>
+    <select id="topK">
+        <option value="3">Top 3</option>
+        <option value="5" selected>Top 5</option>
+        <option value="10">Top 10</option>
+        <option value="20">Top 20</option>
+    </select>
+</div>
+<p style="color:var(--text-dim);font-size:0.85rem;margin-top:0.5rem">Lower temp = deterministic. Higher temp = creative.</p>
+</div>
+</div>
+
+<footer>
+<p>Built with ❤️ using <a href="https://www.tensorflow.org/js" target="_blank">TensorFlow.js</a></p>
+</footer>
+</div>
+
+<script>
+// ========== CONFIG ==========
+const HIDDEN_DIM = 64;
+const NUM_LAYERS = 2;
+const SPECIAL_TOKENS = ['<|system|>', '<|user|>', '<|assistant|>', '<|stop|>'];
+// ============================
+
+let customTokenizer = null, model = null, vocab = null, idToToken = [];
+let isTraining = false, lossHistory = [], useRoPE = true, stopTokenId = null;
+const ropeCache = {};
+
+// DOM Elements
+const els = {};
+document.addEventListener('DOMContentLoaded', () => {
+	Object.assign(els, {
+		sampleText: document.getElementById('sampleText'), epochs: document.getElementById('epochs'),
+		lr: document.getElementById('learningRate'), seqLen: document.getElementById('seqLength'),
+		enableRoPE: document.getElementById('enableRoPE'), trainBtn: document.getElementById('trainBtn'),
+		trainStatus: document.getElementById('trainStatus'), trainLog: document.getElementById('trainLog'),
+		lossChart: document.getElementById('lossChart'), chatInput: document.getElementById('chatInput'),
+		generateBtn: document.getElementById('generateBtn'), chatOutput: document.getElementById('chatOutput'),
+		responseText: document.getElementById('responseText'), rawOutput: document.getElementById('rawOutput'),
+		chatStatus: document.getElementById('chatStatus'), temp: document.getElementById('temperature'),
+		maxGen: document.getElementById('maxGenTokens'), tokDot: document.getElementById('tokDot'),
+		tokStatus: document.getElementById('tokStatus'), sampleCount: document.getElementById('sampleCount'),
+		vocabSize: document.getElementById('vocabSize'), archSeq: document.getElementById('archSeq'),
+		exportBtn: document.getElementById('exportBtn'), ropeStatus: document.getElementById('ropeStatus'),
+		tagSelector: document.getElementById('tagSelector'),
+		predictionPanel: document.getElementById('predictionPanel'),
+		predictionList: document.getElementById('predictionList'),
+		predictionCount: document.getElementById('predictionCount'),
+		topK: document.getElementById('topK'),
+		rebuildTokenBtn: document.getElementById('rebuildTokenBtn')  // ← NEW
+	});
+	
+	els.archSeq.textContent = parseInt(els.seqLen.value);
+	initTFBackend();
+	initTokenizer();
+	
+	// Events
+	document.getElementById('trainBtn').addEventListener('click', trainModel);
+	document.getElementById('generateBtn').addEventListener('click', generateResponse);
+	els.chatInput.addEventListener('keydown', e => { if (e.key === 'Enter' && !els.generateBtn.disabled) { e.preventDefault(); generateResponse(); } });
+	els.enableRoPE.addEventListener('change', () => { useRoPE = els.enableRoPE.checked; els.ropeStatus.textContent = useRoPE ? 'Enabled' : 'Disabled'; });
+	els.seqLen.addEventListener('change', () => { const v = parseInt(els.seqLen.value); els.archSeq.textContent = v; showStatus(els.trainStatus, v >= 128 ? `⚠️ ${v} tokens: Training will take longer.` : '', 'warning'); });
+	els.tagSelector.addEventListener('change', () => { if (els.tagSelector.value) { els.chatInput.value += els.tagSelector.value; els.chatInput.focus(); els.tagSelector.value = ''; } });
+	els.topK?.addEventListener('change', () => { els.predictionCount.textContent = `Top ${els.topK.value}`; });
+	
+	// ← NEW: Rebuild Tokenizer Button Logic
+	els.rebuildTokenBtn?.addEventListener('click', manualRebuildTokenizer);
+});
+
+// ← NEW: Tokenizer button state helper
+function setTokenBtnState(enabled, loading = false) {
+  els.rebuildTokenBtn.disabled = !enabled || loading;
+  els.rebuildTokenBtn.innerHTML = loading 
+    ? '<span style="display:inline-block; animation: spin 1s linear infinite">🌀</span> Building...' 
+    : '🔄 Rebuild Tokenizer';
+}
+
+// ← NEW: Manual tokenizer rebuild function
+async function manualRebuildTokenizer() {
+  if (!els.sampleText.value.trim()) {
+    showStatus(els.trainStatus, '⚠️ Enter training data first', 'warning');
+    return;
+  }
+  
+  setTokenBtnState(false, true);
+  els.tokStatus.textContent = 'Rebuilding...';
+  els.tokDot.className = 'status-dot';
+  
+  try {
+    await buildVocabulary();
+    
+    if (vocab.length === 0) throw new Error('Empty vocabulary');
+    
+    // Update UI
+    els.tokDot.className = 'status-dot success';
+    els.tokStatus.textContent = `✓ Ready • ${vocab.length} tokens`;
+    els.vocabSize.textContent = vocab.length;
+    
+    // Warn if model exists but vocab changed
+    if (model) {
+      log('⚠️ Vocabulary changed — model needs retraining', 'warn');
+      els.generateBtn.disabled = true;
+      els.exportBtn.disabled = true;
+      showStatus(els.chatStatus, '🔁 Model needs retraining after vocab change', 'warning');
+    }
+    
+    // Re-enable training if not currently training
+    if (!isTraining) {
+      els.trainBtn.disabled = false;
+      els.trainBtn.innerHTML = '🚀 Train';
+    }
+    
+    log('🔤 Tokenizer rebuilt manually');
+    showStatus(els.trainStatus, '✓ Tokenizer updated', 'success');
+    
+  } catch (e) {
+    els.tokDot.className = 'status-dot error';
+    els.tokStatus.textContent = `Error: ${e.message.slice(0, 25)}`;
+    log(`❌ Rebuild failed: ${e.message}`, 'error');
+    showStatus(els.trainStatus, `❌ ${e.message}`, 'error');
+  } finally {
+    setTokenBtnState(true, false);
+  }
+}
+
+async function initTFBackend() {
+	const backends = ['webgl', 'wasm', 'cpu'];
+	for (const b of backends) { try { await tf.setBackend(b); await tf.ready(); log(`✅ Backend: ${b.toUpperCase()}`); return; } catch(e) {} }
+	log('⚠️ TF.js backend init failed', 'error');
+}
+
+function log(msg, type = 'info') {
+	const time = new Date().toLocaleTimeString();
+	const prefix = {error:'❌', success:'✅', warn:'⚠️'}[type] || 'ℹ️';
+	els.trainLog.innerHTML += `[${time}] ${prefix} ${msg}\n`;
+	els.trainLog.scrollTop = els.trainLog.scrollHeight;
+}
+
+function showStatus(el, msg, type) { if (!el) return; el.textContent = msg; el.className = `status show ${type}`; }
+
+// Tokenizer
+function buildChatTokenizer(corpus, specialTokens = []) {
+	const tokenRegex = /[a-zA-Z0-9]+|[^a-zA-Z0-9\s]/g;
+	const baseTokens = corpus.match(tokenRegex) || [];
+	const specialSet = new Set(specialTokens);
+	const uniqueBase = [...new Set(baseTokens)].filter(t => !specialSet.has(t));
+	uniqueBase.sort((a, b) => { for(let i=0; i<Math.max(a.length, b.length); i++) { const ca = i<a.length?a.charCodeAt(i):-1, cb = i<b.length?b.charCodeAt(i):-1; if(ca!==cb) return ca-cb; } return 0; });
+	const vocabulary = [...specialTokens, ...uniqueBase];
+	const decoder = {}; vocabulary.forEach((t, i) => decoder[t] = i + 1);
+	const encode = text => {
+		const ids = []; const escaped = specialTokens.map(t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+		const parts = text.split(new RegExp(`(${escaped.join('|')})`, 'g')).filter(p => p.trim());
+		for (const p of parts) { if(specialSet.has(p)) ids.push(decoder[p]); else ids.push(...(p.match(tokenRegex)||[]).map(t=>decoder[t]||0)); }
+		return ids;
+	};
+	return { vocabulary, decoder, encode, decode: ids => ids.map(id => id===0?'':(vocabulary[id-1]||'')).join(''), specialTokens };
+}
+
+function restoreSpacing(decodedText, vocabulary, specialTokens) {
+	if (!decodedText) return '';
+	const escaped = specialTokens.map(t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+	const segments = decodedText.split(new RegExp(`(${escaped.join('|')})`, 'g'));
+	const valid = new Set(vocabulary);
+	return segments.map(seg => {
+		if (specialTokens.includes(seg)) return seg;
+		let words = [], i = 0;
+		while (i < seg.length) { let m = null; for (let l = Math.min(30, seg.length - i); l > 0; l--) { if (valid.has(seg.slice(i, i+l))) { m = seg.slice(i, i+l); break; } } if (m) { words.push(m); i += m.length; } else { words.push(seg[i++]); } }
+		return words.join(' ').replace(/\s+([,.!?:;'"')\]])/g, '$1').trim();
+	}).join('').trim();
+}
+
+async function buildVocabulary() {
+	customTokenizer = buildChatTokenizer(els.sampleText.value, SPECIAL_TOKENS);
+	vocab = customTokenizer.vocabulary;
+	// Use array for safe numeric indexing: index 0 = <unk>, index 1 = first vocab token, etc.
+	idToToken = ['<unk>', ...vocab.map(t => t.replace(/\n/g,'\\n'))];
+	stopTokenId = customTokenizer.decoder['<|stop|>'];
+	els.vocabSize.textContent = vocab.length; log(`✓ Vocab: ${vocab.length} | Stop ID: ${stopTokenId}`);
+}
+
+async function initTokenizer() {
+	els.tokStatus.textContent = 'Building...'; els.tokDot.className = 'status-dot';
+	try { 
+    await buildVocabulary(); 
+    if(vocab.length===0) throw new Error('Empty'); 
+    els.tokDot.className = 'status-dot success'; 
+    els.tokStatus.textContent = `✓ Ready • ${vocab.length}`; 
+    els.trainBtn.disabled = false; 
+    els.trainBtn.innerHTML = '🚀 Train'; 
+    els.chatInput.disabled = false; 
+    els.generateBtn.disabled = false;
+    els.rebuildTokenBtn.disabled = false;  // ← NEW: Enable rebuild button
+    log('🔤 Tokenizer ready'); 
+  } 
+	catch(e) { els.tokDot.className = 'status-dot error'; els.tokStatus.textContent = `Error: ${e.message.slice(0,20)}`; log(e.message, 'error'); }
+}
+
+// ← UPDATED: Debounced auto-rebuild with button state sync
+els.sampleText?.addEventListener('input', () => { 
+  // Enable rebuild button when text changes
+  els.rebuildTokenBtn.disabled = false;
+  
+  // Debounced auto-rebuild (existing behavior)
+  clearTimeout(window.vt); 
+  window.vt = setTimeout(async () => {
+    if (!isTraining) {
+      els.tokStatus.textContent = 'Auto-updating...';
+      await buildVocabulary();
+      els.tokStatus.textContent = `✓ Ready • ${vocab.length}`;
+      els.vocabSize.textContent = vocab.length;
+      
+      // Warn if model exists but vocab changed
+      if (model) {
+        log('⚠️ Vocabulary changed — model needs retraining', 'warn');
+        els.generateBtn.disabled = true;
+        els.exportBtn.disabled = true;
+      }
+      
+      log('🔤 Tokenizer auto-updated');
+    }
+  }, 400); 
+});
+
+// RoPE
+function computeRoPEConstants(seqLen, hiddenDim, base=10000) {
+	const key = `${seqLen}_${hiddenDim}`; if(ropeCache[key]) return ropeCache[key];
+	const half = Math.floor(hiddenDim/2), freqs = Array.from({length:half}, (_,i)=>1/Math.pow(base, 2*i/hiddenDim));
+	const s=[], c=[]; for(let p=0;p<seqLen;p++){const sr=[],cr=[];for(let i=0;i<half;i++){sr.push(Math.sin(p*freqs[i]));cr.push(Math.cos(p*freqs[i]));}s.push(sr);c.push(cr);}
+	return ropeCache[key]={sinTable:s, cosTable:c, halfDim:half};
+}
+class RoPELayer extends tf.layers.Layer {
+	constructor(cfg){super(cfg);this.seqLen=cfg.seqLen;this.hiddenDim=cfg.hiddenDim;const{sinTable,cosTable,halfDim}=computeRoPEConstants(this.seqLen,this.hiddenDim);this.sinTable=sinTable;this.cosTable=cosTable;this.halfDim=halfDim;}
+	static className='RoPELayer'; computeOutputShape(s){return s;}
+	call(inputs){return tf.tidy(()=>{const x=inputs[0],s=tf.reshape(tf.tensor2d(this.sinTable,[this.seqLen,this.halfDim]),[1,this.seqLen,this.halfDim]),c=tf.reshape(tf.tensor2d(this.cosTable,[this.seqLen,this.halfDim]),[1,this.seqLen,this.halfDim]);const x1=tf.slice(x,[0,0,0],[-1,-1,this.halfDim]),x2=tf.slice(x,[0,0,this.halfDim],[-1,-1,this.halfDim]);return tf.concat([tf.sub(tf.mul(x1,c),tf.mul(x2,s)),tf.add(tf.mul(x1,s),tf.mul(x2,c))],-1);});}
+}
+tf.serialization.registerClass(RoPELayer);
+
+// Model
+function prepareTrainingData() {
+	const lines = els.sampleText.value.trim().split('\n').filter(l=>l.trim()), seqLen = parseInt(els.seqLen.value), seqs = [];
+	for(const l of lines){const ids=customTokenizer.encode(l);if(ids.length<2)continue;for(let i=0;i<ids.length-1;i++){const s=Math.max(0,i-seqLen+1),inp=ids.slice(s,i+1);if(inp.length<=seqLen)seqs.push({input:inp.length<seqLen?[...Array(seqLen-inp.length).fill(0),...inp]:inp, target:ids[i+1]});}}
+	log(`📊 ${seqs.length} sequences`); return seqs;
+}
+function createModel(vsz, lr, rope=true) {
+	const inp = tf.input({shape:[parseInt(els.seqLen.value)], dtype:'int32'});
+	let x = tf.layers.embedding({inputDim:vsz+1,outputDim:HIDDEN_DIM,inputLength:parseInt(els.seqLen.value)}).apply(inp);
+	if(rope) x = new RoPELayer({seqLen:parseInt(els.seqLen.value),hiddenDim:HIDDEN_DIM}).apply(x);
+	for(let i=0;i<NUM_LAYERS;i++){const r=x;const g=tf.layers.dense({units:HIDDEN_DIM}).apply(x);const v=tf.layers.dense({units:HIDDEN_DIM}).apply(x);x=tf.layers.multiply().apply([tf.layers.activation({activation:'swish'}).apply(g),v]);x=tf.layers.add().apply([x,r]);}
+	x = tf.layers.globalAveragePooling1d().apply(x);
+	const out = tf.layers.dense({units:vsz+1, activation:'softmax'}).apply(x);
+	const m = tf.model({inputs:inp, outputs:out}); m.compile({optimizer:tf.train.adam(lr), loss:'categoricalCrossentropy'}); return m;
+}
+
+async function trainModel() {
+	if(isTraining||!vocab?.length)return; isTraining=true; els.trainBtn.disabled=true; els.generateBtn.disabled=true; lossHistory=[]; els.trainLog.innerHTML=''; showStatus(els.trainStatus,'Training...','training');
+	try {
+		const seqs = prepareTrainingData(), seqLen = parseInt(els.seqLen.value);
+		const xs = tf.tensor2d(seqs.map(s=>s.input),[seqs.length,seqLen],'int32'), ys = tf.oneHot(tf.tensor1d(seqs.map(s=>s.target),'int32'), vocab.length+1);
+		model = createModel(vocab.length, parseFloat(els.lr.value), useRoPE);
+		const bs = seqLen>=128 ? Math.max(1,Math.floor(32/(seqLen/16))) : 8;
+		await model.fit(xs, ys, {epochs:parseInt(els.epochs.value), batchSize:bs, callbacks:{onEpochEnd:(e,l)=>{lossHistory.push(l.loss);updateLossChart();if(e%5===0||e===parseInt(els.epochs.value)-1)log(`Epoch ${e+1} Loss: ${l.loss.toFixed(4)}`);showStatus(els.trainStatus,`${Math.round((e+1)/parseInt(els.epochs.value)*100)}%`,'training');}}});
+		xs.dispose(); ys.dispose(); showStatus(els.trainStatus,'✅ Done!','success'); log('🎉 Ready!'); els.generateBtn.disabled=false; els.exportBtn.disabled=false;
+	} catch(e){showStatus(els.trainStatus,`❌ ${e.message}`,'error');log(e.message,'error');} finally{isTraining=false;els.trainBtn.disabled=false;}
+}
+
+function sampleFromProbs(p, t=1.0) { if(t===0) { let mx=0; for(let i=1;i<p.length;i++) if(p[i]>p[mx]) mx=i; return mx; } const sc=p.map(v=>Math.log(v+1e-10)/t), mx=Math.max(...sc), ex=sc.map(v=>Math.exp(v-mx)), sm=ex.reduce((a,b)=>a+b,0), nm=ex.map(v=>v/sm), r=Math.random(); let c=0; for(let i=0;i<nm.length;i++){c+=nm[i];if(r<=c)return i;} return nm.length-1; }
+
+async function generateResponse() {
+	if(!model||!customTokenizer){showStatus(els.chatStatus,'⚠️ Train first!','error');return;}
+	const raw = els.chatInput.value.trim(); if(!raw){showStatus(els.chatStatus,'⚠️ Type a prompt!','error');return;}
+	showStatus(els.chatStatus,'Generating...','training'); els.chatOutput.classList.add('ready'); els.responseText.innerHTML='<span style="color:var(--text-dim)">Processing...</span>'; els.rawOutput.value='';
+	const seqLen = parseInt(els.seqLen.value), maxT = parseInt(els.maxGen.value), temp = parseFloat(els.temp.value);
+	let ctx = customTokenizer.encode(raw), gen = [], stopped = false;
+	try {
+		for(let i=0;i<maxT;i++){let inp=ctx.slice(-seqLen); if(inp.length<seqLen)inp=[...Array(seqLen-inp.length).fill(0),...inp];
+		const t=tf.tensor2d([inp],[1,seqLen],'int32'), p=model.predict(t), probs=await p.data(); t.dispose(); p.dispose();
+		const n=sampleFromProbs(probs,temp); if(n===stopTokenId||n===0){stopped=true;break;} gen.push(n); ctx.push(n);}
+		els.rawOutput.value = restoreSpacing(customTokenizer.decode(stopped?[...gen,stopTokenId]:gen), vocab, SPECIAL_TOKENS);
+		els.responseText.innerHTML = `<span style="color:var(--primary)">Input:</span> ${raw}<br><span style="color:var(--success)">Output:</span> ${restoreSpacing(customTokenizer.decode(gen),vocab,SPECIAL_TOKENS)||'Empty.'}`;
+		showStatus(els.chatStatus,'✓ Generated!','success');
+		await updatePredictions(); // 🔥 SHOW PREDICTIONS
+	} catch(e){els.responseText.textContent=`Error: ${e.message}`; showStatus(els.chatStatus,`❌ ${e.message}`,'error'); console.error(e);}
+}
+
+// ========== PREDICTION ENGINE (FIXED & ROBUST) ==========
+async function getTopKPredictions(prompt, k) {
+	if(!model||!customTokenizer) return [];
+	const seqLen = parseInt(els.seqLen.value);
+	let inp = customTokenizer.encode(prompt).slice(-seqLen);
+	if(inp.length < seqLen) inp = [...Array(seqLen-inp.length).fill(0), ...inp];
+	const t = tf.tensor2d([inp], [1, seqLen], 'int32');
+	const p = model.predict(t);
+	const probs = Array.from(await p.data()); // Convert TypedArray to standard Array
+	t.dispose(); p.dispose();
+
+	// Safe mapping with explicit fallbacks
+	return probs.map((pr, i) => ({ 
+		token: idToToken[i] !== undefined ? idToToken[i] : (i === 0 ? '<unk>' : `[ID:${i}]`), 
+		prob: pr 
+	})).sort((a,b) => b.prob - a.prob)
+	  .slice(0, k)
+	  .map(item => ({ ...item, pct: (item.prob * 100).toFixed(2) }));
+}
+
+function renderPredictions(preds) {
+	const list = els.predictionList; list.innerHTML = '';
+	if(!preds || preds.length === 0) {
+		list.innerHTML = '<div style="padding:0.8rem;color:var(--text-dim);text-align:center">No predictions available</div>';
+		els.predictionPanel.classList.add('show');
+		els.predictionPanel.scrollIntoView({behavior:'smooth', block:'nearest'});
+		return;
+	}
+	const maxP = preds[0].prob || 0.001;
+	preds.forEach(p => {
+		if (!p || !p.token) return; // Skip invalid entries
+		const el = document.createElement('div');
+		el.className = 'prediction-item';
+		const safeToken = String(p.token).replace(/\n/g,'↵').replace(/\s+/g,'·');
+		const barWidth = Math.min(100, (p.prob / maxP) * 100);
+		el.innerHTML = `<span class="prediction-token">${safeToken}</span><div style="display:flex;align-items:center;gap:0.6rem"><div class="prediction-bar" style="width:${barWidth}%"></div><span class="prediction-prob">${p.pct}%</span></div>`;
+		el.addEventListener('click', () => { els.chatInput.value += p.token; els.chatInput.focus(); });
+		list.appendChild(el);
+	});
+	els.predictionPanel.classList.add('show');
+	els.predictionPanel.scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+
+async function updatePredictions() {
+	const prompt = els.chatInput.value.trim();
+	if(!prompt) { els.predictionPanel.classList.remove('show'); return; }
+	els.predictionCount.textContent = `Top ${els.topK.value}`;
+	try {
+		const preds = await getTopKPredictions(prompt, parseInt(els.topK.value));
+		renderPredictions(preds);
+	} catch(e) {
+		console.warn('Prediction error:', e);
+		els.predictionList.innerHTML = `<div style="padding:0.8rem;color:var(--error)">⚠️ Prediction failed: ${e.message?.slice(0,50) || 'Unknown error'}</div>`;
+		els.predictionPanel.classList.add('show');
+	}
+}
+
+// Utilities
+function updateLossChart() {
+	const c=els.lossChart; c.innerHTML=''; if(!lossHistory.length)return;
+	const mx=Math.max(...lossHistory,0.001), bw=Math.max(2,Math.floor(c.clientWidth/Math.max(lossHistory.length,15)));
+	lossHistory.forEach((l,i)=>{const b=document.createElement('div');b.className='loss-bar';b.style.left=`${i*bw}px`;b.style.height=`${Math.min(100,l/mx*100)}%`;c.appendChild(b);});
+}
+function clearChat() { els.chatInput.value=''; els.responseText.innerHTML='<span style="color:var(--text-dim)">Cleared. Enter a raw prompt...</span>'; els.rawOutput.value=''; els.chatOutput.classList.remove('ready'); els.predictionPanel.classList.remove('show'); showStatus(els.chatStatus,'',''); }
+async function exportModel() { if(!model)return; try{showStatus(els.chatStatus,'Exporting...','training');await model.save('downloads://chat-llm');showStatus(els.chatStatus,'✅ Exported','success');}catch(e){showStatus(els.chatStatus,`❌ ${e.message}`,'error');} }
+window.clearChat = clearChat; window.exportModel = exportModel;
+
+log('🚀 Initializing...');
+</script>
+</body>
+</html>

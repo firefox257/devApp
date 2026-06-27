@@ -19,8 +19,7 @@
             "filePicker": "/system/ux/filePicker.js",
             "filePickerUI": "/system/ux/filePickerUI.js",
             "optText": "/system/ux/optText/optText.js",
-            "optTextRegistry": "/system/ux/optText/optTextAdditionsRegistry.js",
-            "aiChat": "/system/ux/aichat.js"
+            "optTextRegistry": "/system/ux/optText/optTextAdditionsRegistry.js"
         }
     }
     </script>
@@ -82,7 +81,7 @@
             display:flex; 
             align-items:center; 
             justify-content:center; 
-            font-size:14px; /* ✅ Increased slightly for the new ✕ icon */
+            font-size:14px;
             cursor:pointer; 
             padding:0;
             margin-left:4px;
@@ -489,108 +488,6 @@
             color: white;
         }
         .viewer-btn:hover { background: #10890c; }
-        
-        /* AIChat Component Theme */
-        ai-chat {
-            --ai-chat-bg: #1e1e1e;
-            --ai-chat-text: #ccc;
-            --ai-chat-border: #3e3e42;
-            --ai-chat-input-bg: #2d2d30;
-            --ai-chat-input-text: #fff;
-            --ai-chat-button-bg: #007acc;
-            --ai-chat-button-hover: #005c99;
-            --ai-chat-user-bg: #252526;
-            --ai-chat-ai-bg: #2d2d30;
-            --ai-chat-code-bg: #1e1e1e;
-            --ai-chat-code-text: #d4d4d4;
-            --ai-chat-scrollbar-thumb: #444;
-            --ai-chat-scrollbar-track: #252526;
-            --ai-chat-error: #c50f1f;
-            --ai-chat-success: #13a10e;
-            --ai-chat-warning: #ffc107;
-            --ai-chat-warning-text: #000;
-        }
-        
-        /* Override AIChat internal styles */
-        ai-chat .section {
-            border-bottom: 1px solid #3e3e42 !important;
-        }
-        
-        ai-chat .top-menu button,
-        ai-chat .top-menu select {
-            background-color: #2d2d30 !important;
-            border: 1px solid #3e3e42 !important;
-            color: #fff !important;
-        }
-        
-        ai-chat .top-menu button:hover,
-        ai-chat .top-menu select:hover {
-            background-color: #3e3e42 !important;
-        }
-        
-        ai-chat #textInput,
-        ai-chat #systemInput {
-            background-color: #2d2d30 !important;
-            border: 1px solid #3e3e42 !important;
-            color: #fff !important;
-        }
-        
-        ai-chat #textInput:focus,
-        ai-chat #systemInput:focus {
-            border-color: #007acc !important;
-            box-shadow: 0 0 0 2px rgba(0, 122, 204, 0.3) !important;
-        }
-        
-        ai-chat .chat-area {
-            background-color: #1e1e1e !important;
-            color: #ccc !important;
-        }
-        
-        ai-chat .code-block-container {
-            background-color: #252526 !important;
-            border: 1px solid #3e3e42 !important;
-        }
-        
-        ai-chat .code-block-header {
-            background-color: #2d2d30 !important;
-            border-bottom: 1px solid #3e3e42 !important;
-            color: #ccc !important;
-        }
-        
-        ai-chat #sendButton {
-            background-color: #007acc !important;
-        }
-        
-        ai-chat #sendButton:hover {
-            background-color: #005c99 !important;
-        }
-        
-        ai-chat #conversationBigButton {
-            background-color: #007acc !important;
-        }
-        
-        ai-chat #conversationBigButton:hover {
-            background-color: #005c99 !important;
-        }
-        
-        ai-chat #conversationBigButton.listening {
-            background-color: #c50f1f !important;
-            box-shadow: 0 0 0 0.5em rgba(197, 15, 31, 0.5) !important;
-        }
-        
-        ai-chat #conversationBigButton.speaking {
-            background-color: #13a10e !important;
-            color: #fff !important;
-            box-shadow: 0 0 0 0.5em rgba(19, 161, 14, 0.5) !important;
-        }
-        
-        ai-chat .close-button {
-            color: #888 !important;
-        }
-        
-        ai-chat .close-button:hover {
-            color: #ccc !important;
-        }
     </style>
 </head>
 <body>
@@ -598,26 +495,15 @@
         <div class="nav">
             <div class="page-control">
                 <select id="pageSelector">
-                    <option value="chat">💬 Chat</option>
-                    <option value="settings">⚙️ Settings</option>
                     <option value="filepicker">📁 Files</option>
+                    <option value="settings">⚙️ Settings</option>
                 </select>
-                <!-- ✅ CHANGED: Trash icon replaced with a clean close (✕) icon -->
                 <button id="closePageBtn" class="close-btn" disabled title="Close tab">✕</button>
                 <div class="save-status" id="saveStatus"></div>
             </div>
         </div>
         
         <div class="content">
-            <!-- Chat Page -->
-            <div id="chatPage" class="page active">
-                <ai-chat 
-                    title="Dev AI Assistant" 
-                    style="width:100%;height:100%;"
-                    id="aiChatComponent"
-                ></ai-chat>
-            </div>
-            
             <!-- Settings Page -->
             <div id="settingsPage" class="page">
                 <div class="settings-page">
@@ -625,17 +511,17 @@
                         <h3>ℹ️ About</h3>
                         <p style="font-size:11px;line-height:1.5;">
                             Dev Environment v1.0<br>
-                            • Chat: AI Assistant with voice support<br>
                             • File Editor: Canvas-based code editing (optText)<br>
                             • File Viewer: Live preview with refresh<br>
+                            • PDF Viewer: Built-in PDF rendering<br>
                             • Settings: Persistent configuration
                         </p>
                     </div>
                 </div>
             </div>
             
-            <!-- File Picker Page -->
-            <div id="filePickerPage" class="page">
+            <!-- File Picker Page (Default) -->
+            <div id="filePickerPage" class="page active">
                 <div class="fp-container" id="filePickerContainer">
                     <div class="fp-placeholder">
                         <div class="spinner"></div>
@@ -672,7 +558,7 @@
 
     <script type="module">
         // Load modules
-        const mods = { api: null, fp: null, optText: null, aiChat: null };
+        const mods = { api: null, fp: null, optText: null };
         try {
             const apiMod = await import('apiCalls');
             mods.api = apiMod.api;
@@ -685,10 +571,6 @@
             await import('optTextRegistry');
             const optTextMod = await import('optText');
             mods.optText = optTextMod.newOptText;
-            
-            // Load AIChat component
-            await import('aiChat');
-            mods.aiChat = true;
             
         } catch (e) {
             console.error('Module load failed:', e);
@@ -716,11 +598,149 @@
         const SETTINGS_KEY = 'devEnvSettings';
         let appSettings = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
         
+        // ===== STATE PERSISTENCE =====
+        const TABS_STATE_KEY = 'devEnvOpenTabs';
+        const ACTIVE_TAB_KEY = 'devEnvActiveTab';
+        
+        function debounce(fn, delay) {
+            let timeoutId;
+            return (...args) => {
+                clearTimeout(timeoutId);
+                timeoutId = setTimeout(() => fn(...args), delay);
+            };
+        }
+        
+        // Save current tabs state to localStorage
+        function saveTabsState() {
+            try {
+                const tabsData = {};
+                
+                for (const [id, tab] of Object.entries(state.tabs)) {
+                    const tabInfo = {
+                        id: tab.id,
+                        name: tab.name,
+                        filePath: tab.filePath,
+                        type: tab.type || 'editor'
+                    };
+                    
+                    // Save editor-specific state
+                    if (tab.type === 'editor' || tab.type === undefined) {
+                        if (tab.editor) {
+                            tabInfo.cursorPosition = tab.editor.cursorPosition || null;
+                            tabInfo.scrollTop = tab.editor.scrollTop || 0;
+                            tabInfo.scrollLeft = tab.editor.scrollLeft || 0;
+                            tabInfo.content = tab.editor.value || tab.content;
+                        }
+                    }
+                    
+                    // Save viewer-specific state
+                    if (tab.type === 'viewer') {
+                        tabInfo.previewUrl = tab.previewUrl;
+                        tabInfo.isPDF = tab.isPDF;
+                        
+                        // Save PDF viewer state
+                        if (tab.isPDF && tab.viewerElement) {
+                            tabInfo.pdfState = {
+                                pageNum: tab.viewerElement.pageNum,
+                                scale: tab.viewerElement.scale
+                            };
+                        }
+                    }
+                    
+                    tabsData[id] = tabInfo;
+                }
+                
+                localStorage.setItem(TABS_STATE_KEY, JSON.stringify(tabsData));
+                
+                // Save active tab info - use file path for tabs, page ID for system pages
+                const activeTabInfo = { type: 'system', id: state.currentPage };
+                if (state.tabs[state.currentPage]) {
+                    activeTabInfo.type = 'tab';
+                    activeTabInfo.filePath = state.tabs[state.currentPage].filePath;
+                    activeTabInfo.tabType = state.tabs[state.currentPage].type || 'editor';
+                }
+                localStorage.setItem(ACTIVE_TAB_KEY, JSON.stringify(activeTabInfo));
+                
+            } catch (e) {
+                console.warn('Failed to save tabs state:', e);
+            }
+        }
+        
+        const saveTabsStateDebounced = debounce(saveTabsState, 500);
+        
+        // Restore tabs from localStorage
+        async function restoreTabsState() {
+            try {
+                const savedTabs = JSON.parse(localStorage.getItem(TABS_STATE_KEY) || '{}');
+                const savedActiveTabInfo = JSON.parse(localStorage.getItem(ACTIVE_TAB_KEY) || '{}');
+                
+                if (Object.keys(savedTabs).length === 0) return;
+                
+                showToast('🔄 Restoring previous session...', 'info');
+                
+                let restoredCount = 0;
+                const restoredTabsByPath = {}; // Map file path to new tab ID
+                
+                for (const [oldId, tabInfo] of Object.entries(savedTabs)) {
+                    try {
+                        if (tabInfo.type === 'viewer') {
+                            await openFileInViewer(tabInfo.filePath, {
+                                restoreState: tabInfo.pdfState
+                            });
+                            // Find the newly created tab
+                            const newTab = Object.values(state.tabs).find(t => 
+                                t.filePath === tabInfo.filePath && t.type === 'viewer'
+                            );
+                            if (newTab) restoredTabsByPath[tabInfo.filePath + '_viewer'] = newTab.id;
+                            restoredCount++;
+                        } else {
+                            await openFile(tabInfo.filePath, {
+                                restoreState: {
+                                    cursorPosition: tabInfo.cursorPosition,
+                                    scrollTop: tabInfo.scrollTop,
+                                    scrollLeft: tabInfo.scrollLeft
+                                }
+                            });
+                            // Find the newly created tab
+                            const newTab = Object.values(state.tabs).find(t => 
+                                t.filePath === tabInfo.filePath && (t.type === 'editor' || t.type === undefined)
+                            );
+                            if (newTab) restoredTabsByPath[tabInfo.filePath + '_editor'] = newTab.id;
+                            restoredCount++;
+                        }
+                    } catch (e) {
+                        console.warn(`Failed to restore tab ${tabInfo.name}:`, e);
+                    }
+                }
+                
+                // Switch to the last active tab
+                if (savedActiveTabInfo.type === 'system') {
+                    switchPage(savedActiveTabInfo.id);
+                } else if (savedActiveTabInfo.filePath) {
+                    const key = savedActiveTabInfo.filePath + '_' + (savedActiveTabInfo.tabType || 'editor');
+                    if (restoredTabsByPath[key]) {
+                        switchPage(restoredTabsByPath[key]);
+                    } else {
+                        // Fallback to the last restored tab
+                        const lastTabId = Object.values(restoredTabsByPath).pop();
+                        if (lastTabId) switchPage(lastTabId);
+                    }
+                }
+                
+                if (restoredCount > 0) {
+                    showToast(`✅ Restored ${restoredCount} tab${restoredCount > 1 ? 's' : ''}`, 'success');
+                }
+                
+            } catch (e) {
+                console.error('Failed to restore tabs state:', e);
+                showToast('⚠️ Could not restore previous session', 'error');
+            }
+        }
+        
         // State
         const state = {
-            currentPage: 'chat',
+            currentPage: 'filepicker',
             systemPages: {
-                chat: { id:'chat', el:document.getElementById('chatPage') },
                 settings: { id:'settings', el:document.getElementById('settingsPage') },
                 filepicker: { id:'filepicker', el:document.getElementById('filePickerPage'), init:false }
             },
@@ -760,7 +780,7 @@
             
             state.currentPage = id;
             pageSel.value = id;
-            closeBtn.disabled = (id === 'chat' || id === 'filepicker' || id === 'settings');
+            closeBtn.disabled = (id === 'filepicker' || id === 'settings');
             
             if (id in state.tabs) {
                 const tab = state.tabs[id];
@@ -789,19 +809,6 @@
             
             if (id === 'settings') {
                 updateStatus('Settings');
-            }
-            
-            if (id === 'chat') {
-                updateStatus('AI Assistant ready');
-                setTimeout(() => {
-                    const aiChat = document.getElementById('aiChatComponent');
-                    if (aiChat) {
-                        const textInput = aiChat.shadowRoot?.getElementById('textInput');
-                        if (textInput) textInput.focus();
-                    }
-                }, 100);
-            } else if (id === 'settings') {
-                updateStatus('Settings');
             } else if (id === 'filepicker') {
                 updateStatus('File browser');
             } else if (state.tabs[id]) {
@@ -813,6 +820,8 @@
                     updateStatus(`Editing: ${cleanName}`);
                 }
             }
+            
+            saveTabsState();
         }
         
         function addTab(id, name, el, editor, filePath, content) {
@@ -821,6 +830,8 @@
             opt.value = id;
             opt.textContent = name;
             pageSel.appendChild(opt);
+            
+            saveTabsState();
         }
         
         function removeTab(id) {
@@ -831,10 +842,12 @@
                 state.tabs[id].el.parentNode.removeChild(state.tabs[id].el);
             }
             delete state.tabs[id];
+            
+            saveTabsState();
         }
         
         // ===== FILE OPERATIONS =====
-        async function openFile(path) {
+        async function openFile(path, options = {}) {
             try {
                 const content = await mods.api.readFile(path);
                 const name = path.split('/').pop();
@@ -869,8 +882,24 @@
                     ]
                 });
                 
-                // ✅ Manually append the returned editor instance to the DOM
+                // Manually append the returned editor instance to the DOM
                 editorContainer.appendChild(editor);
+                
+                // Restore editor state if provided
+                if (options.restoreState) {
+                    setTimeout(() => {
+                        try {
+                            if (options.restoreState.scrollTop !== undefined && editor.scrollTo) {
+                                editor.scrollTo(options.restoreState.scrollTop, options.restoreState.scrollLeft || 0);
+                            }
+                            if (options.restoreState.cursorPosition && editor.setCursor) {
+                                editor.setCursor(options.restoreState.cursorPosition);
+                            }
+                        } catch (e) {
+                            console.warn('Could not restore editor position:', e);
+                        }
+                    }, 100);
+                }
                 
                 // Wire up optText callbacks
                 editor.onSave = async (container) => {
@@ -880,6 +909,7 @@
                         if (state.currentPage === id) updateSaveStatus(false);
                         showToast(`✅ Saved: ${name}`, 'success');
                         updateStatus(`Saved: ${name}`);
+                        saveTabsState();
                     } catch (error) {
                         showToast(`❌ Save failed: ${error.message}`, 'error');
                         console.error('Save error:', error);
@@ -900,6 +930,16 @@
                         const isDirty = editor.value !== state.tabs[id].content;
                         updateSaveStatus(isDirty);
                     }
+                    saveTabsStateDebounced();
+                });
+                
+                // Listen for scroll and cursor changes
+                editor.addEventListener('optText:scroll', () => {
+                    saveTabsStateDebounced();
+                });
+                
+                editor.addEventListener('optText:cursor', () => {
+                    saveTabsStateDebounced();
                 });
                 
                 addTab(id, `📝 ${name}`, page, editor, path, content);
@@ -1065,12 +1105,14 @@
                 if (pdfState.pageNum <= 1) return;
                 pdfState.pageNum--;
                 queueRenderPage(pdfState.pageNum);
+                saveTabsStateDebounced();
             }
             
             function onNextPage() {
                 if (pdfState.pageNum >= pdfState.pdfDoc.numPages) return;
                 pdfState.pageNum++;
                 queueRenderPage(pdfState.pageNum);
+                saveTabsStateDebounced();
             }
             
             function onZoomIn() {
@@ -1080,6 +1122,7 @@
                     updateZoomSelect();
                     queueRenderPage(pdfState.pageNum);
                     showToast(`🔍 Zoom: ${formatScale(pdfState.scale)}`, 'info');
+                    saveTabsStateDebounced();
                 }
             }
             
@@ -1090,6 +1133,7 @@
                     updateZoomSelect();
                     queueRenderPage(pdfState.pageNum);
                     showToast(`🔍 Zoom: ${formatScale(pdfState.scale)}`, 'info');
+                    saveTabsStateDebounced();
                 }
             }
             
@@ -1105,6 +1149,7 @@
                 
                 queueRenderPage(pdfState.pageNum);
                 showToast(`🔍 Zoom: ${formatScale(pdfState.scale)}`, 'info');
+                saveTabsStateDebounced();
             }
             
             function onPageInputChange(e) {
@@ -1112,6 +1157,7 @@
                 if (!isNaN(num) && num >= 1 && num <= pdfState.pdfDoc.numPages) {
                     pdfState.pageNum = num;
                     queueRenderPage(pdfState.pageNum);
+                    saveTabsStateDebounced();
                 }
             }
             
@@ -1175,11 +1221,11 @@
             
             await loadPDF(url);
             
-            return { page, pdfState };
+            return { page, pdfState, renderPage };
         }
         
-        // Viewer tab creator - FIXED: uses iframe + visibility CSS to prevent reloads
-        async function openFileInViewer(filePath) {
+        // Viewer tab creator
+        async function openFileInViewer(filePath, options = {}) {
             try {
                 const url = convertFilePathToUrl(filePath);
                 const fileName = filePath.split('/').pop() || 'preview';
@@ -1202,8 +1248,40 @@
                     const pdfViewer = await createPDFViewer(tabId, url, fileName);
                     page = pdfViewer.page;
                     viewerElement = pdfViewer.pdfState;
+                    
+                    // Restore PDF state if provided
+                    if (options.restoreState) {
+                        setTimeout(() => {
+                            try {
+                                if (options.restoreState.pageNum && viewerElement.pageNum !== options.restoreState.pageNum) {
+                                    viewerElement.pageNum = options.restoreState.pageNum;
+                                    if (pdfViewer.renderPage) {
+                                        pdfViewer.renderPage(options.restoreState.pageNum);
+                                    }
+                                }
+                                if (options.restoreState.scale) {
+                                    viewerElement.scale = options.restoreState.scale;
+                                    const zoomSelect = document.getElementById(`pdfZoomSelect-${tabId}`);
+                                    if (zoomSelect) {
+                                        const scaleStr = options.restoreState.scale.toString();
+                                        const matchingOption = Array.from(zoomSelect.options).find(opt => opt.value === scaleStr);
+                                        if (matchingOption) {
+                                            zoomSelect.value = scaleStr;
+                                        } else {
+                                            const customOption = document.createElement('option');
+                                            customOption.value = scaleStr;
+                                            customOption.textContent = formatScale(options.restoreState.scale);
+                                            customOption.selected = true;
+                                            zoomSelect.add(customOption);
+                                        }
+                                    }
+                                }
+                            } catch (e) {
+                                console.warn('Could not restore PDF state:', e);
+                            }
+                        }, 200);
+                    }
                 } else {
-                    // ✅ Use iframe instead of object for better persistence
                     page = document.createElement('div');
                     page.className = 'page';
                     page.innerHTML = `
@@ -1238,7 +1316,6 @@
                     `;
                     contentArea.appendChild(page);
                     
-                    // ✅ Updated references: frameEl instead of objectEl
                     viewerElement = {
                         frameEl: document.getElementById(`viewerFrame-${tabId}`),
                         fallback: document.getElementById(`viewerFallback-${tabId}`),
@@ -1262,7 +1339,6 @@
                         updateStatus(`Preview error: ${msg}`);
                     };
                     
-                    // ✅ iframe load/error handlers
                     if (viewerElement.frameEl) {
                         viewerElement.frameEl.addEventListener('load', () => {
                             clearTimeout(loadTimeout);
@@ -1283,7 +1359,6 @@
                         viewerElement.retryBtn.addEventListener('click', (e) => {
                             e.stopPropagation();
                             if (viewerElement.frameEl) {
-                                // ✅ Refresh by reassigning src (triggers reload)
                                 const currentSrc = viewerElement.frameEl.src;
                                 viewerElement.frameEl.src = '';
                                 setTimeout(() => { viewerElement.frameEl.src = currentSrc; }, 50);
@@ -1295,7 +1370,6 @@
                     if (viewerElement.refreshBtn) {
                         viewerElement.refreshBtn.addEventListener('click', () => {
                             if (viewerElement.frameEl) {
-                                // ✅ Explicit refresh: reassign src to force reload
                                 const currentSrc = viewerElement.frameEl.src;
                                 viewerElement.frameEl.src = '';
                                 setTimeout(() => { viewerElement.frameEl.src = currentSrc; }, 50);
@@ -1325,7 +1399,7 @@
         
         function closeCurrent() {
             const id = state.currentPage;
-            if (id === 'chat' || id === 'filepicker' || id === 'settings') return;
+            if (id === 'filepicker' || id === 'settings') return;
             
             const tab = state.tabs[id];
             if (!tab) return;
@@ -1439,10 +1513,22 @@
             }
         });
         
-        setTimeout(() => {
+        // Initialize file picker on load
+        setTimeout(async () => {
+            initFilePicker();
             showToast('Ready', 'info');
-            updateStatus('Ready');
+            updateStatus('File browser');
+            
+            // Restore previous session after a short delay
+            setTimeout(() => {
+                restoreTabsState();
+            }, 500);
         }, 300);
+        
+        // Save state before page unload
+        window.addEventListener('beforeunload', () => {
+            saveTabsState();
+        });
         
         window.dev = { 
             state, 
@@ -1451,7 +1537,9 @@
             closeCurrent, 
             switchPage,
             convertFilePathToUrl,
-            isPDFFile
+            isPDFFile,
+            saveTabsState,
+            restoreTabsState
         };
     </script>
 </body>

@@ -1,4 +1,4 @@
-// ./js/editorCsg.js
+// editorCsg.js
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { STLExporter } from 'three/addons/exporters/STLExporter.js'
@@ -46,13 +46,12 @@ var resizeRenderer, animate, showView
 let scene, groupItems, currentObjects
 let isWireframeMode = false
 
-const TOOLBAR_HEIGHT = 40  // ✅ Updated to match new toolbar height
+const TOOLBAR_HEIGHT = 40
 const MIN_CONSOLE_HEIGHT = 30
 const MAX_CONSOLE_HEIGHT_RATIO = 0.8
 
 let project, isInitializing = true
 
-// ⭐ NEW FUNCTION: Returns a standardized data object for a new, default project.
 function getNewDefaultProjectData() {
 	return {
 		csgCode: [{ title: DEFAULT_CSG_PAGE_TITLE, content: DEFAULT_CSG_CODE_CONTENT }],
@@ -79,13 +78,8 @@ const applyFilter = (item, checkFunction, applyFunction, ...args) => {
 	}
 }
 
-function isMesh(item) {
-	return item && (item instanceof THREE.Mesh || item instanceof Brush)
-}
-function isJsonMesh(item) {
-	return typeof item === 'object' && item !== null && item.$jsonMesh != undefined
-}
-
+function isMesh(item) { return item && (item instanceof THREE.Mesh || item instanceof Brush) }
+function isJsonMesh(item) { return typeof item === 'object' && item !== null && item.$jsonMesh != undefined }
 const applyToMesh = (item, applyFunction, ...args) => applyFilter(item, isMesh, applyFunction, ...args)
 
 const cloneFilter = (item, checkFunction, applyFunction, ...args) => {
@@ -97,9 +91,7 @@ const cloneFilter = (item, checkFunction, applyFunction, ...args) => {
 	} else if (item !== null && item !== undefined && typeof item === 'object') {
 		const obj = {}
 		for (const key in item) {
-			if (Object.prototype.hasOwnProperty.call(item, key)) {
-				obj[key] = cloneFilter(item[key], checkFunction, applyFunction, ...args)
-			}
+			if (Object.prototype.hasOwnProperty.call(item, key)) obj[key] = cloneFilter(item[key], checkFunction, applyFunction, ...args)
 		}
 		return obj
 	}
@@ -112,21 +104,18 @@ function floatArrayToBase64(floatArray) {
 	for (let i = 0; i < uint8Array.length; i++) binaryString += String.fromCharCode(uint8Array[i])
 	return btoa(binaryString)
 }
-
 function base64ToFloatArray(base64String) {
 	const binaryString = atob(base64String)
 	const bytes = new Uint8Array(binaryString.length)
 	for (let i = 0; i < binaryString.length; i++) bytes[i] = binaryString.charCodeAt(i)
 	return new Float32Array(bytes.buffer)
 }
-
 function uint16ToBase64(uint16Array) {
 	const uint8Array = new Uint8Array(uint16Array.buffer)
 	let binaryString = ''
 	for (let i = 0; i < uint8Array.length; i++) binaryString += String.fromCharCode(uint8Array[i])
 	return btoa(binaryString)
 }
-
 function base64ToUint16(base64String) {
 	const binaryString = atob(base64String)
 	const uint16Array = new Uint16Array(binaryString.length / 2)
@@ -136,43 +125,37 @@ function base64ToUint16(base64String) {
 }
 
 globalThis.guid = (() => {
-		if (typeof window.crypto?.randomUUID === 'function') {
-			return window.crypto.randomUUID.bind(window.crypto)
-		} else {
-			return function () {
-				return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
-						const r = (Math.random() * 16) | 0
-						const v = c === 'x' ? r : (r & 0x3) | 0x8
-						return v.toString(16)
-					})
-			}
-		}
-	})()
+	if (typeof window.crypto?.randomUUID === 'function') return window.crypto.randomUUID.bind(window.crypto)
+	return function () {
+		return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+			const r = (Math.random() * 16) | 0
+			const v = c === 'x' ? r : (r & 0x3) | 0x8
+			return v.toString(16)
+		})
+	}
+})()
 
 globalThis.___blobfunctions = globalThis.___blobfunctions || {}
-
 globalThis.blobFunction = function (params, codeString) {
 	return new Promise((resolve, reject) => {
-			const gid = guid()
-			const code = `___blobfunctions['${gid}'] = function(${params.join(",")}){return (async ()=>{${codeString}})();}`
-			const codeBlob = new Blob([code], { type: 'text/javascript' })
-			const blobUrl = URL.createObjectURL(codeBlob)
-			const scriptElement = document.createElement('script')
-			scriptElement.src = blobUrl
-
-			const cleanup = (wasSuccessful) => {
-				URL.revokeObjectURL(blobUrl)
-				if (scriptElement.parentNode) scriptElement.parentNode.removeChild(scriptElement)
-				const result = ___blobfunctions[gid]
-				delete ___blobfunctions[gid]
-				if (wasSuccessful) resolve(result)
-				else reject(new Error(`Failed to load/execute Blob script: ${blobUrl}`))
-			}
-
-			scriptElement.onload = () => cleanup(true)
-			scriptElement.onerror = () => cleanup(false)
-			document.body.appendChild(scriptElement)
-		})
+		const gid = guid()
+		const code = `___blobfunctions['${gid}'] = function(${params.join(",")}){return (async ()=>{${codeString}})();}`
+		const codeBlob = new Blob([code], { type: 'text/javascript' })
+		const blobUrl = URL.createObjectURL(codeBlob)
+		const scriptElement = document.createElement('script')
+		scriptElement.src = blobUrl
+		const cleanup = (wasSuccessful) => {
+			URL.revokeObjectURL(blobUrl)
+			if (scriptElement.parentNode) scriptElement.parentNode.removeChild(scriptElement)
+			const result = ___blobfunctions[gid]
+			delete ___blobfunctions[gid]
+			if (wasSuccessful) resolve(result)
+			else reject(new Error(`Failed to load/execute Blob script: ${blobUrl}`))
+		}
+		scriptElement.onload = () => cleanup(true)
+		scriptElement.onerror = () => cleanup(false)
+		document.body.appendChild(scriptElement)
+	})
 }
 
 class ScadProject {
@@ -188,12 +171,13 @@ class ScadProject {
 		this.basePath = basePath || null
 	}
 
+	// ✅ UPDATED: Read from 'pages' instead of 'values' to match pagesManagerCore.js
 	get csgValues() {
-		if (this._csgEditorRef && Array.isArray(this._csgEditorRef.values)) return this._csgEditorRef.values
+		if (this._csgEditorRef && Array.isArray(this._csgEditorRef.pages)) return this._csgEditorRef.pages
 		return this._csgValues || []
 	}
 	get codeValues() {
-		if (this._codeEditorRef && Array.isArray(this._codeEditorRef.values)) return this._codeEditorRef.values
+		if (this._codeEditorRef && Array.isArray(this._codeEditorRef.pages)) return this._codeEditorRef.pages
 		return this._codeValues || []
 	}
 
@@ -201,7 +185,6 @@ class ScadProject {
 		this._csgEditorRef = csgEditorRef
 		this._codeEditorRef = codeEditorRef
 	}
-
 	setBasePath(bp) { this.basePath = bp || null }
 
 	path(filepath) {
@@ -210,10 +193,7 @@ class ScadProject {
 		const libraryPath = typeof settings !== 'undefined' && settings.libraryPath ? settings.libraryPath : '/csgLib'
 		if (filepath.startsWith('$lib/')) return libraryPath + '/' + filepath.substring(5)
 		const base = this.basePath ?? (this._csgEditorRef && this._csgEditorRef.basePath) ?? (typeof csgEditor !== 'undefined' ? csgEditor.basePath : null)
-		if (!base) {
-			alert('Error: Cannot use relative paths. Load or save a project first.')
-			return null
-		}
+		if (!base) { alert('Error: Cannot use relative paths. Load or save a project first.'); return null }
 		const parts = base.split('/').filter(Boolean)
 		const fileParts = filepath.split('/')
 		for (const part of fileParts) {
@@ -230,11 +210,7 @@ class ScadProject {
 			const projectData = JSON.parse(fileContent)
 			const segs = fullPath.split('/'); segs.pop()
 			const subBase = '/' + segs.filter(Boolean).join('/')
-			const subProject = new ScadProject({
-					csgValues: projectData.csgCode || [],
-					codeValues: projectData.editorCode || [],
-					basePath: subBase
-				})
+			const subProject = new ScadProject({ csgValues: projectData.csgCode || [], codeValues: projectData.editorCode || [], basePath: subBase })
 			this.fileCache[fullPath] = subProject
 			return subProject
 		} catch (err) {
@@ -298,12 +274,8 @@ class ScadProject {
 		}
 	}
 
-	clearMeshCache(name) {
-		if (this.meshCache[name]) { delete this.meshCache[name]; PrintLog(`✅ Cleared mesh cache for: ${name}`) }
-	}
-	clearCodeCache(name) {
-		if (this.codeCache[name]) { delete this.codeCache[name]; PrintLog(`✅ Cleared code cache for: ${name}`) }
-	}
+	clearMeshCache(name) { if (this.meshCache[name]) { delete this.meshCache[name]; PrintLog(`✅ Cleared mesh cache for: ${name}`) } }
+	clearCodeCache(name) { if (this.codeCache[name]) { delete this.codeCache[name]; PrintLog(`✅ Cleared code cache for: ${name}`) } }
 	clearAllCache(groupItems, currentObjects) {
 		this.meshCache = {}; this.codeCache = {}; this.fileCache = {}
 		currentObjects.forEach(obj => groupItems.remove(obj))
@@ -313,7 +285,7 @@ class ScadProject {
 
 function extractMeshData(mesh) {
 	try {
-		if (!mesh || !mesh.geometry) { console.error('Invalid mesh provided. It must have a geometry.'); return null }
+		if (!mesh || !mesh.geometry) { console.error('Invalid mesh provided.'); return null }
 		const geometry = mesh.geometry, data = {}
 		const positionAttribute = geometry.getAttribute('position')
 		if (positionAttribute) data.positions = floatArrayToBase64(positionAttribute.array)
@@ -322,54 +294,36 @@ function extractMeshData(mesh) {
 		const indexAttribute = geometry.getIndex()
 		if (indexAttribute) data.indices = uint16ToBase64(indexAttribute.array)
 		const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material]
-		data.materials = materials.map(m => ({
-					color: m.color ? '#' + m.color.getHexString() : '#ffffff',
-					roughness: m.roughness, metalness: m.metalness,
-					side: m.side, flatShading: m.flatShading, type: m.type
-				}))
+		data.materials = materials.map(m => ({ color: m.color ? '#' + m.color.getHexString() : '#ffffff', roughness: m.roughness, metalness: m.metalness, side: m.side, flatShading: m.flatShading, type: m.type }))
 		data.groups = geometry.groups && geometry.groups.length > 0 ? geometry.groups : []
 		data.position = [mesh.position.x, mesh.position.y, mesh.position.z]
 		data.rotation = [mesh.rotation.x, mesh.rotation.y, mesh.rotation.z]
 		data.scale = [mesh.scale.x, mesh.scale.y, mesh.scale.z]
 		return data
-	} catch (error) { console.log('Failed to extract mesh ', error); return null }
+	} catch (error) { return null }
 }
 
 function recreateMeshFromData(data) {
 	try {
-		if (!data || !data.positions) { console.error("Invalid data provided. 'positions' array is required."); return null }
+		if (!data || !data.positions) return null
 		const geometry = new THREE.BufferGeometry()
-		const positions = base64ToFloatArray(data.positions)
-		geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
-		if (data.normals) {
-			const normals = base64ToFloatArray(data.normals)
-			geometry.setAttribute('normal', new THREE.BufferAttribute(normals, 3))
-		}
-		if (data.indices) {
-			const indices = base64ToUint16(data.indices)
-			geometry.setIndex(new THREE.BufferAttribute(indices, 1))
-		}
+		geometry.setAttribute('position', new THREE.BufferAttribute(base64ToFloatArray(data.positions), 3))
+		if (data.normals) geometry.setAttribute('normal', new THREE.BufferAttribute(base64ToFloatArray(data.normals), 3))
+		if (data.indices) geometry.setIndex(new THREE.BufferAttribute(base64ToUint16(data.indices), 1))
 		let materials = []
 		if (data.materials && data.materials.length > 0) {
 			materials = data.materials.map(m => {
-					const materialProps = {
-						color: new THREE.Color(m.color), roughness: m.roughness,
-						metalness: m.metalness, side: m.side, flatShading: m.flatShading
-					}
-					return m.type === 'MeshBasicMaterial' ? new THREE.MeshBasicMaterial(materialProps) : new THREE.MeshStandardMaterial(materialProps)
-				})
-			if (data.groups && data.groups.length > 0) {
-				data.groups.forEach(group => geometry.addGroup(group.start, group.count, group.materialIndex))
-			}
-		} else {
-			materials.push(new THREE.MeshStandardMaterial({ color: 0xffcc00 }))
-		}
+				const props = { color: new THREE.Color(m.color), roughness: m.roughness, metalness: m.metalness, side: m.side, flatShading: m.flatShading }
+				return m.type === 'MeshBasicMaterial' ? new THREE.MeshBasicMaterial(props) : new THREE.MeshStandardMaterial(props)
+			})
+			if (data.groups && data.groups.length > 0) data.groups.forEach(group => geometry.addGroup(group.start, group.count, group.materialIndex))
+		} else { materials.push(new THREE.MeshStandardMaterial({ color: 0xffcc00 })) }
 		const newMesh = new THREE.Mesh(geometry, materials.length === 1 ? materials[0] : materials)
-		if (data.position) newMesh.position.set(data.position[0], data.position[1], data.position[2])
-		if (data.rotation) newMesh.rotation.set(data.rotation[0], data.rotation[1], data.rotation[2])
-		if (data.scale) newMesh.scale.set(data.scale[0], data.scale[1], data.scale[2])
+		if (data.position) newMesh.position.set(...data.position)
+		if (data.rotation) newMesh.rotation.set(...data.rotation)
+		if (data.scale) newMesh.scale.set(...data.scale)
 		return newMesh
-	} catch (error) { console.error('Failed to recreate mesh from data:', error); return null }
+	} catch (error) { return null }
 }
 
 // --- END: ScadProject, Mesh/Data Helpers ---
@@ -382,22 +336,25 @@ function updateMainContainerHeight(consoleHeight) {
 	if (editorCodeEditor && typeof editorCodeEditor.resize === 'function') editorCodeEditor.resize()
 }
 
+// ✅ UPDATED: Use 'pageIndex' instead of 'valuesIndex'
 function saveActivePageIndex(editorRef, key) {
-	if (editorRef && editorRef.valuesIndex !== undefined) {
-		try { localStorage.setItem(key, editorRef.valuesIndex.toString()) }
+	if (editorRef && editorRef.pageIndex !== undefined) {
+		try { localStorage.setItem(key, editorRef.pageIndex.toString()) }
 		catch (e) { PrintWarn(`Failed to save active page index for ${key}:`, e) }
 	}
 }
 
+// ✅ UPDATED: Use 'pages' and 'pageIndex'
 function restoreActivePageIndex(editorRef, key) {
 	const savedIndex = localStorage.getItem(key)
 	if (savedIndex !== null) {
 		const index = parseInt(savedIndex, 10)
-		if (!isNaN(index) && index >= 0 && index < editorRef.values.length) { editorRef.valuesIndex = index }
+		if (!isNaN(index) && index >= 0 && index < editorRef.pages.length) { editorRef.pageIndex = index }
 		else { localStorage.removeItem(key) }
 	}
 }
 
+// ✅ UPDATED: Use 'pages' and 'pageIndex'
 function resetProjectToDefault(path) {
 	if (path) PrintWarn(`⚠️ Hard failure. Clearing saved path and resetting to default project.`)
 	else PrintLog('Initializing default project content.')
@@ -411,8 +368,8 @@ function resetProjectToDefault(path) {
 		project._csgValues = defaultData.csgCode
 		project._codeValues = defaultData.editorCode
 	}
-	csgEditor.values = defaultData.csgCode; csgEditor.valuesIndex = 0; csgEditor.basePath = null
-	editorCodeEditor.values = defaultData.editorCode; editorCodeEditor.valuesIndex = 0
+	csgEditor.pages = defaultData.csgCode; csgEditor.pageIndex = 0; csgEditor.basePath = null
+	editorCodeEditor.pages = defaultData.editorCode; editorCodeEditor.pageIndex = 0
 	isInitializing = true
 	runCSGCode().then(() => { isInitializing = false; PrintLog('Default project loaded and rendered.') })
 }
@@ -424,13 +381,14 @@ async function autoLoadLastProject() {
 		PrintLog(`Attempting to auto-load last project from: ${lastPath}`)
 		try {
 			const success = await handleLoadFile(null, lastPath)
-			if (success) { PrintLog(`✅ Project successfully loaded (or reset to default if file was empty).`); return }
+			if (success) { PrintLog(`✅ Project successfully loaded.`); return }
 		} catch (error) { PrintError(`❌ Auto-load failed for path: ${lastPath}.`, error) }
 	}
 	PrintLog('No previous project path found or load failed. Forcing default project initialization.')
 	resetProjectToDefault(null)
 }
 
+// ✅ UPDATED: Use 'pages' and 'pageIndex'
 export async function handleLoadFile(event, filePath) {
 	let fileContent, projectData
 	try {
@@ -438,45 +396,45 @@ export async function handleLoadFile(event, filePath) {
 		const defaultDataJson = JSON.stringify(getNewDefaultProjectData())
 		let fileWasEmpty = false
 		if (fileStats && fileStats.size !== undefined && fileStats.size === 0) {
-			PrintWarn(`⚠️ File at path '${filePath}' has a size of 0 bytes. Treating as new project.`)
 			fileContent = defaultDataJson; fileWasEmpty = true
 		} else { fileContent = await api.readFile(filePath) }
 		if (!fileWasEmpty && (!fileContent || fileContent.trim().length === 0)) {
-			PrintWarn(`⚠️ File content read as empty. Treating as new project.`)
 			fileContent = defaultDataJson
 		}
 		projectData = JSON.parse(fileContent)
 		const pathSegments = filePath.split('/'); pathSegments.pop()
 		const newBasePath = pathSegments.join('/') + '/'
 		csgEditor.basePath = newBasePath; globalThis.settings.basePath = newBasePath; project.setBasePath(newBasePath)
-		if (projectData.csgCode) { csgEditor.values = projectData.csgCode; project._csgValues = projectData.csgCode }
-		if (projectData.editorCode) { editorCodeEditor.values = projectData.editorCode; project._codeValues = projectData.editorCode }
+		
+		if (projectData.csgCode) { csgEditor.pages = projectData.csgCode; project._csgValues = projectData.csgCode }
+		if (projectData.editorCode) { editorCodeEditor.pages = projectData.editorCode; project._codeValues = projectData.editorCode }
+		
 		restoreActivePageIndex(csgEditor, LAST_CSG_PAGE_KEY)
 		restoreActivePageIndex(editorCodeEditor, LAST_EDITOR_CODE_PAGE_KEY)
+		
 		if (projectData.meshCache) {
 			project.meshCache = cloneFilter(projectData.meshCache, isJsonMesh, (item) => {
-					if (item.isBrush) {
-						const mesh = recreateMeshFromData(item.$jsonMesh.mesh)
-						if (item.$jsonMesh.userData != undefined) mesh.userData = item.$jsonMesh.userData
-						return new Brush(mesh)
-					} else if (item.isShape) { return null }
-					else {
-						const mesh = recreateMeshFromData(item.$jsonMesh.mesh)
-						if (item.$jsonMesh.userData != undefined) mesh.userData = item.$jsonMesh.userData
-						return mesh
-					}
-				})
+				if (item.isBrush) {
+					const mesh = recreateMeshFromData(item.$jsonMesh.mesh)
+					if (item.$jsonMesh.userData != undefined) mesh.userData = item.$jsonMesh.userData
+					return new Brush(mesh)
+				} else if (item.isShape) { return null }
+				else {
+					const mesh = recreateMeshFromData(item.$jsonMesh.mesh)
+					if (item.$jsonMesh.userData != undefined) mesh.userData = item.$jsonMesh.userData
+					return mesh
+				}
+			})
 		}
 		setTimeout(() => {
-				const csgEditorValues = csgEditor.values, activeIndex = csgEditor.valuesIndex
-				if (csgEditorValues && csgEditorValues[activeIndex]) runCSGCode()
-				isInitializing = false
-			}, 50)
+			const csgEditorPages = csgEditor.pages, activeIndex = csgEditor.pageIndex
+			if (csgEditorPages && csgEditorPages[activeIndex]) runCSGCode()
+			isInitializing = false
+		}, 50)
 		try {
 			localStorage.setItem(LAST_PROJECT_PATH_KEY, filePath)
 			saveActivePageIndex(csgEditor, LAST_CSG_PAGE_KEY)
 			saveActivePageIndex(editorCodeEditor, LAST_EDITOR_CODE_PAGE_KEY)
-			PrintLog(`Saved last project path and page index on load: ${filePath}`)
 		} catch (e) { PrintWarn('Failed to save persistence data after load:', e) }
 		closeModal('load-code-modal')
 		return true
@@ -487,6 +445,7 @@ export async function handleLoadFile(event, filePath) {
 	}
 }
 
+// ✅ UPDATED: Use 'pages'
 export async function handleSaveFile(event, filePath) {
 	try {
 		let finalPath = filePath
@@ -496,25 +455,19 @@ export async function handleSaveFile(event, filePath) {
 		}
 		project.setBasePath(csgEditor.basePath)
 		const projectData = {
-			csgCode: csgEditor.values,
-			editorCode: editorCodeEditor.values,
+			csgCode: csgEditor.pages,
+			editorCode: editorCodeEditor.pages,
 			meshCache: cloneFilter(project.meshCache, isMesh, (item) => {
-					if (item instanceof THREE.Mesh) {
-						return { $jsonMesh: { mesh: extractMeshData(item), userData: item.userData } }
-					} else if (item instanceof Brush) {
-						return { $jsonMesh: { isBrush: true, mesh: extractMeshData(item.mesh), userData: item.userData } }
-					} else if (item instanceof THREE.Shape) {
-						return { $jsonMesh: { isShape: true, shape: null } }
-					}
-				})
+				if (item instanceof THREE.Mesh) return { $jsonMesh: { mesh: extractMeshData(item), userData: item.userData } }
+				else if (item instanceof Brush) return { $jsonMesh: { isBrush: true, mesh: extractMeshData(item.mesh), userData: item.userData } }
+				else if (item instanceof THREE.Shape) return { $jsonMesh: { isShape: true, shape: null } }
+			})
 		}
-		const projectDataString = JSON.stringify(projectData, null, 2)
-		await api.saveFile(finalPath, projectDataString)
+		await api.saveFile(finalPath, JSON.stringify(projectData, null, 2))
 		try {
 			localStorage.setItem(LAST_PROJECT_PATH_KEY, finalPath)
 			saveActivePageIndex(csgEditor, LAST_CSG_PAGE_KEY)
 			saveActivePageIndex(editorCodeEditor, LAST_EDITOR_CODE_PAGE_KEY)
-			PrintLog(`Saved last project path and page index: ${finalPath}`)
 		} catch (e) { PrintWarn('Failed to save path to localStorage:', e) }
 		alert(`Project saved successfully to: ${finalPath}`)
 		closeModal('save-code-modal')
@@ -523,43 +476,48 @@ export async function handleSaveFile(event, filePath) {
 	}
 }
 
+// ✅ UPDATED: Use 'pages' and 'pageIndex'
 export async function runEditorScript() {
-	const pageData = editorCodeEditor.values[editorCodeEditor.valuesIndex]
+	const pageData = editorCodeEditor.pages[editorCodeEditor.pageIndex]
 	if (!pageData) return
 	const pageName = pageData.title
 	if (project.codeCache[pageName]) project.codeCache[pageName].updated = false
 	await project.include(pageName)
 }
 
+// ✅ UPDATED: Use 'pages' and 'pageIndex'
 export async function runCSGCode() {
 	currentObjects.forEach(obj => groupItems.remove(obj))
 	currentObjects = []
-	const pageData = csgEditor.values[csgEditor.valuesIndex]
+	const pageData = csgEditor.pages[csgEditor.pageIndex]
 	if (!pageData) return
 	const activeMesh = await project.get(pageData.title)
 	const meshes = []
 	applyToMesh(activeMesh, item => meshes.push(item))
 	meshes.forEach(item => {
-			if (item.userData.$csgShow == undefined || item.$csgShow) {
-				groupItems.add(item); currentObjects.push(item)
-			}
-		})
+		if (item.userData.$csgShow == undefined || item.$csgShow) {
+			groupItems.add(item); currentObjects.push(item)
+		}
+	})
 	isWireframeMode = false
 	const btn = document.getElementById('btn-wireframe')
-	if (btn) btn.style.backgroundColor = 'transparent' // ✅ Fixed: Use transparent instead of #3498db
+	if (btn) btn.style.backgroundColor = 'transparent'
 }
 
+// ✅ UPDATED: Use 'pages' and 'pageIndex'
 export function clearCurrentCacheByName() {
 	const codePanel = document.getElementById('code-panel')
 	const editorCodePanel = document.getElementById('editor-code-panel')
 	let currentTitle = null
-	if (codePanel.style.display === 'block' && csgEditor.values[csgEditor.valuesIndex]) {
-		currentTitle = csgEditor.values[csgEditor.valuesIndex].title
+	
+	if (codePanel.style.display !== 'none' && csgEditor.pages[csgEditor.pageIndex]) {
+		currentTitle = csgEditor.pages[csgEditor.pageIndex].title
 		project.clearMeshCache(currentTitle)
-	} else if (editorCodePanel.style.display === 'block' && editorCodeEditor.values[editorCodeEditor.valuesIndex]) {
-		currentTitle = editorCodeEditor.values[editorCodeEditor.valuesIndex].title
+	} else if (editorCodePanel.style.display !== 'none' && editorCodeEditor.pages[editorCodeEditor.pageIndex]) {
+		currentTitle = editorCodeEditor.pages[editorCodeEditor.pageIndex].title
 		project.clearCodeCache(currentTitle)
 	}
+	
 	if (currentTitle) {
 		PrintLog(`Cache for "${currentTitle}" cleared.`)
 		alert(`Cache for "${currentTitle}" cleared. Please click "Run" to re-render.`)
@@ -572,15 +530,15 @@ export function clearCurrentCacheByName() {
 export function toggleWireframe() {
 	isWireframeMode = !isWireframeMode
 	applyToMesh(currentObjects, item => {
-			if (isWireframeMode) {
-				if (!item.userData.originalMaterial) item.userData.originalMaterial = item.material
-				item.material = new THREE.MeshBasicMaterial({ color: 0x11ccaa, wireframe: true, transparent: true, opacity: 0.5 })
-			} else {
-				if (item.userData.originalMaterial) item.material = item.userData.originalMaterial
-			}
-		})
+		if (isWireframeMode) {
+			if (!item.userData.originalMaterial) item.userData.originalMaterial = item.material
+			item.material = new THREE.MeshBasicMaterial({ color: 0x11ccaa, wireframe: true, transparent: true, opacity: 0.5 })
+		} else {
+			if (item.userData.originalMaterial) item.material = item.userData.originalMaterial
+		}
+	})
 	const btn = document.getElementById('btn-wireframe')
-	if (isWireframeMode) { btn.style.backgroundColor = 'rgba(231,76,60,0.3)' } // ✅ Fixed: Match HTML active color
+	if (isWireframeMode) { btn.style.backgroundColor = 'rgba(231,76,60,0.3)' }
 	else { btn.style.backgroundColor = 'transparent' }
 }
 
@@ -621,10 +579,10 @@ function initConsolePanelLoggers() {
 	function formatArgs(args) {
 		try {
 			return Array.from(args).map(a => {
-					if (typeof a === 'string') return a
-					if (a instanceof Error) return a.message
-					return JSON.stringify(a, null, 2)
-				}).join(' ')
+				if (typeof a === 'string') return a
+				if (a instanceof Error) return a.message
+				return JSON.stringify(a, null, 2)
+			}).join(' ')
 		} catch { return String(args) }
 	}
 	function logToPanel(type, args, stack = null) {
@@ -651,8 +609,6 @@ function initConsolePanelLoggers() {
 	globalThis.jlog = function (...args) {
 		for (var i = 0; i < args.length; i += 2) PrintLog(args[i] + ':' + JSON.stringify(args[i + 1]))
 	}
-
-	
 }
 
 export function initialize(domElements) {
@@ -664,56 +620,30 @@ export function initialize(domElements) {
 	currentObjects = []
 	const defaultData = getNewDefaultProjectData()
 	project = new ScadProject({
-			csgEditorRef: csgEditor, codeEditorRef: editorCodeEditor,
-			csgValues: defaultData.csgCode, codeValues: defaultData.editorCode,
-			basePath: csgEditor.basePath || null
-		})
+		csgEditorRef: csgEditor, codeEditorRef: editorCodeEditor,
+		csgValues: defaultData.csgCode, codeValues: defaultData.editorCode,
+		basePath: csgEditor.basePath || null
+	})
 	initConsolePanelLoggers()
 
 	// --- Console Resizing Logic ---
 	const consoleContainer = document.getElementById('console-container')
 	const consoleResizer = document.getElementById('console-resizer')
 	let isResizing = false, startY = 0, startHeight = 0
-
-	const startResize = (y) => {
-		isResizing = true; startY = y; startHeight = consoleContainer.offsetHeight
-		document.body.style.userSelect = 'none'; document.body.style.cursor = 'ns-resize'
-	}
+	const startResize = (y) => { isResizing = true; startY = y; startHeight = consoleContainer.offsetHeight; document.body.style.userSelect = 'none'; document.body.style.cursor = 'ns-resize' }
 	const resize = (y) => {
 		if (!isResizing) return
 		const newHeight = Math.max(MIN_CONSOLE_HEIGHT, startHeight + (startY - y))
 		const maxHeight = window.innerHeight * MAX_CONSOLE_HEIGHT_RATIO
-		if (newHeight >= MIN_CONSOLE_HEIGHT && newHeight <= maxHeight) {
-			consoleContainer.style.height = `${newHeight}px`
-			updateMainContainerHeight(newHeight)
-		}
+		if (newHeight >= MIN_CONSOLE_HEIGHT && newHeight <= maxHeight) { consoleContainer.style.height = `${newHeight}px`; updateMainContainerHeight(newHeight) }
 	}
-	const stopResize = () => {
-		if (!isResizing) return
-		isResizing = false; document.body.style.userSelect = ''; document.body.style.cursor = ''
-		localStorage.setItem(LAST_CONSOLE_HEIGHT_KEY, consoleContainer.offsetHeight)
-	}
-
-	consoleResizer.addEventListener('mousedown', (e) => {
-			e.preventDefault()
-			document.addEventListener('mousemove', onMouseMove, false)
-			document.addEventListener('mouseup', onMouseUp, false)
-			startResize(e.clientY)
-		}, false)
+	const stopResize = () => { if (!isResizing) return; isResizing = false; document.body.style.userSelect = ''; document.body.style.cursor = ''; localStorage.setItem(LAST_CONSOLE_HEIGHT_KEY, consoleContainer.offsetHeight) }
+	consoleResizer.addEventListener('mousedown', (e) => { e.preventDefault(); document.addEventListener('mousemove', onMouseMove, false); document.addEventListener('mouseup', onMouseUp, false); startResize(e.clientY) }, false)
 	function onMouseMove(e) { resize(e.clientY) }
 	function onMouseUp() { stopResize(); document.removeEventListener('mousemove', onMouseMove, false); document.removeEventListener('mouseup', onMouseUp, false) }
-
-	consoleResizer.addEventListener('touchstart', (e) => {
-			e.preventDefault()
-			if (e.touches.length === 1) {
-				document.addEventListener('touchmove', onTouchMove, { passive: false })
-				document.addEventListener('touchend', onTouchEnd, false)
-				startResize(e.touches[0].clientY)
-			}
-		}, false)
+	consoleResizer.addEventListener('touchstart', (e) => { e.preventDefault(); if (e.touches.length === 1) { document.addEventListener('touchmove', onTouchMove, { passive: false }); document.addEventListener('touchend', onTouchEnd, false); startResize(e.touches[0].clientY) } }, false)
 	function onTouchMove(e) { if (e.touches.length > 0) resize(e.touches[0].clientY); e.preventDefault() }
 	function onTouchEnd() { stopResize(); document.removeEventListener('touchmove', onTouchMove, { passive: false }); document.removeEventListener('touchend', onTouchEnd, false) }
-
 	const savedHeight = localStorage.getItem(LAST_CONSOLE_HEIGHT_KEY)
 	if (savedHeight) {
 		const parsedHeight = parseFloat(savedHeight)
@@ -723,30 +653,44 @@ export function initialize(domElements) {
 	updateMainContainerHeight(consoleContainer.offsetHeight)
 	// --- End Console Resizing Logic ---
 
-	editorCodeEditor.addEventListener('keydown', function () {
-			const pageData = editorCodeEditor.values[editorCodeEditor.valuesIndex]
-			if (pageData && pageData.title) { const pageName = pageData.title; if (project.codeCache[pageName]) project.codeCache[pageName].updated = false }
-		})
-	csgEditor.addEventListener('keydown', function () {
-			const pageData = csgEditor.values[csgEditor.valuesIndex]
-			if (pageData && pageData.title) { const pageName = pageData.title; if (project.meshCache[pageName]) project.meshCache[pageName].updated = false }
-		})
+	// ✅ Cache Invalidation: Triggered on typing (oninput) or structural changes (onchange)
+	const invalidateMeshCache = function() {
+		const pageData = csgEditor.pages[csgEditor.pageIndex]
+		if (pageData && pageData.title) {
+			if (project.meshCache[pageData.title]) project.meshCache[pageData.title].updated = false
+		}
+	}
+	csgEditor.oninput = invalidateMeshCache
+	csgEditor.onchange = invalidateMeshCache
 
-	csgEditor.addEventListener('pagechange', function () {
-			if (isInitializing) { PrintLog('Page change event ignored during initialization.'); return }
+	const invalidateCodeCache = function() {
+		const pageData = editorCodeEditor.pages[editorCodeEditor.pageIndex]
+		if (pageData && pageData.title) {
+			if (project.codeCache[pageData.title]) project.codeCache[pageData.title].updated = false
+		}
+	}
+	editorCodeEditor.oninput = invalidateCodeCache
+	editorCodeEditor.onchange = invalidateCodeCache
+
+	// ✅ Save active page index to localStorage when the user switches pages via the Pages Manager UI
+	// We listen to the core 'optText:change' event for context switches, as pagesManager triggers switchContext()
+	csgEditor.addEventListener('optText:change', (e) => {
+		if (e.detail?.type === 'context-switched' && !isInitializing) {
 			saveActivePageIndex(csgEditor, LAST_CSG_PAGE_KEY)
-		})
-	editorCodeEditor.addEventListener('pagechange', function () {
-			if (isInitializing) { PrintLog('Page change event ignored during initialization.'); return }
+		}
+	})
+	editorCodeEditor.addEventListener('optText:change', (e) => {
+		if (e.detail?.type === 'context-switched' && !isInitializing) {
 			saveActivePageIndex(editorCodeEditor, LAST_EDITOR_CODE_PAGE_KEY)
-		})
+		}
+	})
 
 	window.addEventListener('keydown', (e) => {
-			if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); openModal('save-code-modal') }
-		})
+		if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); openModal('save-code-modal') }
+	})
 	window.addEventListener('resize', () => { updateMainContainerHeight(consoleContainer.offsetHeight) })
 
 	autoLoadLastProject()
 }
 
-;(() => { /* Console setup logic is now primarily in initConsolePanelLoggers and initialize. */ })()
+;(() => { })()

@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<title>Crystal Quest</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    width: 100%; height: 100%; overflow: hidden;
+    background: #000; color: #fff;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    user-select: none; -webkit-user-select: none;
+    touch-action: none; overscroll-behavior: none;
+  }
+  #game { position: fixed; inset: 0; }
+  canvas { display: block; width: 100%; height: 100%; }
+
+  /* HUD */
+  #hud {
+    position: fixed; top: env(safe-area-inset-top, 10px); left: 10px; right: 10px;
+    display: flex; justify-content: space-between; align-items: flex-start;
+    pointer-events: none; z-index: 10; padding-top: 8px;
+  }
+  .hud-box {
+    background: rgba(0,0,0,0.45); backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 12px; padding: 8px 12px;
+    font-size: 14px; font-weight: 600;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+  }
+  #health-bar {
+    width: 140px; height: 10px; background: rgba(255,255,255,0.15);
+    border-radius: 5px; overflow: hidden; margin-top: 4px;
+  }
+  #health-fill { height: 100%; width: 100%; background: linear-gradient(90deg,#ff4d6d,#ff7096); transition: width 0.2s; }
+
+  /* Joystick */
+  #joystick {
+    position: fixed; bottom: calc(env(safe-area-inset-bottom, 20px) + 20px);
+    left: 30px; width: 130px; height: 130px;
+    background: rgba(255,255,255,0.08); border: 2px solid rgba(255,255,255,0.2);
+    border-radius: 50%; z-index: 11; touch-action: none;
+  }
+  #stick {
+    position: absolute; top: 50%; left: 50%;
+    width: 55px; height: 55px; margin: -27.5px 0 0 -27.5px;
+    background: radial-gradient(circle at 30% 30%, #9ad8ff, #3a7bd5);
+    border-radius: 50%; box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+  }
+
+  /* Action button */
+  #action-btn {
+    position: fixed; bottom: calc(env(safe-area-inset-bottom, 20px) + 40px);
+    right: 30px; width: 90px; height: 90px;
+    background: radial-gradient(circle at 30% 30%, #ffd86b, #c2410c);
+    border: 3px solid rgba(255,255,255,0.3);
+    border-radius: 50%; z-index: 11;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 28px; font-weight: bold; color: #fff;
+    box-shadow: 0 6px 20px rgba(194,65,12,0.6);
+    touch-action: none;
+  }
+  #action-btn:active { transform: scale(0.92); }
+
+  /* Console toggle */
+  #console-toggle {
+    position: fixed; top: env(safe-area-inset-top, 10px); right: 10px;
+    width: 44px; height: 44px; border-radius: 50%;
+    background: rgba(0,0,0,0.55); border: 1px solid rgba(255,255,255,0.2);
+    color: #fff; font-size: 18px; z-index: 20; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+  #console-badge {
+    position: absolute; top: -4px; right: -4px;
+    min-width: 18px; height: 18px; padding: 0 5px;
+    background: #ff3b30; border-radius: 9px; font-size: 11px;
+    display: none; align-items: center; justify-content: center;
+    font-weight: bold;
+  }
+
+  /* Console panel */
+  #console-panel {
+    position: fixed; top: 0; right: 0; bottom: 0;
+    width: min(420px, 92vw); background: rgba(15,15,20,0.96);
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    border-left: 1px solid rgba(255,255,255,0.1);
+    z-index: 30; display: none; flex-direction: column;
+    transform: translateX(100%); transition: transform 0.25s ease;
+    padding-top: env(safe-area-inset-top, 0);
+  }
+  #console-panel.open { display: flex; transform: translateX(0); }
+  #console-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 14px; border-bottom: 1px solid rgba(255,255,255,0.1);
+  }
+  #console-header h3 { font-size: 15px; font-weight: 600; }
+  #console-header button {
+    background: rgba(255,255,255,0.1); color: #fff;
+    border: 1px solid rgba(255,255,255,0.15);
+    padding: 6px 12px; border-radius: 6px; font-size: 12px;
+    margin-left: 6px; cursor: pointer;
+  }
+  #console-header button.primary { background: #3478f6; border-color: #3478f6; }
+  #console-list {
+    flex: 1; overflow-y: auto; padding: 8px; font-family: "SF Mono", Menlo, monospace;
+    font-size: 12px; -webkit-overflow-scrolling: touch;
+  }
+  .log-entry {
+    padding: 6px 8px; margin-bottom: 4px; border-radius: 4px;
+    border-left: 3px solid #888; word-break: break-word;
+    white-space: pre-wrap;
+  }
+  .log-entry.log   { background: rgba(255,255,255,0.04); border-color: #8ab4f8; color: #e8eaed; }
+  .log-entry.warn  { background: rgba(255,180,0,0.1); border-color: #fbbc04; color: #ffe08a; }
+  .log-entry.error { background: rgba(255,60,60,0.12); border-color: #ff4d6d; color: #ffb3bc; }
+  .log-entry .ts { opacity: 0.5; font-size: 10px; margin-right: 6px; }
+
+  /* Game over overlay */
+  #overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.75);
+    display: none; align-items: center; justify-content: center;
+    z-index: 40; flex-direction: column; text-align: center; padding: 20px;
+  }
+  #overlay.show { display: flex; }
+  #overlay h1 { font-size: 36px; margin-bottom: 10px; color: #ffd86b; }
+  #overlay p { font-size: 18px; margin-bottom: 20px; opacity: 0.9; }
+  #overlay button {
+    background: linear-gradient(180deg,#ffd86b,#c2410c); color: #fff;
+    border: none; padding: 14px 32px; font-size: 18px; font-weight: bold;
+    border-radius: 30px; cursor: pointer;
+    box-shadow: 0 6px 20px rgba(194,65,12,0.5);
+  }
+
+  /* Toast */
+  #toast {
+    position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%);
+    background: rgba(0,0,0,0.8); padding: 10px 18px; border-radius: 20px;
+    font-size: 13px; z-index: 50; opacity: 0; transition: opacity 0.3s;
+    pointer-events: none;
+  }
+  #toast.show { opacity: 1; }
+
+  /* Instructions */
+  #instructions {
+    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+    background: rgba(0,0,0,0.6); padding: 8px 16px; border-radius: 20px;
+    font-size: 12px; z-index: 15; pointer-events: none;
+    opacity: 0.8;
+  }
+</style>
+</head>
+<body>
+<div id="game"></div>
+
+<div id="hud">
+  <div class="hud-box">
+    <div>⚔️ Score: <span id="score">0</span></div>
+    <div style="margin-top:4px;">💖 Health</div>
+    <div id="health-bar"><div id="health-fill"></div></div>
+  </div>
+  <div class="hud-box">💎 <span id="crystals">0</span> / <span id="total-crystals">0</span></div>
+</div>
+
+<div id="joystick"><div id="stick"></div></div>
+<div id="action-btn">✨</div>
+
+<button id="console-toggle" aria-label="Open console">
+  &gt;_
+  <span id="console-badge">0</span>
+</button>
+
+<div id="console-panel">
+  <div id="console-header">
+    <h3>Console</h3>
+    <div>
+      <button id="copy-all" class="primary">📋 Copy All</button>
+      <button id="clear-console">Clear</button>
+      <button id="close-console">✕</button>
+    </div>
+  </div>
+  <div id="console-list"></div>
+</div>
+
+<div id="overlay">
+  <h1 id="overlay-title">Game Over</h1>
+  <p id="overlay-text">Your score: 0</p>
+  <button id="restart-btn">Play Again</button>
+</div>
+
+<div id="toast"></div>
+<div id="instructions">Swipe to turn & look up/down • Joystick to move • Double-tap to jump</div>
+
+<script src="https://unpkg.com/three@0.150.1/build/three.min.js"></script>
+<script>
+/* =========================================================
+   Custom console capture
+   ========================================================= */
+const ConsolePanel = (() => {
+  const list = document.getElementById('console-list');
+  const panel = document.getElementById('console-panel');
+  const toggle = document.getElementById('console-toggle');
+  const badge = document.getElementById('console-badge');
+  const copyBtn = document.getElementById('copy-all');
+  const clearBtn = document.getElementById('clear-console');
+  const closeBtn = document.getElementById('close-console');
+
+  const entries = [];
+  let unread = 0;
+  const orig = {
+    log: console.log.bind(console),
+    warn: console.warn.bind(console),
+    error: console.error.bind(console),
+  };
+
+  function fmtArgs(args) {
+    return args.map(a => {
+      if (a instanceof Error) return a.stack || a.message;
+      if (typeof a === 'object') {
+        try { return JSON.stringify(a, null, 2); }
+        catch { return String(a); }
+      }
+      return String(a);
+    }).join(' ');
+  }
+
+  function push(level, args) {
+    const text = fmtArgs(args);
+    const time = new Date().toLocaleTimeString();
+    entries.push({ level, text, time });
+
+    const el = document.createElement('div');
+    el.className = 'log-entry ' + level;
+    el.innerHTML = `<span class="ts">${time}</span><b>[${level.toUpperCase()}]</b> ${escapeHtml(text)}`;
+    list.appendChild(el);
+    list.scrollTop = list.scrollHeight;
+
+    if (!panel.classList.contains('open')) {
+      unread++;
+      badge.textContent = unread;
+      badge.style.display = 'flex';
+    }
+  }
+
+  function escapeHtml(s) {
+    return s.replace(/[&<>"']/g, c => ({
+      '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+    }[c]));
+  }
+
+  console.log   = (...a) => { orig.log(...a);   push('log',   a); };
+  console.warn  = (...a) => { orig.warn(...a);  push('warn',  a); };
+  console.error = (...a) => { orig.error(...a); push('error', a); };
+
+  toggle.addEventListener('click', () => {
+    panel.classList.add('open');
+    unread = 0;
+    badge.style.display = 'none';
+  });
+  closeBtn.addEventListener('click', () => panel.classList.remove('open'));
+  clearBtn.addEventListener('click', () => {
+    entries.length = 0;
+    list.innerHTML = '';
+  });
+  copyBtn.addEventListener('click', async () => {
+    const text = entries.map(e => `[${e.time}] [${e.level.toUpperCase()}] ${e.text}`).join('\n');
+    try {
+      await navigator.clipboard.writeText(text);
+      showToast('Copied to clipboard ✓');
+    } catch (err) {
+      const ta = document.createElement('textarea');
+      ta.value = text; document.body.appendChild(ta);
+      ta.select(); document.execCommand('copy'); ta.remove();
+      showToast('Copied ✓');
+    }
+  });
+
+  return { push };
+})();
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._h);
+  t._h = setTimeout(() => t.classList.remove('show'), 1800);
+}
+
+console.log('🎮 Crystal Quest initialized');
+console.warn('This is a sample warning');
+
+/* =========================================================
+   Three.js Game
+   ========================================================= */
+const container = document.getElementById('game');
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x1a1033);
+scene.fog = new THREE.Fog(0x1a1033, 25, 70);
+
+const camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 200);
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+container.appendChild(renderer.domElement);
+
+// Lights
+const ambient = new THREE.AmbientLight(0x6a5acd, 0.5);
+scene.add(ambient);
+
+const moon = new THREE.DirectionalLight(0xaab8ff, 0.7);
+moon.position.set(20, 40, 10);
+moon.castShadow = true;
+moon.shadow.mapSize.set(1024, 1024);
+moon.shadow.camera.left = -40; moon.shadow.camera.right = 40;
+moon.shadow.camera.top = 40; moon.shadow.camera.bottom = -40;
+scene.add(moon);
+
+// Ground
+const groundGeo = new THREE.PlaneGeometry(200, 200, 40, 40);
+const pos = groundGeo.attributes.position;
+for (let i = 0; i < pos.count; i++) {
+  const x = pos.getX(i), y = pos.getY(i);
+  pos.setZ(i, Math.sin(x*0.2)*0.3 + Math.cos(y*0.15)*0.3);
+}
+groundGeo.computeVertexNormals();
+const groundMat = new THREE.MeshStandardMaterial({ color: 0x2d5016, roughness: 0.95 });
+const ground = new THREE.Mesh(groundGeo, groundMat);
+ground.rotation.x = -Math.PI / 2;
+ground.receiveShadow = true;
+scene.add(ground);
+
+// Trees
+function makeTree(x, z) {
+  const g = new THREE.Group();
+  const trunk = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.3, 0.4, 2, 6),
+    new THREE.MeshStandardMaterial({ color: 0x4a2c17 })
+  );
+  trunk.position.y = 1; trunk.castShadow = true;
+  g.add(trunk);
+  const leaves = new THREE.Mesh(
+    new THREE.ConeGeometry(1.5, 3, 7),
+    new THREE.MeshStandardMaterial({ color: 0x1e5a2a })
+  );
+  leaves.position.y = 3; leaves.castShadow = true;
+  g.add(leaves);
+  g.position.set(x, 0, z);
+  return g;
+}
+const trees = [];
+for (let i = 0; i < 40; i++) {
+  const r = 15 + Math.random() * 35;
+  const a = Math.random() * Math.PI * 2;
+  const t = makeTree(Math.cos(a)*r, Math.sin(a)*r);
+  scene.add(t); trees.push(t);
+}
+
+// Crystals
+const crystals = [];
+function spawnCrystals(n) {
+  for (let i = 0; i < n; i++) {
+    const geo = new THREE.OctahedronGeometry(0.4, 0);
+    const hue = Math.random();
+    const color = new THREE.Color().setHSL(hue, 0.9, 0.6);
+    const mat = new THREE.MeshStandardMaterial({
+      color, emissive: color, emissiveIntensity: 0.8,
+      roughness: 0.2, metalness: 0.6
+    });
+    const c = new THREE.Mesh(geo, mat);
+    const r = 5 + Math.random() * 30;
+    const a = Math.random() * Math.PI * 2;
+    c.position.set(Math.cos(a)*r, 1.2, Math.sin(a)*r);
+    c.castShadow = true;
+
+    const light = new THREE.PointLight(color, 0.8, 6);
+    c.add(light);
+
+    scene.add(c);
+    crystals.push({ mesh: c, collected: false });
+  }
+  document.getElementById('total-crystals').textContent = n;
+}
+spawnCrystals(15);
+
+// Player (wizard)
+const player = new THREE.Group();
+const body = new THREE.Mesh(
+  new THREE.CylinderGeometry(0.4, 0.5, 1.2, 8),
+  new THREE.MeshStandardMaterial({ color: 0x3a4fbf })
+);
+body.position.y = 0.6; body.castShadow = true;
+player.add(body);
+const head = new THREE.Mesh(
+  new THREE.SphereGeometry(0.3, 12, 10),
+  new THREE.MeshStandardMaterial({ color: 0xffd9b3 })
+);
+head.position.y = 1.5; head.castShadow = true;
+player.add(head);
+const hat = new THREE.Mesh(
+  new THREE.ConeGeometry(0.45, 0.8, 8),
+  new THREE.MeshStandardMaterial({ color: 0x2a1a5a })
+);
+hat.position.y = 2.05; hat.castShadow = true;
+player.add(hat);
+scene.add(player);
+
+// Enemies (shadow creatures)
+const enemies = [];
+function spawnEnemy() {
+  const g = new THREE.Group();
+  const core = new THREE.Mesh(
+    new THREE.SphereGeometry(0.5, 10, 8),
+    new THREE.MeshStandardMaterial({ color: 0x1a0a2a, emissive: 0x4a0a4a, emissiveIntensity: 0.5 })
+  );
+  core.castShadow = true;
+  g.add(core);
+  const eyeGeo = new THREE.SphereGeometry(0.08, 6, 6);
+  const eyeMat = new THREE.MeshBasicMaterial({ color: 0xff2a5a });
+  const e1 = new THREE.Mesh(eyeGeo, eyeMat); e1.position.set(-0.15, 0.1, 0.45);
+  const e2 = new THREE.Mesh(eyeGeo, eyeMat); e2.position.set(0.15, 0.1, 0.45);
+  g.add(e1); g.add(e2);
+
+  const r = 20 + Math.random() * 15;
+  const a = Math.random() * Math.PI * 2;
+  g.position.set(Math.cos(a)*r, 0.5, Math.sin(a)*r);
+  scene.add(g);
+  enemies.push({ mesh: g, hp: 2, speed: 0.02 + Math.random()*0.02 });
+}
+for (let i = 0; i < 5; i++) spawnEnemy();
+
+// Projectiles
+const projectiles = [];
+function castSpell() {
+  const dir = new THREE.Vector3(Math.sin(player.rotation.y), 0, Math.cos(player.rotation.y));
+  const geo = new THREE.SphereGeometry(0.2, 8, 6);
+  const mat = new THREE.MeshBasicMaterial({ color: 0xffd86b });
+  const p = new THREE.Mesh(geo, mat);
+  p.position.copy(player.position).add(new THREE.Vector3(0, 1, 0));
+  const light = new THREE.PointLight(0xffd86b, 1, 5);
+  p.add(light);
+  scene.add(p);
+  projectiles.push({ mesh: p, dir, life: 2.0 });
+  console.log('✨ Spell cast');
+}
+
+/* =========================================================
+   Jump state & physics
+   ========================================================= */
+let yVelocity = 0;
+let isGrounded = true;
+const GRAVITY = -28;
+const JUMP_VELOCITY = 11;
+
+function tryJump() {
+  if (!isGrounded || state.gameOver) return;
+  yVelocity = JUMP_VELOCITY;
+  isGrounded = false;
+  console.log('🦘 Jump!');
+}
+
+/* =========================================================
+   Input: Virtual joystick
+   ========================================================= */
+const joystick = document.getElementById('joystick');
+const stick = document.getElementById('stick');
+let joyVec = { x: 0, y: 0 };
+let joyActive = false, joyId = null;
+
+function joyStart(e) {
+  const t = e.changedTouches ? e.changedTouches[0] : e;
+  joyId = e.changedTouches ? t.identifier : 'mouse';
+  joyActive = true;
+  joyMove(e);
+}
+function joyMove(e) {
+  if (!joyActive) return;
+  let t;
+  if (e.changedTouches) {
+    for (const tt of e.changedTouches) if (tt.identifier === joyId) { t = tt; break; }
+    if (!t) return;
+  } else t = e;
+  const rect = joystick.getBoundingClientRect();
+  const cx = rect.left + rect.width/2;
+  const cy = rect.top + rect.height/2;
+  let dx = t.clientX - cx, dy = t.clientY - cy;
+  const max = rect.width/2 - 27.5;
+  const dist = Math.hypot(dx, dy);
+  if (dist > max) { dx = dx/dist*max; dy = dy/dist*max; }
+  stick.style.transform = `translate(${dx}px, ${dy}px)`;
+  joyVec.x = dx / max; joyVec.y = dy / max;
+  if (e.cancelable) e.preventDefault();
+}
+function joyEnd(e) {
+  if (e.changedTouches) {
+    let found = false;
+    for (const tt of e.changedTouches) if (tt.identifier === joyId) { found = true; break; }
+    if (!found) return;
+  }
+  joyActive = false; joyId = null;
+  stick.style.transform = 'translate(0,0)';
+  joyVec.x = 0; joyVec.y = 0;
+}
+joystick.addEventListener('touchstart', joyStart, { passive: false });
+joystick.addEventListener('touchmove', joyMove, { passive: false });
+joystick.addEventListener('touchend', joyEnd);
+joystick.addEventListener('touchcancel', joyEnd);
+joystick.addEventListener('mousedown', joyStart);
+window.addEventListener('mousemove', joyMove);
+window.addEventListener('mouseup', joyEnd);
+
+/* =========================================================
+   Input: Screen drag to rotate (yaw + pitch) + double-tap to jump
+   ========================================================= */
+let rotateTouchId = null;
+let lastRotateX = 0;
+let lastRotateY = 0;
+const rotateSensitivity = 0.008;
+
+// Camera pitch state (vertical look) - now controls the VIEW angle
+let cameraPitch = 0;
+const PITCH_MIN = -0.8;  // look down at ground
+const PITCH_MAX = 0.8;   // look up at sky
+const CAM_BASE_ELEV = Math.atan2(4, 6);     // ~34°, matches original height/distance
+const CAM_RADIUS = Math.sqrt(6*6 + 4*4);    // ~7.21
+
+// Double-tap tracking
+let lastTapTime = 0;
+let lastTapPos = { x: 0, y: 0 };
+const DOUBLE_TAP_DELAY = 320;
+const DOUBLE_TAP_DISTANCE = 40;
+
+function isDoubleTap(clientX, clientY) {
+  const now = performance.now();
+  const dx = clientX - lastTapPos.x;
+  const dy = clientY - lastTapPos.y;
+  const dist = Math.hypot(dx, dy);
+  if (now - lastTapTime < DOUBLE_TAP_DELAY && dist < DOUBLE_TAP_DISTANCE) {
+    lastTapTime = 0;
+    return true;
+  }
+  lastTapTime = now;
+  lastTapPos = { x: clientX, y: clientY };
+  return false;
+}
+
+renderer.domElement.addEventListener('touchstart', (e) => {
+  if (rotateTouchId !== null) return;
+  const t = e.changedTouches[0];
+
+  if (isDoubleTap(t.clientX, t.clientY)) {
+    tryJump();
+    return;
+  }
+
+  rotateTouchId = t.identifier;
+  lastRotateX = t.clientX;
+  lastRotateY = t.clientY;
+}, { passive: true });
+
+renderer.domElement.addEventListener('touchmove', (e) => {
+  for (const t of e.changedTouches) {
+    if (t.identifier === rotateTouchId) {
+      const dx = t.clientX - lastRotateX;
+      const dy = t.clientY - lastRotateY;
+
+      // Horizontal drag → yaw (character facing)
+      player.rotation.y -= dx * rotateSensitivity;
+
+      // Vertical drag → pitch (camera view angle). 
+      // Finger moving up (dy negative) should look up (pitch positive).
+      cameraPitch -= dy * rotateSensitivity;
+      cameraPitch = Math.max(PITCH_MIN, Math.min(PITCH_MAX, cameraPitch));
+
+      lastRotateX = t.clientX;
+      lastRotateY = t.clientY;
+      break;
+    }
+  }
+}, { passive: true });
+
+renderer.domElement.addEventListener('touchend', (e) => {
+  for (const t of e.changedTouches) {
+    if (t.identifier === rotateTouchId) {
+      rotateTouchId = null;
+      break;
+    }
+  }
+}, { passive: true });
+
+renderer.domElement.addEventListener('touchcancel', (e) => {
+  for (const t of e.changedTouches) {
+    if (t.identifier === rotateTouchId) {
+      rotateTouchId = null;
+      break;
+    }
+  }
+}, { passive: true });
+
+// Mouse support
+let mouseRotating = false;
+let lastMouseX = 0;
+let lastMouseY = 0;
+renderer.domElement.addEventListener('mousedown', (e) => {
+  if (isDoubleTap(e.clientX, e.clientY)) {
+    tryJump();
+    return;
+  }
+  mouseRotating = true;
+  lastMouseX = e.clientX;
+  lastMouseY = e.clientY;
+});
+window.addEventListener('mousemove', (e) => {
+  if (!mouseRotating) return;
+  const dx = e.clientX - lastMouseX;
+  const dy = e.clientY - lastMouseY;
+
+  player.rotation.y -= dx * rotateSensitivity;
+  cameraPitch -= dy * rotateSensitivity;
+  cameraPitch = Math.max(PITCH_MIN, Math.min(PITCH_MAX, cameraPitch));
+
+  lastMouseX = e.clientX;
+  lastMouseY = e.clientY;
+});
+window.addEventListener('mouseup', () => {
+  mouseRotating = false;
+});
+
+// Action button
+const actionBtn = document.getElementById('action-btn');
+let lastCast = 0;
+function doAction(e) {
+  if (e) e.preventDefault();
+  const now = performance.now();
+  if (now - lastCast < 400) return;
+  lastCast = now;
+  castSpell();
+}
+actionBtn.addEventListener('touchstart', doAction, { passive: false });
+actionBtn.addEventListener('mousedown', doAction);
+
+/* =========================================================
+   Game state
+   ========================================================= */
+const state = {
+  score: 0,
+  health: 100,
+  crystalsCollected: 0,
+  gameOver: false,
+};
+
+function updateHUD() {
+  document.getElementById('score').textContent = state.score;
+  document.getElementById('crystals').textContent = state.crystalsCollected;
+  document.getElementById('health-fill').style.width = Math.max(0, state.health) + '%';
+}
+
+function endGame(won) {
+  state.gameOver = true;
+  document.getElementById('overlay-title').textContent = won ? '🏆 Victory!' : '💀 Game Over';
+  document.getElementById('overlay-text').textContent =
+    `Score: ${state.score} • Crystals: ${state.crystalsCollected}`;
+  document.getElementById('overlay').classList.add('show');
+  console.log(won ? 'Victory!' : 'Game over', { score: state.score });
+}
+
+document.getElementById('restart-btn').addEventListener('click', () => {
+  location.reload();
+});
+
+/* =========================================================
+   Main loop
+   ========================================================= */
+const clock = new THREE.Clock();
+let elapsed = 0;
+const speed = 6;
+
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.05);
+  elapsed += dt;
+
+  if (!state.gameOver) {
+    // Movement relative to character's facing direction
+    const angle = player.rotation.y;
+    const forward = new THREE.Vector3(Math.sin(angle), 0, Math.cos(angle));
+    const right = new THREE.Vector3(-Math.cos(angle), 0, Math.sin(angle));
+
+    const moveDir = new THREE.Vector3();
+    moveDir.addScaledVector(forward, -joyVec.y);
+    moveDir.addScaledVector(right, joyVec.x);
+
+    const mag = moveDir.length();
+    if (mag > 0.1) {
+      moveDir.normalize();
+      const actualSpeed = speed * Math.min(mag, 1);
+      player.position.x += moveDir.x * actualSpeed * dt;
+      player.position.z += moveDir.z * actualSpeed * dt;
+    }
+
+    // Jump physics
+    if (!isGrounded) {
+      yVelocity += GRAVITY * dt;
+      player.position.y += yVelocity * dt;
+      if (player.position.y <= 0) {
+        player.position.y = 0;
+        yVelocity = 0;
+        isGrounded = true;
+      }
+    }
+
+    player.position.x = Math.max(-45, Math.min(45, player.position.x));
+    player.position.z = Math.max(-45, Math.min(45, player.position.z));
+
+    // Camera follow: orbit with pitch controlling VIEW angle
+    const yaw = player.rotation.y;
+    
+    // When pitch is positive (looking up), lower the camera slightly
+    // When pitch is negative (looking down), raise the camera slightly
+    const elev = CAM_BASE_ELEV - cameraPitch * 0.3;
+    
+    const camOffset = new THREE.Vector3(
+      -CAM_RADIUS * Math.cos(elev) * Math.sin(yaw),
+       CAM_RADIUS * Math.sin(elev),
+      -CAM_RADIUS * Math.cos(elev) * Math.cos(yaw)
+    );
+    const targetCam = player.position.clone().add(camOffset);
+    camera.position.lerp(targetCam, 0.1);
+    
+    // LookAt target: when pitch is positive (looking up), target is higher
+    // When pitch is negative (looking down), target is lower
+    const lookAtY = player.position.y + 1 + cameraPitch * 4;
+    camera.lookAt(player.position.x, lookAtY, player.position.z);
+
+    // Crystals animation + pickup
+    for (const c of crystals) {
+      if (c.collected) continue;
+      c.mesh.rotation.y += dt * 2;
+      c.mesh.rotation.x += dt * 1.2;
+      c.mesh.position.y = 1.2 + Math.sin(elapsed*2 + c.mesh.position.x) * 0.2;
+      const dx = c.mesh.position.x - player.position.x;
+      const dz = c.mesh.position.z - player.position.z;
+      const horizDist = Math.hypot(dx, dz);
+      const vertDist = Math.abs(c.mesh.position.y - (player.position.y + 1));
+      if (horizDist < 1.2 && vertDist < 1.5) {
+        c.collected = true;
+        scene.remove(c.mesh);
+        state.crystalsCollected++;
+        state.score += 10;
+        console.log('💎 Crystal collected!', state.crystalsCollected);
+        updateHUD();
+      }
+    }
+
+    // Enemies
+    for (const en of enemies) {
+      if (en.hp <= 0) continue;
+      const dir = new THREE.Vector3().subVectors(player.position, en.mesh.position);
+      dir.y = 0;
+      const d = dir.length();
+      if (d > 0.01) {
+        dir.normalize();
+        en.mesh.position.add(dir.multiplyScalar(en.speed * 60 * dt));
+        en.mesh.lookAt(player.position.x, en.mesh.position.y, player.position.z);
+      }
+      en.mesh.position.y = 0.5 + Math.sin(elapsed*3 + en.mesh.position.x) * 0.1;
+      if (d < 1.0 && player.position.y < 1.2) {
+        state.health -= 20 * dt;
+        updateHUD();
+        if (state.health <= 0) endGame(false);
+      }
+    }
+
+    // Projectiles
+    for (let i = projectiles.length - 1; i >= 0; i--) {
+      const p = projectiles[i];
+      p.mesh.position.add(p.dir.clone().multiplyScalar(20 * dt));
+      p.life -= dt;
+      for (const en of enemies) {
+        if (en.hp <= 0) continue;
+        if (p.mesh.position.distanceTo(en.mesh.position) < 0.8) {
+          en.hp--;
+          p.life = 0;
+          state.score += 5;
+          console.log('💥 Hit! Enemy HP:', en.hp);
+          if (en.hp <= 0) {
+            scene.remove(en.mesh);
+            state.score += 20;
+            console.log('☠️ Enemy defeated!');
+          }
+          updateHUD();
+          break;
+        }
+      }
+      if (p.life <= 0) {
+        scene.remove(p.mesh);
+        projectiles.splice(i, 1);
+      }
+    }
+
+    if (state.crystalsCollected >= crystals.length &&
+        enemies.every(e => e.hp <= 0)) {
+      endGame(true);
+    }
+  }
+
+  renderer.render(scene, camera);
+}
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+document.addEventListener('gesturestart', e => e.preventDefault());
+document.addEventListener('touchmove', e => {
+  if (e.target.tagName !== 'DIV' || !e.target.closest('#console-list')) {
+    e.preventDefault();
+  }
+}, { passive: false });
+
+updateHUD();
+animate();
+console.log('🌲 Scene ready:', trees.length, 'trees,', crystals.length, 'crystals,', enemies.length, 'enemies');
+
+setTimeout(() => {
+  document.getElementById('instructions').style.opacity = '0';
+  setTimeout(() => document.getElementById('instructions').remove(), 500);
+}, 5000);
+</script>
+</body>
+</html>

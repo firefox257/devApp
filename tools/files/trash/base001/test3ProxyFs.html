@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>C++ → WASM Compiler (Browser)</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #1a1a2e; color: #eee; padding: 12px; max-width: 100vw; overflow-x: hidden;
+    }
+    h1 { font-size: 1.2rem; margin: 0 0 10px; color: #00d9ff; }
+    .controls { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+    button {
+      background: #0077ff; color: white; border: none; padding: 8px 16px;
+      border-radius: 6px; font-size: 14px; cursor: pointer; flex: 1; min-width: 80px;
+    }
+    button:disabled { background: #555; cursor: not-allowed; }
+    button.danger { background: #ff4444; }
+    .console {
+      background: #0f0f1a; border: 1px solid #333; border-radius: 8px;
+      padding: 10px; height: 60vh; overflow-y: auto; font-family: monospace;
+      font-size: 12px; line-height: 1.4; white-space: pre-wrap; word-break: break-word;
+    }
+    .log-entry { margin: 2px 0; padding: 2px 4px; border-left: 3px solid transparent; }
+    .log-entry.info { border-left-color: #00d9ff; color: #ccc; }
+    .log-entry.warn { border-left-color: #ffaa00; color: #ffcc66; }
+    .log-entry.error { border-left-color: #ff4444; color: #ff8888; }
+    .log-entry.success { border-left-color: #00cc66; color: #88ffbb; }
+    .progress { height: 4px; background: #333; border-radius: 2px; margin: 8px 0; overflow: hidden; }
+    .progress-bar { height: 100%; background: linear-gradient(90deg, #00d9ff, #0077ff); width: 0%; transition: width 0.2s; }
+    .status { font-size: 11px; color: #888; margin: 4px 0; }
+    .copied { color: #00cc66; font-size: 11px; margin-left: 8px; display: none; }
+    @media (max-width: 400px) { .console { font-size: 11px; height: 55vh; } button { font-size: 13px; padding: 7px 12px; } }
+  </style>
+</head>
+<body>
+  <h1>🔧 C++ → WASM (Browser)</h1>
+  <div class="controls">
+    <button id="runBtn" onclick="runCompiler()">▶ Run Compilation</button>
+    <button id="clearBtn" class="danger" onclick="clearConsole()">🗑 Clear</button>
+    <button id="copyBtn" onclick="copyConsole()">📋 Copy</button>
+    <span id="copiedMsg" class="copied">✓ Copied!</span>
+  </div>
+  <div class="progress"><div id="progressBar" class="progress-bar"></div></div>
+  <div id="status" class="status">Ready. Tap "Run Compilation" to start.</div>
+  <div id="console" class="console"></div>
+
+  <script type="module">
+    const consoleEl = document.getElementById('console');
+    const statusEl = document.getElementById('status');
+    const progressBar = document.getElementById('progressBar');
+    const runBtn = document.getElementById('runBtn');
+    const copiedMsg = document.getElementById('copiedMsg');
+    
+    const originalConsole = { log: console.log, warn: console.warn, error: console.error, info: console.info };
+    
+    function addLog(msg, type = 'info') {
+      const entry = document.createElement('div');
+      entry.className = `log-entry ${type}`;
+      const time = new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      entry.textContent = `[${time}] ${msg}`;
+      consoleEl.appendChild(entry);
+      consoleEl.scrollTop = consoleEl.scrollHeight;
+      if (originalConsole[type]) originalConsole[type](msg);
+    }
+    
+    console.log = (...args) => addLog(args.join(' '), 'info');
+    console.warn = (...args) => addLog(args.join(' '), 'warn');
+    console.error = (...args) => addLog(args.join(' '), 'error');
+    console.info = (...args) => addLog(args.join(' '), 'info');
+    
+    function updateStatus(msg, progress = null) {
+      statusEl.textContent = msg;
+      if (progress !== null) progressBar.style.width = `${Math.min(100, Math.max(0, progress))}%`;
+    }
+    
+    function setButtons(enabled) {
+      runBtn.disabled = !enabled;
+      document.getElementById('clearBtn').disabled = !enabled;
+      document.getElementById('copyBtn').disabled = !enabled;
+    }
+    
+    window.clearConsole = function() {
+      consoleEl.innerHTML = '';
+      updateStatus('Console cleared.');
+      progressBar.style.width = '0%';
+    };
+    
+    window.copyConsole = async function() {
+      try {
+        await navigator.clipboard.writeText(consoleEl.textContent);
+        copiedMsg.style.display = 'inline';
+        setTimeout(() => copiedMsg.style.display = 'none', 1500);
+        addLog('📋 Console copied to clipboard', 'success');
+      } catch (e) { addLog('❌ Copy failed: ' + e.message, 'error'); }
+    };
+
+    // ===== ROBUST INLINE WASI POLYFILL =====
+    let wasmMemory = null;
+    
+    const wasiImports = {
+      proc_exit: (code) => { throw { name: 'ExitStatus', code }; },
+      
+      fd_write: (fd, iovs, iovsLen, nwrittenPtr) => {
+        if (fd !== 1 && fd !== 2) return 8; // EBADF
+        const mem = new Uint8Array(wasmMemory.buffer);
+        const view = new DataView(wasmMemory.buffer);
+        let total = 0;
+        for (let i = 0; i < iovsLen; i++) {
+          const ptr = view.getUint32(iovs + i * 8, true);
+          const len = view.getUint32(iovs + i * 8 + 4, true);
+          const str = new TextDecoder().decode(mem.subarray(ptr, ptr + len));
+          if (fd === 1) addLog(`[app] ${str}`, 'info');
+          if (fd === 2) addLog(`[app-err] ${str}`, 'error');
+          total += len;
+        }
+        view.setUint32(nwrittenPtr, total, true);
+        return 0; // SUCCESS
+      },
+
+      fd_read: () => 29, // EBADF
+      fd_close: () => 0,
+      fd_seek: () => 0,
+      fd_fdstat_get: () => 0,
+      fd_prestat_get: () => 8, // EBADF (no preopened dirs)
+      fd_prestat_dir_name: () => 8,
+      path_open: () => 44, // ENOSYS
+      path_filestat_get: () => 44,
+      fd_filestat_get: () => 44,
+      fd_readdir: () => 44,
+      fd_advise: () => 44,
+      fd_allocate: () => 44,
+      fd_datasync: () => 44,
+      fd_sync: () => 44,
+      fd_tell: () => 44,
+      
+      args_get: () => 0,
+      args_sizes_get: (argcPtr, argvBufSizePtr) => {
+        const v = new DataView(wasmMemory.buffer);
+        v.setUint32(argcPtr, 0, true);
+        v.setUint32(argvBufSizePtr, 0, true);
+        return 0;
+      },
+      environ_get: () => 0,
+      environ_sizes_get: (countPtr, bufSizePtr) => {
+        const v = new DataView(wasmMemory.buffer);
+        v.setUint32(countPtr, 0, true);
+        v.setUint32(bufSizePtr, 0, true);
+        return 0;
+      },
+      
+      clock_time_get: (clockId, precision, timePtr) => {
+        const ns = BigInt(Date.now()) * 1000000n;
+        new DataView(wasmMemory.buffer).setBigUint64(timePtr, ns, true);
+        return 0;
+      },
+      random_get: (bufPtr, bufLen) => {
+        crypto.getRandomValues(new Uint8Array(wasmMemory.buffer, bufPtr, bufLen));
+        return 0;
+      },
+      poll_oneoff: () => 44,
+      sched_yield: () => 0,
+    };
+
+    // ===== MAIN LOGIC =====
+    window.runCompiler = async function() {
+      setButtons(false);
+      clearConsole();
+      updateStatus('Initializing...', 10);
+      
+      try {
+        addLog('⬇️ Loading Clang compiler (~100MB)...', 'info');
+        updateStatus('Downloading compiler bundle...', 20);
+        
+        const { runClang } = await import('./bundleProxyFs.js');
+        updateStatus('Compiler loaded ✓', 40);
+        addLog('✅ Clang bundle ready', 'success');
+        
+        addLog('📝 Preparing C++ source...', 'info');
+        const sourceCode = `
+#include <iostream>
+#include <vector>
+#include <string>
+
+int main() {
+  std::vector<std::string> messages = {
+    "Hello from iPhone! 📱",
+    "C++ compiled to WASM",
+    "Running entirely in-browser",
+    "No server required ✨"
+  };
+  
+  std::cout << "=== Browser C++ Compiler ===" << std::endl;
+  for (const auto& msg : messages) {
+    std::cout << "• " << msg << std::endl;
+  }
+  
+  std::vector<int> nums = {10, 20, 30, 40};
+  int sum = 0;
+  for (int n : nums) sum += n;
+  std::cout << "\\nSum of [10,20,30,40] = " << sum << std::endl;
+  
+  return 0;
+}
+        `.trim();
+        
+        addLog('🔧 Compiling C++ → WASM...', 'info');
+        updateStatus('Running clang++...', 60);
+        
+        const compileStart = performance.now();
+        const result = await runClang([
+          'clang++', '-std=c++17', '-O2', '-fno-exceptions', '-fno-rtti', '-o', 'app.wasm', 'main.cpp'
+        ], { 'main.cpp': sourceCode });
+        
+        const compileTime = ((performance.now() - compileStart) / 1000).toFixed(2);
+        addLog(`✅ Compilation successful (${compileTime}s)`, 'success');
+        updateStatus('Compiled! Running output...', 80);
+        
+        if (!result['app.wasm']) throw new Error('No output WASM file generated.');
+        
+        addLog('🚀 Executing compiled WASM...', 'info');
+        
+        // Instantiate with robust inline WASI polyfill
+        const { instance } = await WebAssembly.instantiate(result['app.wasm'], {
+          wasi_snapshot_preview1: wasiImports
+        });
+        
+        // Set memory reference AFTER instantiation (before _start runs)
+        wasmMemory = instance.exports.memory;
+        
+        updateStatus('Running application...', 95);
+        try {
+          if (instance.exports._start) instance.exports._start();
+          addLog('✅ Application finished successfully', 'success');
+        } catch (e) {
+          if (e.name !== 'ExitStatus') throw e;
+          addLog(`✅ Application exited with code: ${e.code || 0}`, 'success');
+        }
+        
+        updateStatus('✓ All done!', 100);
+        addLog('🎉 Process complete. Tap "Copy" to save logs.', 'success');
+        
+      } catch (err) {
+        console.error('Compilation/execution failed:', err);
+        addLog(`❌ ERROR: ${err.message || err}`, 'error');
+        if (err.message?.includes('Cross-origin') || err.message?.includes('CORS')) {
+          addLog('💡 TIP: Host this file online (GitHub Pages/Netlify) or via http://localhost', 'warn');
+          addLog('   iOS Safari blocks cross-origin module imports from file://', 'warn');
+        }
+        updateStatus('❌ Failed. Check logs above.', 0);
+      } finally {
+        setButtons(true);
+      }
+    };
+    
+    addLog('👋 Ready to compile C++ → WASM in your browser!', 'success');
+    addLog('📱 Works on iPhone. No console needed.', 'info');
+    addLog('⚠️ First run downloads ~100MB (cached after).', 'warn');
+    addLog('🔧 Tap "Run Compilation" to start.', 'info');
+  </script>
+</body>
+</html>

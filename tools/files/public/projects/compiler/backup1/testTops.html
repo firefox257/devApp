@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Tops Compiler - Stack Fix</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: #121212; color: #d4d4d4; padding: 20px; }
+        .container { max-width: 900px; margin: auto; }
+        textarea { width: 100%; height: 400px; background: #1e1e1e; color: #ce9178; border: 1px solid #333; padding: 15px; font-family: 'Consolas', monospace; font-size: 1rem; border-radius: 4px; line-height: 1.4; outline: none; }
+        button { background: #4caf50; color: white; border: none; padding: 12px 24px; cursor: pointer; border-radius: 2px; margin-top: 10px; font-weight: bold; }
+        #output { margin-top: 20px; padding: 20px; background: #000; border-radius: 4px; border-left: 5px solid #f44336; font-family: 'Consolas', monospace; white-space: pre-wrap; color: #9cdcfe; }
+    </style>
+	<script src = "topsCompiler.js">
+	</script>
+</head>
+<body>
+    <div class="container">
+        <h2>Tops Compiler: Corrected Return Stack</h2>
+        <textarea id="editor">
+
+		
+		
+
+		
+		
+func dd(float8 a) -> float8
+{
+
+return a+ a;
+}		
+		
+func main() -> float8 {
+    float4 i = 0;
+    loop {
+        i = i + 1;
+        if (i > 5) {
+            break;
+        }
+    }
+i=i+1.5;
+    return dd(i); // Should return 6
+}
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		</textarea>
+        <button onclick="runTops()">Compile & Run</button>
+        <div id="output">Output will appear here...</div>
+    </div>
+
+<script type="module">
+
+
+
+
+
+window.runTops = async () => {
+    const output = document.getElementById('output');
+    output.style.borderLeftColor = "#f44336";
+    try {
+        const compiler = new TopsCompiler(document.getElementById('editor').value);
+        const { instance } = await WebAssembly.instantiate(compiler.compile());
+        output.innerHTML = `✅ Result: ${instance.exports.main(1,123)}`;
+        output.style.borderLeftColor = "#4caf50";
+    } catch (e) { 
+        output.innerHTML = `❌ Error: ${e.message}`; 
+        output.style.borderLeftColor = "#f44336";
+    }
+};
+</script>
+</body>
+</html>

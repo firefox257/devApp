@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Realistic Flowing Grass with Sunlight & Glimmer — Three.js</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #000; }
+  canvas { display: block; }
+  #info {
+    position: absolute; top: 12px; left: 12px; color: #fff;
+    font: 13px/1.4 system-ui, sans-serif;
+    background: rgba(0,0,0,0.45); padding: 8px 12px; border-radius: 6px;
+    pointer-events: none; user-select: none;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.6);
+  }
+  #info b { color: #9f9; }
+</style>
+</head>
+<body>
+<div id="info">
+  <b>Realistic Flowing Grass with Sunlight & Glimmer</b><br/>
+  Drag to orbit · Scroll to zoom · Right-drag to pan<br/>
+  Blades: <span id="bladeCount">0</span> · FPS: <span id="fps">0</span>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+// ─────────────────────────────────────────────────────────────
+// CONFIG
+// ─────────────────────────────────────────────────────────────
+const CONFIG = {
+  fieldSize: 80,
+  bladeCount: 90000,
+  bladeWidth: 0.08,
+  bladeHeight: 0.9,
+  bladeSegments: 6,
+  windStrength: 0.35,
+  windSpeed: 1.2,
+  windTurbulence: 0.6,
+  fogDensity: 0.018,
+  sunDir: new THREE.Vector3(0.5, 0.8, 0.3).normalize(),
+  sunColor: new THREE.Color(1.0, 0.95, 0.85),
+  sunIntensity: 1.5,
+  ambientColor: new THREE.Color(0.35, 0.45, 0.55),
+  glimmerStrength: 1.5, // BOOSTED for visibility
+  glimmerSpeed: 2.0,
+};
+
+// ─────────────────────────────────────────────────────────────
+// RENDERER / SCENE / CAMERA
+// ─────────────────────────────────────────────────────────────
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.3;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0xbcd4e6, CONFIG.fogDensity);
+
+// Sky gradient background with sun position
+const skyCanvas = document.createElement('canvas');
+skyCanvas.width = 2; skyCanvas.height = 512;
+const skyCtx = skyCanvas.getContext('2d');
+const skyGrad = skyCtx.createLinearGradient(0, 0, 0, 512);
+skyGrad.addColorStop(0.0, '#1a4a7a');
+skyGrad.addColorStop(0.25, '#4a7fb5');
+skyGrad.addColorStop(0.45, '#7fb3d5');
+skyGrad.addColorStop(0.65, '#c9dfe8');
+skyGrad.addColorStop(0.85, '#f4e4c1');
+skyGrad.addColorStop(1.0, '#d4c4a0');
+skyCtx.fillStyle = skyGrad;
+skyCtx.fillRect(0, 0, 2, 512);
+const skyTexture = new THREE.CanvasTexture(skyCanvas);
+skyTexture.colorSpace = THREE.SRGBColorSpace;
+scene.background = skyTexture;
+
+const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 500);
+camera.position.set(0, 3.5, 12);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 0.8, 0);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.maxPolarAngle = Math.PI / 2.05;
+controls.minDistance = 2;
+controls.maxDistance = 60;
+controls.update();
+
+// ─────────────────────────────────────────────────────────────
+// SUN MESH WITH GLOW
+// ─────────────────────────────────────────────────────────────
+function createSun() {
+  const sunGroup = new THREE.Group();
+  
+  // Core sun sphere
+  const sunGeo = new THREE.SphereGeometry(2, 32, 32);
+  const sunMat = new THREE.ShaderMaterial({
+    uniforms: {
+      sunColor: { value: new THREE.Color(1.0, 0.95, 0.8) },
+      glowColor: { value: new THREE.Color(1.0, 0.85, 0.6) },
+    },
+    vertexShader: `
+      varying vec3 vNormal;
+      varying vec3 vPositionNormal;
+      void main() {
+        vNormal = normalize(normalMatrix * normal);
+        vPositionNormal = normalize((modelViewMatrix * vec4(position, 1.0)).xyz);
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      uniform vec3 sunColor;
+      uniform vec3 glowColor;
+      varying vec3 vNormal;
+      varying vec3 vPositionNormal;
+      void main() {
+        float intensity = pow(0.6 - dot(vNormal, vPositionNormal), 3.0);
+        vec3 color = mix(sunColor * 2.0, glowColor, intensity * 0.5);
+        gl_FragColor = vec4(color, 1.0);
+      }
+    `,
+    side: THREE.BackSide,
+    blending: THREE.AdditiveBlending,
+    transparent: true,
+  });
+  
+  const sun = new THREE.Mesh(sunGeo, sunMat);
+  sunGroup.add(sun);
+  
+  // Outer glow
+  const glowGeo = new THREE.SphereGeometry(3.5, 32, 32);
+  const glowMat = new THREE.ShaderMaterial({
+    uniforms: {
+      glowColor: { value: new THREE.Color(1.0, 0.9, 0.7) },
+    },
+    vertexShader: `
+      varying vec3 vNormal;
+      varying vec3 vPositionNormal;
+      void main() {
+        vNormal = normalize(normalMatrix * normal);
+        vPositionNormal = normalize((modelViewMatrix * vec4(position, 1.0)).xyz);
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      uniform vec3 glowColor;
+      varying vec3 vNormal;
+      varying vec3 vPositionNormal;
+      void main() {
+        float intensity = pow(0.5 - dot(vNormal, vPositionNormal), 2.0);
+        vec3 color = glowColor * intensity * 0.8;
+        gl_FragColor = vec4(color, intensity * 0.6);
+      }
+    `,
+    side: THREE.BackSide,
+    blending: THREE.AdditiveBlending,
+    transparent: true,
+    depthWrite: false,
+  });
+  
+  const glow = new THREE.Mesh(glowGeo, glowMat);
+  sunGroup.add(glow);
+  
+  // Position sun in sky
+  const sunDistance = 80;
+  sunGroup.position.copy(CONFIG.sunDir).multiplyScalar(sunDistance);
+  
+  return sunGroup;
+}
+
+const sun = createSun();
+scene.add(sun);
+
+// ─────────────────────────────────────────────────────────────
+// GRASS BLADE GEOMETRY
+// ─────────────────────────────────────────────────────────────
+function createBladeGeometry(width, height, segments) {
+  const geo = new THREE.BufferGeometry();
+  const verts = [];
+  const uvs = [];
+  const indices = [];
+
+  for (let i = 0; i <= segments; i++) {
+    const t = i / segments;
+    const y = t * height;
+    const taper = Math.pow(1 - t, 0.6);
+    const w = width * taper * 0.5;
+    const curve = Math.sin(t * Math.PI) * width * 0.15;
+
+    verts.push(-w + curve, y, 0);
+    verts.push( w + curve, y, 0);
+
+    uvs.push(0, t);
+    uvs.push(1, t);
+  }
+
+  for (let i = 0; i < segments; i++) {
+    const a = i * 2;
+    const b = i * 2 + 1;
+    const c = (i + 1) * 2;
+    const d = (i + 1) * 2 + 1;
+    indices.push(a, c, b);
+    indices.push(b, c, d);
+  }
+
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  geo.setIndex(indices);
+  geo.computeVertexNormals();
+  return geo;
+}
+
+// ─────────────────────────────────────────────────────────────
+// GRASS SHADERS WITH GLIMMER
+// ─────────────────────────────────────────────────────────────
+const grassVertexShader = /* glsl */`
+  precision highp float;
+
+  attribute float aHeight;
+  attribute float aWidth;
+  attribute float aPhase;
+  attribute float aBend;
+  attribute vec3  aColor;
+  attribute float aGlimmerPhase;
+  attribute float aGlimmerOffset;
+
+  varying vec2  vUv;
+  varying vec3  vColor;
+  varying vec3  vWorldPos;
+  varying vec3  vNormal;
+  varying float vFogFactor;
+  varying float vHeightRatio;
+  varying float vGlimmerPhase;
+  varying float vGlimmerOffset;
+  varying vec3  vViewDirection;
+
+  uniform float uTime;
+  uniform float uWindStrength;
+  uniform float uWindSpeed;
+  uniform float uWindTurbulence;
+  uniform vec3  uCameraPosition;
+
+  vec3 mod289(vec3 x){ return x - floor(x * (1.0/289.0)) * 289.0; }
+  vec2 mod289(vec2 x){ return x - floor(x * (1.0/289.0)) * 289.0; }
+  vec3 permute(vec3 x){ return mod289(((x*34.0)+1.0)*x); }
+
+  float snoise(vec2 v){
+    const vec4 C = vec4(0.211324865405187, 0.366025403784439,
+                       -0.577350269189626, 0.024390243902439);
+    vec2 i  = floor(v + dot(v, C.yy));
+    vec2 x0 = v - i + dot(i, C.xx);
+    vec2 i1 = (x0.x > x0.y) ? vec2(1.0, 0.0) : vec2(0.0, 1.0);
+    vec4 x12 = x0.xyxy + C.xxzz;
+    x12.xy -= i1;
+    i = mod289(i);
+    vec3 p = permute(permute(i.y + vec3(0.0, i1.y, 1.0))
+                               + i.x + vec3(0.0, i1.x, 1.0));
+    vec3 m = max(0.5 - vec3(dot(x0,x0), dot(x12.xy,x12.xy),
+                            dot(x12.zw,x12.zw)), 0.0);
+    m = m*m; m = m*m;
+    vec3 x = 2.0 * fract(p * C.www) - 1.0;
+    vec3 h = abs(x) - 0.5;
+    vec3 ox = floor(x + 0.5);
+    vec3 a0 = x - ox;
+    m *= 1.79284291400159 - 0.85373472095314 * (a0*a0 + h*h);
+    vec3 g;
+    g.x  = a0.x  * x0.x  + h.x  * x0.y;
+    g.yz = a0.yz * x12.xz + h.yz * x12.yw;
+    return 130.0 * dot(m, g);
+  }
+
+  float fbm(vec2 p){
+    float v = 0.0;
+    float a = 0.5;
+    vec2 shift = vec2(100.0);
+    mat2 rot = mat2(cos(0.5), sin(0.5), -sin(0.5), cos(0.5));
+    for (int i = 0; i < 4; ++i) {
+      v += a * snoise(p);
+      p = rot * p * 2.0 + shift;
+      a *= 0.5;
+    }
+    return v;
+  }
+
+  void main() {
+    vUv = uv;
+
+    vec3 pos = position;
+    pos.x *= aWidth;
+    pos.y *= aHeight;
+
+    float h = uv.y;
+    vHeightRatio = h;
+
+    vec2 worldXZ = vec2(
+      (instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0)).x,
+      (instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0)).z
+    );
+
+    float t = uTime * uWindSpeed;
+    float n1 = fbm(worldXZ * 0.15 + vec2(t * 0.3, t * 0.2));
+    float n2 = snoise(worldXZ * 0.4 + vec2(t * 0.7, -t * 0.5));
+
+    float bend = h * h * (1.0 + aBend * 0.5);
+
+    float windX = (n1 * 0.7 + n2 * 0.3) * uWindStrength * bend;
+    float windZ = (snoise(worldXZ * 0.2 - vec2(t * 0.25, t * 0.35)) * 0.5 + 0.5 - 0.25)
+                  * uWindStrength * 0.6 * bend;
+
+    float sway = sin(t * 0.8 + worldXZ.x * 0.1 + worldXZ.y * 0.1) * 0.15 * bend;
+
+    pos.x += windX + sway * 0.3;
+    pos.z += windZ;
+    pos.x += aBend * h * 0.15;
+
+    vec4 worldPos = instanceMatrix * vec4(pos, 1.0);
+    vWorldPos = worldPos.xyz;
+    vColor = aColor;
+    vGlimmerPhase = aGlimmerPhase;
+    vGlimmerOffset = aGlimmerOffset;
+
+    vec3 tangent = normalize(vec3(
+      (instanceMatrix * vec4(1.0, 0.0, 0.0, 0.0)).x,
+      0.0,
+      (instanceMatrix * vec4(1.0, 0.0, 0.0, 0.0)).z
+    ));
+    vec3 bitangent = vec3(0.0, 1.0, 0.0);
+    vNormal = normalize(cross(bitangent, tangent));
+    
+    vViewDirection = normalize(uCameraPosition - vWorldPos);
+
+    float fogDist = length(worldPos.xyz - uCameraPosition);
+    vFogFactor = 1.0 - exp(-fogDist * fogDist * 0.0004);
+
+    gl_Position = projectionMatrix * viewMatrix * worldPos;
+  }
+`;
+
+const grassFragmentShader = /* glsl */`
+  precision highp float;
+
+  varying vec2  vUv;
+  varying vec3  vColor;
+  varying vec3  vWorldPos;
+  varying vec3  vNormal;
+  varying float vFogFactor;
+  varying float vHeightRatio;
+  varying float vGlimmerPhase;
+  varying float vGlimmerOffset;
+  varying vec3  vViewDirection;
+
+  uniform float uTime;
+  uniform vec3  uSunDir;
+  uniform vec3  uSunColor;
+  uniform vec3  uAmbientColor;
+  uniform vec3  uFogColor;
+  uniform float uGlimmerStrength;
+  uniform float uGlimmerSpeed;
+
+  // Hash function for random glimmer
+  float hash(vec2 p) {
+    p = fract(p * vec2(123.34, 456.21));
+    p += dot(p, p + 45.32);
+    return fract(p.x * p.y);
+  }
+
+  void main() {
+    // Base grass color with gradient
+    vec3 baseColor = vColor;
+    vec3 tipColor  = mix(vColor, vec3(0.75, 0.85, 0.45), 0.55);
+    vec3 col = mix(baseColor, tipColor, smoothstep(0.0, 1.0, vHeightRatio));
+
+    vec3 N = normalize(vNormal);
+    vec3 V = vViewDirection;
+    vec3 L = uSunDir;
+    
+    // Diffuse lighting
+    float NdotL = max(dot(N, L), 0.0);
+    
+    // Enhanced specular for glimmer (sharp highlights)
+    vec3 H = normalize(L + V);
+    float NdotH = max(dot(N, H), 0.0);
+    float specBase = pow(NdotH, 80.0) * 2.5;
+    
+    // Time-varying glimmer effect
+    float glimmerTime = uTime * uGlimmerSpeed;
+    float glimmerWave = sin(glimmerTime + vGlimmerPhase * 6.28318) * 0.5 + 0.5;
+    float glimmerNoise = hash(vWorldPos.xz * 10.0 + vGlimmerOffset);
+    
+    // Combine glimmer factors
+    float glimmerFactor = specBase * (0.3 + 0.7 * glimmerWave) * (0.5 + 0.5 * glimmerNoise);
+    
+    // Dew drop reflections (bright sparkles on tips)
+    float dewFactor = smoothstep(0.7, 1.0, vHeightRatio);
+    float dewGlimmer = pow(max(dot(N, H), 0.0), 120.0) * 3.0 * dewFactor;
+    dewGlimmer *= (0.5 + 0.5 * sin(glimmerTime * 2.0 + vGlimmerPhase * 10.0));
+    
+    // Subsurface scattering (backlight)
+    float backLight = max(dot(-N, L), 0.0);
+    float sss = pow(backLight, 2.0) * 0.55;
+
+    // Fresnel rim
+    float fresnel = pow(1.0 - max(dot(N, V), 0.0), 3.0);
+
+    // Combine lighting
+    vec3 ambient = uAmbientColor * col * 0.55;
+    vec3 diffuse = uSunColor * col * NdotL * 0.9;
+    vec3 scatter = uSunColor * vec3(0.6, 0.85, 0.3) * sss;
+    
+    // WHITE GLIMMER & SPARKLE (Boosted for visibility)
+    vec3 glimmer = vec3(1.0, 1.0, 0.95) * glimmerFactor * uGlimmerStrength;
+    vec3 dewSparkle = vec3(1.0, 1.0, 1.0) * dewGlimmer * uGlimmerStrength * 2.0; // Pure white sparkle
+    
+    vec3 rim = vec3(0.9, 0.95, 0.8) * fresnel * 0.12;
+    
+    vec3 finalColor = ambient + diffuse + scatter + glimmer + dewSparkle + rim;
+
+    // Fog blend
+    finalColor = mix(finalColor, uFogColor, clamp(vFogFactor, 0.0, 1.0));
+
+    // Alpha fade at base
+    float alpha = smoothstep(0.0, 0.08, vHeightRatio);
+
+    gl_FragColor = vec4(finalColor, alpha);
+  }
+`;
+
+// ─────────────────────────────────────────────────────────────
+// GROUND SHADER
+// ─────────────────────────────────────────────────────────────
+const groundVertexShader = /* glsl */`
+  varying vec2 vUv;
+  varying vec3 vWorldPos;
+  varying float vFogFactor;
+  void main(){
+    vUv = uv;
+    vec4 wp = modelMatrix * vec4(position, 1.0);
+    vWorldPos = wp.xyz;
+    float d = length(wp.xyz - cameraPosition);
+    vFogFactor = 1.0 - exp(-d * d * 0.0004);
+    gl_Position = projectionMatrix * viewMatrix * wp;
+  }
+`;
+
+const groundFragmentShader = /* glsl */`
+  precision highp float;
+  varying vec2 vUv;
+  varying vec3 vWorldPos;
+  varying float vFogFactor;
+  uniform vec3 uFogColor;
+  uniform vec3 uSunDir;
+  uniform vec3 uSunColor;
+  uniform vec3 uAmbientColor;
+
+  float hash(vec2 p){
+    p = fract(p * vec2(123.34, 456.21));
+    p += dot(p, p + 45.32);
+    return fract(p.x * p.y);
+  }
+  
+  float noise(vec2 p){
+    vec2 i = floor(p); vec2 f = fract(p);
+    float a = hash(i);
+    float b = hash(i + vec2(1,0));
+    float c = hash(i + vec2(0,1));
+    float d = hash(i + vec2(1,1));
+    vec2 u = f*f*(3.0-2.0*f);
+    return mix(a,b,u.x) + (c-a)*u.y*(1.0-u.x) + (d-b)*u.x*u.y;
+  }
+  
+  float fbm(vec2 p){
+    float v=0.0, a=0.5;
+    for(int i=0;i<5;i++){ v+=a*noise(p); p*=2.02; a*=0.5; }
+    return v;
+  }
+
+  void main(){
+    vec2 p = vWorldPos.xz * 0.6;
+    float n = fbm(p);
+    float n2 = fbm(p * 3.0 + 17.0);
+
+    vec3 dark = vec3(0.12, 0.18, 0.08);
+    vec3 mid  = vec3(0.22, 0.30, 0.14);
+    vec3 light= vec3(0.35, 0.42, 0.22);
+    vec3 col = mix(dark, mid, smoothstep(0.2, 0.55, n));
+    col = mix(col, light, smoothstep(0.55, 0.85, n2));
+
+    float NdL = max(dot(vec3(0,1,0), uSunDir), 0.0);
+    col *= uAmbientColor * 0.7 + uSunColor * NdL * 0.6;
+
+    col = mix(col, uFogColor, clamp(vFogFactor, 0.0, 1.0));
+    gl_FragColor = vec4(col, 1.0);
+  }
+`;
+
+// ─────────────────────────────────────────────────────────────
+// BUILD GRASS FIELD
+// ─────────────────────────────────────────────────────────────
+const bladeGeo = createBladeGeometry(CONFIG.bladeWidth, CONFIG.bladeHeight, CONFIG.bladeSegments);
+
+const grassMat = new THREE.ShaderMaterial({
+  vertexShader: grassVertexShader,
+  fragmentShader: grassFragmentShader,
+  uniforms: {
+    uTime:            { value: 0 },
+    uWindStrength:    { value: CONFIG.windStrength },
+    uWindSpeed:       { value: CONFIG.windSpeed },
+    uWindTurbulence:  { value: CONFIG.windTurbulence },
+    uSunDir:          { value: CONFIG.sunDir },
+    uSunColor:        { value: CONFIG.sunColor },
+    uAmbientColor:    { value: CONFIG.ambientColor },
+    uFogColor:        { value: new THREE.Color(0xbcd4e6) },
+    uCameraPosition:  { value: camera.position },
+    uGlimmerStrength: { value: CONFIG.glimmerStrength },
+    uGlimmerSpeed:    { value: CONFIG.glimmerSpeed },
+  },
+  side: THREE.DoubleSide,
+  transparent: true,
+  depthWrite: true,
+  blending: THREE.NormalBlending,
+});
+
+const grassMesh = new THREE.InstancedMesh(bladeGeo, grassMat, CONFIG.bladeCount);
+grassMesh.frustumCulled = false;
+
+const heights = new Float32Array(CONFIG.bladeCount);
+const widths  = new Float32Array(CONFIG.bladeCount);
+const phases  = new Float32Array(CONFIG.bladeCount);
+const bends   = new Float32Array(CONFIG.bladeCount);
+const colors  = new Float32Array(CONFIG.bladeCount * 3);
+const glimmerPhases = new Float32Array(CONFIG.bladeCount);
+const glimmerOffsets = new Float32Array(CONFIG.bladeCount);
+
+const dummy = new THREE.Object3D();
+const halfField = CONFIG.fieldSize * 0.5;
+
+for (let i = 0; i < CONFIG.bladeCount; i++) {
+  const gx = Math.floor(Math.random() * 400) / 400;
+  const gz = Math.floor(Math.random() * 400) / 400;
+  const x = (gx - 0.5) * CONFIG.fieldSize + (Math.random() - 0.5) * 0.15;
+  const z = (gz - 0.5) * CONFIG.fieldSize + (Math.random() - 0.5) * 0.15;
+
+  const hill = Math.sin(x * 0.1) * Math.cos(z * 0.12) * 0.3;
+
+  dummy.position.set(x, hill, z);
+  dummy.rotation.y = Math.random() * Math.PI * 2;
+  dummy.updateMatrix();
+  grassMesh.setMatrixAt(i, dummy.matrix);
+
+  const h = 0.6 + Math.random() * 0.9;
+  const w = 0.7 + Math.random() * 0.6;
+  heights[i] = h;
+  widths[i]  = w;
+  phases[i]  = Math.random() * Math.PI * 2;
+  bends[i]   = (Math.random() - 0.5) * 2.0;
+
+  const r = 0.15 + Math.random() * 0.25;
+  const g = 0.35 + Math.random() * 0.45;
+  const b = 0.10 + Math.random() * 0.20;
+  colors[i * 3 + 0] = r;
+  colors[i * 3 + 1] = g;
+  colors[i * 3 + 2] = b;
+  
+  // Random glimmer phases and offsets for variety
+  glimmerPhases[i] = Math.random();
+  glimmerOffsets[i] = Math.random() * 1000.0;
+}
+
+bladeGeo.setAttribute('aHeight', new THREE.InstancedBufferAttribute(heights, 1));
+bladeGeo.setAttribute('aWidth',  new THREE.InstancedBufferAttribute(widths, 1));
+bladeGeo.setAttribute('aPhase',  new THREE.InstancedBufferAttribute(phases, 1));
+bladeGeo.setAttribute('aBend',   new THREE.InstancedBufferAttribute(bends, 1));
+bladeGeo.setAttribute('aColor',  new THREE.InstancedBufferAttribute(colors, 3));
+bladeGeo.setAttribute('aGlimmerPhase', new THREE.InstancedBufferAttribute(glimmerPhases, 1));
+bladeGeo.setAttribute('aGlimmerOffset', new THREE.InstancedBufferAttribute(glimmerOffsets, 1));
+
+grassMesh.instanceMatrix.needsUpdate = true;
+scene.add(grassMesh);
+
+document.getElementById('bladeCount').textContent = CONFIG.bladeCount.toLocaleString();
+
+// ─────────────────────────────────────────────────────────────
+// GROUND
+// ─────────────────────────────────────────────────────────────
+const groundGeo = new THREE.PlaneGeometry(CONFIG.fieldSize * 1.5, CONFIG.fieldSize * 1.5, 1, 1);
+const groundMat = new THREE.ShaderMaterial({
+  vertexShader: groundVertexShader,
+  fragmentShader: groundFragmentShader,
+  uniforms: {
+    uFogColor:     { value: new THREE.Color(0xbcd4e6) },
+    uSunDir:       { value: CONFIG.sunDir },
+    uSunColor:     { value: CONFIG.sunColor },
+    uAmbientColor: { value: CONFIG.ambientColor },
+  },
+});
+const ground = new THREE.Mesh(groundGeo, groundMat);
+ground.rotation.x = -Math.PI / 2;
+ground.position.y = -0.02;
+scene.add(ground);
+
+// ─────────────────────────────────────────────────────────────
+// ANIMATION LOOP
+// ─────────────────────────────────────────────────────────────
+const clock = new THREE.Clock();
+let frames = 0, lastFpsTime = 0;
+const fpsEl = document.getElementById('fps');
+
+function animate() {
+  const t = clock.getElapsedTime();
+  grassMat.uniforms.uTime.value = t;
+  grassMat.uniforms.uCameraPosition.value.copy(camera.position);
+
+  controls.update();
+  renderer.render(scene, camera);
+
+  frames++;
+  if (t - lastFpsTime >= 1.0) {
+    fpsEl.textContent = frames;
+    frames = 0;
+    lastFpsTime = t;
+  }
+
+  requestAnimationFrame(animate);
+}
+animate();
+
+// ─────────────────────────────────────────────────────────────
+// RESIZE
+// ─────────────────────────────────────────────────────────────
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+</script>
+</body>
+</html>

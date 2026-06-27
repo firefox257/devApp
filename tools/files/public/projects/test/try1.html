@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Highly Detailed Character</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background: radial-gradient(circle at center, #f0f4f8 0%, #d9e2ec 100%);
+            font-family: 'Segoe UI', system-ui, sans-serif;
+        }
+        canvas {
+            background-color: #ffffff;
+            border-radius: 16px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+            max-width: 95vw;
+        }
+        h2 { color: #2c3e50; margin-bottom: 10px; font-weight: 600; }
+    </style>
+</head>
+<body>
+    <h2>High-Fidelity Canvas Rendering</h2>
+    <canvas id="canvas" width="450" height="550"></canvas>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        // --- Helper Functions ---
+        function drawEllipse(x, y, rx, ry, color, stroke = null, lineWidth = 1) {
+            ctx.beginPath();
+            ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
+            if (color) { ctx.fillStyle = color; ctx.fill(); }
+            if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = lineWidth; ctx.stroke(); }
+        }
+
+        function drawPath(points, fillColor, strokeColor = null, lineWidth = 2) {
+            if (points.length < 2) return;
+            ctx.beginPath();
+            ctx.moveTo(points[0].x, points[0].y);
+            for (let i = 1; i < points.length; i++) {
+                ctx.lineTo(points[i].x, points[i].y);
+            }
+            ctx.closePath();
+            if (fillColor) { ctx.fillStyle = fillColor; ctx.fill(); }
+            if (strokeColor) { ctx.strokeStyle = strokeColor; ctx.lineWidth = lineWidth; ctx.stroke(); }
+        }
+
+        // --- Main Drawing Logic ---
+        function drawPerson() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Light source: Top Left (0, -100)
+            // Shadows fall Bottom Right
+
+            // 1. Background Elements
+            // Floor Shadow
+            const shadowGrad = ctx.createRadialGradient(225, 510, 20, 225, 510, 150);
+            shadowGrad.addColorStop(0, 'rgba(0,0,0,0.3)');
+            shadowGrad.addColorStop(1, 'rgba(0,0,0,0)');
+            ctx.fillStyle = shadowGrad;
+            ctx.beginPath();
+            ctx.ellipse(225, 510, 120, 20, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 2. LEGS & PANTS
+            // Left Pant Leg
+            ctx.beginPath();
+            ctx.moveTo(195, 260);
+            ctx.bezierCurveTo(180, 320, 185, 380, 175, 450);
+            ctx.lineTo(210, 450);
+            ctx.bezierCurveTo(215, 380, 215, 320, 215, 260);
+            ctx.closePath();
+            const pantGradL = ctx.createLinearGradient(180, 260, 215, 260);
+            pantGradL.addColorStop(0, '#34495e'); pantGradL.addColorStop(0.5, '#4a6078'); pantGradL.addColorStop(1, '#2c3e50');
+            ctx.fillStyle = pantGradL;
+            ctx.fill();
+
+            // Right Pant Leg
+            ctx.beginPath();
+            ctx.moveTo(255, 260);
+            ctx.bezierCurveTo(270, 320, 265, 380, 275, 450);
+            ctx.lineTo(240, 450);
+            ctx.bezierCurveTo(235, 380, 235, 320, 235, 260);
+            ctx.closePath();
+            const pantGradR = ctx.createLinearGradient(235, 260, 270, 260);
+            pantGradR.addColorStop(0, '#2c3e50'); pantGradR.addColorStop(1, '#4a6078');
+            ctx.fillStyle = pantGradR;
+            ctx.fill();
+
+            // Pant Details: Seams & Rivets
+            ctx.strokeStyle = 'rgba(255,255,255,0.2)'; ctx.lineWidth = 1.5;
+            ctx.beginPath(); ctx.moveTo(205, 270); ctx.lineTo(205, 450); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(245, 270); ctx.lineTo(245, 450); ctx.stroke();
+            // Pockets
+            ctx.fillStyle = '#2c3e50'; ctx.strokeStyle = '#555'; ctx.lineWidth = 1;
+            ctx.fillRect(190, 265, 35, 40);
+            ctx.strokeRect(190, 265, 35, 40);
+            ctx.fillRect(225, 265, 35, 40);
+            ctx.strokeRect(225, 265, 35, 40);
+
+            // 3. SHOES (Sneakers)
+            function drawSneaker(x, y, flip = false) {
+                ctx.save();
+                ctx.translate(x, y);
+                if (flip) ctx.scale(-1, 1);
+
+                // Sole
+                const soleGrad = ctx.createLinearGradient(0, -5, 0, 15);
+                soleGrad.addColorStop(0, '#eee'); soleGrad.addColorStop(1, '#ccc');
+                ctx.fillStyle = soleGrad;
+                ctx.beginPath();
+                ctx.moveTo(0, 0); ctx.quadraticCurveTo(40, -10, 75, 5);
+                ctx.lineTo(75, 15); ctx.lineTo(0, 15); ctx.closePath();
+                ctx.fill();
+
+                // Sole Lines
+                ctx.strokeStyle = '#aaa'; ctx.lineWidth = 1;
+                ctx.beginPath(); ctx.moveTo(5, 15); ctx.lineTo(5, 5); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(70, 15); ctx.lineTo(70, 10); ctx.stroke();
+
+                // Upper Shoe Body
+                const bodyGrad = ctx.createLinearGradient(0, -10, 0, -40);
+                bodyGrad.addColorStop(0, '#c0392b'); bodyGrad.addColorStop(1, '#e74c3c');
+                ctx.fillStyle = bodyGrad;
+                ctx.beginPath();
+                ctx.moveTo(0, 0); ctx.quadraticCurveTo(40, -10, 75, 5);
+                ctx.lineTo(65, -35); ctx.quadraticCurveTo(40, -45, 5, -30); ctx.lineTo(0, 0);
+                ctx.fill();
+
+                // Toe Cap
+                ctx.fillStyle = '#fff';
+                ctx.beginPath();
+                ctx.moveTo(50, -5); ctx.quadraticCurveTo(75, 0, 75, 10);
+                ctx.lineTo(50, 10); ctx.closePath();
+                ctx.fill();
+                ctx.strokeStyle = '#ddd'; ctx.stroke();
+
+                // Laces
+                ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
+                for(let i=1; i<=4; i++) {
+                    ctx.beginPath();
+                    ctx.moveTo(20 + i*5, -25 - i*2);
+                    ctx.lineTo(55 - i*2, -20 - i*2);
+                    ctx.stroke();
+                }
+                // Lace holes
+                ctx.fillStyle = '#333';
+                for(let i=1; i<=4; i++) {
+                    ctx.beginPath(); ctx.arc(22 + i*4, -24 - i*2, 1.5, 0, Math.PI*2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(53 - i*2, -19 - i*2, 1.5, 0, Math.PI*2); ctx.fill();
+                }
+
+                // Tongue
+                ctx.fillStyle = '#a93226';
+                ctx.beginPath();
+                ctx.moveTo(35, -40); ctx.quadraticCurveTo(45, -35, 45, -20);
+                ctx.lineTo(30, -20); ctx.quadraticCurveTo(25, -30, 35, -40);
+                ctx.fill();
+
+                ctx.restore();
+            }
+            drawSneaker(165, 445, false);
+            drawSneaker(285, 445, true);
+
+            // 4. TORSO & SHIRT
+            // Shirt Base
+            ctx.beginPath();
+            ctx.moveTo(170, 160); // Shoulder L
+            ctx.quadraticCurveTo(160, 210, 175, 260); // Hip L
+            ctx.lineTo(275, 260); // Hip R
+            ctx.quadraticCurveTo(290, 210, 280, 160); // Shoulder R
+            ctx.quadraticCurveTo(225, 170, 170, 160); // Collar
+            ctx.closePath();
+            const shirtGrad = ctx.createLinearGradient(160, 160, 290, 260);
+            shirtGrad.addColorStop(0, '#3498db'); shirtGrad.addColorStop(0.5, '#2980b9'); shirtGrad.addColorStop(1, '#1f618d');
+            ctx.fillStyle = shirtGrad;
+            ctx.fill();
+            ctx.strokeStyle = '#154360'; ctx.lineWidth = 1.5; ctx.stroke();
+
+            // Collar
+            ctx.fillStyle = '#1f618d';
+            ctx.beginPath();
+            ctx.moveTo(190, 165); ctx.lineTo(205, 180); ctx.lineTo(225, 165); ctx.lineTo(215, 150); ctx.lineTo(185, 150); ctx.closePath();
+            ctx.fill(); ctx.stroke();
+
+            // Buttons & Placket
+            ctx.fillStyle = '#ecf0f1';
+            ctx.fillRect(220, 165, 10, 95);
+            for(let y=175; y<255; y+=22) {
+                ctx.beginPath(); ctx.arc(225, y, 4, 0, Math.PI*2); ctx.fill();
+                ctx.strokeStyle = '#bdc3c7'; ctx.lineWidth = 1; ctx.stroke();
+            }
+
+            // Pocket
+            ctx.fillStyle = '#2980b9';
+            ctx.beginPath();
+            ctx.moveTo(245, 190); ctx.lineTo(270, 190); ctx.lineTo(270, 220); ctx.lineTo(245, 220); ctx.closePath();
+            ctx.fill(); ctx.stroke();
+            ctx.fillStyle = '#1f618d'; ctx.fillRect(240, 188, 35, 4); // Flap
+
+            // 5. ARMS & HANDS
+            function drawArm(startX, startY, endX, endY, isLeft) {
+                ctx.save();
+                ctx.translate(startX, startY);
+                const angle = Math.atan2(endY - startY, endX - startX);
+                ctx.rotate(angle);
+                const len = Math.hypot(endX - startX, endY - startY);
+
+                // Arm shape
+                ctx.beginPath();
+                ctx.moveTo(0, -12);
+                ctx.bezierCurveTo(len * 0.3, -15, len * 0.8, -8, len, -5);
+                ctx.lineTo(len, 5);
+                ctx.bezierCurveTo(len * 0.8, 8, len * 0.3, 15, 0, 12);
+                ctx.closePath();
+                const armGrad = ctx.createLinearGradient(0, -15, 0, 15);
+                armGrad.addColorStop(0, '#f5d0b5'); armGrad.addColorStop(0.5, '#e0ac8f'); armGrad.addColorStop(1, '#c08060');
+                ctx.fillStyle = armGrad; ctx.fill();
+                
+                // Sleeve
+                ctx.fillStyle = '#2980b9';
+                ctx.beginPath();
+                ctx.moveTo(0, -14); ctx.lineTo(20, -16); ctx.lineTo(20, 16); ctx.lineTo(0, 14);
+                ctx.closePath(); ctx.fill(); ctx.stroke();
+
+                // Hand (Fist with Thumb)
+                ctx.beginPath();
+                ctx.arc(len - 5, 0, 9, 0, Math.PI*2);
+                ctx.fillStyle = '#d49a7a'; ctx.fill();
+                // Thumb
+                ctx.beginPath();
+                ctx.moveTo(len - 5, -2); ctx.quadraticCurveTo(len - 15, -10, len - 12, -14);
+                ctx.quadraticCurveTo(len - 5, -12, len + 2, -2);
+                ctx.fill();
+
+                // Knuckles
+                ctx.strokeStyle = '#b07050'; ctx.lineWidth = 1;
+                ctx.beginPath(); ctx.moveTo(len - 2, -6); ctx.lineTo(len - 2, 6); ctx.stroke();
+
+                ctx.restore();
+            }
+            drawArm(160, 175, 130, 275, true);
+            drawArm(290, 175, 320, 275, false);
+
+            // Watch on Left Wrist
+            ctx.save(); ctx.translate(130, 275);
+            ctx.fillStyle = '#333'; ctx.fillRect(-2, -16, 16, 32); // Strap
+            ctx.fillStyle = '#ecf0f1'; ctx.fillRect(0, -12, 12, 24); // Face
+            ctx.fillStyle = '#3498db'; ctx.fillRect(2, -8, 8, 16); // Screen
+            ctx.strokeStyle = '#bdc3c7'; ctx.strokeRect(0, -12, 12, 24);
+            ctx.restore();
+
+            // 6. HEAD & NECK
+            // Neck
+            ctx.fillStyle = '#d49a7a';
+            ctx.beginPath(); ctx.moveTo(205, 130); ctx.lineTo(205, 155); ctx.lineTo(245, 155); ctx.lineTo(245, 130); ctx.closePath(); ctx.fill();
+            // Neck Shadow
+            ctx.fillStyle = 'rgba(0,0,0,0.2)';
+            ctx.beginPath(); ctx.moveTo(205, 130); ctx.lineTo(245, 130); ctx.lineTo(245, 140); ctx.quadraticCurveTo(225, 150, 205, 140); ctx.fill();
+
+            // Head Base
+            ctx.beginPath();
+            ctx.ellipse(225, 105, 35, 45, 0, 0, Math.PI * 2);
+            const headGrad = ctx.createRadialGradient(210, 85, 10, 225, 105, 50);
+            headGrad.addColorStop(0, '#fceee6'); headGrad.addColorStop(0.7, '#e0ac8f'); headGrad.addColorStop(1, '#c08060');
+            ctx.fillStyle = headGrad; ctx.fill();
+
+            // Jawline Shading
+            ctx.strokeStyle = 'rgba(0,0,0,0.1)'; ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.moveTo(195, 115); ctx.quadraticCurveTo(225, 140, 255, 115); ctx.stroke();
+
+            // Ears
+            drawEllipse(190, 110, 6, 12, '#d49a7a');
+            drawEllipse(260, 110, 6, 12, '#d49a7a');
+            // Inner Ear
+            ctx.strokeStyle = '#b07050'; ctx.lineWidth = 1;
+            ctx.beginPath(); ctx.arc(190, 110, 3, 0, Math.PI*2); ctx.stroke();
+            ctx.beginPath(); ctx.arc(260, 110, 3, 0, Math.PI*2); ctx.stroke();
+
+            // 7. FACE DETAILS
+            // Eyes
+            function drawDetailedEye(x, y, w, h) {
+                // White
+                ctx.fillStyle = '#fff';
+                ctx.beginPath(); ctx.ellipse(x, y, w, h, 0, 0, Math.PI*2); ctx.fill();
+                // Iris
+                const irisGrad = ctx.createRadialGradient(x, y, 1, x, y, w*0.7);
+                irisGrad.addColorStop(0, '#2c3e50'); irisGrad.addColorStop(0.8, '#1a252f');
+                ctx.fillStyle = irisGrad;
+                ctx.beginPath(); ctx.arc(x, y, w*0.7, 0, Math.PI*2); ctx.fill();
+                // Pupil
+                ctx.fillStyle = '#000';
+                ctx.beginPath(); ctx.arc(x, y, w*0.3, 0, Math.PI*2); ctx.fill();
+                // Catchlight
+                ctx.fillStyle = '#fff';
+                ctx.beginPath(); ctx.arc(x - 2, y - 2, 2, 0, Math.PI*2); ctx.fill();
+                ctx.beginPath(); ctx.arc(x + 1, y + 1, 1, 0, Math.PI*2); ctx.fill();
+                // Eyelid Crease
+                ctx.strokeStyle = '#a06040'; ctx.lineWidth = 1;
+                ctx.beginPath(); ctx.arc(x, y - h*0.2, w*1.1, Math.PI + 0.5, -0.5); ctx.stroke();
+            }
+            drawDetailedEye(210, 100, 7, 5);
+            drawDetailedEye(240, 100, 7, 5);
+
+            // Eyebrows
+            ctx.strokeStyle = '#3a2b22'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+            ctx.beginPath(); ctx.moveTo(200, 88); ctx.quadraticCurveTo(210, 84, 220, 88); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(230, 88); ctx.quadraticCurveTo(240, 84, 250, 88); ctx.stroke();
+
+            // Nose
+            ctx.fillStyle = '#d49a7a';
+            ctx.beginPath(); ctx.moveTo(225, 100); ctx.quadraticCurveTo(235, 115, 225, 120); ctx.quadraticCurveTo(215, 115, 225, 100); ctx.fill();
+            // Nostrils
+            ctx.fillStyle = '#804020';
+            ctx.beginPath(); ctx.ellipse(216, 115, 2.5, 1.5, 0.5, 0, Math.PI*2); ctx.fill();
+            ctx.beginPath(); ctx.ellipse(234, 115, 2.5, 1.5, -0.5, 0, Math.PI*2); ctx.fill();
+            // Nose Highlight
+            ctx.fillStyle = 'rgba(255,255,255,0.4)';
+            ctx.beginPath(); ctx.moveTo(225, 100); ctx.lineTo(227, 115); ctx.lineTo(223, 115); ctx.closePath(); ctx.fill();
+
+            // Mouth
+            ctx.fillStyle = '#c0392b';
+            ctx.beginPath();
+            ctx.moveTo(212, 125); ctx.quadraticCurveTo(225, 132, 238, 125);
+            ctx.quadraticCurveTo(225, 128, 212, 125); ctx.fill();
+            // Teeth Shadow
+            ctx.fillStyle = 'rgba(0,0,0,0.3)';
+            ctx.beginPath(); ctx.moveTo(212, 125); ctx.quadraticCurveTo(225, 130, 238, 125); ctx.lineTo(238, 127); ctx.quadraticCurveTo(225, 132, 212, 127); ctx.fill();
+            // Upper Lip Line
+            ctx.strokeStyle = '#804020'; ctx.lineWidth = 1;
+            ctx.beginPath(); ctx.moveTo(212, 125); ctx.quadraticCurveTo(225, 132, 238, 125); ctx.stroke();
+
+            // 8. HAIR
+            // Base Hair Block
+            ctx.fillStyle = '#2c3e50';
+            ctx.beginPath();
+            ctx.moveTo(190, 105);
+            ctx.quadraticCurveTo(180, 50, 225, 55);
+            ctx.quadraticCurveTo(270, 50, 260, 105);
+            ctx.quadraticCurveTo(240, 75, 225, 80);
+            ctx.quadraticCurveTo(210, 75, 190, 105);
+            ctx.fill();
+
+            // Hair Strands (Volume)
+            ctx.strokeStyle = '#456075'; ctx.lineWidth = 2; ctx.lineCap = 'round';
+            const strands = [
+                [[190, 90], [200, 70], [215, 75]],
+                [[210, 75], [225, 60], [240, 65]],
+                [[230, 65], [245, 55], [255, 70]],
+                [[185, 100], [195, 80], [210, 65]],
+            ];
+            strands.forEach(s => {
+                ctx.beginPath(); ctx.moveTo(s[0][0], s[0][1]);
+                ctx.quadraticCurveTo(s[1][0], s[1][1], s[2][0], s[2][1]);
+                ctx.stroke();
+            });
+
+            // Hair Highlights
+            ctx.strokeStyle = 'rgba(255,255,255,0.2)'; ctx.lineWidth = 3;
+            ctx.beginPath(); ctx.moveTo(200, 75); ctx.quadraticCurveTo(210, 65, 220, 70); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(230, 70); ctx.quadraticCurveTo(240, 60, 250, 75); ctx.stroke();
+
+            // Belt & Buckle
+            ctx.fillStyle = '#111'; ctx.fillRect(175, 258, 100, 8);
+            ctx.fillStyle = '#bdc3c7'; ctx.fillRect(220, 256, 10, 12); // Buckle
+            ctx.strokeStyle = '#95a5a6'; ctx.lineWidth = 1; ctx.strokeRect(220, 256, 10, 12);
+            ctx.beginPath(); ctx.moveTo(225, 256); ctx.lineTo(225, 268); ctx.stroke();
+        }
+
+        window.onload = drawPerson;
+    </script>
+</body>
+</html>
