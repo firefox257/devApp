@@ -1,0 +1,428 @@
+================================================================================
+                 optText BUILT-IN ADDITION EXTENSIONS DOCUMENTATION
+================================================================================
+
+OVERVIEW
+--------
+optText includes a modular "Addition" (extension) system. Several useful 
+extensions are provided out-of-the-box and registered automatically via 
+`optTextAdditionsRegistry.js`. 
+
+This document details each built-in extension, its features, configuration 
+options (including disable/hide states), and how to use them.
+
+================================================================================
+1. AUTO INDENT (`autoIndent`)
+================================================================================
+Type: Background / Auto-Init (No UI button)
+Description: Automatically calculates and applies the correct indentation level
+when the user presses the "Enter" key, ensuring a smooth and intelligent coding 
+experience.
+Features:
+- Intercepts the "Enter" key press while explicitly ignoring `Ctrl+Enter` and 
+  `Meta+Enter` (allowing developers to bind custom line-break behaviors to those 
+  combinations).
+- Analyzes the current line's leading tabs up to the exact cursor position.
+- Counts open `{`, `[`, `(` and closed `}`, `]`, `)` brackets *before* the cursor 
+  to dynamically calculate the base indent level for the new line.
+- Automatically increments the indent level by one if the text before the cursor 
+  ends with an opening bracket (`{`, `[`, or `(`).
+- Decrements the indent level if the text immediately after the cursor starts 
+  with a closing bracket (`}`, `]`, or `)`).
+- Modifies the document using `api.editor.augmentLines`, ensuring seamless and 
+  reliable integration with the editor's history (undo/redo).
+- Includes a robust `cleanup` lifecycle method to safely remove event listeners 
+  and prevent memory leaks when the extension is unregistered or the editor is 
+  destroyed.
+State Configuration:
+- This extension is designed to run automatically in the background. It does not 
+  have disable/hide UI states, but it can be selectively excluded from loading 
+  by omitting `'autoIndent'` from the `extensions` array during initialization.
+Usage:
+Loaded automatically via the additions registry. No UI configuration or runtime 
+state management is required.
+================================================================================
+2. BEAUTIFY CODE (`beautifyCode`)
+================================================================================
+Type: Dropdown Menu Item OR Static Toolbar Button 
+      (Depending on which module is registered: `beautifyCodeDropdown.js` or `beautifyCodeButton.js`)
+Description: A lightweight, built-in code formatter that adjusts indentation
+based on bracket nesting, while intelligently respecting strings and 
+multi-line comments.
+UI Location: 
+- As Dropdown: Appears in the main dropdown menu as "✨ Beautify Code".
+- As Toolbar Button: Appears as a static "✨" button in the main toolbar.
+Features:
+- Iterates through all lines and applies tab-based indentation.
+- Decreases indent level when a line starts with `}`, `]`, or `)`.
+- Increases indent level when encountering `{`, `[`, or `(`.
+- Intelligently ignores bracket counting inside strings (`'`, `"`, `` ` ``) 
+  and multi-line comments (`/* ... */`).
+- Preserves the user's exact cursor position and automatically scrolls the 
+  viewport to it after formatting is complete.
+- Includes a concurrency guard (`_isRunning` flag) to prevent multiple 
+  simultaneous formatting attempts from corrupting the document.
+- Provides immediate user feedback via toast notifications 
+  ("Code beautified ✨" or "Beautify failed ❌").
+State Configuration:
+- HTML Attribute (Disable): `beautifycode-disabled="true"`
+- JS Property (Disable): `editor.beautifyCodeDisabled = true`
+- HTML Attribute (Hide): `beautifycode-hidden="true"`
+- JS Property (Hide): `editor.beautifyCodeHidden = true`
+================================================================================
+7. CLOSE (`close`)
+================================================================================
+Type: Static Toolbar Button OR Dropdown Menu Item 
+      (Depending on which module is registered: `closeButton.js` or `closeDropdown.js`)
+Description: Provides a dedicated "Close" button (❌) that triggers a 
+developer-defined callback function. This is highly useful for closing modals, 
+panels, or dismissing the editor instance entirely.
+UI Location: 
+- As Toolbar Button: Appears as a static "❌" button in the main toolbar.
+- As Dropdown: Appears in the main dropdown menu as "❌ Close".
+Features:
+- Executes a custom function when clicked.
+- Passes the `container` (the optText editor instance) as the first argument 
+  to the callback function.
+- Includes state checking: if disabled, the dropdown version shows a toast 
+  ("Close is currently disabled"), while the toolbar button version silently 
+  ignores the click.
+- Validates that the `onClose` handler is actually a function (the dropdown 
+  version provides a toast warning: "No onClose handler defined" if missing).
+Custom Instance API Additions:
+- `editor.onClose` (Getter/Setter): The function to execute when clicked. 
+  Receives the `container` instance as its first argument.
+- HTML Attribute Mapping: You can define the close logic directly in HTML 
+  using the `onclose` attribute, which will be parsed and assigned to 
+  `editor.onClose`.
+State Configuration:
+- HTML Attribute (Disable): `close-disabled="true"`
+- JS Property (Disable): `editor.closeDisabled = true`
+- HTML Attribute (Hide): `close-hidden="true"`
+- JS Property (Hide): `editor.closeHidden = true`
+Usage Example (HTML):
+<opttext id="my-editor" onclose="handleMyClose"></opttext>
+<script>
+function handleMyClose(editorInstance) {
+  console.log("Closing editor:", editorInstance);
+  // Example: editorInstance.remove(); or close a modal wrapper
+}
+</script>
+================================================================================
+8. COMPILE (`compile`)
+================================================================================
+Type: Static Toolbar Button OR Dropdown Menu Item 
+      (Depending on which module is registered: `compileButton.js` or `complieDropdown.js`)
+Description: Provides a dedicated "Compile" button (⚙️) that triggers a 
+developer-defined callback function. This is highly useful for triggering 
+transpilation, build processes, or custom execution logic directly from the editor.
+UI Location: 
+- As Toolbar Button: Appears as a static "⚙️" button in the main toolbar.
+- As Dropdown: Appears in the main dropdown menu as "⚙️ Compile".
+Features:
+- Executes a custom function when clicked.
+- Passes the `container` (the optText editor instance) as the first argument 
+  to the callback function.
+- Includes state checking: if disabled, the dropdown version shows a toast 
+  ("Compile is currently disabled"), while the toolbar button version silently 
+  ignores the click.
+- Validates that the `onCompile` handler is actually a function (the dropdown 
+  version provides a toast warning: "No onCompile handler defined" if missing).
+Custom Instance API Additions:
+- `editor.onCompile` (Getter/Setter): The function to execute when clicked. 
+  Receives the `container` instance as its first argument.
+- HTML Attribute Mapping: You can define the compile logic directly in HTML 
+  using the `oncompile` attribute, which will be parsed and assigned to 
+  `editor.onCompile`.
+State Configuration:
+- HTML Attribute (Disable): `compile-disabled="true"`
+- JS Property (Disable): `editor.compileDisabled = true`
+- HTML Attribute (Hide): `compile-hidden="true"`
+- JS Property (Hide): `editor.compileHidden = true`
+Usage Example (HTML):
+<opttext id="my-editor" oncompile="handleMyCompile"></opttext>
+<script>
+function handleMyCompile(editorInstance) {
+  console.log("Compiling content:", editorInstance.value);
+  // Example: Trigger a build process or send code to a compiler API
+}
+</script>
+================================================================================
+9. DELETE (`delete`)
+================================================================================
+Type: Static Toolbar Button OR Dropdown Menu Item 
+      (Depending on which module is registered: `deleteButton.js` or `deleteDropdown.js`)
+Description: Provides a dedicated "Delete" button (🗑️) that triggers a 
+developer-defined callback function. This is highly useful for clearing the 
+editor content, deleting the current file/page, or removing the editor 
+instance entirely.
+UI Location: 
+- As Toolbar Button: Appears as a static "🗑️" button in the main toolbar.
+- As Dropdown: Appears in the main dropdown menu as "🗑️ Delete".
+Features:
+- Executes a custom function when clicked.
+- Passes the `container` (the optText editor instance) as the first argument 
+  to the callback function.
+- Includes state checking: if disabled, the dropdown version shows a toast 
+  ("Delete is currently disabled"), while the toolbar button version silently 
+  ignores the click.
+- Validates that the `onDelete` handler is actually a function (the dropdown 
+  version provides a toast warning: "No onDelete handler defined" if missing).
+Custom Instance API Additions:
+- `editor.onDelete` (Getter/Setter): The function to execute when clicked. 
+  Receives the `container` instance as its first argument.
+- HTML Attribute Mapping: You can define the delete logic directly in HTML 
+  using the `ondelete` attribute, which will be parsed and assigned to 
+  `editor.onDelete`.
+State Configuration:
+- HTML Attribute (Disable): `delete-disabled="true"`
+- JS Property (Disable): `editor.deleteDisabled = true`
+- HTML Attribute (Hide): `delete-hidden="true"`
+- JS Property (Hide): `editor.deleteHidden = true`
+Usage Example (HTML):
+<opttext id="my-editor" ondelete="handleMyDelete"></opttext>
+<script>
+function handleMyDelete(editorInstance) {
+  console.log("Delete action triggered for:", editorInstance);
+  // Example: editorInstance.value = ''; or editorInstance.remove();
+}
+</script>
+================================================================================
+10. OPEN (`open`)
+================================================================================
+Type: Static Toolbar Button OR Dropdown Menu Item 
+      (Depending on which module is registered: `openButton.js` or `openDropdown.js`)
+Description: Provides a dedicated "Open" button (📂) that triggers a 
+developer-defined callback function. This is highly useful for opening file 
+dialogs, loading saved content into the editor, or triggering custom 
+initialization logic.
+UI Location: 
+- As Toolbar Button: Appears as a static "📂" button in the main toolbar.
+- As Dropdown: Appears in the main dropdown menu as "📂 Open".
+Features:
+- Executes a custom function when clicked.
+- Passes the `container` (the optText editor instance) as the first argument 
+  to the callback function.
+- Includes state checking: if disabled, the dropdown version shows a toast 
+  ("Open is currently disabled"), while the toolbar button version silently 
+  ignores the click.
+- Validates that the `onOpen` handler is actually a function (the dropdown 
+  version provides a toast warning: "No onOpen handler defined" if missing).
+Custom Instance API Additions:
+- `editor.onOpen` (Getter/Setter): The function to execute when clicked. 
+  Receives the `container` instance as its first argument.
+- HTML Attribute Mapping: You can define the open logic directly in HTML 
+  using the `onopen` attribute, which will be parsed and assigned to 
+  `editor.onOpen`.
+State Configuration:
+- HTML Attribute (Disable): `open-disabled="true"`
+- JS Property (Disable): `editor.openDisabled = true`
+- HTML Attribute (Hide): `open-hidden="true"`
+- JS Property (Hide): `editor.openHidden = true`
+Usage Example (HTML):
+<opttext id="my-editor" onopen="handleMyOpen"></opttext>
+<script>
+function handleMyOpen(editorInstance) {
+  console.log("Open action triggered for:", editorInstance);
+  // Example: Trigger a file input click or load data into editorInstance.value
+}
+</script>
+================================================================================
+3. PAGES MANAGER (`pagesManager`)
+================================================================================
+Type: Static Toolbar Button OR Dropdown Menu Item 
+      (Depending on which module is registered: `pagesManagerButton.js` or `pagesManagerDropdown.js`)
+Description: A comprehensive tab/page management system that allows users to
+navigate, rename, create, and delete multiple contexts (files/pages) directly
+from the editor interface.
+UI Location: 
+- As Toolbar Button: Expands into a custom tool UI in the main toolbar.
+- As Dropdown: Appears in the main dropdown menu as "Pages Manager" (with a document icon).
+Custom Toolbar UI Features (when activated):
+- ◀ Previous / ▶ Next: Navigate between pages. "Next" on the last page creates a new one.
+- 📋 Dropdown: Opens a global, overflow-safe dropdown list of all pages appended to `document.body`.
+- 📝 Title Input: Editable text field that live-saves the current page's name on input/blur/Enter.
+- 🗑️ Delete Page: Opens a custom, animated confirmation modal before removing the current page (prevents deleting the only remaining page).
+Custom Instance API Additions:
+This extension dynamically adds powerful properties to the main `optText` container instance:
+1. `editor.pages` (Getter/Setter):
+   - GET: Returns `[{ title: 'Page 1', content: '...' }]` for all contexts.
+   - SET: Accepts an array of page objects to completely replace all contexts.
+2. `editor.pageIndex` (Getter/Setter):
+   - GET: Returns the integer index of the currently active page.
+   - SET: Switches to the page at the specified index.
+3. `editor.onpagechange` (Getter/Setter):
+   - SET: Assign a callback function. Receives `{ pageIndex, title, content }` whenever the page changes.
+State Configuration:
+- HTML Attribute (Disable): `pagesmanager-disabled="true"`
+- JS Property (Disable - Button): `editor.pagesManagerButtonDisabled = true`
+- JS Property (Disable - Dropdown): `editor.pagesManagerDropdownDisabled = true`
+- HTML Attribute (Hide): `pagesmanager-hidden="true"`
+- JS Property (Hide - Button): `editor.pagesManagerButtonHidden = true`
+- JS Property (Hide - Dropdown): `editor.pagesManagerDropdownHidden = true`
+Lifecycle & Safety:
+- Includes a robust `cleanup` method that safely removes global event listeners and destroys the appended dropdown menu and delete modal to prevent memory leaks when the extension is unregistered.
+================================================================================
+11. RUN (`run`)
+================================================================================
+Type: Static Toolbar Button OR Dropdown Menu Item 
+      (Depending on which module is registered: `runButton.js` or `runDropdown.js`)
+Description: Provides a dedicated "Run" button (▶️) that triggers a 
+developer-defined callback function. This is highly useful for executing code, 
+running scripts, previewing output, or triggering custom execution logic 
+directly from the editor.
+UI Location: 
+- As Toolbar Button: Appears as a static "▶️" button in the main toolbar.
+- As Dropdown: Appears in the main dropdown menu as "▶️ Run".
+Features:
+- Executes a custom function when clicked.
+- Passes the `container` (the optText editor instance) as the first argument 
+  to the callback function.
+- Includes state checking: if disabled, the dropdown version shows a toast 
+  ("Run is currently disabled"), while the toolbar button version silently 
+  ignores the click.
+- Validates that the `onRun` handler is actually a function (the dropdown 
+  version provides a toast warning: "No onRun handler defined" if missing).
+Custom Instance API Additions:
+- `editor.onRun` (Getter/Setter): The function to execute when clicked. 
+  Receives the `container` instance as its first argument.
+- HTML Attribute Mapping: You can define the run logic directly in HTML 
+  using the `onrun` attribute, which will be parsed and assigned to 
+  `editor.onRun`.
+State Configuration:
+- HTML Attribute (Disable): `run-disabled="true"`
+- JS Property (Disable): `editor.runDisabled = true`
+- HTML Attribute (Hide): `run-hidden="true"`
+- JS Property (Hide): `editor.runHidden = true`
+Usage Example (HTML):
+<opttext id="my-editor" onrun="handleMyRun"></opttext>
+<script>
+function handleMyRun(editorInstance) {
+  console.log("Running content:", editorInstance.value);
+  // Example: Pass editorInstance.value to an iframe, eval(), or a backend API
+}
+</script>
+================================================================================
+4. SAVE (`save`)
+================================================================================
+Type: Static Toolbar Button OR Dropdown Menu Item 
+      (Depending on which module is registered: `saveButton.js` or `saveDropdown.js`)
+Description: Provides a dedicated "Save" action (💾) that triggers a 
+developer-defined callback function. This is highly useful for saving editor 
+content, triggering backend synchronization, or executing custom save logic.
+UI Location: 
+- As Toolbar Button: Appears as a static "💾" button in the main toolbar.
+- As Dropdown: Appears in the main dropdown menu as "💾 Save".
+Features:
+- Executes a custom function when clicked.
+- Passes the `container` (the optText editor instance) as the first argument 
+  to the callback function.
+- Includes state checking: if disabled, the dropdown version shows a toast 
+  ("Save is currently disabled"), while the toolbar button version silently 
+  ignores the click.
+- Validates that the `onSave` handler is actually a function (the dropdown 
+  version provides a toast warning: "No onSave handler defined" if missing).
+Custom Instance API Additions:
+- `editor.onSave` (Getter/Setter): The function to execute when clicked. 
+  Receives the `container` instance as its first argument.
+- HTML Attribute Mapping: You can define the save logic directly in HTML 
+  using the `onsave` attribute, which will be parsed and assigned to 
+  `editor.onSave`.
+State Configuration:
+- HTML Attribute (Disable): `save-disabled="true"`
+- JS Property (Disable): `editor.saveDisabled = true` 
+  *(Note: The toolbar button action also checks `editor.saveButtonDisabled` as a fallback).*
+- HTML Attribute (Hide): `save-hidden="true"`
+- JS Property (Hide): `editor.saveHidden = true`
+Usage Example (HTML):
+<opttext id="my-editor" onsave="handleMySave"></opttext>
+<script>
+function handleMySave(editorInstance) {
+  console.log("Saving content:", editorInstance.value);
+  // Example: Send editorInstance.value to a backend API or localStorage
+}
+</script>
+⚠️ Important Developer Note:
+Both `saveButton.js` and `saveDropdown.js` register with the same `id: 'save'`. 
+If you intend to use both simultaneously in the same project, you should 
+modify the `id` in `saveDropdown.js` (e.g., to `'saveDropdown'`) to prevent 
+registry ID conflicts in the `additionManager`.
+================================================================================
+5. SEARCH TOOL (`searchTool`)
+================================================================================
+Type: Static Toolbar Button OR Dropdown Menu Item 
+      (Depending on which module is registered: `searchToolButton.js` or `searchToolDropdown.js`)
+Description: A find-in-document tool that allows users to search for text,
+navigate between matches, and see the total match count.
+UI Location: 
+- As Toolbar Button: Expands into a custom search tool UI in the main toolbar.
+- As Dropdown: Appears in the main dropdown menu as "🔍 Search" (activates the tool UI).
+Custom Toolbar UI Features (when activated):
+- 🔍 Input Field: Type to search (debounced at 150ms for performance).
+- ↑ Previous / ↓ Next Match: Buttons to jump between occurrences.
+- Counter: Displays "Current/Total" (e.g., "2/5") or "0/0" if no matches.
+Features:
+- Case-insensitive search across all lines.
+- Automatically sets the cursor and scrolls the viewport to the active match.
+- Pressing "Enter" in the input field jumps to the next match.
+- Pressing "Escape" closes the search tool UI.
+- Includes a robust `cleanup` method to safely clear debounce timers and prevent memory leaks when the extension is unregistered.
+State Configuration:
+- HTML Attribute (Disable): `searchtool-disabled="true"`
+- JS Property (Disable - Button): `editor.searchToolButtonDisabled = true`
+- JS Property (Disable - Dropdown): `editor.searchToolDropdownDisabled = true`
+- HTML Attribute (Hide): `searchtool-hidden="true"`
+- JS Property (Hide - Button): `editor.searchToolButtonHidden = true`
+- JS Property (Hide - Dropdown): `editor.searchToolDropdownHidden = true`
+================================================================================
+6. SELECT BRACKET (`selectBracket`)
+================================================================================
+Type: Static Toolbar Button OR Dropdown Menu Item 
+      (Depending on which module is registered: `selectBracketButton.js` or `selectBracketDropdown.js`)
+Description: A utility tool that automatically selects the content inside a
+pair of matching brackets, supporting nested structures and multi-line selections.
+UI Location: 
+- As Toolbar Button: Appears as a static bracket icon button (`< >`) in the main toolbar.
+- As Dropdown: Appears in the main dropdown menu as "Select Bracket Content" (with a bracket SVG icon).
+Features:
+- Detects if the cursor is immediately before or after a bracket character 
+  (`{`, `[`, `(`, `<`, `}`, `]`, `)`, `>`).
+- Intelligently scans forward or backward to find the exact matching 
+  closing/opening bracket, accurately accounting for nested brackets.
+- Automatically highlights the text *between* the brackets (inclusive of the 
+  brackets themselves).
+- Scrolls the viewport to ensure the new selection is visible 
+  (`api.editor.scrollToFocus()`).
+- Provides immediate user feedback via toast notifications:
+  - "Bracket content selected" (on success)
+  - "Cursor is not near a bracket" (if triggered away from brackets)
+  - "No matching bracket found" (if the pair is unbalanced/missing)
+State Configuration:
+- HTML Attribute (Disable): `selectbracket-disabled="true"`
+- JS Property (Disable - Button): `editor.selectBracketButtonDisabled = true`
+- JS Property (Disable - Dropdown): `editor.selectBracketDropdownDisabled = true`
+- HTML Attribute (Hide): `selectbracket-hidden="true"`
+- JS Property (Hide - Button): `editor.selectBracketButtonHidden = true`
+- JS Property (Hide - Dropdown): `editor.selectBracketDropdownHidden = true`
+================================================================================
+MANAGING EXTENSIONS
+================================================================================
+
+By default, if you import `optTextAdditionsRegistry.js`, all extensions are 
+registered. You can control which ones are active per instance:
+
+1. Via JavaScript Initialization:
+   const editor = newOptText('#el', {
+     extensions: ['saveButton', 'pagesManager'] // Only load these two
+   });
+
+2. Via HTML Attribute:
+   <opttext extensions='["searchTool", "autoIndent"]'></opttext>
+
+3. Reactively at Runtime:
+   // This will dynamically inject 'beautifyCode' and remove others
+   editor.extensions = ['beautifyCode']; 
+
+================================================================================
+End of Extensions Documentation
+================================================================================

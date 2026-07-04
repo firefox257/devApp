@@ -196,10 +196,19 @@ var File = class {
 		return this._data ? this._data.length : 0;
 	}
 
-	static resetCache() {
-		File._xhrCache.clear();
+	static resetCache(paths) {
+		if (!paths) {
+			// If no paths are provided, clear the entire cache (backward compatible)
+			File._xhrCache.clear();
+		} else {
+			// Normalize to an array if a single string is passed
+			const pathsArray = Array.isArray(paths) ? paths : [paths];
+			for (const path of pathsArray) {
+				File._xhrCache.delete(path);
+			}
+		}
 	}
-};;
+};
 var Directory = class _Directory {
 	constructor(files = {}) {
 		this.id = nextFilesystemId();
@@ -270,7 +279,7 @@ var Descriptor = class _Descriptor {
 		this.entry = entry;
 	}
 
-	// NEW: Dynamically creates a lazy-loading file proxy for missing paths
+	// NEW: Smart lazy-loading proxy that distinguishes between files and directories
 	_createLazyProxy(path) {
 		const lastSlash = path.lastIndexOf("/");
 		const dirPath = lastSlash === -1 ? "" : path.substring(0, lastSlash);
@@ -281,9 +290,54 @@ var Descriptor = class _Descriptor {
 			parentDir = this.entry.traverse(dirPath, { create: "directory" });
 		}
 
-		const lazyFile = new File(`lazy://${path}`);
-		parentDir.files[fileName] = lazyFile;
-		return lazyFile;
+		// Note: Ensure this matches the BASE_DIR logic in your File class
+		const serverPath = '/public/wasmfs/' + path;
+
+		// 1. Attempt to read the path as a file via Sync XHR
+		const xhr = new XMLHttpRequest();
+		xhr.open('GET', '/', false); // 'false' = Synchronous
+		xhr.setRequestHeader('X-CMD', 'freadb');
+		xhr.setRequestHeader('X-SRC', serverPath);
+		xhr.responseType = 'arraybuffer';
+		xhr.send();
+
+		if (xhr.status === 200) {
+			// SUCCESS: It's a file! Pre-load the binary data into memory.
+			const file = new File(new Uint8Array(xhr.response));
+			parentDir.files[fileName] = file;
+			return file;
+		} else if (xhr.status === 400) {
+			// SUCCESS: Server returned "Cannot read a directory", so it IS a directory!
+			// Fetch the directory contents using the 'ls' command.
+			const lsXhr = new XMLHttpRequest();
+			lsXhr.open('GET', '/', false);
+			lsXhr.setRequestHeader('X-CMD', 'ls');
+			lsXhr.setRequestHeader('X-SRC', serverPath);
+			lsXhr.send();
+
+			const dir = new Directory({});
+			if (lsXhr.status === 200) {
+				try {
+					const entries = JSON.parse(lsXhr.responseText);
+					for (const entry of entries) {
+						if (entry.type === 'file') {
+							// Create a lazy proxy for every file inside this directory
+							dir.files[entry.name] = new File(`lazy://${path}/${entry.name}`);
+						} else if (entry.type === 'directory') {
+							// Create an empty sub-directory (it will be lazily populated if Clang enters it)
+							dir.files[entry.name] = new Directory({});
+						}
+					}
+				} catch (e) {
+					console.error(`[WASM FS] Failed to parse ls response for ${serverPath}:`, e);
+				}
+			}
+			parentDir.files[fileName] = dir;
+			return dir;
+		} else {
+			// FAILURE: 404 Not Found or other error. The path does not exist.
+			throw "no-entry";
+		}
 	}
 
 	getType() {
@@ -298,6 +352,8 @@ var Descriptor = class _Descriptor {
 	metadataHash() {
 		return { upper: 0, lower: this.entry.id };
 	}
+
+	// UPDATED: Catches "no-entry" and triggers lazy loading
 	metadataHashAt(_pathFlags, path) {
 		if (!(this.entry instanceof Directory))
 		throw "invalid";
@@ -310,6 +366,7 @@ var Descriptor = class _Descriptor {
 		}
 		return new _Descriptor(pathEntry).metadataHash();
 	}
+
 	stat() {
 		let type;
 		if (this.entry instanceof Directory)
@@ -325,6 +382,8 @@ var Descriptor = class _Descriptor {
 			statusChangeTimestamp: null
 		};
 	}
+
+	// UPDATED: Catches "no-entry" and triggers lazy loading
 	statAt(_pathFlags, path) {
 		if (!(this.entry instanceof Directory))
 		throw "invalid";
@@ -337,6 +396,8 @@ var Descriptor = class _Descriptor {
 		}
 		return new _Descriptor(pathEntry).stat();
 	}
+
+	// UPDATED: Catches "no-entry" and triggers lazy loading (only if not explicitly creating)
 	openAt(_pathFlags, path, openFlags, _descriptorFlags) {
 		if (!(this.entry instanceof Directory))
 		throw "invalid";
@@ -361,6 +422,7 @@ var Descriptor = class _Descriptor {
 		}
 		return new _Descriptor(openEntry);
 	}
+
 	read(length, offset) {
 		if (this.entry instanceof Directory)
 		throw "is-directory";
@@ -422,7 +484,7 @@ var Descriptor = class _Descriptor {
 		this.entry.traverse(newPath, { create: oldEntry });
 		this.entry.traverse(oldPath, { remove: true });
 	}
-};;
+};;;
 var DirectoryEntryStream = class {
 	constructor(directory) {
 		this.entries = Object.entries(directory.files);
@@ -8172,8 +8234,8 @@ function _sanitizePath(path) {
 	};
 	var version = "22.0.0-git20542-10";
 	// Helper to expose the File cache reset to the Web Worker
-	function resetFileCache() {
-		File.resetCache();
+	function resetFileCache(paths) {
+		File.resetCache(paths);
 	}
 
 	export {
@@ -8182,5 +8244,5 @@ function _sanitizePath(path) {
 		runClang,
 		runLLVM,
 		version,
-		resetFileCache // <-- ADD THIS
+		resetFileCache
 	};

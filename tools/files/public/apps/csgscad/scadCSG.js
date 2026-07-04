@@ -3649,7 +3649,6 @@ function extrude3d(target, commandPath, allowAxes = { x: true, y: true, z: true 
  */
 function sweep3d(circularPath, wallPath, holeWallPath) {
 	let close = false;
-
 	const bboxProfile = boundingBoxPath(wallPath);
 	if (!bboxProfile || !bboxProfile.min || !bboxProfile.max) {
 		console.warn("Invalid bounding box for wallPath in sweep3d");
@@ -3657,8 +3656,8 @@ function sweep3d(circularPath, wallPath, holeWallPath) {
 	}
 	const bboxPathW = (bboxProfile.max.x - bboxProfile.min.x) || 1;
 	const bboxPathH = (bboxProfile.max.y - bboxProfile.min.y) || 1;
-
 	const convertToVector2 = (p) => new THREE.Vector2(p.x, p.y);
+
 	var wallPoints = () => {
 		var v = wallPath.getPoints()[0].outerPoints.map(convertToVector2);
 		var v1 = v[0];
@@ -3666,6 +3665,7 @@ function sweep3d(circularPath, wallPath, holeWallPath) {
 		if (v2.y < v1.y) return v.reverse();
 		return v;
 	};
+
 	var holeWallPoints = () => {
 		var v = holeWallPath.getPoints()[0].outerPoints.map(convertToVector2);
 		var v1 = v[0];
@@ -3766,7 +3766,6 @@ function sweep3d(circularPath, wallPath, holeWallPath) {
 
 		var points3d = [];
 		var preCalc = [];
-
 		for (var i = 0; i < path.p.length; i++) {
 			points3d.push(...[0, 0, i]);
 			const rotation = path.r[i];
@@ -3802,25 +3801,19 @@ function sweep3d(circularPath, wallPath, holeWallPath) {
 			var x = point.x;
 			var y = point.y;
 			var z = 0;
-
 			let scaleX = stScales[i][0] * sScales[i][0];
 			let scaleY = stScales[i][1] * sScales[i][1];
-
 			x = x * scaleX;
 			y = y * scaleY;
-
 			var o = preCalc[i];
 			let rotatedX = x * o.cosR - y * o.sinR;
 			let rotatedY = x * o.sinR + y * o.cosR;
 			x = rotatedX;
 			y = rotatedY;
-
 			const ppoint = new THREE.Vector3(x, y, z);
-
 			for (var k = 0; k <= i; k++) {
 				applyQuaternion(ppoint, preCalc[k].quaternion);
 			}
-
 			ppoint.x += path.p[i][0];
 			ppoint.y += path.p[i][1];
 			ppoint.z += path.p[i][2];
@@ -3842,21 +3835,39 @@ function sweep3d(circularPath, wallPath, holeWallPath) {
 			const currentCapPoints = [];
 			const currentTopPoints = [];
 
+			// --- MODIFIED LOOP TO CLOSE SEAM GAP ---
 			for (let i = 0; i <= segments; i++) {
 				const v = 1 - i / segments;
 				u_current = 0;
 				for (let j = 0; j < numPoints; j++) {
-					const point = points[j];
-					var ppoint = calcFinalPoint(point, i);
-					r.vertices.push(ppoint.x, ppoint.y, ppoint.z);
+					let px, py, pz;
+
+					if (i === segments) {
+						// Copy from the very first points (i = 0) to fully close any gaps
+						const firstRingIndex = j * 3;
+						px = r.vertices[firstRingIndex];
+						py = r.vertices[firstRingIndex + 1];
+						pz = r.vertices[firstRingIndex + 2];
+					} else {
+						const point = points[j];
+						var ppoint = calcFinalPoint(point, i);
+						px = ppoint.x;
+						py = ppoint.y;
+						pz = ppoint.z;
+					}
+
+					r.vertices.push(px, py, pz);
 					r.vertexCount++;
 
-					if (j == 0) currentCapPoints.push(ppoint.x, ppoint.y, ppoint.z);
-					if (j == numPoints - 1) currentTopPoints.push(ppoint.x, ppoint.y, ppoint.z);
+					// Only add to cap boundaries for i < segments to avoid duplicate points
+					// since i = segments is now identical to i = 0
+					if (i < segments) {
+						if (j == 0) currentCapPoints.push(px, py, pz);
+						if (j == numPoints - 1) currentTopPoints.push(px, py, pz);
+					}
 
 					let u_val = u_current / contourLength;
 					if (j === numPoints - 1) u_val = 1.0;
-
 					r.uvs.push(u_val, v);
 
 					if (j < numWallSegments) {
@@ -3866,6 +3877,7 @@ function sweep3d(circularPath, wallPath, holeWallPath) {
 					}
 				}
 			}
+			// --- END MODIFIED LOOP ---
 
 			if (isHole) {
 				bottomHolePointArrays.push(currentCapPoints);
@@ -3889,7 +3901,6 @@ function sweep3d(circularPath, wallPath, holeWallPath) {
 		};
 
 		finalMeshes.push(extrudeContour(contourPoints, isHole));
-
 		for (var i = 0; i < finalMeshes.length; i++) {
 			var geometry = new THREE.BufferGeometry();
 			geometry.setIndex(finalMeshes[i].indices);
@@ -3911,7 +3922,6 @@ function sweep3d(circularPath, wallPath, holeWallPath) {
 		}
 		var fpath = new Path2d().path(lpath).fn(circularPath._fn);
 		genFromShapeData(fpath, false);
-
 		var hpaths = cirPaths[v].holePoints;
 		for (var j = 0; j < hpaths.length; j++) {
 			lpath = [];
@@ -3930,7 +3940,6 @@ function sweep3d(circularPath, wallPath, holeWallPath) {
 		let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
 		var contour3DPoints = [];
 		var projected2DPoints = [];
-
 		for (let i = 0; i < outer3DPoints.length; i += 3) {
 			var x = outer3DPoints[i];
 			var y = outer3DPoints[i + 1];
@@ -3943,7 +3952,6 @@ function sweep3d(circularPath, wallPath, holeWallPath) {
 			maxX = Math.max(maxX, x);
 			maxY = Math.max(maxY, y);
 		}
-
 		const projectedHoles2D = [];
 		for (var hole3DPoints of hole3DPointArrays) {
 			var hole2DPoints = [];
@@ -3957,22 +3965,18 @@ function sweep3d(circularPath, wallPath, holeWallPath) {
 			}
 			projectedHoles2D.push(hole2DPoints);
 		}
-
 		let width = maxX - minX;
 		let height = maxY - minY;
 		if (width === 0) { maxX += 1; width = 1; }
 		if (height === 0) { maxY += 1; height = 1; }
-
 		var triangles = THREE.ShapeUtils.triangulateShape(projected2DPoints, projectedHoles2D);
 		var capVerticesFinal = [];
 		var capIndices = [];
 		var capUVs = [];
-
 		for (const v of contour3DPoints) {
 			capVerticesFinal.push(v.x, v.y, v.z);
 			capUVs.push((v.x - minX) / width, (v.y - minY) / height);
 		}
-
 		for (const triangle of triangles) {
 			var idx0 = triangle[0];
 			var idx1 = triangle[1];
@@ -3983,7 +3987,6 @@ function sweep3d(circularPath, wallPath, holeWallPath) {
 				capIndices.push(idx0, idx1, idx2);
 			}
 		}
-
 		var capGeom = new THREE.BufferGeometry();
 		capGeom.setIndex(capIndices);
 		capGeom.setAttribute('position', new THREE.Float32BufferAttribute(capVerticesFinal, 3));
@@ -3994,7 +3997,6 @@ function sweep3d(circularPath, wallPath, holeWallPath) {
 
 	const topCapMesh = createCapGeometry(topCapPoints, topHolePointArrays, true);
 	if (topCapMesh) { meshes.push(topCapMesh); }
-
 	const bottomCapMesh = createCapGeometry(bottomCapPoints, bottomHolePointArrays, false);
 	if (bottomCapMesh) { meshes.push(bottomCapMesh); }
 
@@ -6076,245 +6078,245 @@ function cloneGeometryData(sourceGeometry) {
 * @returns {Promise<Path2d[]>} A Promise resolving to an array of Path2d objects.
 */
 async function importSvg(filePath) {
-    try {
-        // 1. Safely read and decode the file to a string
-        const buffer = await api.readFileBinary($path(filePath))
-        const text = new TextDecoder().decode(buffer)
-        
-        const parser = new DOMParser()
-        const svgDoc = parser.parseFromString(text, 'image/svg+xml')
-        const path2dObjects = []
-        const fn = 32 // Default tessellation factor for curves
+	try {
+		// 1. Safely read and decode the file to a string
+		const buffer = await api.readFileBinary($path(filePath))
+		const text = new TextDecoder().decode(buffer)
 
-        // --- ROBUST SVG PATH PARSER ---
-        const parsePathData = (d) => {
-            if (!d) return []
-            const path = []
+		const parser = new DOMParser()
+		const svgDoc = parser.parseFromString(text, 'image/svg+xml')
+		const path2dObjects = []
+		const fn = 32 // Default tessellation factor for curves
 
-            // Robust Tokenization: handles commas, negative numbers, and implicit commands
-            const normalized = d
-                .replace(/([A-Za-z])/g, ' $1 ')      // Isolate command letters
-                .replace(/,/g, ' ')                  // Replace commas with spaces
-                .replace(/([0-9])([+-])/g, '$1 $2')  // Separate numbers from negative signs
-                .replace(/\s+/g, ' ')                // Collapse multiple spaces
-                .trim()
+		// --- ROBUST SVG PATH PARSER ---
+		const parsePathData = (d) => {
+			if (!d) return []
+			const path = []
 
-            const tokens = normalized.split(' ')
-            let i = 0
-            let lastCommand = ''
-            let lastControlPoint = null
+			// Robust Tokenization: handles commas, negative numbers, and implicit commands
+			const normalized = d
+			.replace(/([A-Za-z])/g, ' $1 ')      // Isolate command letters
+			.replace(/,/g, ' ')                  // Replace commas with spaces
+			.replace(/([0-9])([+-])/g, '$1 $2')  // Separate numbers from negative signs
+			.replace(/\s+/g, ' ')                // Collapse multiple spaces
+			.trim()
 
-            const getNum = () => {
-                while (i < tokens.length && !tokens[i].match(/^-?[0-9.]/)) i++
-                if (i >= tokens.length) return 0
-                return parseFloat(tokens[i++])
-            }
+			const tokens = normalized.split(' ')
+			let i = 0
+			let lastCommand = ''
+			let lastControlPoint = null
 
-            const getNums = (n) => {
-                const nums = []
-                for (let j = 0; j < n; j++) nums.push(getNum())
-                return nums
-            }
+			const getNum = () => {
+				while (i < tokens.length && !tokens[i].match(/^-?[0-9.]/)) i++
+				if (i >= tokens.length) return 0
+				return parseFloat(tokens[i++])
+			}
 
-            while (i < tokens.length) {
-                let cmd = tokens[i]
+			const getNums = (n) => {
+				const nums = []
+				for (let j = 0; j < n; j++) nums.push(getNum())
+				return nums
+			}
 
-                // Check if current token is a command letter
-                if (cmd.match(/^[A-Za-z]$/)) {
-                    lastCommand = cmd
-                    i++
-                } else {
-                    // Handle implicit command repetition (e.g., M 0 0 L 10 10 20 20)
-                    if (lastCommand === 'M') lastCommand = 'L'
-                    if (lastCommand === 'm') lastCommand = 'l'
-                    cmd = lastCommand
-                }
+			while (i < tokens.length) {
+				let cmd = tokens[i]
 
-                const isRelative = cmd === cmd.toLowerCase()
-                const cmdUpper = cmd.toUpperCase()
+				// Check if current token is a command letter
+				if (cmd.match(/^[A-Za-z]$/)) {
+					lastCommand = cmd
+					i++
+				} else {
+					// Handle implicit command repetition (e.g., M 0 0 L 10 10 20 20)
+					if (lastCommand === 'M') lastCommand = 'L'
+					if (lastCommand === 'm') lastCommand = 'l'
+					cmd = lastCommand
+				}
 
-                switch (cmdUpper) {
-                    case 'M': {
-                        const [x, y] = getNums(2)
-                        path.push(isRelative ? 'mr' : 'm', x, y)
-                        lastCommand = isRelative ? 'l' : 'L'
-                        break
-                    }
-                    case 'L': {
-                        const [x, y] = getNums(2)
-                        path.push(isRelative ? 'lr' : 'l', x, y)
-                        break
-                    }
-                    case 'H': {
-                        const [x] = getNums(1)
-                        path.push(isRelative ? 'lr' : 'l', x, 0)
-                        break
-                    }
-                    case 'V': {
-                        const [y] = getNums(1)
-                        path.push(isRelative ? 'lr' : 'l', 0, y)
-                        break
-                    }
-                    case 'C': {
-                        const [cp1x, cp1y, cp2x, cp2y, x, y] = getNums(6)
-                        path.push(isRelative ? 'cr' : 'c', cp1x, cp1y, cp2x, cp2y, x, y)
-                        lastControlPoint = [cp2x, cp2y]
-                        break
-                    }
-                    case 'S': {
-                        const [cp2x, cp2y, x, y] = getNums(4)
-                        let cp1x = cp2x, cp1y = cp2y
-                        path.push(isRelative ? 'cr' : 'c', cp1x, cp1y, cp2x, cp2y, x, y)
-                        lastControlPoint = [cp2x, cp2y]
-                        break
-                    }
-                    case 'Q': {
-                        const [cpx, cpy, x, y] = getNums(4)
-                        path.push(isRelative ? 'qr' : 'q', cpx, cpy, x, y)
-                        lastControlPoint = [cpx, cpy]
-                        break
-                    }
-                    case 'T': {
-                        const [x, y] = getNums(2)
-                        let cpx = lastControlPoint ? lastControlPoint[0] : 0
-                        let cpy = lastControlPoint ? lastControlPoint[1] : 0
-                        path.push(isRelative ? 'qr' : 'q', cpx, cpy, x, y)
-                        break
-                    }
-                    case 'A': {
-                        const [rx, ry, xAxisRot, largeArc, sweep, x, y] = getNums(7)
-                        path.push(isRelative ? 'lr' : 'l', x, y)
-                        break
-                    }
-                    case 'Z': {
-                        break
-                    }
-                }
-            }
-            return path
-        }
+				const isRelative = cmd === cmd.toLowerCase()
+				const cmdUpper = cmd.toUpperCase()
 
-        // --- ELEMENT CONVERTER ---
-        const convertElementToPath = (element) => {
-            const tagName = element.tagName.toLowerCase()
-            let pathData = []
+				switch (cmdUpper) {
+					case 'M': {
+						const [x, y] = getNums(2)
+						path.push(isRelative ? 'mr' : 'm', x, y)
+						lastCommand = isRelative ? 'l' : 'L'
+						break
+					}
+					case 'L': {
+						const [x, y] = getNums(2)
+						path.push(isRelative ? 'lr' : 'l', x, y)
+						break
+					}
+					case 'H': {
+						const [x] = getNums(1)
+						path.push(isRelative ? 'lr' : 'l', x, 0)
+						break
+					}
+					case 'V': {
+						const [y] = getNums(1)
+						path.push(isRelative ? 'lr' : 'l', 0, y)
+						break
+					}
+					case 'C': {
+						const [cp1x, cp1y, cp2x, cp2y, x, y] = getNums(6)
+						path.push(isRelative ? 'cr' : 'c', cp1x, cp1y, cp2x, cp2y, x, y)
+						lastControlPoint = [cp2x, cp2y]
+						break
+					}
+					case 'S': {
+						const [cp2x, cp2y, x, y] = getNums(4)
+						let cp1x = cp2x, cp1y = cp2y
+						path.push(isRelative ? 'cr' : 'c', cp1x, cp1y, cp2x, cp2y, x, y)
+						lastControlPoint = [cp2x, cp2y]
+						break
+					}
+					case 'Q': {
+						const [cpx, cpy, x, y] = getNums(4)
+						path.push(isRelative ? 'qr' : 'q', cpx, cpy, x, y)
+						lastControlPoint = [cpx, cpy]
+						break
+					}
+					case 'T': {
+						const [x, y] = getNums(2)
+						let cpx = lastControlPoint ? lastControlPoint[0] : 0
+						let cpy = lastControlPoint ? lastControlPoint[1] : 0
+						path.push(isRelative ? 'qr' : 'q', cpx, cpy, x, y)
+						break
+					}
+					case 'A': {
+						const [rx, ry, xAxisRot, largeArc, sweep, x, y] = getNums(7)
+						path.push(isRelative ? 'lr' : 'l', x, y)
+						break
+					}
+					case 'Z': {
+						break
+					}
+				}
+			}
+			return path
+		}
 
-            switch (tagName) {
-                case 'path': {
-                    const d = element.getAttribute('d')
-                    pathData = parsePathData(d)
-                    break
-                }
-                case 'circle': {
-                    const cx = parseFloat(element.getAttribute('cx')) || 0
-                    const cy = parseFloat(element.getAttribute('cy')) || 0
-                    const r = parseFloat(element.getAttribute('r')) || 0
-                    const k = 0.5522847498
-                    pathData = [
-                        'm', cx + r, cy,
-                        'c', cx + r, cy + r * k, cx + r * k, cy + r, cx, cy + r,
-                        'c', cx - r * k, cy + r, cx - r, cy + r * k, cx - r, cy,
-                        'c', cx - r, cy - r * k, cx - r * k, cy - r, cx, cy - r,
-                        'c', cx + r * k, cy - r, cx + r, cy - r * k, cx + r, cy
-                    ]
-                    break
-                }
-                case 'ellipse': {
-                    const cx = parseFloat(element.getAttribute('cx')) || 0
-                    const cy = parseFloat(element.getAttribute('cy')) || 0
-                    const rx = parseFloat(element.getAttribute('rx')) || 0
-                    const ry = parseFloat(element.getAttribute('ry')) || 0
-                    const k = 0.5522847498
-                    pathData = [
-                        'm', cx + rx, cy,
-                        'c', cx + rx, cy + ry * k, cx + rx * k, cy + ry, cx, cy + ry,
-                        'c', cx - rx * k, cy + ry, cx - rx, cy + ry * k, cx - rx, cy,
-                        'c', cx - rx, cy - ry * k, cx - rx * k, cy - ry, cx, cy - ry,
-                        'c', cx + rx * k, cy - ry, cx + rx, cy - ry * k, cx + rx, cy
-                    ]
-                    break
-                }
-                case 'rect': {
-                    const x = parseFloat(element.getAttribute('x')) || 0
-                    const y = parseFloat(element.getAttribute('y')) || 0
-                    const w = parseFloat(element.getAttribute('width')) || 0
-                    const h = parseFloat(element.getAttribute('height')) || 0
-                    const rx = parseFloat(element.getAttribute('rx')) || 0
-                    const ry = parseFloat(element.getAttribute('ry')) || rx
-                    
-                    if (rx > 0 || ry > 0) {
-                        const k = 0.5522847498
-                        pathData = [
-                            'm', x + rx, y,
-                            'l', x + w - rx, y,
-                            'c', x + w, y, x + w, y + ry * k, x + w, y + ry,
-                            'l', x + w, y + h - ry,
-                            'c', x + w, y + h, x + w - rx * k, y + h, x + w - rx, y + h,
-                            'l', x + rx, y + h,
-                            'c', x, y + h, x, y + h - ry * k, x, y + h - ry,
-                            'l', x, y + ry,
-                            'c', x, y, x + rx * k, y, x + rx, y
-                        ]
-                    } else {
-                        pathData = [
-                            'm', x, y,
-                            'l', x + w, y,
-                            'l', x + w, y + h,
-                            'l', x, y + h,
-                            'l', x, y
-                        ]
-                    }
-                    break
-                }
-                case 'line': {
-                    const x1 = parseFloat(element.getAttribute('x1')) || 0
-                    const y1 = parseFloat(element.getAttribute('y1')) || 0
-                    const x2 = parseFloat(element.getAttribute('x2')) || 0
-                    const y2 = parseFloat(element.getAttribute('y2')) || 0
-                    pathData = ['m', x1, y1, 'l', x2, y2]
-                    break
-                }
-                case 'polygon':
-                case 'polyline': {
-                    const points = element.getAttribute('points')
-                    if (points) {
-                        const pointPairs = points.trim().split(/[\s,]+/).map(parseFloat)
-                        if (pointPairs.length >= 2) {
-                            pathData = ['m', pointPairs[0], pointPairs[1]]
-                            for (let i = 2; i < pointPairs.length; i += 2) {
-                                pathData.push('l', pointPairs[i], pointPairs[i + 1])
-                            }
-                            if (tagName === 'polygon') {
-                                pathData.push('l', pointPairs[0], pointPairs[1])
-                            }
-                        }
-                    }
-                    break
-                }
-            }
-            return pathData
-        }
+		// --- ELEMENT CONVERTER ---
+		const convertElementToPath = (element) => {
+			const tagName = element.tagName.toLowerCase()
+			let pathData = []
 
-        // Process all path-containing elements
-        const svgElements = svgDoc.querySelectorAll('path, circle, rect, ellipse, line, polygon, polyline')
-        
-        svgElements.forEach((element) => {
-            const pathData = convertElementToPath(element)
-            if (pathData.length > 0) {
-                const path2d = new Path2d().path(pathData).fn(fn)
-                path2dObjects.push(path2d)
-            }
-        })
+			switch (tagName) {
+				case 'path': {
+					const d = element.getAttribute('d')
+					pathData = parsePathData(d)
+					break
+				}
+				case 'circle': {
+					const cx = parseFloat(element.getAttribute('cx')) || 0
+					const cy = parseFloat(element.getAttribute('cy')) || 0
+					const r = parseFloat(element.getAttribute('r')) || 0
+					const k = 0.5522847498
+					pathData = [
+						'm', cx + r, cy,
+						'c', cx + r, cy + r * k, cx + r * k, cy + r, cx, cy + r,
+						'c', cx - r * k, cy + r, cx - r, cy + r * k, cx - r, cy,
+						'c', cx - r, cy - r * k, cx - r * k, cy - r, cx, cy - r,
+						'c', cx + r * k, cy - r, cx + r, cy - r * k, cx + r, cy
+					]
+					break
+				}
+				case 'ellipse': {
+					const cx = parseFloat(element.getAttribute('cx')) || 0
+					const cy = parseFloat(element.getAttribute('cy')) || 0
+					const rx = parseFloat(element.getAttribute('rx')) || 0
+					const ry = parseFloat(element.getAttribute('ry')) || 0
+					const k = 0.5522847498
+					pathData = [
+						'm', cx + rx, cy,
+						'c', cx + rx, cy + ry * k, cx + rx * k, cy + ry, cx, cy + ry,
+						'c', cx - rx * k, cy + ry, cx - rx, cy + ry * k, cx - rx, cy,
+						'c', cx - rx, cy - ry * k, cx - rx * k, cy - ry, cx, cy - ry,
+						'c', cx + rx * k, cy - ry, cx + rx, cy - ry * k, cx + rx, cy
+					]
+					break
+				}
+				case 'rect': {
+					const x = parseFloat(element.getAttribute('x')) || 0
+					const y = parseFloat(element.getAttribute('y')) || 0
+					const w = parseFloat(element.getAttribute('width')) || 0
+					const h = parseFloat(element.getAttribute('height')) || 0
+					const rx = parseFloat(element.getAttribute('rx')) || 0
+					const ry = parseFloat(element.getAttribute('ry')) || rx
 
-        if (typeof PrintLog !== 'undefined') PrintLog(`Successfully loaded SVG from ${filePath}, found ${path2dObjects.length} path(s)`)
-        else console.log(`Successfully loaded SVG from ${filePath}, found ${path2dObjects.length} path(s)`)
-        
-        return path2dObjects
-    } catch (error) {
-        if (typeof PrintError !== 'undefined') PrintError('SVG loading error:', error)
-        else console.error('SVG loading error:', error)
-        throw error
-    }
+					if (rx > 0 || ry > 0) {
+						const k = 0.5522847498
+						pathData = [
+							'm', x + rx, y,
+							'l', x + w - rx, y,
+							'c', x + w, y, x + w, y + ry * k, x + w, y + ry,
+							'l', x + w, y + h - ry,
+							'c', x + w, y + h, x + w - rx * k, y + h, x + w - rx, y + h,
+							'l', x + rx, y + h,
+							'c', x, y + h, x, y + h - ry * k, x, y + h - ry,
+							'l', x, y + ry,
+							'c', x, y, x + rx * k, y, x + rx, y
+						]
+					} else {
+						pathData = [
+							'm', x, y,
+							'l', x + w, y,
+							'l', x + w, y + h,
+							'l', x, y + h,
+							'l', x, y
+						]
+					}
+					break
+				}
+				case 'line': {
+					const x1 = parseFloat(element.getAttribute('x1')) || 0
+					const y1 = parseFloat(element.getAttribute('y1')) || 0
+					const x2 = parseFloat(element.getAttribute('x2')) || 0
+					const y2 = parseFloat(element.getAttribute('y2')) || 0
+					pathData = ['m', x1, y1, 'l', x2, y2]
+					break
+				}
+				case 'polygon':
+				case 'polyline': {
+					const points = element.getAttribute('points')
+					if (points) {
+						const pointPairs = points.trim().split(/[\s,]+/).map(parseFloat)
+						if (pointPairs.length >= 2) {
+							pathData = ['m', pointPairs[0], pointPairs[1]]
+							for (let i = 2; i < pointPairs.length; i += 2) {
+								pathData.push('l', pointPairs[i], pointPairs[i + 1])
+							}
+							if (tagName === 'polygon') {
+								pathData.push('l', pointPairs[0], pointPairs[1])
+							}
+						}
+					}
+					break
+				}
+			}
+			return pathData
+		}
+
+		// Process all path-containing elements
+		const svgElements = svgDoc.querySelectorAll('path, circle, rect, ellipse, line, polygon, polyline')
+
+		svgElements.forEach((element) => {
+				const pathData = convertElementToPath(element)
+				if (pathData.length > 0) {
+					const path2d = new Path2d().path(pathData).fn(fn)
+					path2dObjects.push(path2d)
+				}
+			})
+
+		if (typeof PrintLog !== 'undefined') PrintLog(`Successfully loaded SVG from ${filePath}, found ${path2dObjects.length} path(s)`)
+		else console.log(`Successfully loaded SVG from ${filePath}, found ${path2dObjects.length} path(s)`)
+
+		return path2dObjects
+	} catch (error) {
+		if (typeof PrintError !== 'undefined') PrintError('SVG loading error:', error)
+		else console.error('SVG loading error:', error)
+		throw error
+	}
 }
 
 /**

@@ -5,7 +5,6 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
         <title>CSG Editor - Mobile</title>
         <style>
-            /* ========== MATERIAL ICONS FONT ========== */
             @font-face {
                 font-family: 'Material Icons';
                 font-style: normal;
@@ -79,7 +78,7 @@
 
             #code-panel, #editor-code-panel, #help-panel {
                 background: #1e1e1e; color: #f8f8f8;
-                display: flex; /* ✅ Changed to flex to stack tabs and editor */
+                display: flex;
                 flex-direction: column;
             }
 
@@ -130,6 +129,68 @@
                 max-width: 100%; max-height: 100%;
             }
 
+            .alert-modal-overlay {
+                position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+                background: rgba(0,0,0,0.75); display: none;
+                justify-content: center; align-items: center; z-index: 20000;
+                animation: fadeIn 0.2s ease-out;
+            }
+            @keyframes fadeIn {
+                from { opacity: 0; }
+                to { opacity: 1; }
+            }
+            .alert-modal {
+                background: #282c34; border-radius: 8px; padding: 24px;
+                max-width: 90%; max-height: 80vh; min-width: 300px;
+                box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+                display: flex; flex-direction: column; gap: 16px;
+                animation: slideIn 0.25s ease-out;
+                border-left: 6px solid #6c757d;
+            }
+            @keyframes slideIn {
+                from { transform: translateY(-20px); opacity: 0; }
+                to { transform: translateY(0); opacity: 1; }
+            }
+            .alert-modal.success { border-left-color: #28a745; }
+            .alert-modal.error { border-left-color: #dc3545; }
+            .alert-modal.warning { border-left-color: #ffc107; }
+            .alert-modal.info { border-left-color: #17a2b8; }
+            
+            .alert-modal-header {
+                display: flex; align-items: center; gap: 12px;
+                font-size: 1.2em; font-weight: 600;
+            }
+            .alert-modal-icon { font-size: 1.5em; }
+            .alert-modal.success .alert-modal-header { color: #28a745; }
+            .alert-modal.error .alert-modal-header { color: #dc3545; }
+            .alert-modal.warning .alert-modal-header { color: #ffc107; }
+            .alert-modal.info .alert-modal-header { color: #17a2b8; }
+            
+            .alert-modal-body {
+                color: #e6e6e6; line-height: 1.6;
+                white-space: pre-wrap; word-break: break-word;
+                max-height: 50vh; overflow-y: auto;
+                font-size: 0.95em;
+            }
+            .alert-modal-footer {
+                display: flex; justify-content: flex-end; gap: 10px;
+                margin-top: 8px;
+            }
+            .alert-modal-btn {
+                padding: 10px 20px; border: none; border-radius: 5px;
+                cursor: pointer; font-size: 0.95em; font-weight: 500;
+                transition: all 0.2s;
+            }
+            .alert-modal-btn.success { background: #28a745; color: white; }
+            .alert-modal-btn.success:hover { background: #218838; }
+            .alert-modal-btn.error { background: #dc3545; color: white; }
+            .alert-modal-btn.error:hover { background: #c82333; }
+            .alert-modal-btn.warning { background: #ffc107; color: #000; }
+            .alert-modal-btn.warning:hover { background: #e0a800; }
+            .alert-modal-btn.info { background: #17a2b8; color: white; }
+            .alert-modal-btn.info:hover { background: #138496; }
+            .alert-modal-btn:active { transform: scale(0.96); }
+
             #console-container {
                 position: fixed; left: 0; right: 0; bottom: 0;
                 height: 180px; display: flex; flex-direction: column;
@@ -154,18 +215,17 @@
                 margin-top: 4px; white-space: pre-wrap;
             }
 
-            /* ========================================== */
-            /* === ✅ NEW: OPTTEXT TAB BAR STYLES === */
-            /* ========================================== */
             .tab-bar {
-                display: flex;
+                display: none;
                 background: #252526;
                 border-bottom: 1px solid #3e4451;
                 overflow-x: auto;
-                height: 35px;
                 min-height: 35px;
                 align-items: center;
                 padding: 0 5px;
+            }
+            .tab-bar.has-tabs {
+                display: flex;
             }
             .tab {
                 padding: 6px 12px;
@@ -206,7 +266,40 @@
             }
             .tab-close:hover { opacity: 1; color: #dc3545; }
             
-            /* Ensure optText fills the remaining space below the tab bar */
+            .path-bar {
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                background: #2d2d2d;
+                border-bottom: 1px solid #3e4451;
+                padding: 4px 10px;
+                min-height: 26px;
+                font-family: 'Consolas', 'Monaco', monospace;
+                font-size: 12px;
+                color: #858585;
+                overflow: hidden;
+            }
+            .path-bar .material-icon {
+                font-size: 14px;
+                color: #6c757d;
+                flex-shrink: 0;
+            }
+            .path-bar .path-text {
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                flex: 1;
+                direction: rtl;
+                text-align: left;
+            }
+            .path-bar .path-text.has-path {
+                color: #b0b0b0;
+            }
+            .path-bar .path-text.no-path {
+                color: #6c757d;
+                font-style: italic;
+            }
+
             opttext {
                 flex: 1;
                 width: 100%;
@@ -230,76 +323,72 @@
     </head>
     <body>
         <div id="toolbar">
-            <!-- 3D View - Primary Blue -->
             <button id="btn-3d" title="3D View" data-view="3d">
                 <span class="material-icon" style="color: #007bff" aria-hidden="true">visibility</span>
             </button>
             <div class="toolbar-separator"></div>
             
-            <!-- Wireframe Toggle - Secondary Gray -->
             <button id="btn-wireframe" title="Toggle Wireframe" style="display: none" data-view="wireframe">
                 <span class="material-icon" style="color: #6c757d" aria-hidden="true">grid_on</span>
             </button>
             <div class="toolbar-separator" id="separator-wireframe" style="display: none"></div>
             
-            <!-- CSG Code Editor - Primary Blue -->
             <button id="btn-code" title="CSG Code Editor" data-view="code">
                 <span class="material-icon" style="color: #007bff" aria-hidden="true">code</span>
             </button>
             <div class="toolbar-separator"></div>
             
-            <!-- Editor Code - Secondary Gray -->
             <button id="btn-editor-code" title="Editor Code" data-view="editor-code">
                 <span class="material-icon" style="color: #6c757d" aria-hidden="true">source</span>
             </button>
             <div class="toolbar-separator"></div>
             
-            <!-- Clear Current Cache - Destructive Red -->
             <button id="btn-clear-cache-by-name" style="display: none" title="Clear Current Cache" data-view="clear-cache">
                 <span class="material-icon" style="color: #dc3545" aria-hidden="true">delete_outline</span>
             </button>
             <div class="toolbar-separator" id="separator-clear-cache" style="display: none"></div>
             
-            <!-- Settings - Secondary Gray -->
             <button id="btn-settings" title="Settings" data-view="settings">
                 <span class="material-icon" style="color: #6c757d" aria-hidden="true">settings</span>
             </button>
             <div class="toolbar-separator"></div>
             
-            <!-- Load Project - Directory Amber -->
             <button id="btn-load" title="Load Project" data-view="load">
                 <span class="material-icon" style="color: #ffc107" aria-hidden="true">upload_file</span>
             </button>
             <div class="toolbar-separator"></div>
             
-            <!-- Save Project - Warning Orange -->
             <button id="btn-save" title="Save Project" data-view="save">
                 <span class="material-icon" style="color: #fd7e14" aria-hidden="true">save</span>
             </button>
             <div class="toolbar-separator"></div>
             
-            <!-- Help - Secondary Gray -->
             <button id="btn-help" title="Help" data-view="help">
                 <span class="material-icon" style="color: #6c757d" aria-hidden="true">help</span>
             </button>
             <div class="toolbar-separator"></div>
             
-            <!-- Clear Console - Destructive Red -->
             <button id="btn-clear-console" title="Clear Console" data-view="clear-console">
                 <span class="material-icon" style="color: #dc3545" aria-hidden="true">delete_sweep</span>
             </button>
         </div>
 
         <div id="main-container">
-            <!-- ✅ UPDATED: CSG Code Panel with Tab Bar and onrun attribute -->
             <div id="code-panel">
                 <div id="csg-tabs" class="tab-bar"></div>
+                <div id="csg-path-bar" class="path-bar">
+                    <span class="material-icon" aria-hidden="true">folder_open</span>
+                    <span id="csg-path-text" class="path-text no-path">No project loaded</span>
+                </div>
                 <opttext id="csg-code" onrun="runCSGCode" extensions='["searchTool", "beautifyCode", "selectBracket", "pagesManager", "autoIndent", "run"]'></opttext>
             </div>
 
-            <!-- ✅ UPDATED: Editor Code Panel with Tab Bar and onrun attribute -->
             <div id="editor-code-panel">
                 <div id="editor-code-tabs" class="tab-bar"></div>
+                <div id="editor-code-path-bar" class="path-bar">
+                    <span class="material-icon" aria-hidden="true">folder_open</span>
+                    <span id="editor-code-path-text" class="path-text no-path">No project loaded</span>
+                </div>
                 <opttext id="editor-code" onrun="runEditorScript" extensions='["searchTool", "beautifyCode", "selectBracket", "pagesManager", "autoIndent", "run"]'></opttext>
             </div>
 
@@ -357,12 +446,24 @@
             </div>
         </div>
 
+        <div id="alert-modal-overlay" class="alert-modal-overlay">
+            <div id="alert-modal" class="alert-modal">
+                <div class="alert-modal-header">
+                    <span id="alert-modal-icon" class="material-icon alert-modal-icon"></span>
+                    <span id="alert-modal-title"></span>
+                </div>
+                <div id="alert-modal-body" class="alert-modal-body"></div>
+                <div class="alert-modal-footer">
+                    <button id="alert-modal-btn" class="alert-modal-btn">OK</button>
+                </div>
+            </div>
+        </div>
+
         <div id="console-container" aria-live="polite">
             <div id="console-resizer" title="Drag to resize console"></div>
             <div id="console-panel"></div>
         </div>
 
-        <!-- ✅ UPDATED: Swapped textCode.js for optText.js and added the registry -->
         <script type="module" src="/system/ux/optText/optText.js"></script>
         <script type="module" src="/system/ux/optText/optTextAdditionsRegistry.js"></script>
         <script type="module" src="/system/ux/filePicker.js"></script>
@@ -374,13 +475,58 @@
                 initialize, runCSGCode, runEditorScript,
                 handleLoadFile, handleSaveFile, handleSaveStl,
                 exportSTL, clearAllCache, clearCurrentCacheByName,
-                toggleWireframe
+                toggleWireframe, updatePathBars
             } from 'editorCsg'
 
             globalThis.settings = {}
             let currentObjects, domElements, renderer, scene, groupItems, camera, controls
             let keyLight, ambientLight, originLine, buildPlateGrid = null, buildPlateBox = null
-            let currentView = '3d' // ✅ Track current view state
+            let currentView = '3d'
+
+            const ALERT_CONFIGS = {
+                success: { icon: 'check_circle', title: 'Success', btnClass: 'success' },
+                error: { icon: 'error', title: 'Error', btnClass: 'error' },
+                warning: { icon: 'warning', title: 'Warning', btnClass: 'warning' },
+                info: { icon: 'info', title: 'Info', btnClass: 'info' }
+            }
+
+            window.showAlert = function(message, type = 'info') {
+                const config = ALERT_CONFIGS[type] || ALERT_CONFIGS.info
+                const overlay = document.getElementById('alert-modal-overlay')
+                const modal = document.getElementById('alert-modal')
+                const icon = document.getElementById('alert-modal-icon')
+                const title = document.getElementById('alert-modal-title')
+                const body = document.getElementById('alert-modal-body')
+                const btn = document.getElementById('alert-modal-btn')
+
+                modal.className = 'alert-modal ' + type
+                icon.textContent = config.icon
+                title.textContent = config.title
+                body.textContent = message
+                btn.className = 'alert-modal-btn ' + config.btnClass
+                btn.textContent = 'OK'
+
+                overlay.style.display = 'flex'
+
+                const close = () => {
+                    overlay.style.display = 'none'
+                    btn.removeEventListener('click', close)
+                    overlay.removeEventListener('click', handleOverlayClick)
+                    document.removeEventListener('keydown', handleEsc)
+                }
+                const handleOverlayClick = (e) => {
+                    if (e.target === overlay) close()
+                }
+                const handleEsc = (e) => {
+                    if (e.key === 'Escape') close()
+                }
+
+                btn.addEventListener('click', close)
+                overlay.addEventListener('click', handleOverlayClick)
+                document.addEventListener('keydown', handleEsc)
+
+                setTimeout(() => btn.focus(), 100)
+            }
 
             window.openModal = (id) => document.getElementById(id).style.display = 'flex'
             window.closeModal = (id) => document.getElementById(id).style.display = 'none'
@@ -489,13 +635,20 @@
                     dom.btn3D.style.backgroundColor = 'rgba(231,76,60,0.3)'
                     dom.btnWireframe.style.display = 'block'
                     dom.separatorWireframe.style.display = 'block'
+                    
+                    // ✅ Refresh the 3D rendering when switching to 3D view
+                    // Use requestAnimationFrame to ensure the panel is fully rendered before resizing
+                    requestAnimationFrame(() => {
+                        resizeRenderer()
+                        renderer.render(scene, camera)
+                    })
                 } else if (id === 'code') {
-                    dom.codePanel.style.display = 'flex' // ✅ Changed to flex to respect tab bar layout
+                    dom.codePanel.style.display = 'flex'
                     dom.btnCode.style.backgroundColor = 'rgba(231,76,60,0.3)'
                     dom.btnClearCacheByName.style.display = 'block'
                     dom.separatorClearCache.style.display = 'block'
                 } else if (id === 'editor-code') {
-                    dom.editorCodePanel.style.display = 'flex' // ✅ Changed to flex to respect tab bar layout
+                    dom.editorCodePanel.style.display = 'flex'
                     dom.btnEditorCode.style.backgroundColor = 'rgba(231,76,60,0.3)'
                     dom.btnClearCacheByName.style.display = 'block'
                     dom.separatorClearCache.style.display = 'block'
@@ -507,7 +660,7 @@
                     dom.btnHelp.style.backgroundColor = 'rgba(231,76,60,0.3)'
                 }
                 
-                currentView = id // ✅ Update current view state
+                currentView = id
             }
 
             function saveSettings(domElements) {
@@ -517,7 +670,7 @@
                 const newLibraryPath = domElements.libraryPathInput.value
                 if (isNaN(newWidth) || newWidth <= 0 || isNaN(newLength) || newLength <= 0 ||
                     isNaN(newGridSize) || newGridSize <= 0) {
-                    alert('Please enter valid positive numbers for all settings.')
+                    showAlert('Please enter valid positive numbers for all settings.', 'error')
                     return
                 }
                 settings.plateWidth = newWidth
@@ -527,7 +680,7 @@
                 settings.exportFormat = domElements.exportStlRadio.checked ? 'stl' : 'glb'
                 localStorage.setItem('csg-editor-settings', JSON.stringify(settings))
                 createBuildPlate()
-                alert('Settings saved successfully!')
+                showAlert('Settings saved successfully!', 'success')
             }
 
             window.onload = function () {
@@ -594,7 +747,6 @@
                 document.getElementById('btn-wireframe').addEventListener('click', toggleWireframe)
                 domElements.btnHelp.addEventListener('click', () => showView('help'))
 
-                // ✅ FIXED: Save button now uses currentView state instead of color comparison
                 domElements.btnSave.addEventListener('click', () => {
                     if (currentView === 'code' || currentView === 'editor-code') {
                         openModal('save-code-modal')

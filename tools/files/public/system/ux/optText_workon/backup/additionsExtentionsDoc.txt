@@ -1,0 +1,213 @@
+================================================================================
+                 optText BUILT-IN ADDITION EXTENSIONS DOCUMENTATION
+================================================================================
+
+OVERVIEW
+--------
+optText includes a modular "Addition" (extension) system. Several useful 
+extensions are provided out-of-the-box and registered automatically via 
+`optTextAdditionsRegistry.js`. 
+
+This document details each built-in extension, its features, configuration 
+options (including disable/hide states), and how to use them.
+
+================================================================================
+1. AUTO INDENT (`autoIndent`)
+================================================================================
+Type: Background / Auto-Init (No UI button)
+Description: Automatically calculates and applies the correct indentation level 
+when the user presses the "Enter" key.
+
+Features:
+- Analyzes the current line's leading tabs.
+- Counts open `{`, `[`, `(` and closed `}`, `]`, `)` brackets to adjust the 
+  indent level for the new line.
+- Decrements the indent level if the new line starts with a closing bracket.
+- Seamlessly integrates with the editor's history (undo/redo).
+
+Usage:
+Loaded automatically. No UI configuration or state management required.
+
+================================================================================
+2. BEAUTIFY CODE (`beautifyCode`)
+================================================================================
+Type: Dropdown Menu Item (Activates Custom Tool UI)
+Description: A lightweight, built-in code formatter that adjusts indentation 
+based on bracket nesting, while respecting strings and multi-line comments.
+
+UI Location: Appears in the main dropdown menu as "✨ Beautify Code".
+
+Features:
+- Iterates through all lines and applies tab-based indentation.
+- Decreases indent level when a line starts with `}`, `]`, or `)`.
+- Increases indent level when encountering `{`, `[`, or `(`.
+- Ignores bracket counting inside strings (`'`, `"`, `` ` ``) and 
+  multi-line comments (`/* ... */`).
+- Preserves the user's cursor position after formatting.
+
+State Configuration:
+- HTML Attribute (Disable): `beautifycode-disabled="true"`
+- JS Property (Disable): `editor.beautifyCodeDisabled = true`
+- HTML Attribute (Hide): `beautifycode-hidden="true"`
+- JS Property (Hide): `editor.beautifyCodeHidden = true`
+
+================================================================================
+3. PAGES MANAGER (`pagesManager`)
+================================================================================
+Type: Static Toolbar Button (Expands to Custom Tool UI)
+Description: A comprehensive tab/page management system that allows users to 
+navigate, rename, create, and delete multiple contexts (files/pages) directly 
+from the toolbar.
+
+UI Location: A document icon button in the main toolbar.
+
+Custom Toolbar UI Features:
+- ◀ Previous Page / ▶ Next Page: Navigate or create new pages.
+- 📋 Dropdown: Opens a global, overflow-safe dropdown list of all pages.
+- 📝 Title Input: Editable text field that updates the current page's name.
+- 🗑️ Delete Page: Opens a confirmation modal before removing the current page.
+
+Custom Instance API Additions:
+This extension dynamically adds powerful properties to the main `optText` 
+container instance:
+1. `editor.pages` (Getter/Setter): 
+   - GET: Returns `[{ title: 'Page 1', content: '...' }]`
+   - SET: Accepts an array of page objects to replace all contexts.
+2. `editor.pageIndex` (Getter/Setter): 
+   - GET: Returns the integer index of the currently active page.
+   - SET: Switches to the page at the specified index.
+3. `editor.onpagechange` (Getter/Setter): 
+   - SET: Assign a callback function. Receives `{ pageIndex, title, content }`.
+
+State Configuration:
+- HTML Attribute (Disable): `pagesmanager-disabled="true"`
+- JS Property (Disable): `editor.pagesManagerDisabled = true`
+- HTML Attribute (Hide): `pagesmanager-hidden="true"`
+- JS Property (Hide): `editor.pagesManagerHidden = true`
+
+================================================================================
+4. SAVE BUTTON (`saveButton`)
+================================================================================
+Type: Static Toolbar Button
+Description: Provides a dedicated "Save" button (💾) in the toolbar that 
+triggers a developer-defined callback function.
+
+Features:
+- Executes a custom function when clicked.
+- Integrates with the universal state management system.
+
+Custom Instance API Additions:
+- `editor.onSave` (Getter/Setter): The function to execute when clicked. 
+  Receives the `editor` instance as its first argument.
+- HTML Attribute Mapping: You can define the save logic directly in HTML using 
+  the `onsave` attribute, which will be parsed and assigned to `editor.onSave`.
+
+State Configuration:
+- HTML Attribute (Disable): `savebutton-disabled="true"`
+- JS Property (Disable): `editor.saveButtonDisabled = true`
+- HTML Attribute (Hide): `savebutton-hidden="true"`
+- JS Property (Hide): `editor.saveButtonHidden = true`
+
+Usage Example (HTML):
+  <opttext id="my-editor" onsave="handleMySave"></opttext>
+  <script>
+    function handleMySave(editorInstance) {
+      console.log("Saving content:", editorInstance.value);
+    }
+  </script>
+
+================================================================================
+5. SEARCH TOOL (`searchTool`)
+================================================================================
+Type: Dropdown Menu Item (Activates Custom Tool UI)
+Description: A find-in-document tool that allows users to search for text, 
+navigate between matches, and see the total match count.
+
+UI Location: Appears in the main dropdown menu as "🔍 Search".
+
+Custom Toolbar UI Features (when activated):
+- 🔍 Input Field: Type to search (debounced at 150ms for performance).
+- ↑ Previous / ↓ Next Match: Jumps between occurrences.
+- Counter: Displays "Current/Total" (e.g., "2/5") or "0/0" if no matches.
+
+Features:
+- Case-insensitive search.
+- Automatically sets the cursor and scrolls the viewport to the active match.
+- Pressing "Enter" jumps to the next match; "Escape" closes the tool.
+
+*(Note: This extension does not include disable/hide state configurations in 
+the source code, as it is intended to be universally available via the menu).*
+
+================================================================================
+6. SELECT BRACKET (`selectBracket`)
+================================================================================
+Type: Static Toolbar Button
+Description: A utility tool that automatically selects the content inside a 
+pair of matching brackets, supporting nested structures and multi-line selections.
+
+UI Location: A bracket icon button (`< >`) in the main toolbar.
+
+Features:
+- Detects if the cursor is immediately before or after a bracket character 
+  (`{`, `[`, `(`, `<`, `}`, `]`, `)`, `>`).
+- Intelligently scans forward or backward to find the exact matching 
+  closing/opening bracket, accurately accounting for nested brackets.
+- Automatically highlights the text *between* the brackets.
+- Scrolls the viewport to ensure the new selection is visible.
+- Provides user feedback via toast notifications.
+
+State Configuration:
+- HTML Attribute (Disable): `selectbracket-disabled="true"`
+- JS Property (Disable): `editor.selectBracketDisabled = true`
+- HTML Attribute (Hide): `selectbracket-hidden="true"`
+- JS Property (Hide): `editor.selectBracketHidden = true`
+
+================================================================================
+MANAGING EXTENSIONS
+================================================================================
+
+By default, if you import `optTextAdditionsRegistry.js`, all extensions are 
+registered. You can control which ones are active per instance:
+
+1. Via JavaScript Initialization:
+   const editor = newOptText('#el', {
+     extensions: ['saveButton', 'pagesManager'] // Only load these two
+   });
+
+2. Via HTML Attribute:
+   <opttext extensions='["searchTool", "autoIndent"]'></opttext>
+
+3. Reactively at Runtime:
+   // This will dynamically inject 'beautifyCode' and remove others
+   editor.extensions = ['beautifyCode']; 
+
+================================================================================
+CREATING CUSTOM EXTENSIONS (Template)
+================================================================================
+
+To create your own extension, use the `additionManager`:
+
+  import { additionManager } from './system/ux/optTextAdditions.js';
+
+  additionManager.register({
+    id: 'myCustomTool',
+    isStaticToolbarButton: true, // Optional: renders directly in toolbar
+    
+    toolbarButton: {
+      label: 'My Tool',
+      icon: '🚀', // Can be emoji or SVG string
+      action: (api, container) => {
+        api.ui.toast('Hello from my custom tool!');
+      }
+    },
+    
+    // Optional: Add reactive state control (Disable/Hide)
+    stateConfig: {
+      disabled: { attribute: 'mycustomtool-disabled', property: 'myCustomToolDisabled' },
+      hidden: { attribute: 'mycustomtool-hidden', property: 'myCustomToolHidden' }
+    }
+  });
+
+================================================================================
+End of Extensions Documentation
+================================================================================

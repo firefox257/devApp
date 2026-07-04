@@ -1,0 +1,160 @@
+// ww-thread.js
+
+export class WWThread {
+    static _idCounter = 1;
+    static _workerBlobUrl = null;
+
+    // Creates a generic worker that can execute any passed function string
+    static _getWorkerUrl() {
+        if (!WWThread._workerBlobUrl) {
+            const workerCode = `
+                self.onmessage = async function(e) {
+                    const { taskId, funcStr, args } = e.data;
+                    try {
+                        // Reconstruct the function from its string representation
+                        // Note: Closures are NOT preserved. The function must be self-contained.
+                        const func = (0, eval)('(' + funcStr + ')');
+                        
+                        // Execute the function (supports async/await)
+                        const result = await func(...args);
+                        
+                        // Post result back to the main thread
+                        self.postMessage({ taskId, type: 'resolve', result });
+                    } catch (err) {
+                        self.postMessage({ taskId, type: 'reject', error: err.message, stack: err.stack });
+                    }
+                };
+            `;
+            const blob = new Blob([workerCode], { type: 'application/javascript' });
+            WWThread._workerBlobUrl = URL.createObjectURL(blob);
+        }
+        return WWThread._workerBlobUrl;
+    }
+
+    /**
+     * Constructs and immediately starts a new thread.
+     * Mimics: std::thread::thread(Function&& f, Args&&... args);
+     */
+    constructor(task, ...args) {
+        this._id = WWThread._idCounter++;
+        this._joinable = true;
+        this._detached = false;
+        
+        // Serialize the function to a string to pass to the Worker
+        const funcStr = task.toString();
+        
+        // Spin up the underlying Web Worker
+        this._worker = new Worker(WWThread._getWorkerUrl());
+        
+        // Create a Promise to handle the async "join"
+        this._promise = new Promise((resolve, reject) => {
+            this._resolve = resolve;
+            this._reject = reject;
+        });
+
+        // Listen for messages from the thread
+        this._worker.onmessage = (e) => {
+            const { taskId, type, result, error } = e.data;
+            if (taskId !== this._id) return; // Safety check
+
+            if (type === 'resolve') {
+                this._resolve(result);
+            } else if (type === 'reject') {
+                this._reject(new Error(error));
+            }
+        };
+
+        this._worker.onerror = (e) => {
+            this._reject(new Error(e.message || 'Worker fatal error'));
+        };
+
+        // Send the task to the thread to begin execution immediately
+        this._worker.postMessage({
+            taskId: this._id,
+            funcStr: funcStr,
+            args: args
+        });
+    }
+
+    /**
+     * Waits for the thread to finish execution.
+     * Mimics: std::thread::join()
+     * Note: In JS, we return a Promise instead of blocking the main UI thread.
+     */
+    async join() {
+        if (!this._joinable) {
+            throw new Error("WWThread is not joinable (already joined or detached)");
+        }
+        this._joinable = false;
+        
+        try {
+            const result = await this._promise;
+            this._worker.terminate(); // Clean up the OS thread
+            return result;
+        } catch (err) {
+            this._worker.terminate();
+            throw err;
+        }
+    }
+
+    /**
+     * Detaches the thread. It will run in the background and clean itself up.
+     * Mimics: std::thread::detach()
+     */
+    detach() {
+        if (!this._joinable) {
+            throw new Error("WWThread is not joinable");
+        }
+        this._joinable = false;
+        this._detached = true;
+        
+        // Fire-and-forget: terminate the worker automatically when the promise settles
+        this._promise.finally(() => {
+            this._worker.terminate();
+        });
+    }
+
+    /**
+     * Checks if the thread is active and can be joined.
+     * Mimics: std::thread::joinable()
+     */
+    joinable() {
+        return this._joinable;
+    }
+
+    /**
+     * Returns the unique ID of the thread.
+     * Mimics: std::thread::get_id()
+     */
+    get_id() {
+        return this._id;
+    }
+
+    /**
+     * Returns the number of concurrent threads supported by the hardware.
+     * Mimics: std::thread::hardware_concurrency()
+     */
+    static hardware_concurrency() {
+        return navigator.hardwareConcurrency || 4;
+    }
+
+    // ==========================================
+    // std::this_thread equivalents
+    // ==========================================
+    
+    /**
+     * Sleeps the current thread for ms milliseconds.
+     * Mimics: std::this_thread::sleep_for()
+     */
+    static sleep(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    /**
+     * Yields the current thread's time slice.
+     * Mimics: std::this_thread::yield()
+     */
+    static yield() {
+        return new Promise(resolve => setTimeout(resolve, 0));
+    }
+}
