@@ -9,13 +9,6 @@ import {
     getDialogOverlay
 } from './filePickerUI.js';
 
-// --- Module-level Variables ---
-let currentPath = '/';
-let clipboard = { type: null, paths: [] };
-let _onFilePickHandler = null;
-let _onCancelHandler = null;
-let selectedFilePath = null;
-
 // --- Core File Picker Setup Function ---
 
 /**
@@ -157,41 +150,68 @@ function setupFilePickerInstance(originalElement = null) {
             if (typeof newValue === 'function' || newValue === null) {
                 instanceOnCancelHandler = newValue;
             } else {
-                console.warn("Attempted to set oncancel to a non-function value:", newValue);
+                console.warn("Attempted to set oncancel to a non-string value:", newValue);
             }
         },
         configurable: true
     });
 
-    // Emulate a 'filePath' property
+    // ✅ Emulate a 'filePath' property (FIXED FOR ROBUST PATH NORMALIZATION)
     Object.defineProperty(pickerContainer, 'filePath', {
         get() { return instanceSelectedFilePath; },
         set(newValue) {
             if (typeof newValue === 'string') {
-                const normalizedPath = newValue.endsWith('/') ? newValue.slice(0, -1) : newValue;
-                const pathParts = normalizedPath.split('/');
-                pathParts.pop();
-                const dirPath = pathParts.join('/') + (pathParts.length > 1 ? '/' : '');
+                // --- ROBUST PATH NORMALIZATION ---
+                let normalizedPath = newValue.trim();
                 
-                renderFileList(dirPath || '/').then(() => {
+                // 1. Ensure it's an absolute path (starts with /)
+                if (!normalizedPath.startsWith('/')) {
+                    normalizedPath = '/' + normalizedPath;
+                }
+                
+                // 2. Remove trailing slash if it's meant to be a file
+                if (normalizedPath.endsWith('/') && normalizedPath.length > 1) {
+                    normalizedPath = normalizedPath.slice(0, -1);
+                }
+
+                // 3. Extract the parent directory path
+                const pathParts = normalizedPath.split('/');
+                pathParts.pop(); // Remove the file name
+                let dirPath = pathParts.join('/');
+                
+                // 4. Ensure directory path ends with / or is root
+                if (!dirPath) {
+                    dirPath = '/';
+                } else if (!dirPath.endsWith('/')) {
+                    dirPath += '/';
+                }
+                // ---------------------------------
+
+                // Navigate to the directory
+                renderFileList(dirPath).then(() => {
+                    // Look for the exact normalized path in the newly rendered DOM
                     const checkbox = fileListTbody.querySelector(`.file-checkbox[data-path="${normalizedPath}"]`);
                     const row = checkbox ? checkbox.closest('tr') : fileListTbody.querySelector(`.file-name[data-path="${normalizedPath}"]`)?.closest('tr');
-                    
+
                     if (checkbox) {
+                        // ✅ Automatically check mark the file
                         checkbox.checked = true;
                         instanceSelectedFilePath = normalizedPath;
                         instanceSelectedFileType = row.dataset.type;
                         titleTextEl.textContent = normalizedPath;
                     } else if (row) {
+                        // If a directory path was passed instead of a file
                         instanceSelectedFilePath = normalizedPath;
                         instanceSelectedFileType = row.dataset.type;
                         titleTextEl.textContent = normalizedPath;
                     } else {
-                        console.warn(`File or directory '${newValue}' not found.`);
+                        console.warn(`File or directory '${newValue}' not found in ${dirPath}.`);
                         instanceSelectedFilePath = null;
                         instanceSelectedFileType = null;
                         titleTextEl.textContent = 'No file selected';
                     }
+                    
+                    // Update UI states (enables the "Use Path" button)
                     updateButtonStates();
                 });
             } else {
@@ -202,7 +222,9 @@ function setupFilePickerInstance(originalElement = null) {
     });
 
     // Emulate dom.buttonText property
-    Object.defineProperty(pickerContainer, 'dom.buttonText', {
+    // Note: To make this accessible via pickerContainer.dom.buttonText, you must initialize pickerContainer.dom = {} first.
+    pickerContainer.dom = {}; 
+    Object.defineProperty(pickerContainer.dom, 'buttonText', {
         get() { 
             const span = usePathButton.querySelector('.btn-text');
             return span ? span.textContent : ''; 
@@ -230,7 +252,7 @@ function setupFilePickerInstance(originalElement = null) {
         pickerContainer.oncancel = (e) => executeAttributeHandler(originalOnCancelAttribute, pickerContainer, e);
     }
     if (originalButtonTextAttribute) {
-        pickerContainer['dom.buttonText'] = originalButtonTextAttribute;
+        pickerContainer.dom.buttonText = originalButtonTextAttribute;
     }
 
     // ✅ INSTANCE-SPECIFIC DIALOG FUNCTIONS (Centered within picker)
@@ -498,7 +520,7 @@ function setupFilePickerInstance(originalElement = null) {
             updateButtonStates();
         } catch (error) {
             console.error("Error rendering file list:", error);
-            showPopupMessage(`Error: ${error.message || 'Failed to list files.'}`, true);
+            showInstancePopupMessage(`Error: ${error.message || 'Failed to list files.'}`, true);
             fileListTbody.innerHTML = `<tr><td colspan="4">Error loading files: ${error.message || 'Unknown error'}</td></tr>`;
         }
     };
@@ -566,7 +588,7 @@ function setupFilePickerInstance(originalElement = null) {
             renderFileList(instanceCurrentPath);
         } catch (error) {
             console.error("Error renaming item:", error);
-            showPopupMessage(`Failed to rename: ${error.message}`, true);
+            showInstancePopupMessage(`Failed to rename: ${error.message}`, true);
         }
     };
 
@@ -594,7 +616,7 @@ function setupFilePickerInstance(originalElement = null) {
             renderFileList(instanceCurrentPath);
         } catch (error) {
             console.error(`Error creating ${type}:`, error);
-            showPopupMessage(`Failed to create ${type} '${normalizedName}': ${error.message}`, true);
+            showInstancePopupMessage(`Failed to create ${type} '${normalizedName}': ${error.message}`, true);
         }
     };
 
@@ -765,7 +787,7 @@ function setupFilePickerInstance(originalElement = null) {
 
         } catch (error) {
             console.error("Error during file download:", error);
-            showPopupMessage(`Download failed: ${error.message}`, true);
+            showInstancePopupMessage(`Download failed: ${error.message}`, true);
         }
     };
     
@@ -808,13 +830,13 @@ function setupFilePickerInstance(originalElement = null) {
                     } else {
                         const errorText = xhr.responseText || 'Unknown error';
                         console.error("Upload failed:", errorText);
-                        showPopupMessage(`❌ Upload failed: ${errorText}`, true);
+                        showInstancePopupMessage(`❌ Upload failed: ${errorText}`, true);
                     }
                 });
                 
                 xhr.addEventListener('error', () => {
                     console.error("Network error during upload");
-                    showPopupMessage(`❌ Network error during upload`, true);
+                    showInstancePopupMessage(`❌ Network error during upload`, true);
                 });
                 
                 xhr.addEventListener('abort', () => {
@@ -826,7 +848,7 @@ function setupFilePickerInstance(originalElement = null) {
                 
             } catch (error) {
                 console.error("Error initiating file upload:", error);
-                showPopupMessage(`Upload failed for '${file.name}': ${error.message}`, true);
+                showInstancePopupMessage(`Upload failed for '${file.name}': ${error.message}`, true);
             } finally {
                 document.body.removeChild(fileInput);
             }

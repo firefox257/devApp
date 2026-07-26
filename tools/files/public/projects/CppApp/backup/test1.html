@@ -1,0 +1,28 @@
+<script>
+function delay(ms) {
+	var p = new Promise((resolve, reject) => {
+			// Basic validation
+			if (typeof ms !== 'number' || ms < 0) {
+				reject(new Error("Delay must be a non-negative number."));
+				return;
+			}
+
+			// Asynchronous operation (e.g., timer)
+			setTimeout(() => {
+					resolve();
+				}, ms);
+		});
+	return p;
+}
+
+
+delay(5000).then(()=>{
+		alert(1);
+	});
+
+delay(2000).then(()=>{
+		alert(2);
+	});
+
+
+</script>

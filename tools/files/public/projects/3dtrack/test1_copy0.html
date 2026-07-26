@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+  <title>WebGL Body Tracking (iOS Safari Ready)</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 12px;
+      background-color: #121212;
+      color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    .controls {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+      width: 100%;
+      max-width: 640px;
+    }
+
+    select {
+      flex: 1;
+      padding: 10px;
+      background: #2a2a2a;
+      color: #fff;
+      border: 1px solid #444;
+      border-radius: 8px;
+      font-size: 14px;
+      outline: none;
+    }
+
+    .container {
+      position: relative;
+      width: 100%;
+      max-width: 640px;
+      aspect-ratio: 4 / 3;
+      background: #000;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    video, canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .console-wrapper {
+      width: 100%;
+      max-width: 640px;
+      margin-top: 12px;
+      background: #1e1e1e;
+      border: 1px solid #333;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .console-header {
+      padding: 8px 12px;
+      background: #2a2a2a;
+      font-size: 12px;
+      font-weight: bold;
+      letter-spacing: 0.5px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+    }
+
+    .console-logs {
+      height: 120px;
+      overflow-y: auto;
+      padding: 8px;
+      font-family: monospace;
+      font-size: 11px;
+      line-height: 1.4;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .log-item { word-break: break-word; white-space: pre-wrap; border-bottom: 1px solid #282828; padding-bottom: 2px; }
+    .log-info { color: #8cdcfe; }
+    .log-warn { color: #ce9178; }
+    .log-error { color: #f48771; }
+  </style>
+
+  <!-- TensorFlow.js WebGL Engine Libraries -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core@4.10.0/dist/tf-core.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-converter@4.10.0/dist/tf-converter.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl@4.10.0/dist/tf-backend-webgl.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection@2.1.0/dist/pose-detection.min.js"></script>
+</head>
+<body>
+
+  <div class="controls">
+    <select id="cameraSelect">
+      <option value="">Loading cameras...</option>
+    </select>
+    <select id="peopleSelect">
+      <option value="1">1 Person</option>
+      <option value="2">2 People</option>
+      <option value="3">3 People</option>
+      <option value="4">4 People</option>
+    </select>
+  </div>
+
+  <div class="container">
+    <video id="webcam" autoplay playsinline muted></video>
+    <canvas id="output_canvas"></canvas>
+  </div>
+
+  <div class="console-wrapper">
+    <div class="console-header" id="consoleToggle">
+      <span>WEBGL CONSOLE LOGS</span>
+      <span id="clearLogs" style="font-weight: normal; text-decoration: underline;">Clear</span>
+    </div>
+    <div class="console-logs" id="consoleLogs"></div>
+  </div>
+
+  <script>
+    // --- On-Screen Console Hook ---
+    const logsContainer = document.getElementById("consoleLogs");
+    function appendLog(type, args) {
+      const msg = args.map(a => {
+        if (a instanceof Error) return `${a.message}\n${a.stack}`;
+        if (typeof a === "object") {
+          try { return JSON.stringify(a, Object.getOwnPropertyNames(a)); } 
+          catch (e) { return String(a); }
+        }
+        return String(a);
+      }).join(" ");
+      
+      const el = document.createElement("div");
+      el.className = `log-item log-${type}`;
+      el.textContent = `[${type.toUpperCase()}] ${msg}`;
+      logsContainer.appendChild(el);
+      logsContainer.scrollTop = logsContainer.scrollHeight;
+    }
+
+    const origLog = console.log, origWarn = console.warn, origErr = console.error;
+    console.log = (...a) => { origLog(...a); appendLog("info", a); };
+    console.warn = (...a) => { origWarn(...a); appendLog("warn", a); };
+    console.error = (...a) => { origErr(...a); appendLog("error", a); };
+
+    document.getElementById("clearLogs").addEventListener("click", (e) => {
+      e.stopPropagation();
+      logsContainer.innerHTML = "";
+    });
+
+    // --- Core Engine Variables ---
+    const video = document.getElementById("webcam");
+    const canvas = document.getElementById("output_canvas");
+    const ctx = canvas.getContext("2d");
+    const cameraSelect = document.getElementById("cameraSelect");
+    const peopleSelect = document.getElementById("peopleSelect");
+
+    let detector = null;
+    let currentStream = null;
+    let maxPoses = 1;
+
+    // Skeleton bone connections for MoveNet 17 keypoints
+    const SKELETON_PAIRS = [
+      [5, 6], [5, 7], [7, 9], [6, 8], [8, 10], // Upper Body
+      [5, 11], [6, 12], [11, 12],             // Torso
+      [11, 13], [13, 15], [12, 14], [14, 16]   // Lower Body
+    ];
+
+    // Joints to draw motion trail paths for
+    const TRAIL_JOINTS = [7, 8, 9, 10, 13, 14, 15, 16]; 
+    const MAX_HISTORY = 25;
+    let motionTrails = [];
+
+    // 1. Initialize WebGL Backend & MoveNet Model
+    async function initDetector() {
+      try {
+        console.log("Setting backend to WebGL...");
+        await tf.setBackend("webgl");
+        await tf.ready();
+        console.log("Active TFJS Backend:", tf.getBackend());
+
+        if (detector) {
+          detector.dispose();
+        }
+
+        console.log(`Loading MoveNet Model (Max people: ${maxPoses})...`);
+        const modelType = maxPoses > 1 
+          ? poseDetection.movenet.modelType.MULTIPOSE_LIGHTNING 
+          : poseDetection.movenet.modelType.SINGLEPOSE_LIGHTNING;
+
+        detector = await poseDetection.createDetector(
+          poseDetection.SupportedModels.MoveNet,
+          {
+            modelType: modelType,
+            enableTracking: true
+          }
+        );
+
+        motionTrails = [];
+        console.log("MoveNet WebGL detector initialized successfully.");
+      } catch (err) {
+        console.error("WebGL Model Init Error:", err);
+      }
+    }
+
+    // 2. Setup Camera Stream and Enumeration
+    async function setupCameraOptions() {
+      try {
+        const initialStream = await navigator.mediaDevices.getUserMedia({ 
+          video: { facingMode: "user" } 
+        });
+        initialStream.getTracks().forEach(t => t.stop());
+
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoDevices = devices.filter(d => d.kind === "videoinput");
+
+        cameraSelect.innerHTML = "";
+        videoDevices.forEach((device, index) => {
+          const opt = document.createElement("option");
+          opt.value = device.deviceId;
+          opt.textContent = device.label || `Camera ${index + 1}`;
+          cameraSelect.appendChild(opt);
+        });
+
+        if (videoDevices.length > 0) {
+          startCamera(videoDevices[0].deviceId);
+        }
+      } catch (err) {
+        console.error("Camera Permission Error:", err);
+      }
+    }
+
+    async function startCamera(deviceId) {
+      if (currentStream) {
+        currentStream.getTracks().forEach(t => t.stop());
+      }
+
+      console.log("Starting stream device:", deviceId);
+      try {
+        currentStream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            deviceId: deviceId ? { exact: deviceId } : undefined,
+            width: { ideal: 640 },
+            height: { ideal: 480 }
+          }
+        });
+        video.srcObject = currentStream;
+        video.addEventListener("loadeddata", renderLoop);
+      } catch (err) {
+        console.error("Camera Stream Error:", err);
+      }
+    }
+
+    // 3. Render Motion Trail Lines
+    function drawTrails(personIdx, keypoints) {
+      if (!motionTrails[personIdx]) motionTrails[personIdx] = {};
+      const personTrails = motionTrails[personIdx];
+
+      TRAIL_JOINTS.forEach(jIdx => {
+        const kp = keypoints[jIdx];
+        if (!kp || (kp.score && kp.score < 0.3)) return;
+
+        if (!personTrails[jIdx]) personTrails[jIdx] = [];
+        personTrails[jIdx].push({ x: kp.x, y: kp.y });
+
+        if (personTrails[jIdx].length > MAX_HISTORY) {
+          personTrails[jIdx].shift();
+        }
+
+        const pts = personTrails[jIdx];
+        if (pts.length < 2) return;
+
+        ctx.lineWidth = 3;
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+
+        for (let i = 1; i < pts.length; i++) {
+          const alpha = i / pts.length;
+          ctx.strokeStyle = `rgba(0, 225, 255, ${alpha.toFixed(2)})`;
+          ctx.beginPath();
+          ctx.moveTo(pts[i - 1].x, pts[i - 1].y);
+          ctx.lineTo(pts[i].x, pts[i].y);
+          ctx.stroke();
+        }
+      });
+    }
+
+    // 4. Main Detection Loop
+    async function renderLoop() {
+      if (video.videoWidth && video.videoHeight) {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+      }
+
+      if (detector && video.readyState >= 2) {
+        const poses = await detector.estimatePoses(video);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Limit poses to requested count
+        const activePoses = poses.slice(0, maxPoses);
+
+        activePoses.forEach((pose, personIdx) => {
+          // A. Draw Motion Trails
+          drawTrails(personIdx, pose.keypoints);
+
+          // B. Draw Skeleton Lines
+          SKELETON_PAIRS.forEach(([i, j]) => {
+            const kp1 = pose.keypoints[i];
+            const kp2 = pose.keypoints[j];
+            if (kp1 && kp2 && (kp1.score || 1) > 0.3 && (kp2.score || 1) > 0.3) {
+              ctx.strokeStyle = "#00FF00";
+              ctx.lineWidth = 3;
+              ctx.beginPath();
+              ctx.moveTo(kp1.x, kp1.y);
+              ctx.lineTo(kp2.x, kp2.y);
+              ctx.stroke();
+            }
+          });
+
+          // C. Draw Joint Keypoints
+          pose.keypoints.forEach(kp => {
+            if ((kp.score || 1) > 0.3) {
+              ctx.fillStyle = "#FF0000";
+              ctx.beginPath();
+              ctx.arc(kp.x, kp.y, 4, 0, 2 * Math.PI);
+              ctx.fill();
+            }
+          });
+        });
+      }
+
+      requestAnimationFrame(renderLoop);
+    }
+
+    // Event Listeners
+    cameraSelect.addEventListener("change", e => startCamera(e.target.value));
+    peopleSelect.addEventListener("change", async e => {
+      maxPoses = parseInt(e.target.value, 10);
+      await initDetector();
+    });
+
+    // Startup
+    (async () => {
+      await initDetector();
+      await setupCameraOptions();
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+  <title>WebGL Multi-Person Body Tracking</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 12px;
+      background-color: #121212;
+      color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    .security-warning {
+      background: #ff4444;
+      color: white;
+      padding: 10px;
+      border-radius: 8px;
+      margin-bottom: 12px;
+      width: 100%;
+      max-width: 640px;
+      text-align: center;
+      font-weight: bold;
+      display: none; /* Hidden by default */
+    }
+
+    .controls {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+      width: 100%;
+      max-width: 640px;
+    }
+
+    select {
+      flex: 1;
+      padding: 10px;
+      background: #2a2a2a;
+      color: #fff;
+      border: 1px solid #444;
+      border-radius: 8px;
+      font-size: 14px;
+      outline: none;
+    }
+
+    .container {
+      position: relative;
+      width: 100%;
+      max-width: 640px;
+      background: #000;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    video {
+      display: block;
+      width: 100%;
+      height: auto;
+      z-index: 1; 
+    }
+
+    canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 2; 
+      pointer-events: none;
+    }
+
+    .status-badge {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 3;
+      background: rgba(0, 0, 0, 0.75);
+      color: #00FF66;
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-family: monospace;
+      border: 1px solid #00FF66;
+    }
+
+    .console-wrapper {
+      width: 100%;
+      max-width: 640px;
+      margin-top: 12px;
+      background: #1e1e1e;
+      border: 1px solid #333;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .console-header {
+      padding: 8px 12px;
+      background: #2a2a2a;
+      font-size: 12px;
+      font-weight: bold;
+      letter-spacing: 0.5px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+    }
+
+    .console-logs {
+      height: 120px;
+      overflow-y: auto;
+      padding: 8px;
+      font-family: monospace;
+      font-size: 11px;
+      line-height: 1.4;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .log-item { word-break: break-word; white-space: pre-wrap; border-bottom: 1px solid #282828; padding-bottom: 2px; }
+    .log-info { color: #8cdcfe; }
+    .log-warn { color: #ce9178; }
+    .log-error { color: #f48771; }
+  </style>
+
+  <!-- UNIFIED TensorFlow.js Bundle (Prevents dependency mismatch issues) -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0/dist/tf.min.js"></script>
+  <!-- Latest stable pose-detection model -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection@2.1.3/dist/pose-detection.min.js"></script>
+</head>
+<body>
+
+  <div id="securityWarning" class="security-warning">
+    ⚠️ Camera requires HTTPS or localhost. If you opened this file directly (file://), it will not work. Use a local server.
+  </div>
+
+  <div class="controls">
+    <select id="cameraSelect">
+      <option value="">Loading cameras...</option>
+    </select>
+    <select id="peopleSelect">
+      <option value="1">1 Person</option>
+      <option value="2">2 People</option>
+      <option value="3">3 People</option>
+      <option value="4">4 People</option>
+    </select>
+  </div>
+
+  <div class="container">
+    <div class="status-badge" id="statusBadge">Status: Initializing...</div>
+    <video id="webcam" autoplay playsinline muted></video>
+    <canvas id="output_canvas"></canvas>
+  </div>
+
+  <div class="console-wrapper">
+    <div class="console-header">
+      <span>WEBGL CONSOLE LOGS</span>
+      <div style="display: flex; gap: 15px;">
+        <span id="copyLogs" style="font-weight: normal; text-decoration: underline; cursor: pointer;">Copy</span>
+        <span id="clearLogs" style="font-weight: normal; text-decoration: underline; cursor: pointer;">Clear</span>
+      </div>
+    </div>
+    <div class="console-logs" id="consoleLogs"></div>
+  </div>
+
+  <script>
+    console.log("✅ Script started. Checking environment...");
+
+    // --- Security Context Check ---
+    if (!window.isSecureContext) {
+      document.getElementById("securityWarning").style.display = "block";
+      console.error("❌ Not a secure context! Camera API requires HTTPS or localhost.");
+    }
+
+    // --- Console Logger ---
+    const logsContainer = document.getElementById("consoleLogs");
+    function appendLog(type, args) {
+      const msg = args.map(a => {
+        if (a instanceof Error) return `${a.message}\n${a.stack}`;
+        if (typeof a === "object") {
+          try { return JSON.stringify(a, Object.getOwnPropertyNames(a)); } 
+          catch (e) { return String(a); }
+        }
+        return String(a);
+      }).join(" ");
+      
+      const el = document.createElement("div");
+      el.className = `log-item log-${type}`;
+      el.textContent = `[${type.toUpperCase()}] ${msg}`;
+      logsContainer.appendChild(el);
+      logsContainer.scrollTop = logsContainer.scrollHeight;
+    }
+
+    const origLog = console.log, origWarn = console.warn, origErr = console.error;
+    console.log = (...a) => { origLog(...a); appendLog("info", a); };
+    console.warn = (...a) => { origWarn(...a); appendLog("warn", a); };
+    console.error = (...a) => { origErr(...a); appendLog("error", a); };
+
+    document.getElementById("clearLogs").addEventListener("click", (e) => {
+      e.stopPropagation();
+      logsContainer.innerHTML = "";
+    });
+
+    document.getElementById("copyLogs").addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const logText = logsContainer.innerText;
+      if (!logText.trim()) return;
+      try {
+        await navigator.clipboard.writeText(logText);
+        const btn = e.target;
+        btn.textContent = "Copied!";
+        btn.style.color = "#00FF66";
+        setTimeout(() => { btn.textContent = "Copy"; btn.style.color = ""; }, 1500);
+      } catch (err) {
+        console.error("Clipboard failed:", err);
+      }
+    });
+
+    // --- Core Engine Variables ---
+    const video = document.getElementById("webcam");
+    const canvas = document.getElementById("output_canvas");
+    const ctx = canvas.getContext("2d");
+    const cameraSelect = document.getElementById("cameraSelect");
+    const peopleSelect = document.getElementById("peopleSelect");
+    const statusBadge = document.getElementById("statusBadge");
+
+    let detector = null;
+    let currentStream = null;
+    let maxPoses = 1;
+
+    const SKELETON_PAIRS = [
+      [5, 6], [5, 7], [7, 9], [6, 8], [8, 10],
+      [5, 11], [6, 12], [11, 12],
+      [11, 13], [13, 15], [12, 14], [14, 16]
+    ];
+
+    const TRAIL_JOINTS = [7, 8, 9, 10, 13, 14, 15, 16]; 
+    const MAX_HISTORY = 25;
+    let motionTrails = {};
+
+    async function initDetector() {
+      try {
+        statusBadge.textContent = "Status: Loading Model...";
+        console.log("Setting backend to WebGL...");
+        await tf.setBackend("webgl");
+        await tf.ready();
+        console.log("✅ TensorFlow.js ready. Active backend:", tf.getBackend());
+
+        if (detector) detector.dispose();
+
+        const modelType = maxPoses > 1 
+          ? poseDetection.movenet.modelType.MULTIPOSE_LIGHTNING 
+          : poseDetection.movenet.modelType.SINGLEPOSE_LIGHTNING;
+
+        console.log("Loading MoveNet model:", modelType);
+        detector = await poseDetection.createDetector(
+          poseDetection.SupportedModels.MoveNet,
+          { 
+            modelType: modelType,
+            enableTracking: true,
+            maxPoses: maxPoses,
+            trackerType: poseDetection.TrackerType.Keypoint
+          }
+        );
+
+        motionTrails = {};
+        statusBadge.textContent = "Status: Ready";
+        console.log(`✅ MoveNet Ready (${maxPoses} person mode)`);
+      } catch (err) {
+        statusBadge.textContent = "Status: Model Error";
+        console.error("❌ Init Error:", err);
+      }
+    }
+
+    async function setupCameraOptions() {
+      try {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          throw new Error("navigator.mediaDevices is undefined. Are you using HTTPS or localhost?");
+        }
+
+        console.log("Requesting initial camera permission to enumerate devices...");
+        const initialStream = await navigator.mediaDevices.getUserMedia({ video: true });
+        initialStream.getTracks().forEach(t => t.stop());
+
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoDevices = devices.filter(d => d.kind === "videoinput");
+
+        cameraSelect.innerHTML = "";
+        videoDevices.forEach((device, index) => {
+          const opt = document.createElement("option");
+          opt.value = device.deviceId;
+          opt.textContent = device.label || `Camera ${index + 1}`;
+          cameraSelect.appendChild(opt);
+        });
+
+        if (videoDevices.length > 0) {
+          console.log("Starting camera:", videoDevices[0].label);
+          startCamera(videoDevices[0].deviceId);
+        } else {
+          console.warn("No video devices found.");
+        }
+      } catch (err) {
+        statusBadge.textContent = "Status: Camera Error";
+        console.error("❌ Camera Error:", err);
+      }
+    }
+
+    async function startCamera(deviceId) {
+      if (currentStream) currentStream.getTracks().forEach(t => t.stop());
+
+      try {
+        currentStream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            deviceId: deviceId ? { exact: deviceId } : undefined,
+            width: { ideal: 640 },
+            height: { ideal: 480 }
+          }
+        });
+        video.srcObject = currentStream;
+        console.log("✅ Camera stream started.");
+      } catch (err) {
+        statusBadge.textContent = "Status: Stream Error";
+        console.error("❌ Stream Error:", err);
+      }
+    }
+
+    function drawTrails(personId, keypoints, scaleX, scaleY) {
+      if (!motionTrails[personId]) motionTrails[personId] = {};
+      const personTrails = motionTrails[personId];
+
+      TRAIL_JOINTS.forEach(jIdx => {
+        const kp = keypoints[jIdx];
+        if (!kp || (kp.score && kp.score < 0.15)) return;
+
+        if (!personTrails[jIdx]) personTrails[jIdx] = [];
+        personTrails[jIdx].push({ x: kp.x * scaleX, y: kp.y * scaleY });
+
+        if (personTrails[jIdx].length > MAX_HISTORY) personTrails[jIdx].shift();
+
+        const pts = personTrails[jIdx];
+        if (pts.length < 2) return;
+
+        ctx.lineWidth = 4;
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+
+        for (let i = 1; i < pts.length; i++) {
+          const alpha = i / pts.length;
+          ctx.strokeStyle = `rgba(0, 225, 255, ${alpha.toFixed(2)})`;
+          ctx.beginPath();
+          ctx.moveTo(pts[i - 1].x, pts[i - 1].y);
+          ctx.lineTo(pts[i].x, pts[i].y);
+          ctx.stroke();
+        }
+      });
+    }
+
+    async function renderLoop() {
+      if (!detector || video.readyState < 2) {
+        requestAnimationFrame(renderLoop);
+        return;
+      }
+
+      if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+      }
+
+      let poses = [];
+      try {
+        // Pass video element directly for optimal GPU texturing
+        poses = await detector.estimatePoses(video, {
+          maxPoses: maxPoses,
+          flipHorizontal: false
+        });
+      } catch (e) {
+        console.error("Pose estimation failed:", e);
+        poses = [];
+      }
+
+      if (!Array.isArray(poses)) poses = [];
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      const activePoses = poses.filter(p => (p.score === undefined || p.score > 0.15)).slice(0, maxPoses);
+      statusBadge.textContent = `Tracking: ${activePoses.length} person(s)`;
+
+      const scaleX = canvas.width / video.videoWidth;
+      const scaleY = canvas.height / video.videoHeight;
+      const activeIds = new Set();
+
+      activePoses.forEach((pose, index) => {
+        const personId = pose.id !== undefined ? pose.id : index;
+        activeIds.add(personId);
+
+        drawTrails(personId, pose.keypoints, scaleX, scaleY);
+
+        ctx.shadowColor = "#00FF66";
+        ctx.shadowBlur = 8;
+        ctx.strokeStyle = "#00FF66";
+        ctx.lineWidth = 5;
+
+        SKELETON_PAIRS.forEach(([i, j]) => {
+          const kp1 = pose.keypoints[i];
+          const kp2 = pose.keypoints[j];
+          const score1 = kp1 ? (kp1.score ?? 1) : 0;
+          const score2 = kp2 ? (kp2.score ?? 1) : 0;
+
+          if (score1 > 0.15 && score2 > 0.15) {
+            ctx.beginPath();
+            ctx.moveTo(kp1.x * scaleX, kp1.y * scaleY);
+            ctx.lineTo(kp2.x * scaleX, kp2.y * scaleY);
+            ctx.stroke();
+          }
+        });
+
+        ctx.shadowColor = "#FF0055";
+        ctx.shadowBlur = 10;
+        ctx.fillStyle = "#FF0055";
+
+        pose.keypoints.forEach(kp => {
+          const score = kp ? (kp.score ?? 1) : 0;
+          if (score > 0.15) {
+            ctx.beginPath();
+            ctx.arc(kp.x * scaleX, kp.y * scaleY, 6, 0, 2 * Math.PI);
+            ctx.fill();
+          }
+        });
+
+        ctx.shadowBlur = 0;
+      });
+
+      for (const id in motionTrails) {
+        if (!activeIds.has(Number(id))) {
+          delete motionTrails[id];
+        }
+      }
+
+      requestAnimationFrame(renderLoop);
+    }
+
+    cameraSelect.addEventListener("change", e => startCamera(e.target.value));
+    peopleSelect.addEventListener("change", async e => {
+      maxPoses = parseInt(e.target.value, 10);
+      await initDetector();
+    });
+
+    (async () => {
+      await initDetector();
+      await setupCameraOptions();
+      requestAnimationFrame(renderLoop);
+    })();
+  </script>
+</body>
+</html>

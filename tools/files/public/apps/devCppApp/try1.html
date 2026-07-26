@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Try1 WASM Runner</title>
+    
+    <!-- 
+      REQUIRED FOR SHAREDARRAYBUFFER (used by -pthread / -matomics)
+      If these meta tags don't work in your browser, you MUST configure 
+      your web server to send these HTTP headers instead.
+    -->
+    <meta http-equiv="Cross-Origin-Opener-Policy" content="same-origin">
+    <meta http-equiv="Cross-Origin-Embedder-Policy" content="require-corp">
+
+    <style>
+        body {
+            background-color: #1e1e1e;
+            color: #d4d4d4;
+            font-family: 'Consolas', 'Courier New', monospace;
+            margin: 0;
+            padding: 20px;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        h2 {
+            color: #569cd6;
+            margin: 0 0 15px 0;
+            font-size: 18px;
+        }
+        #console-container {
+            flex: 1;
+            background-color: #121212;
+            border: 1px solid #333;
+            border-radius: 4px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        #console-header {
+            background-color: #252526;
+            padding: 8px 12px;
+            border-bottom: 1px solid #333;
+            font-size: 12px;
+            color: #888;
+            display: flex;
+            justify-content: space-between;
+        }
+        #console {
+            flex: 1;
+            padding: 12px;
+            overflow-y: auto;
+            font-size: 13px;
+            line-height: 1.5;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        /* Console Log Levels */
+        .log-log { color: #d4d4d4; }
+        .log-warn { color: #dcdcaa; background: rgba(220, 220, 170, 0.05); }
+        .log-error { color: #f48771; background: rgba(244, 135, 113, 0.05); }
+        .log-info { color: #9cdcfe; }
+        
+        .status-badge {
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 11px;
+            font-weight: bold;
+        }
+        .status-running { background: #0e639c; color: white; }
+        .status-success { background: #16825d; color: white; }
+        .status-fail { background: #c50f1f; color: white; }
+    </style>
+</head>
+<body>
+
+    <h2>🚀 C++ WASM Execution Environment</h2>
+    
+    <div id="console-container">
+        <div id="console-header">
+            <span>Output Console</span>
+            <span id="status-badge" class="status-badge status-running">INITIALIZING</span>
+        </div>
+        <div id="console"></div>
+    </div>
+
+    <script type="module">
+        import { WasmRuntime } from './wasm-runtime.js';
+
+        // ==========================================
+        // 1. HTML CONSOLE & NATIVE CONSOLE INTERCEPTION
+        // ==========================================
+        const consoleEl = document.getElementById('console');
+        const statusBadge = document.getElementById('status-badge');
+
+        function appendToConsole(msg, type = 'log') {
+            const line = document.createElement('div');
+            line.className = `log-${type}`;
+            
+            // Timestamp
+            const time = new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            
+            // Format message (handle objects safely)
+            const formattedMsg = typeof msg === 'string' ? msg : JSON.stringify(msg, null, 2);
+            
+            line.textContent = `[${time}] ${formattedMsg}`;
+            consoleEl.appendChild(line);
+            consoleEl.scrollTop = consoleEl.scrollHeight;
+        }
+
+        // Save original console methods
+        const _origLog = console.log;
+        const _origWarn = console.warn;
+        const _origError = console.error;
+        const _origInfo = console.info;
+
+        // Override console methods to capture EVERYTHING in our HTML UI
+        console.log = (...args) => {
+            appendToConsole(args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' '), 'log');
+            _origLog.apply(console, args);
+        };
+        console.info = (...args) => {
+            appendToConsole(args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' '), 'info');
+            _origInfo.apply(console, args);
+        };
+        console.warn = (...args) => {
+            appendToConsole(args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' '), 'warn');
+            _origWarn.apply(console, args);
+        };
+        console.error = (...args) => {
+            appendToConsole(args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' '), 'error');
+            _origError.apply(console, args);
+        };
+
+        function setStatus(text, className) {
+            statusBadge.textContent = text;
+            statusBadge.className = `status-badge ${className}`;
+        }
+
+        // ==========================================
+        // 2. WASM EXECUTION LOGIC
+        // ==========================================
+        async function runWasm() {
+            console.info('Fetching try1.wasm...');
+            
+            try {
+                // Fetch the WASM binary from the same directory
+                const response = await fetch('./try1.wasm');
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                
+                const wasmBuffer = await response.arrayBuffer();
+                console.info(`Downloaded ${wasmBuffer.byteLength} bytes.`);
+                
+                console.info('Initializing WasmRuntime...');
+                
+                // Initialize the custom WASI runtime
+                // Note: initialMemory=256 (16MB), maxMemory=4096 (256MB) to match your -Wl,--max-memory=268435456 flag
+                const runtime = new WasmRuntime({
+                    initialMemory: 256, 
+                    maxMemory: 4096,    
+                    shared: true,       // Required for -pthread / -matomics
+                    onStdout: (msg) => console.log(msg),  // Route C++ cout to our HTML console
+                    onStderr: (msg) => console.error(msg) // Route C++ cerr to our HTML console
+                });
+
+                console.info('Instantiating WebAssembly module...');
+                await runtime.instantiate(wasmBuffer);
+                
+                console.info('✅ WASM instantiated. Executing main()...');
+                setStatus('RUNNING', 'status-running');
+
+                // Run the WASM _start function
+                const exitCode = runtime.run();
+                
+                if (exitCode === 0) {
+                    console.info('🏁 Application finished successfully (Exit Code 0).');
+                    setStatus('SUCCESS', 'status-success');
+                } else {
+                    console.warn(`⚠️ Application exited with code: ${exitCode}`);
+                    setStatus(`EXIT ${exitCode}`, 'status-fail');
+                }
+
+            } catch (err) {
+                console.error('❌ FATAL ERROR:', err.message || err);
+                setStatus('FAILED', 'status-fail');
+                
+                // Helpful debugging hints for common WASM browser issues
+                if (err.message && err.message.includes('SharedArrayBuffer')) {
+                    console.error('🛑 HINT: SharedArrayBuffer is blocked. Ensure your server sends Cross-Origin-Opener-Policy and Cross-Origin-Embedder-Policy headers.');
+                }
+                if (err.message && err.message.includes('out of memory')) {
+                    console.error('🛑 HINT: WASM ran out of memory. Increase maxMemory in WasmRuntime options.');
+                }
+            }
+        }
+
+        // Start execution
+        runWasm();
+    </script>
+</body>
+</html>

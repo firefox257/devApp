@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>C++ → WASM (Explicit Worker Management)</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #1a1a2e; color: #eee; padding: 12px; max-width: 100vw; overflow-x: hidden; }
+h1 { font-size: 1.2rem; margin: 0 0 10px; color: #00d9ff; }
+.editor { width: 100%; height: 35vh; background: #0f0f1a; color: #e6e6e6; border: 1px solid #333; border-radius: 8px; padding: 10px; font-family: monospace; font-size: 13px; margin-bottom: 10px; resize: vertical; outline: none; }
+.editor:focus { border-color: #00d9ff; }
+.controls { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+button { background: #0077ff; color: white; border: none; padding: 8px 16px; border-radius: 6px; font-size: 14px; cursor: pointer; flex: 1; min-width: 80px; }
+button:disabled { background: #555; cursor: not-allowed; }
+button.danger { background: #ff4444; }
+button.secondary { background: #444; border: 1px solid #666; }
+.console { background: #0f0f1a; border: 1px solid #333; border-radius: 8px; padding: 10px; height: 35vh; overflow-y: auto; font-family: monospace; font-size: 12px; line-height: 1.4; white-space: pre-wrap; word-break: break-word; }
+.log-entry { margin: 2px 0; padding: 2px 4px; border-left: 3px solid transparent; }
+.log-entry.info { border-left-color: #00d9ff; color: #ccc; }
+.log-entry.warn { border-left-color: #ffaa00; color: #ffcc66; }
+.log-entry.error { border-left-color: #ff4444; color: #ff8888; }
+.log-entry.success { border-left-color: #00cc66; color: #88ffbb; }
+.log-clang-entry.info { color: #ccc; }
+.log-clang-entry.warn { color: #ffcc66; }
+.log-clang-entry.error { color: #ff8888; }
+.log-clang-entry.success { color: #88ffbb; }
+.progress { height: 4px; background: #333; border-radius: 2px; margin: 8px 0; overflow: hidden; }
+.progress-bar { height: 100%; background: linear-gradient(90deg, #00d9ff, #0077ff); width: 0%; transition: width 0.2s; }
+.status { font-size: 11px; color: #888; margin: 4px 0; }
+.copied { color: #00cc66; font-size: 11px; margin-left: 8px; display: none; }
+@media (max-width: 400px) { .console { font-size: 11px; height: 30vh; } .editor { height: 30vh; font-size: 12px; } button { font-size: 13px; padding: 7px 12px; } }
+</style>
+</head>
+<body>
+<h1>🔧 C++ → WASM (Explicit Worker Management)</h1>
+<textarea id="editor" class="editor" spellcheck="false"></textarea>
+<div class="controls">
+<button id="runBtn" onclick="runCompiler()">▶ Run Compilation</button>
+<button id="resetAllBtn" class="secondary" onclick="resetCache('all')">🔄 Reset All Cache</button>
+<button id="resetMainBtn" class="secondary" onclick="resetCache('main')">🔄 Reset main.cpp</button>
+</div>
+<div class="controls">
+<button id="clearBtn" class="danger" onclick="clearConsole()">🗑 Clear Logs</button>
+<button id="copyBtn" onclick="copyConsole()">📋 Copy</button>
+<span id="copiedMsg" class="copied">✓ Copied!</span>
+</div>
+<div class="progress"><div id="progressBar" class="progress-bar"></div></div>
+<div id="status" class="status">Ready. Edit code above and tap "Run Compilation".</div>
+<div id="console" class="console"></div>
+
+<script type="module">
+const consoleEl = document.getElementById('console');
+const statusEl = document.getElementById('status');
+const progressBar = document.getElementById('progressBar');
+const runBtn = document.getElementById('runBtn');
+const copiedMsg = document.getElementById('copiedMsg');
+const editorEl = document.getElementById('editor');
+const originalConsole = { log: console.log, warn: console.warn, error: console.error, info: console.info };
+
+function addLog(msg, type = 'info') {
+	const entry = document.createElement('div');
+	entry.className = `log-entry ${type}`;
+	const time = new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+	entry.textContent = `[${time}] ${msg}`;
+	consoleEl.appendChild(entry);
+	consoleEl.scrollTop = consoleEl.scrollHeight;
+	if (originalConsole[type]) originalConsole[type](msg);
+}
+
+function addClangLog(msg, type = 'info') {
+	const entry = document.createElement('span');
+	entry.className = `log-clang-entry ${type}`;
+	entry.textContent = `${msg}`;
+	consoleEl.appendChild(entry);
+	consoleEl.scrollTop = consoleEl.scrollHeight;
+	if (originalConsole[type]) originalConsole[type](msg);
+}
+
+console.log = (...args) => addLog(args.join(' '), 'info');
+console.warn = (...args) => addLog(args.join(' '), 'warn');
+console.error = (...args) => addLog(args.join(' '), 'error');
+console.info = (...args) => addLog(args.join(' '), 'info');
+
+function updateStatus(msg, progress = null) {
+	statusEl.textContent = msg;
+	if (progress !== null) progressBar.style.width = `${Math.min(100, Math.max(0, progress))}%`;
+}
+
+function setButtons(enabled) {
+	runBtn.disabled = !enabled;
+	document.getElementById('clearBtn').disabled = !enabled;
+	document.getElementById('copyBtn').disabled = !enabled;
+	document.getElementById('resetAllBtn').disabled = !enabled;
+	document.getElementById('resetMainBtn').disabled = !enabled;
+}
+
+window.clearConsole = function() { consoleEl.innerHTML = ''; updateStatus('Console cleared.'); progressBar.style.width = '0%'; };
+window.copyConsole = async function() {
+	try {
+		await navigator.clipboard.writeText(consoleEl.textContent);
+		copiedMsg.style.display = 'inline';
+		setTimeout(() => copiedMsg.style.display = 'none', 1500);
+		addLog('📋 Console copied to clipboard', 'success');
+	} catch (e) { addLog('❌ Copy failed: ' + e.message, 'error'); }
+};
+
+window.resetCache = function(type) {
+	const worker = window.compilerWorker;
+	if (!worker) return;
+	if (type === 'all') { worker.postMessage({ action: 'resetCache', paths: null }); addLog('🔄 Sent command to reset ALL cached files.', 'info'); }
+	else if (type === 'main') { worker.postMessage({ action: 'resetCache', paths: ['main.cpp'] }); addLog('🔄 Sent command to reset main.cpp cache.', 'info'); }
+};
+
+// ==========================================
+// 1. THE REUSABLE INLINE WORKER CODE
+// ==========================================
+const cppWorkerCode = `
+let instance = null;
+let executeThread = null;
+let sharedMemory = null;
+
+self.onmessage = async function(e) {
+    const { type, wasmModule, sharedMem, funcId, workerId, argsPtr, lockBuffer } = e.data;
+
+    if (type === 'init') {
+        sharedMemory = sharedMem;
+        const lockArray = lockBuffer ? new Int32Array(lockBuffer) : null;
+        try {
+            if (lockArray) {
+                while (Atomics.compareExchange(lockArray, 0, 0, 1) !== 0) {
+                    Atomics.wait(lockArray, 0, 1);
+                }
+            }
+
+            const imports = { env: { memory: sharedMemory } };
+            
+            for (const imp of WebAssembly.Module.imports(wasmModule)) {
+                if (!imports[imp.module]) imports[imp.module] = {};
+                
+                if (imp.kind === 'function') {
+                    if (imp.module === 'wasi_snapshot_preview1' && imp.name === 'fd_write') {
+                        imports[imp.module][imp.name] = (fd, iovs, iovs_len, nwritten) => {
+                            if (fd !== 1 && fd !== 2) return 8;
+                            const view = new DataView(sharedMemory.buffer);
+                            const mem = new Uint8Array(sharedMemory.buffer);
+                            let total = 0;
+                            const chunks = [];
+                            for (let i = 0; i < iovs_len; i++) {
+                                const ptr = view.getUint32(iovs + i * 8, true);
+                                const len = view.getUint32(iovs + i * 8 + 4, true);
+                                chunks.push(mem.subarray(ptr, ptr + len));
+                                total += len;
+                            }
+                            const combined = new Uint8Array(total);
+                            let offset = 0;
+                            for (const chunk of chunks) { combined.set(chunk, offset); offset += chunk.length; }
+                            
+                            const str = new TextDecoder().decode(combined);
+                            self.postMessage({ type: 'log', msg: str, level: fd === 1 ? 'info' : 'warn' });
+                            
+                            view.setUint32(nwritten, total, true);
+                            return 0;
+                        };
+                    } 
+                    else if (imp.module === 'wasi_snapshot_preview1' && imp.name === 'fd_fdstat_get') {
+                        imports[imp.module][imp.name] = (fd, buf) => {
+                            if (fd === 1 || fd === 2) {
+                                const view = new DataView(sharedMemory.buffer);
+                                view.setUint8(buf, 2);
+                                view.setUint16(buf + 2, 0, true);
+                                view.setBigUint64(buf + 8, 0xFFFFFFFFFFFFFFFFn, true);
+                                view.setBigUint64(buf + 16, 0xFFFFFFFFFFFFFFFFn, true);
+                                return 0;
+                            }
+                            return 8;
+                        };
+                    } 
+                    else if (imp.module === 'wasi_snapshot_preview1' && imp.name === 'clock_time_get') {
+                        imports[imp.module][imp.name] = (clockId, precision, timePtr) => {
+                            const ns = BigInt(Date.now()) * 1000000n;
+                            new DataView(sharedMemory.buffer).setBigUint64(timePtr, ns, true);
+                            return 0;
+                        };
+                    } 
+                    else {
+                        imports[imp.module][imp.name] = () => 0;
+                    }
+                } else if (imp.kind === 'memory') {
+                    imports[imp.module][imp.name] = sharedMemory;
+                } else if (imp.kind === 'table') {
+                    imports[imp.module][imp.name] = new WebAssembly.Table({
+                        initial: imp.type.initial, maximum: imp.type.maximum, element: imp.type.element
+                    });
+                } else if (imp.kind === 'global') {
+                    imports[imp.module][imp.name] = new WebAssembly.Global({ value: 'i32', mutable: false }, 0);
+                }
+            }
+
+            instance = await WebAssembly.instantiate(wasmModule, imports);
+            executeThread = instance.exports.ww_execute_thread;
+            executeThread = instance.exports.ww_execute_thread;
+            if (!executeThread) throw new Error('ww_execute_thread not exported');
+            
+            if (lockArray) {
+                Atomics.store(lockArray, 0, 0);
+                Atomics.notify(lockArray, 0, 1);
+            }
+
+            self.postMessage({ type: 'ready', workerId });
+        } catch (err) {
+            if (lockArray) { Atomics.store(lockArray, 0, 0); Atomics.notify(lockArray, 0, 1); }
+            self.postMessage({ type: 'error', workerId, msg: err.message });
+        }
+        return;
+    }
+
+    if (type === 'run') {
+        if (!executeThread) {
+            self.postMessage({ type: 'error', workerId, msg: 'Worker not initialized' });
+            return;
+        }
+        try {
+            // Pass workerId as the second argument to match C++ signature
+            executeThread(funcId, workerId, argsPtr);
+            self.postMessage({ type: 'done', workerId });
+        } catch (err) {
+            self.postMessage({ type: 'error', workerId, msg: err.message });
+        }
+    }
+};
+`;
+
+// ==========================================
+// 2. THE CPPWORKER CLASS
+// ==========================================
+class CppWorker {
+    constructor(wasmModule, sharedMemory, workerId, lockBuffer) {
+        this.workerId = workerId;
+        this.wasmModule = wasmModule;
+        this.sharedMemory = sharedMemory;
+        this.isReady = false;
+        this.isBusy = false;
+        this.taskQueue = [];
+        
+        this.onDone = null;
+        this.onError = null;
+        this.onLog = null;
+
+        const blob = new Blob([cppWorkerCode], { type: 'application/javascript' });
+        this.worker = new Worker(URL.createObjectURL(blob));
+        this.worker.onmessage = (e) => this._handleMessage(e.data);
+        
+        this.worker.postMessage({ 
+            type: 'init', 
+            wasmModule: this.wasmModule, 
+            sharedMem: this.sharedMemory,
+            lockBuffer: lockBuffer
+        });
+    }
+
+    _handleMessage(data) {
+        if (data.type === 'ready') {
+            this.isReady = true;
+            this._processQueue();
+        } else if (data.type === 'done') {
+            this.isBusy = false;
+            if (this.onDone) this.onDone(data.workerId, this.workerId);
+            this._processQueue();
+        } else if (data.type === 'error') {
+            this.isBusy = false;
+            if (this.onError) this.onError(data.workerId, data.msg, this.workerId);
+            this._processQueue();
+        } else if (data.type === 'log') {
+            if (this.onLog) this.onLog(data.msg, data.level, this.workerId);
+        }
+    }
+
+    _processQueue() {
+        if (this.isBusy || !this.isReady || this.taskQueue.length === 0) return;
+        
+        const task = this.taskQueue.shift();
+        this.isBusy = true;
+        
+        this.worker.postMessage({
+            type: 'run',
+            funcId: task.funcId,
+            workerId: task.workerId,
+            argsPtr: task.argsPtr
+        });
+    }
+
+    run(funcId, workerId, argsPtr) {
+        this.taskQueue.push({ funcId, workerId, argsPtr });
+        this._processQueue();
+    }
+
+    terminate() {
+        this.worker.terminate();
+    }
+}
+
+// ==========================================
+// 3. COMPILER WORKER SETUP
+// ==========================================
+window.compilerWorker = new Worker('./compiler.worker.js', { type: 'module' });
+window.compilerWorker.onmessage = async (e) => {
+	const data = e.data;
+	if (data.type === 'log') { addClangLog(data.msg, data.level); return; }
+	if (data.type === 'status') { updateStatus(data.msg, data.progress); return; }
+
+	if (data.type === 'result') {
+		if (data.success) {
+			updateStatus('Compiled! Running output...', 80);
+			addLog(`✅ Compilation successful`, 'success');
+			const wasmBinary = data.files['app.wasm'];
+			if (!wasmBinary) { addLog('❌ No output WASM file generated.', 'error'); updateStatus('❌ Failed. No output.', 0); setButtons(true); return; }
+			await executeWasm(wasmBinary);
+		} else {
+			addLog(`❌ Compilation failed: ${data.error}`, 'error');
+			updateStatus('❌ Failed. Check logs.', 0);
+			setButtons(true);
+		}
+	}
+};
+
+// ==========================================
+// 4. EXPLICIT WORKER MANAGEMENT
+// ==========================================
+async function executeWasm(wasmBinary) {
+	addLog('🚀 Setting up Explicit Worker Management...', 'info');
+
+	const sharedMemory = new WebAssembly.Memory({
+			initial: 256,
+			maximum: 512,
+			shared: true
+		});
+
+	const lockBuffer = new SharedArrayBuffer(4);
+	const wasmModule = await WebAssembly.compile(wasmBinary);
+	addLog('✅ WASM Module compiled. Starting Runner Worker...', 'success');
+
+	// Map to store workers by their ID
+	const workers = new Map();
+
+	// Note: Ensure your runner.worker.js has the updated ww_create_worker and ww_run_on_worker imports!
+	const runnerWorker = new Worker('./runner.worker.js', { type: 'module' });
+
+	runnerWorker.onmessage = (e) => {
+		const { type, msg, level, exitCode, error, workerId, funcId, argsPtr } = e.data;
+
+		if (type === 'create_worker') {
+			addLog(`🛠️ Creating Web Worker ${workerId}...`, 'info');
+			const cppWorker = new CppWorker(wasmModule, sharedMemory, workerId, lockBuffer);
+			
+			cppWorker.onLog = (msg, level, wId) => addClangLog(`[W${wId}] ${msg}`, level);
+			cppWorker.onError = (tid, msg, wId) => {
+				addLog(`❌ Worker ${wId} error: ${msg}`, 'error');
+				runnerWorker.terminate();
+				updateStatus('❌ Execution failed.', 0);
+				setButtons(true);
+			};
+			cppWorker.onDone = (completedWId, wId) => {
+				addLog(`✅ Worker ${completedWId} finished task.`, 'success');
+			};
+			
+			workers.set(workerId, cppWorker);
+			return;
+		}
+
+		if (type === 'run_on_worker') {
+			const cppWorker = workers.get(workerId);
+			if (!cppWorker) {
+				addLog(`❌ Worker ${workerId} not found!`, 'error');
+				return;
+			}
+			// Run the function. The CppWorker will queue it if not ready.
+			cppWorker.run(funcId, workerId, argsPtr);
+			return;
+		}
+
+		if (type === 'log') { addClangLog(msg, level); return; }
+		if (type === 'done') {
+			if (exitCode === 0) addLog('✅ Main application finished successfully.', 'success');
+			else addLog(`⚠️ Application exited with code: ${exitCode}`, 'warn');
+
+			addLog(`🎉 All tasks completed!`, 'success');
+			updateStatus('✓ All done!', 100);
+			setButtons(true);
+			
+			// Optional: Terminate pool to free memory after execution
+			// workers.forEach(w => w.terminate());
+			// workers.clear();
+		}
+		if (type === 'error') {
+			addLog(`❌ WASM Execution Error: ${error}`, 'error');
+			updateStatus('❌ Execution failed.', 0);
+			runnerWorker.terminate();
+			setButtons(true);
+		}
+	};
+
+	runnerWorker.postMessage({ wasmModule, sharedMemory });
+}
+
+// ==========================================
+// DEFAULT C++ CODE (Explicit Worker & Task Pool)
+// ==========================================
+const defaultCode = `#include <iostream>
+#include <tuple>
+#include <utility>
+#include <new>
+#include <type_traits>
+
+// 1. The JS Imports
+extern "C" int ww_create_worker();
+extern "C" void ww_run_on_worker(int worker_id, int func_id, void* args_ptr);
+
+constexpr int MAX_TASKS = 64; 
+constexpr int MAX_ARGS_SIZE = 256;
+
+// Shared memory structures
+// Indexed by TASK ID to prevent memory overwrites when queuing!
+alignas(16) char shared_arg_pool[MAX_TASKS][MAX_ARGS_SIZE];
+alignas(64) int task_status[MAX_TASKS] = {}; // 0 = running, 1 = finished
+int next_task_id = 0;
+
+// ==========================================
+// 2. The Magic Variadic Wrapper
+// ==========================================
+template <typename... Args>
+int spawn_worker_on(int worker_id, int func_id, Args&&... args) {
+    int task_id = next_task_id++;
+    if (task_id >= MAX_TASKS) {
+        std::cerr << "Error: Max tasks exceeded!\\n";
+        return -1;
+    }
+
+    using TupleType = std::tuple<std::decay_t<Args>...>;
+    static_assert(sizeof(TupleType) <= MAX_ARGS_SIZE, "Arguments are too large!");
+    
+    // Store arguments using the unique TASK ID
+    new (&shared_arg_pool[task_id]) TupleType(std::forward<Args>(args)...);
+    
+    // Reset status for this specific task
+    __atomic_store_n(&task_status[task_id], 0, __ATOMIC_RELEASE);
+    
+    // Tell JS to run the function on the worker, passing the unique pointer
+    ww_run_on_worker(worker_id, func_id, &shared_arg_pool[task_id]);
+    
+    return task_id; // Return the Task ID so we can join it later!
+}
+
+// ==========================================
+// 3. The Magic Wrapper Template for Execution
+// ==========================================
+template <auto Func>
+struct ThreadWrapper;
+
+template <typename Ret, typename... Args, Ret(*Func)(Args...)>
+struct ThreadWrapper<Func> {
+    static void run(void* args_ptr) {
+        using TupleType = std::tuple<Args...>;
+        TupleType tup = *static_cast<TupleType*>(args_ptr);
+        std::apply(Func, tup);
+    }
+};
+
+// ==========================================
+// 4. Define the Worker Functions
+// ==========================================
+extern "C" void heavy_calculation(int task_id, int iterations) {
+    for(volatile int i = 0; i < 50000000; i++);
+    std::cout << "[Task " << task_id << "] Finished " << iterations << " iterations!\\n";
+}
+
+// ==========================================
+// 5. The Convention-Based Dispatch Table
+// ==========================================
+using ThreadFunc = void(*)(void*);
+const ThreadFunc dispatch_table[] = {
+    &ThreadWrapper<heavy_calculation>::run,
+};
+#define FUNC_HEAVY_CALCULATION 0
+
+// ==========================================
+// 6. The Trampoline (Handles Completion Notification)
+// ==========================================
+extern "C" void ww_execute_thread(int func_id, int worker_id, void* args_ptr) {
+    if (func_id >= 0 && func_id < (sizeof(dispatch_table) / sizeof(dispatch_table[0]))) {
+        dispatch_table[func_id](args_ptr);
+        
+        // Calculate the task_id from the memory pointer!
+        int task_id = ((char*)args_ptr - (char*)shared_arg_pool) / MAX_ARGS_SIZE;
+        
+        // Notify C++ main thread that this specific TASK is finished
+        __atomic_store_n(&task_status[task_id], 1, __ATOMIC_RELEASE);
+        __builtin_wasm_memory_atomic_notify(&task_status[task_id], 1);
+    }
+}
+
+// ==========================================
+// 7. The Async Join Function
+// ==========================================
+extern "C" void ww_join_task(int task_id) {
+    if (task_id < 0 || task_id >= MAX_TASKS) return;
+    while (__atomic_load_n(&task_status[task_id], __ATOMIC_ACQUIRE) == 0) {
+        __builtin_wasm_memory_atomic_wait32(&task_status[task_id], 0, -1LL);
+    }
+}
+
+// ==========================================
+// 8. Main Execution
+// ==========================================
+int main() {
+    std::cout << "[Main] Creating workers...\\n";
+
+    // Create workers and get their IDs
+    int w1 = ww_create_worker();
+    int w2 = ww_create_worker();
+    
+    std::cout << "[Main] Created Worker " << w1 << " and Worker " << w2 << "\\n";
+
+    // 🚀 Queue multiple tasks on the SAME worker.
+    // Because we use Task IDs for the argument pool, they won't overwrite each other!
+    int t1 = spawn_worker_on(w1, FUNC_HEAVY_CALCULATION, 1, 100);
+    int t2 = spawn_worker_on(w1, FUNC_HEAVY_CALCULATION, 2, 200);
+    int t3 = spawn_worker_on(w2, FUNC_HEAVY_CALCULATION, 3, 300);
+
+    std::cout << "[Main] Waiting for tasks to finish...\\n";
+
+    // Wait for them in any order
+    ww_join_task(t2);
+    std::cout << "[Main] Task " << t2 << " finished!\\n";
+
+    ww_join_task(t1);
+    std::cout << "[Main] Task " << t1 << " finished!\\n";
+
+    ww_join_task(t3);
+    std::cout << "[Main] Task " << t3 << " finished!\\n";
+
+    std::cout << "[Main] All tasks completed successfully!\\n";
+    return 0;
+}`.trim();
+
+editorEl.value = defaultCode;
+
+window.runCompiler = function() {
+	setButtons(false);
+	clearConsole();
+	updateStatus('Sending job to Web Worker...', 10);
+	addLog('📝 Preparing C++ source...', 'info');
+
+	window.compilerWorker.postMessage({
+			id: Date.now(),
+			sourcePath: 'main.cpp',
+			sourceCode: editorEl.value,
+			args: [
+				'clang++',
+				'-std=c++17',
+				'-O2',
+				'-fno-exceptions',
+				'-fno-rtti',
+				'-matomics',
+				'-pthread',
+				'-mbulk-memory',
+				'-Wl,--shared-memory',
+				'-Wl,--import-memory',
+				'-Wl,--max-memory=268435456',
+				'-Wl,--no-check-features',
+				'-Wl,--allow-undefined',
+				'-Wl,--export-all',
+				'-o', 'app.wasm',
+				'main.cpp'
+			]
+		});
+};
+
+addLog('👋 Ready to compile C++ → WASM with Explicit Worker Management!', 'success');
+addLog('📱 Edit the code above and tap "Run Compilation".', 'info');
+addLog('⚠️ Note: SharedArrayBuffer requires COOP/COEP server headers.', 'warn');
+</script>
+</body>
+</html>

@@ -288,6 +288,12 @@ globalThis.streamFile = function (req, res, filePath, contentType, statusCode = 
             }
             return;
         }
+		
+		// 🛡️ PREVENT EISDIR CRASH: Return 400 if targeting a directory
+        if (stats.isDirectory()) {
+            return sendPlainTextResponse(res, 'Cannot read a directory', 400);
+        }
+		
         const fileSize = stats.size;
         const range = req.headers.range;
         if (range) {
@@ -329,6 +335,12 @@ function handleFileRequest(req, res, filePath) {
             }
             return;
         }
+		
+		// 🛡️ PREVENT EISDIR CRASH: Return 400 if targeting a directory
+        if (stats.isDirectory()) {
+            return sendPlainTextResponse(res, 'Cannot read a directory', 400);
+        }
+		
         const ext = path.extname(filePath).toLowerCase();
         const contentType = _mimetype[ext] || 'application/octet-stream';
         streamFile(req, res, filePath, contentType);
@@ -731,26 +743,43 @@ async function handleReadFileBinary(req, res, filePathHeader) {
 async function handleSaveFile(req, res, filePathHeader) {
     if (!isPathInsideRoot(FILES_ROOT, filePathHeader)) return sendPlainTextResponse(res, 'Access Denied', 403);
     const fullPath = path.join(FILES_ROOT, filePathHeader);
-    let body = '', sizeExceeded = false;
+    
+    // ✅ FIX: Collect raw Buffer chunks, do NOT convert to string
+    const chunks = [];
+    let totalSize = 0;
+    let sizeExceeded = false;
+
     req.on('data', chunk => {
         if (sizeExceeded) return;
-        body += chunk.toString();
-        if (body.length > MAX_UPLOAD_SIZE) {
+        chunks.push(chunk);
+        totalSize += chunk.length;
+        if (totalSize > MAX_UPLOAD_SIZE) {
             sizeExceeded = true;
             req.destroy();
             if (!res.headersSent) sendPlainTextResponse(res, 'Payload too large (max 500MB)', 413);
         }
     });
+
     req.on('end', async () => {
         if (sizeExceeded) return;
         try {
             const dir = path.dirname(fullPath);
             await mkdir(dir, { recursive: true });
-            await writeFile(fullPath, body, 'utf8');
+            
+            // ✅ FIX: Concatenate buffers and write as raw binary (no 'utf8' flag)
+            const buffer = Buffer.concat(chunks);
+            await writeFile(fullPath, buffer);
+            
             sendPlainTextResponse(res, `File saved: ${filePathHeader}`, 200);
-        } catch (error) { console.error(`SAVEFILE Error: ${error.message}`); sendPlainTextResponse(res, 'Internal Server Error', 500); }
+        } catch (error) { 
+            console.error(`SAVEFILE Error: ${error.message}`); 
+            sendPlainTextResponse(res, 'Internal Server Error', 500); 
+        }
     });
-    req.on('error', (error) => { if (!res.headersSent) sendPlainTextResponse(res, 'Request Error', 500); });
+
+    req.on('error', (error) => { 
+        if (!res.headersSent) sendPlainTextResponse(res, 'Request Error', 500); 
+    });
 }
 
 async function handleMkpath(res, mkPathHeader) {

@@ -59,13 +59,11 @@ function getNewDefaultProjectData() {
 }
 
 // ========== OPTTEXT INSTANCE HELPERS ==========
-// Get the actual optText instance (child wrapper) from the <opttext> element
 function getOptTextInstance(editorElement) {
 	if (!editorElement) return null
 	return editorElement.querySelector('.opt-text-container-wrapper')
 }
 
-// Load pages into an optText editor as contexts
 function loadPagesIntoEditor(editorElement, pages) {
 	const instance = getOptTextInstance(editorElement)
 	if (!instance || !instance.dataManager) {
@@ -77,39 +75,32 @@ function loadPagesIntoEditor(editorElement, pages) {
 	
 	const existingContexts = instance.listContexts()
 	
-	// Update or add contexts
 	pages.forEach((page, index) => {
 		const contextName = page.title || `Page ${index + 1}`
 		const content = page.content || ''
 		
 		if (index < existingContexts.length) {
-			// Update existing context
 			const ctx = existingContexts[index]
 			instance.switchContext(ctx.id)
 			instance.value = content
-			// Rename if needed
 			if (instance.dataManager.current) {
 				instance.dataManager.current.name = contextName
 			}
 		} else {
-			// Add new context
 			const lines = content.split('\n')
 			instance.addContext(contextName, lines, { switchTo: index === 0 })
 		}
 	})
 	
-	// Remove extra old contexts (from the end to avoid index shifting)
 	for (let i = existingContexts.length - 1; i >= pages.length; i--) {
 		instance.removeContext(existingContexts[i].id)
 	}
 	
-	// Switch to first context
 	if (existingContexts.length > 0) {
 		instance.switchContext(existingContexts[0].id)
 	}
 }
 
-// Get pages array from an optText editor
 function getPagesFromEditor(editorElement) {
 	const instance = getOptTextInstance(editorElement)
 	if (!instance || !instance.dataManager) return []
@@ -120,7 +111,6 @@ function getPagesFromEditor(editorElement) {
 	}))
 }
 
-// Get current active page from an optText editor
 function getActivePageFromEditor(editorElement) {
 	const instance = getOptTextInstance(editorElement)
 	if (!instance || !instance.dataManager || !instance.dataManager.current) return null
@@ -132,14 +122,12 @@ function getActivePageFromEditor(editorElement) {
 	}
 }
 
-// Get current context ID
 function getCurrentContextId(editorElement) {
 	const instance = getOptTextInstance(editorElement)
 	if (!instance || !instance.dataManager || !instance.dataManager.current) return null
 	return instance.dataManager.current.id
 }
 
-// Switch to a context by ID or name
 function switchToContext(editorElement, contextIdOrName) {
 	const instance = getOptTextInstance(editorElement)
 	if (!instance) return false
@@ -148,15 +136,50 @@ function switchToContext(editorElement, contextIdOrName) {
 // ========== END OPTTEXT INSTANCE HELPERS ==========
 
 // ========== PATH BAR HELPERS ==========
-// Stores the actual project file path (e.g., /public/projects/.../sidePoutch.csg)
 let currentProjectFilePath = null
+
+// ✅ UPDATED: Robust helper to sync the file path with ALL save/load file pickers
+function updateFilePickersPath(filePath) {
+    if (!filePath) return;
+    
+    // Broadly target any modal/dialog that might contain a save/load file picker
+    // This covers IDs like 'save-code-modal', 'load-code-modal', 'save-modal', etc.
+    const targetModals = document.querySelectorAll('[id*="save" i], [id*="load" i], [class*="save" i], [class*="load" i], .modal, .dialog');
+    
+    targetModals.forEach(modal => {
+        // 1. Update initialized file picker wrappers
+        const picker = modal.querySelector('.file-picker-container-wrapper');
+        if (picker) {
+            try {
+                // Trigger the property setter defined in filePicker.js
+                picker.filePath = filePath;
+            } catch(e) {
+                console.warn("Failed to set filePath on initialized picker", e);
+            }
+        }
+        
+        // 2. Fallback: Update uninitialized <filepicker> tags (if the modal hasn't rendered yet)
+        const originalPicker = modal.querySelector('filepicker');
+        if (originalPicker) {
+            originalPicker.setAttribute('file-path', filePath);
+        }
+        
+        // 3. Auto-fill standard text inputs in Save modals with the filename
+        if (modal.id && modal.id.toLowerCase().includes('save')) {
+            const saveInput = modal.querySelector('input[type="text"]:not(.file-picker-prompt-input):not(.file-picker-item-name-input)');
+            if (saveInput) {
+                const fileName = filePath.split('/').pop();
+                saveInput.value = fileName;
+            }
+        }
+    });
+}
 
 function updatePathBar(textElId, tabContainerId, editorRef) {
 	const textEl = document.getElementById(textElId)
 	const tabContainer = document.getElementById(tabContainerId)
 	if (!textEl) return
 
-	// Show/hide tab bar based on whether there are actual tab elements
 	if (tabContainer) {
 		const hasTabs = tabContainer.querySelector('.tab') !== null
 		tabContainer.classList.toggle('has-tabs', hasTabs)
@@ -181,6 +204,9 @@ export function updatePathBars() {
 export function setProjectFilePath(filePath) {
 	currentProjectFilePath = filePath || null
 	updatePathBars()
+    
+    // ✅ Sync the path with the save and load file pickers
+    updateFilePickersPath(filePath)
 }
 // ========== END PATH BAR HELPERS ==========
 
@@ -295,13 +321,11 @@ class ScadProject {
 	}
 
 	get csgValues() {
-		// Read from optText instance if available
 		const pages = getPagesFromEditor(this._csgEditorRef)
 		if (pages.length > 0) return pages
 		return this._csgValues || []
 	}
 	get codeValues() {
-		// Read from optText instance if available
 		const pages = getPagesFromEditor(this._codeEditorRef)
 		if (pages.length > 0) return pages
 		return this._codeValues || []
@@ -459,7 +483,6 @@ function updateMainContainerHeight(consoleHeight) {
 	const mainContainer = document.getElementById('main-container')
 	mainContainer.style.height = `calc(100vh - ${TOOLBAR_HEIGHT}px - ${consoleHeight}px)`
 	resizeRenderer()
-	// Resize optText instances if they have resize method
 	const csgInstance = getOptTextInstance(csgEditor)
 	const editorInstance = getOptTextInstance(editorCodeEditor)
 	if (csgInstance && typeof csgInstance.resize === 'function') csgInstance.resize()
@@ -494,7 +517,6 @@ function resetProjectToDefault(path) {
 		project._csgValues = defaultData.csgCode
 		project._codeValues = defaultData.editorCode
 	}
-	// Load default pages into editors
 	loadPagesIntoEditor(csgEditor, defaultData.csgCode)
 	loadPagesIntoEditor(editorCodeEditor, defaultData.editorCode)
 	csgEditor.basePath = null
@@ -534,7 +556,6 @@ export async function handleLoadFile(event, filePath) {
 		const newBasePath = pathSegments.join('/') + '/'
 		csgEditor.basePath = newBasePath; globalThis.settings.basePath = newBasePath; project.setBasePath(newBasePath)
 		
-		// Load pages into optText editors
 		if (projectData.csgCode) {
 			project._csgValues = projectData.csgCode
 			loadPagesIntoEditor(csgEditor, projectData.csgCode)
@@ -544,7 +565,6 @@ export async function handleLoadFile(event, filePath) {
 			loadPagesIntoEditor(editorCodeEditor, projectData.editorCode)
 		}
 		
-		// Restore active context
 		restoreActiveContextId(csgEditor, LAST_CSG_CONTEXT_KEY)
 		restoreActiveContextId(editorCodeEditor, LAST_EDITOR_CODE_CONTEXT_KEY)
 		
@@ -562,7 +582,6 @@ export async function handleLoadFile(event, filePath) {
 				}
 			})
 		}
-		// ✅ Store and display the actual file path
 		setProjectFilePath(filePath)
 		setTimeout(() => {
 			const activePage = getActivePageFromEditor(csgEditor)
@@ -606,7 +625,6 @@ export async function handleSaveFile(event, filePath) {
 			saveActiveContextId(csgEditor, LAST_CSG_CONTEXT_KEY)
 			saveActiveContextId(editorCodeEditor, LAST_EDITOR_CODE_CONTEXT_KEY)
 		} catch (e) { PrintWarn('Failed to save path to localStorage:', e) }
-		// ✅ Store and display the actual file path
 		setProjectFilePath(finalPath)
 		showAlert(`Project saved successfully to:\n${finalPath}`, 'success')
 		closeModal('save-code-modal')
@@ -795,7 +813,6 @@ export function initialize(domElements) {
 	}
 	updateMainContainerHeight(consoleContainer.offsetHeight)
 
-	// Cache invalidation using optText events
 	const csgInstance = getOptTextInstance(csgEditor)
 	const editorInstance = getOptTextInstance(editorCodeEditor)
 
@@ -821,7 +838,6 @@ export function initialize(domElements) {
 		editorInstance.onchange = invalidateCodeCache
 	}
 
-	// Listen for context switches and page changes
 	if (csgInstance) {
 		csgInstance.addEventListener('optText:change', (e) => {
 			if (e.detail?.type === 'context-switched' && !isInitializing) {

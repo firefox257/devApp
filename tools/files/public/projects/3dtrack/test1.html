@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+  <title>Optimized Body & Hand Tracking</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; padding: 12px; background-color: #121212; color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      display: flex; flex-direction: column; align-items: center; min-height: 100vh;
+    }
+    .security-warning {
+      background: #ff4444; color: white; padding: 10px; border-radius: 8px; margin-bottom: 12px;
+      width: 100%; max-width: 640px; text-align: center; font-weight: bold; display: none;
+    }
+    .controls { display: flex; gap: 8px; margin-bottom: 12px; width: 100%; max-width: 640px; }
+    select {
+      flex: 1; padding: 10px; background: #2a2a2a; color: #fff;
+      border: 1px solid #444; border-radius: 8px; font-size: 14px; outline: none;
+    }
+    .container {
+      position: relative; width: 100%; max-width: 640px;
+      background: #000; border-radius: 12px; overflow: hidden;
+    }
+    video { display: block; width: 100%; height: auto; z-index: 1; }
+    canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2; pointer-events: none; }
+    .status-badge {
+      position: absolute; top: 10px; left: 10px; z-index: 3;
+      background: rgba(0, 0, 0, 0.85); color: #00FF66; padding: 8px 12px;
+      border-radius: 6px; font-size: 13px; font-family: monospace; border: 1px solid #00FF66;
+    }
+    .console-wrapper {
+      width: 100%; max-width: 640px; margin-top: 12px;
+      background: #1e1e1e; border: 1px solid #333; border-radius: 8px; overflow: hidden;
+    }
+    .console-header {
+      padding: 8px 12px; background: #2a2a2a; font-size: 12px; font-weight: bold;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .console-logs {
+      height: 120px; overflow-y: auto; padding: 8px;
+      font-family: monospace; font-size: 11px; line-height: 1.4;
+      display: flex; flex-direction: column; gap: 4px;
+    }
+    .log-item { word-break: break-word; white-space: pre-wrap; border-bottom: 1px solid #282828; padding-bottom: 2px; }
+    .log-info { color: #8cdcfe; } .log-warn { color: #ce9178; } .log-error { color: #f48771; }
+  </style>
+
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection@2.1.3/dist/pose-detection.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/hands.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/hand-pose-detection@2.0.1/dist/hand-pose-detection.min.js"></script>
+</head>
+<body>
+
+  <div id="securityWarning" class="security-warning">⚠️ Camera requires HTTPS or localhost.</div>
+
+  <div class="controls">
+    <select id="cameraSelect"><option value="">Loading cameras...</option></select>
+    <select id="peopleSelect">
+      <option value="1">1 Person</option><option value="2">2 People</option>
+      <option value="3">3 People</option><option value="4">4 People</option>
+    </select>
+  </div>
+
+  <div class="container">
+    <div class="status-badge" id="statusBadge">Status: Initializing...</div>
+    <video id="webcam" autoplay playsinline muted></video>
+    <canvas id="output_canvas"></canvas>
+  </div>
+
+  <div class="console-wrapper">
+    <div class="console-header">
+      <span>WEBGL CONSOLE LOGS</span>
+      <div style="display: flex; gap: 15px;">
+        <span id="copyLogs" style="text-decoration: underline; cursor: pointer;">Copy</span>
+        <span id="clearLogs" style="text-decoration: underline; cursor: pointer;">Clear</span>
+      </div>
+    </div>
+    <div class="console-logs" id="consoleLogs"></div>
+  </div>
+
+  <script>
+    // --- Console Logger (Abbreviated for space, same as before) ---
+    const logsContainer = document.getElementById("consoleLogs");
+    function appendLog(type, args) {
+      const msg = args.map(a => typeof a === "object" ? JSON.stringify(a) : String(a)).join(" ");
+      const el = document.createElement("div");
+      el.className = `log-item log-${type}`;
+      el.textContent = `[${type.toUpperCase()}] ${msg}`;
+      logsContainer.appendChild(el);
+      logsContainer.scrollTop = logsContainer.scrollHeight;
+    }
+    const origLog = console.log, origWarn = console.warn, origErr = console.error;
+    console.log = (...a) => { origLog(...a); appendLog("info", a); };
+    console.warn = (...a) => { origWarn(...a); appendLog("warn", a); };
+    console.error = (...a) => { origErr(...a); appendLog("error", a); };
+    document.getElementById("clearLogs").addEventListener("click", () => logsContainer.innerHTML = "");
+    document.getElementById("copyLogs").addEventListener("click", async (e) => {
+      try { await navigator.clipboard.writeText(logsContainer.innerText); e.target.textContent = "Copied!"; setTimeout(() => e.target.textContent = "Copy", 1500); } catch(err) {}
+    });
+
+    // --- Core Variables ---
+    const video = document.getElementById("webcam");
+    const canvas = document.getElementById("output_canvas");
+    const ctx = canvas.getContext("2d"); // Added alpha: false for slight performance boost if background is opaque, but keeping default for now
+    const cameraSelect = document.getElementById("cameraSelect");
+    const peopleSelect = document.getElementById("peopleSelect");
+    const statusBadge = document.getElementById("statusBadge");
+
+    let detector = null, handDetector = null, currentStream = null, maxPoses = 1;
+    const SKELETON_PAIRS = [[5,6],[5,7],[7,9],[6,8],[8,10],[5,11],[6,12],[11,12],[11,13],[13,15],[12,14],[14,16]];
+    const TRAIL_JOINTS = [7, 8, 9, 10, 13, 14, 15, 16]; 
+    const MAX_HISTORY = 20; // Reduced slightly for performance
+    let motionTrails = {};
+    const HAND_OPEN_THRESHOLD = 1.4;
+
+    // PERFORMANCE OPTIMIZATION: Throttle hand detection
+    let frameCount = 0;
+    let lastHands = [];
+    const HAND_DETECT_INTERVAL = 3; // Run heavy hand model only every 3rd frame
+
+    // --- Fast Canvas Helpers (Replaces slow shadowBlur) ---
+    function hexToRgba(hex, alpha) {
+      const r = parseInt(hex.slice(1, 3), 16);
+      const g = parseInt(hex.slice(3, 5), 16);
+      const b = parseInt(hex.slice(5, 7), 16);
+      return `rgba(${r},${g},${b},${alpha})`;
+    }
+
+    function drawGlowingCircle(x, y, radius, color) {
+      // Fake glow: draw a larger, semi-transparent circle first
+      ctx.fillStyle = hexToRgba(color, 0.3);
+      ctx.beginPath();
+      ctx.arc(x, y, radius * 2.5, 0, 2 * Math.PI);
+      ctx.fill();
+      // Solid inner circle
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(x, y, radius, 0, 2 * Math.PI);
+      ctx.fill();
+    }
+
+    async function initDetectors() {
+      try {
+        statusBadge.textContent = "Status: Loading Models...";
+        await tf.setBackend("webgl");
+        await tf.ready();
+
+        if (detector) detector.dispose();
+        if (handDetector) handDetector.dispose();
+
+        const modelType = maxPoses > 1 ? poseDetection.movenet.modelType.MULTIPOSE_LIGHTNING : poseDetection.movenet.modelType.SINGLEPOSE_LIGHTNING;
+        
+        detector = await poseDetection.createDetector(poseDetection.SupportedModels.MoveNet, { 
+          modelType, enableTracking: true, enableSmoothing: true, maxPoses, trackerType: poseDetection.TrackerType.BoundingBox 
+        });
+
+        // PERFORMANCE OPTIMIZATION: Cap maxHands to prevent exponential slowdown
+        const maxHandsToTrack = Math.min(maxPoses * 2, 4); 
+        
+        handDetector = await handPoseDetection.createDetector(handPoseDetection.SupportedModels.MediaPipeHands, {
+          runtime: 'mediapipe', solutionPath: 'https://cdn.jsdelivr.net/npm/@mediapipe/hands',
+          modelType: 'lite', maxHands: maxHandsToTrack 
+        });
+
+        motionTrails = {};
+        statusBadge.textContent = "Status: Ready";
+        console.log(`✅ Ready. MoveNet + Hands (Max ${maxHandsToTrack} hands, throttled 1/${HAND_DETECT_INTERVAL} frames)`);
+      } catch (err) {
+        statusBadge.textContent = "Status: Error";
+        console.error("❌ Init Error:", err);
+      }
+    }
+
+    function evaluateHandState(handKeypoints) {
+      const wrist = handKeypoints[0], middleMCP = handKeypoints[9];
+      const handSize = Math.hypot(middleMCP.x - wrist.x, middleMCP.y - wrist.y);
+      if (handSize < 10) return { state: 'unknown', color: '#888888' };
+
+      const tips = [8, 12, 16, 20];
+      const avgTipDist = tips.reduce((sum, idx) => sum + Math.hypot(handKeypoints[idx].x - wrist.x, handKeypoints[idx].y - wrist.y), 0) / 4;
+      const isClosed = (avgTipDist / handSize) < HAND_OPEN_THRESHOLD;
+      
+      return { state: isClosed ? 'grabbing' : 'open', color: isClosed ? '#FF0055' : '#00FF66' };
+    }
+
+    function getHandStateForWrist(moveNetWrist, hands) {
+      if (!moveNetWrist || moveNetWrist.score < 0.3) return { state: 'unknown', color: '#888888' };
+      let closestHand = null, minDist = Infinity;
+
+      for (const hand of hands) {
+        if (hand.score < 0.5) continue;
+        const dist = Math.hypot(hand.keypoints[0].x - moveNetWrist.x, hand.keypoints[0].y - moveNetWrist.y);
+        if (dist < minDist && dist < 120) { minDist = dist; closestHand = hand; }
+      }
+      return closestHand ? evaluateHandState(closestHand.keypoints) : { state: 'not detected', color: '#FFAA00' };
+    }
+
+    async function setupCameraOptions() {
+      try {
+        const initialStream = await navigator.mediaDevices.getUserMedia({ video: true });
+        initialStream.getTracks().forEach(t => t.stop());
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoDevices = devices.filter(d => d.kind === "videoinput");
+        cameraSelect.innerHTML = "";
+        videoDevices.forEach((device, index) => {
+          const opt = document.createElement("option");
+          opt.value = device.deviceId; opt.textContent = device.label || `Camera ${index + 1}`;
+          cameraSelect.appendChild(opt);
+        });
+        if (videoDevices.length > 0) startCamera(videoDevices[0].deviceId);
+      } catch (err) { console.error("❌ Camera Error:", err); }
+    }
+
+    async function startCamera(deviceId) {
+      if (currentStream) currentStream.getTracks().forEach(t => t.stop());
+      try {
+        currentStream = await navigator.mediaDevices.getUserMedia({ video: { deviceId: deviceId ? { exact: deviceId } : undefined, width: { ideal: 640 }, height: { ideal: 480 } } });
+        video.srcObject = currentStream;
+      } catch (err) { console.error("❌ Stream Error:", err); }
+    }
+
+    function drawTrails(personId, keypoints, scaleX, scaleY) {
+      if (!motionTrails[personId]) motionTrails[personId] = {};
+      const personTrails = motionTrails[personId];
+      ctx.lineWidth = 3; ctx.lineCap = "round"; ctx.lineJoin = "round";
+
+      TRAIL_JOINTS.forEach(jIdx => {
+        const kp = keypoints[jIdx];
+        if (!kp || (kp.score && kp.score < 0.15)) return;
+        if (!personTrails[jIdx]) personTrails[jIdx] = [];
+        personTrails[jIdx].push({ x: kp.x * scaleX, y: kp.y * scaleY });
+        if (personTrails[jIdx].length > MAX_HISTORY) personTrails[jIdx].shift();
+
+        const pts = personTrails[jIdx];
+        if (pts.length < 2) return;
+        for (let i = 1; i < pts.length; i++) {
+          ctx.strokeStyle = `rgba(0, 225, 255, ${(i / pts.length).toFixed(2)})`;
+          ctx.beginPath(); ctx.moveTo(pts[i - 1].x, pts[i - 1].y); ctx.lineTo(pts[i].x, pts[i].y); ctx.stroke();
+        }
+      });
+    }
+
+    async function renderLoop() {
+      if (!detector || !handDetector || video.readyState < 2) { requestAnimationFrame(renderLoop); return; }
+      if (video.videoWidth > 0 && canvas.width !== video.videoWidth) {
+        canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+      }
+
+      let poses = [];
+      try { poses = await detector.estimatePoses(video, { maxPoses, flipHorizontal: false }); } catch (e) { poses = []; }
+      if (!Array.isArray(poses)) poses = [];
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const activePoses = poses.filter(p => (p.score === undefined || p.score > 0.15)).slice(0, maxPoses);
+      statusBadge.textContent = `Tracking: ${activePoses.length} person(s)`;
+
+      const scaleX = canvas.width / video.videoWidth;
+      const scaleY = canvas.height / video.videoHeight;
+      const activeIds = new Set();
+
+      const wristsVisible = activePoses.some(p => (p.keypoints[9]?.score > 0.3) || (p.keypoints[10]?.score > 0.3));
+      
+      // PERFORMANCE OPTIMIZATION: Only run hand detection every N frames
+      frameCount++;
+      let hands = lastHands;
+      if (wristsVisible && frameCount % HAND_DETECT_INTERVAL === 0) {
+        try { hands = await handDetector.estimateHands(video); lastHands = hands; } catch (e) {}
+      } else if (!wristsVisible) {
+        lastHands = []; // Clear ghost hands if wrists disappear
+      }
+
+      // --- Optimized Drawing (No shadowBlur) ---
+      activePoses.forEach((pose, index) => {
+        const personId = pose.id !== undefined ? pose.id : index;
+        activeIds.add(personId);
+        drawTrails(personId, pose.keypoints, scaleX, scaleY);
+
+        // Draw Skeleton (Solid lines, no shadow)
+        ctx.strokeStyle = "#00FF66"; ctx.lineWidth = 4;
+        SKELETON_PAIRS.forEach(([i, j]) => {
+          const kp1 = pose.keypoints[i], kp2 = pose.keypoints[j];
+          if ((kp1?.score ?? 0) > 0.15 && (kp2?.score ?? 0) > 0.15) {
+            ctx.beginPath(); ctx.moveTo(kp1.x * scaleX, kp1.y * scaleY); ctx.lineTo(kp2.x * scaleX, kp2.y * scaleY); ctx.stroke();
+          }
+        });
+
+        // Draw Joints & Hands
+        pose.keypoints.forEach((kp, kpIndex) => {
+          if ((kp?.score ?? 0) > 0.15) {
+            let pointColor = "#FF0055", radius = 5;
+            if (kpIndex === 9 || kpIndex === 10) {
+              const handState = getHandStateForWrist(kp, hands);
+              pointColor = handState.color; radius = 7;
+              if (handState.state !== 'unknown' && handState.state !== 'not detected') {
+                ctx.fillStyle = pointColor; ctx.font = "bold 12px monospace";
+                ctx.fillText(handState.state === 'grabbing' ? "✊ GRAB" : "🖐 OPEN", (kp.x * scaleX) + 14, (kp.y * scaleY) + 4);
+              }
+            }
+            drawGlowingCircle(kp.x * scaleX, kp.y * scaleY, radius, pointColor);
+          }
+        });
+      });
+
+      for (const id in motionTrails) { if (!activeIds.has(Number(id))) delete motionTrails[id]; }
+      requestAnimationFrame(renderLoop);
+    }
+
+    cameraSelect.addEventListener("change", e => startCamera(e.target.value));
+    peopleSelect.addEventListener("change", async e => { maxPoses = parseInt(e.target.value, 10); await initDetectors(); });
+
+    (async () => { await initDetectors(); await setupCameraOptions(); requestAnimationFrame(renderLoop); })();
+  </script>
+</body>
+</html>

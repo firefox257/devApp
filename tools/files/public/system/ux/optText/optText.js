@@ -1,4 +1,3 @@
-// ./system/ux/optText/optText.js
 import {
 	injectStyles, showToast, getDialogOverlay, getGotoLineModal, createOptTextDOM,
 	LINE_HEIGHT, LINE_NUM_WIDTH, BOTTOM_PADDING, FONT_SIZE, FONT_FAMILY
@@ -20,9 +19,6 @@ const CONFIG = {
 	focusColor: '#f57c00', focusSelectedColor: '#e65100', debugHistory: false
 };
 
-// ==========================================
-// ✅ SHARED HIDDEN INPUT (Singleton)
-// ==========================================
 let sharedHiddenInput = null;
 let activeInstance = null;
 let lastInputValue = ''; 
@@ -112,7 +108,6 @@ function ensureSharedHiddenInput() {
 	return sharedHiddenInput;
 }
 
-// ✅ TRUE TAB SUPPORT HELPERS
 function _getVisualColumn(line, charIndex) {
 	let visualCol = 0;
 	const limit = Math.min(charIndex, line.length);
@@ -165,7 +160,6 @@ function _getRenderableLine(line) {
 	return result;
 }
 
-// ✅ INTERNAL FACTORY
 function createOptTextInstance(originalElement = null, initialData = null) {
 	injectStyles();
 	let dataManager = null;
@@ -184,7 +178,6 @@ function createOptTextInstance(originalElement = null, initialData = null) {
 	let insertionPoint = { type: 'cursor', ref: cursor };
 	let metrics = { charWidth: 9, viewportWidth: 0, viewportHeight: 0, visibleLineCount: 0, maxScrollY: 0, maxScrollX: 0, contentWidth: 0, dpr: window.devicePixelRatio || 1, fullViewportHeight: 0, keyboardHeight: 0, totalContentHeight: 0, _fontCached: null };
 
-	// ✅ FIX: Added isDoubleTapPending to touch state
 	let touch = { lastY: 0, lastX: 0, lastTime: 0, velocityY: 0, velocityX: 0, isScrolling: false, startTime: 0, startY: 0, startX: 0, momentumId: null, lastMomentumTime: 0, touchedHandle: null, didScroll: false, scrollYAtGrab: 0, scrollXAtGrab: 0, isDown:false, isTouchSequence: false, isDoubleTapPending: false };
 
 	let lastTapTime = { touch: 0, mouse: 0 };
@@ -695,7 +688,6 @@ function createOptTextInstance(originalElement = null, initialData = null) {
 	function _isTouchEvent(e) { return e.type.startsWith('touch'); }
 	function _shouldPreventDefault(e, isScrolling) { return _isTouchEvent(e) && (isScrolling || zoom.active || touch.touchedHandle); }
 
-	// ✅ FIX: Completely overhauled _onPointerDown to detect double-tap early
 	function _onPointerDown(e) {
 		if (isLoading || (e.button !== undefined && e.button !== 0)) return;
 		if (_isTouchEvent(e) && (selection.active || zoom.active || touch.touchedHandle)) e.preventDefault();
@@ -707,7 +699,6 @@ function createOptTextInstance(originalElement = null, initialData = null) {
 		const lastPos = lastTapPos[inputType];
 		const distFromLast = Math.sqrt((pt.y - lastPos.y) ** 2 + (pt.x - lastPos.x) ** 2);
 		
-		// ✅ Detect potential double tap immediately on touch down
 		touch.isDoubleTapPending = lastTime > 0 && (now - lastTime) < DOUBLE_TAP_THRESHOLD && distFromLast < DOUBLE_TAP_DISTANCE;
 
 		touch.isDown = true;
@@ -720,7 +711,6 @@ function createOptTextInstance(originalElement = null, initialData = null) {
 		touch.didScroll = false;
 		_stopMomentum();
 
-		// ✅ If it's a potential double tap, disable handle grabbing and zoom logic
 		if (touch.isDoubleTapPending) {
 			_cancelZoomTimer();
 			return; 
@@ -739,7 +729,6 @@ function createOptTextInstance(originalElement = null, initialData = null) {
 		_cancelZoomTimer(); zoom.timer = setTimeout(() => _activateZoom(pt.x, pt.y), CONFIG.longPressDelay);
 	}
 
-	// ✅ FIX: Ignore move events if double tap is pending
 	function _onPointerMove(e) {
 		if (isLoading) return;
 		if (e.type === 'mousemove' && e.buttons === 0) {
@@ -751,7 +740,6 @@ function createOptTextInstance(originalElement = null, initialData = null) {
 		if (touch.isTouchSequence && !_isTouchEvent(e)) return;
 		if (!touch.isDown) return;
 
-		// ✅ Ignore movement during double tap to prevent accidental handle dragging or scrolling
 		if (touch.isDoubleTapPending) return;
 
 		const pt = _getEventPoint(e);
@@ -967,6 +955,14 @@ function createOptTextInstance(originalElement = null, initialData = null) {
 			_updateUndoRedoButtons();
 		}
 		command.execute(execCtx);
+
+		// 🔥 FIXED: Pass container.extensions
+		additionManager.triggerHook('onChange', {
+			reason: 'insert',
+			context: dataManager.current,
+			api: additionManager._createAPI(container, dataManager)
+		}, container.extensions);
+
 		if (insertionPoint.type !== 'cursor') { cursor.line = newCursorLine; cursor.col = newCursorCol; }
 		else { ip.line = newCursorLine; ip.col = newCursorCol; }
 		_forceCursorPositionVisible(newCursorLine, newCursorCol);
@@ -992,6 +988,13 @@ function createOptTextInstance(originalElement = null, initialData = null) {
 		_updateMetrics();
 		_forceCursorPositionVisible(cursor.line, cursor.col);
 		needsRender = true;
+
+		// 🔥 FIXED: Pass container.extensions
+		additionManager.triggerHook('onChange', {
+			reason: 'replace',
+			context: dataManager.current,
+			api: additionManager._createAPI(container, dataManager)
+		}, container.extensions);
 	}
 
 	function _deleteCurrentSelection(recordHistory = true) {
@@ -1007,6 +1010,14 @@ function createOptTextInstance(originalElement = null, initialData = null) {
 		command.execute(execCtx);
 		_clearSelection();
 		needsRender = true;
+
+		// 🔥 FIXED: Pass container.extensions
+		additionManager.triggerHook('onChange', {
+			reason: 'delete',
+			context: dataManager.current,
+			api: additionManager._createAPI(container, dataManager)
+		}, container.extensions);
+
 		return true;
 	}
 
@@ -1134,6 +1145,18 @@ function createOptTextInstance(originalElement = null, initialData = null) {
 	function _hideModal() { modalOverlay.classList.remove('visible'); pendingClipboardText = ''; }
 
 	function _handleKey(e) {
+		// 🔥 FIXED: Pass container.extensions to filter hooks
+		additionManager.triggerHook('onKeyDown', {
+			key: e.key,
+			code: e.code,
+			ctrlKey: e.ctrlKey,
+			metaKey: e.metaKey,
+			shiftKey: e.shiftKey,
+			context: dataManager.current,
+			api: additionManager._createAPI(container, dataManager),
+			prevented: false
+		}, container.extensions);
+
 		if (e.ctrlKey || e.metaKey) {
 			if (e.key === 'v') { e.preventDefault(); _handlePaste(); return; }
 			if (e.key === 'c') { e.preventDefault(); _handleCopy(); return; }
@@ -1161,6 +1184,29 @@ function createOptTextInstance(originalElement = null, initialData = null) {
 			needsRender = true; e.preventDefault(); break;
 			case 'Enter':
 			if (selection.active && _deleteCurrentSelection()) { needsRender = true; e.preventDefault(); return; }
+
+			const enterPayload = {
+				key: 'Enter',
+				defaultText: '\n',
+				line: cursor.line,
+				col: cursor.col,
+				lines: lines,
+				context: dataManager.current,
+				api: additionManager._createAPI(container, dataManager),
+				prevented: false
+			};
+
+			// 🔥 FIXED: Pass container.extensions
+			const hookResult = additionManager.triggerHook('beforeInsert', enterPayload, container.extensions);
+
+			if (hookResult.prevented) {
+				e.preventDefault();
+				if (hookResult.text !== undefined) {
+					container._insertTextAtCursor(hookResult.text, true);
+				}
+				return;
+			}
+
 			{
 				const command = new EditCommand('insert', cursor.line, cursor.col, cursor.line, cursor.col, '\n', { line: cursor.line + 1, col: 0 }, { active: false });
 				if (dataManager.current) dataManager.current.history.push(command);
@@ -1296,7 +1342,6 @@ function createOptTextInstance(originalElement = null, initialData = null) {
 			});
 	}
 
-	// ✅ FIX: Completely overhauled _onPointerUp to handle early double-tap completion
 	function _onPointerUp(e) {
 		if (isLoading) return;
 		if (touch.isTouchSequence && !_isTouchEvent(e)) return;
@@ -1307,13 +1352,12 @@ function createOptTextInstance(originalElement = null, initialData = null) {
 		
 		_cancelZoomTimer();
 		
-		// ✅ If double tap was pending, execute word selection immediately and exit
 		if (touch.isDoubleTapPending) {
 			_selectWordAt(pt.x, pt.y);
 			touch.isDoubleTapPending = false;
 			touch.isDown = false;
 			touch.isScrolling = false;
-			lastTapTime[inputType] = 0; // Reset to prevent triple-tap chaining issues
+			lastTapTime[inputType] = 0;
 			_enterEdit();
 			if (_shouldPreventDefault(e, false)) e.preventDefault();
 			return;
@@ -1368,7 +1412,6 @@ function createOptTextInstance(originalElement = null, initialData = null) {
 		touch.isScrolling = false;
 	}
 
-	// ✅ FIX: Reset isDoubleTapPending on cancel/leave
 	function _onPointerCancel(e) {
 		touch.isDown = false;
 		touch.isTouchSequence = false;
@@ -1428,9 +1471,6 @@ function createOptTextInstance(originalElement = null, initialData = null) {
 	_init(); return container;
 }
 
-// ==========================================
-// ✅ UNIFIED GLOBAL ENTRY POINT: newOptText
-// ==========================================
 export function newOptText(target = null, initialData = null) {
 	if (target && typeof target === 'object' && !(target instanceof HTMLElement) && !(target instanceof String)) {
 		initialData = target;
@@ -1457,9 +1497,6 @@ if (typeof globalThis !== 'undefined') {
 	globalThis.newOptText = newOptText;
 }
 
-// ==========================================
-// ✅ FIXED AUTO-INITIALIZATION FROM <opttext> TAG
-// ==========================================
 if (typeof document !== 'undefined') {
 	const processOptTextTags = () => {
 		document.querySelectorAll('opttext').forEach(el => {

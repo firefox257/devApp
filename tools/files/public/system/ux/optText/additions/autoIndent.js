@@ -1,86 +1,51 @@
-// ./system/ux/optText/additions/autoIndent.js
 import { additionManager } from '../optTextAdditions.js';
-
-// Module-scoped variables to ensure clean removal during cleanup
-let _container = null;
-let _handleKeyDown = null;
 
 additionManager.register({
 	id: 'autoIndent',
 	name: 'Auto Indent',
+	description: 'Automatically indents new lines and aligns with programming brackets.',
 	
-	// ✅ Universal auto-init will run this automatically because `init` exists
-	
-	init: (api, container, dataManager) => {
-		_container = container;
-		const hiddenInput = container.querySelector('.opt-text-hidden-input');
-		let isHandlingEnter = false;
-
-		_handleKeyDown = (e) => {
-			if ((e.key === 'Enter' || e.keyCode === 13) && !e.ctrlKey && !e.metaKey) {
-				if (isHandlingEnter) {
-					e.preventDefault();
-					e.stopPropagation();
-					return;
-				}
-
-				isHandlingEnter = true;
-				e.preventDefault();
-				e.stopPropagation();
-
-				if (hiddenInput) hiddenInput.value = '';
-
-				setTimeout(() => {
-					try {
-						const cursorPos = api.editor.getCursor();
-						const lines = api.editor.getLines();
-						const lineIdx = cursorPos.line;
-						const col = cursorPos.col;
-						const currentLine = lines[lineIdx] || '';
-
-						const before = currentLine.slice(0, col);
-						const after = currentLine.slice(col);
-
-						const leadingTabs = (before.match(/^\t+/) || [''])[0].length;
-						const openBrackets = (before.match(/[{[(]/g) || []).length;
-						const closeBrackets = (before.match(/[}\])]/g) || []).length;
-						let indentLevel = leadingTabs + (openBrackets - closeBrackets);
-
-						if (before.trim().endsWith('{') || before.trim().endsWith('[') || before.trim().endsWith('(')) {
-							indentLevel = Math.max(indentLevel, leadingTabs + 1);
-						}
-
-						if (/^\s*[}\])]/.test(after)) {
-							indentLevel = Math.max(0, indentLevel - 1);
-						}
-
-						const newIndent = '\t'.repeat(Math.max(0, indentLevel));
-
-						api.editor.augmentLines((currentLines) => {
-							const newLines = [...currentLines];
-							newLines[lineIdx] = before;
-							newLines.splice(lineIdx + 1, 0, newIndent + after);
-							return newLines;
-						});
-
-						api.editor.setCursor(lineIdx + 1, newIndent.length);
-					} catch (err) {
-						console.error("[AutoIndent] Error during auto-indent: ", err);
-					} finally {
-						isHandlingEnter = false;
-					}
-				}, 16);
+	hooks: {
+		beforeInsert: (payload) => {
+			// Only intercept newline insertions for this specific feature
+			if (payload.key !== 'Enter' && payload.defaultText !== '\n') {
+				return payload; 
 			}
-		};
 
-		container.addEventListener('keydown', _handleKeyDown, true);
-	},
+			const { line, col, lines } = payload;
+			const currentLine = lines[line] || '';
+			
+			// 1. Get the text before the cursor to determine current indentation
+			const textBeforeCursor = currentLine.slice(0, col);
+			const indentMatch = textBeforeCursor.match(/^(\s*)/);
+			let baseIndent = indentMatch ? indentMatch[1] : '';
+			
+			// 2. Check if the text before the cursor ends with an opening bracket
+			const trimmedBeforeCursor = textBeforeCursor.trim();
+			const lastChar = trimmedBeforeCursor.slice(-1);
+			const isOpenBracket = ['{', '[', '('].includes(lastChar);
+			
+			// 3. Check if there is a closing bracket immediately after the cursor
+			// (e.g., user pressed Enter between { and })
+			const textAfterCursor = currentLine.slice(col);
+			const trimmedAfterCursor = textAfterCursor.trimStart();
+			const nextChar = trimmedAfterCursor.charAt(0);
+			const isNextCloseBracket = ['}', ']', ')'].includes(nextChar);
 
-	cleanup: () => {
-		if (_container && _handleKeyDown) {
-			_container.removeEventListener('keydown', _handleKeyDown, true);
-			_container = null;
-			_handleKeyDown = null;
+			let newIndent = baseIndent;
+			if (isOpenBracket) {
+				newIndent += '\t'; // Add an extra tab for the new block
+				
+				// Optional: If there's a closing bracket right after, we might want to 
+				// insert a newline, the new indent, AND another newline with base indent 
+				// to sandwich the cursor. For now, standard single-line indent is applied.
+			}
+
+			// 4. Return the custom text to insert and prevent the default '\n' behavior
+			return {
+				text: '\n' + newIndent,
+				prevented: true
+			};
 		}
 	}
 });

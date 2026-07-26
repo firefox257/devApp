@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WASM Console</title>
+
+<!-- Required for SharedArrayBuffer (WASM pthreads) -->
+<meta http-equiv="Cross-Origin-Opener-Policy" content="same-origin">
+<meta http-equiv="Cross-Origin-Embedder-Policy" content="require-corp">
+
+<style>
+html, body {
+	margin: 0;
+	padding: 0;
+	width: 100%;
+	height: 100%;
+	background-color: #0d1117;
+	color: #c9d1d9;
+	font-family: 'Consolas', 'Courier New', monospace;
+	font-size: 14px;
+	overflow: hidden;
+}
+#console {
+	width: 100%;
+	height: 100%;
+	padding: 12px;
+	box-sizing: border-box;
+	overflow-y: auto;
+	white-space: pre-wrap;
+	word-break: break-all;
+}
+.log-info { color: #58a6ff; }
+.log-warn { color: #d29922; }
+.log-error { color: #f85149; }
+</style>
+</head>
+<body>
+<div id="console"></div>
+
+<script type="module">
+import { WasmRuntime } from '/system/js/wasm-runtime.js';
+
+const consoleEl = document.getElementById('console');
+
+function appendToConsole(msg, type = 'log') {
+	const line = document.createElement('div');
+	line.className = `log-${type}`;
+	const time = new Date().toLocaleTimeString('en-US', { hour12: false });
+	const formattedMsg = typeof msg === 'string' ? msg : JSON.stringify(msg, null, 2);
+	line.textContent = `[${time}] ${formattedMsg}`;
+	consoleEl.appendChild(line);
+	consoleEl.scrollTop = consoleEl.scrollHeight;
+}
+
+function addToConsole(msg, type = 'log') {
+	const line = document.createElement('span');
+	line.className = `log-${type}`;
+	const time = new Date().toLocaleTimeString('en-US', { hour12: false });
+	const formattedMsg = typeof msg === 'string' ? msg : JSON.stringify(msg, null, 2);
+	line.textContent = `${formattedMsg}`;
+	consoleEl.appendChild(line);
+	consoleEl.scrollTop = consoleEl.scrollHeight;
+}
+
+// ==========================================
+// 1. Intercept native console
+// ==========================================
+const _origLog = console.log, _origWarn = console.warn, _origError = console.error, _origInfo = console.info;
+console.log = (...args) => { appendToConsole(args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' '), 'log'); _origLog.apply(console, args); };
+console.info = (...args) => { appendToConsole(args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' '), 'info'); _origInfo.apply(console, args); };
+console.warn = (...args) => { appendToConsole(args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' '), 'warn'); _origWarn.apply(console, args); };
+console.error = (...args) => { appendToConsole(args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' '), 'error'); _origError.apply(console, args); };
+
+// ==========================================
+// 2. Intercept process.stdout / process.stderr (Node.js polyfills)
+// ==========================================
+
+const stdoutWrite = function(chunk, encoding, callback) {
+	// Convert Buffer/Uint8Array or other types to string
+	const msg = typeof chunk === 'string' ? chunk : String(chunk);
+	addToConsole(msg, 'log');
+
+};
+
+const stderrWrite = function(chunk, encoding, callback) {
+	const msg = typeof chunk === 'string' ? chunk : String(chunk);
+	addToConsole(msg, 'error');
+
+};
+
+
+
+// ==========================================
+// 3. WASM Execution
+// ==========================================
+async function runWasm() {
+	console.info('Fetching try2.wasm...');
+	try {
+		const response = await fetch('./try2.wasm');
+		if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+
+		const wasmBuffer = await response.arrayBuffer();
+		console.info(`Downloaded ${wasmBuffer.byteLength} bytes.`);
+		console.info('Initializing WasmRuntime...');
+
+
+
+		
+
+		
+		
+
+
+		const runtime = new WasmRuntime({
+				initialMemory: 256,
+				maxMemory: 4096,
+				shared: true,
+				// These will now automatically trigger your intercepted console.log/error!
+				onStdout: (msg) => console.log(msg),
+				onStderr: (msg) => console.error(msg),
+				imports: {
+					env: {
+						jsalert: (ptr) => {
+							const message = runtime.readString(ptr);
+							console.info(`[JS Interceptor] Alert triggered with: "${message}"`);
+							alert(message);
+							return 124;
+						},
+						jsWriteStr: (ptr) => {
+							const message = runtime.readString(ptr);
+							stdoutWrite(message);
+						},
+	
+
+					}
+				},
+			});
+
+		console.info('Instantiating WebAssembly module...');
+		await runtime.instantiate(wasmBuffer);
+
+		console.info('Executing main()...');
+		const exitCode = runtime.run();
+
+		console.info('Calling greet("Alice")...');
+		var namePtr = runtime.writeString("Alice");
+		const resultPtr = runtime.callExport('greet', namePtr);
+		const greeting = runtime.readString(resultPtr);
+		console.info(`Result from C++: "${greeting}"`);
+
+		// Note: Add runtime.callExport('free', resultPtr) here if C++ dynamically allocated the return string
+		runtime.freeString(namePtr);
+
+		if (exitCode === 0) {
+			console.info('🏁 Application finished successfully (Exit Code 0).');
+		} else {
+			console.warn(`⚠️ Application exited with code: ${exitCode}`);
+		}
+	} catch (err) {
+		console.error('❌ FATAL ERROR:', err.message || err);
+		if (err.message && err.message.includes('SharedArrayBuffer')) {
+			console.error('🛑 HINT: Ensure server sends COOP and COEP headers.');
+		}
+	}
+}
+
+runWasm();
+</script>
+</body>
+</html>

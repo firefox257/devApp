@@ -20,6 +20,98 @@ const CONFIG = {
 	focusColor: '#f57c00', focusSelectedColor: '#e65100', debugHistory: false
 };
 
+// ==========================================
+// ✅ SHARED HIDDEN INPUT (Singleton)
+// ==========================================
+let sharedHiddenInput = null;
+let activeInstance = null;
+let lastInputValue = ''; 
+
+function ensureSharedHiddenInput() {
+	if (sharedHiddenInput) return sharedHiddenInput;
+
+	sharedHiddenInput = document.createElement('input');
+	sharedHiddenInput.type = 'text';
+	sharedHiddenInput.className = 'opt-text-hidden-input';
+	sharedHiddenInput.setAttribute('autocomplete', 'off');
+	sharedHiddenInput.setAttribute('autocorrect', 'off');
+	sharedHiddenInput.setAttribute('autocapitalize', 'none');
+	sharedHiddenInput.setAttribute('inputmode', 'text');
+	
+	sharedHiddenInput.style.cssText = 'position:fixed; top:0; left:0; width:1px; height:1px; color:transparent; background:transparent; border:none; outline:none; z-index:-1; caret-color:transparent; font-size:16px;';
+	document.body.appendChild(sharedHiddenInput);
+
+	sharedHiddenInput.addEventListener('input', (e) => {
+		if (!activeInstance) return;
+		
+		const currentValue = sharedHiddenInput.value;
+		let textToInsert = '';
+		let handled = false;
+
+		if (e.inputType === 'deleteContentBackward') {
+			activeInstance._handleKey(new KeyboardEvent('keydown', { key: 'Backspace' }));
+			handled = true;
+		} else if (e.inputType === 'deleteContentForward') {
+			activeInstance._handleKey(new KeyboardEvent('keydown', { key: 'Delete' }));
+			handled = true;
+		} else if (e.inputType === 'insertLineBreak' || e.inputType === 'insertParagraph') {
+			activeInstance._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+			handled = true;
+		} else {
+			if (e.data) {
+				textToInsert = e.data;
+			} else if (currentValue.length > lastInputValue.length) {
+				textToInsert = currentValue.slice(lastInputValue.length);
+			} else if (currentValue.length > 0) {
+				textToInsert = currentValue;
+			}
+
+			if (textToInsert) {
+				activeInstance._insertTextAtCursor(textToInsert, true);
+				if (activeInstance.oninput) activeInstance.oninput.call(activeInstance, { target: activeInstance });
+				handled = true;
+			}
+		}
+
+		lastInputValue = currentValue;
+		sharedHiddenInput.value = '';
+		lastInputValue = ''; 
+	});
+
+	sharedHiddenInput.addEventListener('keydown', (e) => {
+		if (!activeInstance) return;
+		
+		if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key === 'g') {
+			e.preventDefault();
+			activeInstance._showGotoModal();
+			return;
+		}
+
+		activeInstance._handleKey(e);
+	});
+
+	sharedHiddenInput.addEventListener('blur', () => {
+		setTimeout(() => {
+			if (!activeInstance) return;
+			const ae = document.activeElement;
+			
+			if (ae === sharedHiddenInput) return;
+			
+			if (ae === activeInstance._gotoInput || activeInstance._modalOverlay.contains(ae)) {
+				return;
+			}
+			
+			if (activeInstance.contains(ae)) {
+				sharedHiddenInput.focus();
+			} else {
+				activeInstance = null;
+			}
+		}, 0);
+	});
+
+	return sharedHiddenInput;
+}
+
 // ✅ TRUE TAB SUPPORT HELPERS
 function _getVisualColumn(line, charIndex) {
 	let visualCol = 0;
@@ -73,15 +165,16 @@ function _getRenderableLine(line) {
 	return result;
 }
 
-// ✅ INTERNAL FACTORY (Not exported, used by newOptText)
+// ✅ INTERNAL FACTORY
 function createOptTextInstance(originalElement = null, initialData = null) {
 	injectStyles();
 	let dataManager = null;
 	if (initialData?.dataManager) dataManager = initialData.dataManager;
 	else if (initialData?.contexts) dataManager = new TextDataManager(initialData.contexts);
 	if (!dataManager) dataManager = new TextDataManager([{ name: 'default', lines: [''] }]);
-	
+
 	let lines = dataManager.current ? dataManager.current.lines : (dataManager.addContext('default'), dataManager.current.lines);
+
 	let scroll = { y: 0, x: 0 };
 	let cursor = { line: 0, col: 0, visible: true };
 	let selection = { active: false, anchor: { line: 0, col: 0 }, focus: { line: 0, col: 0 } };
@@ -90,14 +183,22 @@ function createOptTextInstance(originalElement = null, initialData = null) {
 	let isLoading = false;
 	let insertionPoint = { type: 'cursor', ref: cursor };
 	let metrics = { charWidth: 9, viewportWidth: 0, viewportHeight: 0, visibleLineCount: 0, maxScrollY: 0, maxScrollX: 0, contentWidth: 0, dpr: window.devicePixelRatio || 1, fullViewportHeight: 0, keyboardHeight: 0, totalContentHeight: 0, _fontCached: null };
-	let touch = { lastY: 0, lastX: 0, lastTime: 0, velocityY: 0, velocityX: 0, isScrolling: false, startTime: 0, startY: 0, startX: 0, momentumId: null, lastMomentumTime: 0, touchedHandle: null, didScroll: false, scrollYAtGrab: 0, scrollXAtGrab: 0 };
+
+	// ✅ FIX: Added isDoubleTapPending to touch state
+	let touch = { lastY: 0, lastX: 0, lastTime: 0, velocityY: 0, velocityX: 0, isScrolling: false, startTime: 0, startY: 0, startX: 0, momentumId: null, lastMomentumTime: 0, touchedHandle: null, didScroll: false, scrollYAtGrab: 0, scrollXAtGrab: 0, isDown:false, isTouchSequence: false, isDoubleTapPending: false };
+
+	let lastTapTime = { touch: 0, mouse: 0 };
+	let lastTapPos = { touch: { x: 0, y: 0 }, mouse: { x: 0, y: 0 } };
+	const DOUBLE_TAP_THRESHOLD = 350;
+	const DOUBLE_TAP_DISTANCE = 30;
+
 	let zoom = { active: false, timer: null, viewportX: 0, viewportY: 0, fadeTimer: null, dragStart: { x: 0, y: 0 } };
 
 	let pendingClipboardText = '';
 	let needsRender = true;
 	let lastRenderTime = 0;
 
-	let container, canvas, ctx, toolbar, dropdown, hiddenInput, cursorPreview, loadingEl;
+	let container, canvas, ctx, toolbar, dropdown, cursorPreview, loadingEl;
 	let vScroll, vThumb, hScroll, hThumb, menuBtn, modalOverlay;
 	let gotoModal, gotoInput, gotoMaxLabel;
 	let scrollbarsVisible = false;
@@ -111,10 +212,10 @@ function createOptTextInstance(originalElement = null, initialData = null) {
 
 	let allowedExtensions = null;
 
-	if (initialData?.extensions) {
-		allowedExtensions = Array.isArray(initialData.extensions)
-			? initialData.extensions
-			: [initialData.extensions];
+	if (Array.isArray(initialData)) {
+		allowedExtensions = initialData;
+	} else if (initialData?.extensions) {
+		allowedExtensions = Array.isArray(initialData.extensions) ? initialData.extensions : [initialData.extensions];
 	}
 	else if (originalElement) {
 		const extAttr = originalElement.getAttribute('extensions');
@@ -133,17 +234,17 @@ function createOptTextInstance(originalElement = null, initialData = null) {
 
 	let _allowedExtensions = allowedExtensions;
 	Object.defineProperty(container, 'extensions', {
-		get() { return _allowedExtensions; },
-		set(val) {
-			_allowedExtensions = Array.isArray(val) ? val : (val ? [val] : null);
-			if (typeof additionManager !== 'undefined') {
-				if (typeof additionManager.injectToolbarButtons === 'function') additionManager.injectToolbarButtons(container, dataManager, _allowedExtensions);
-				if (typeof additionManager.injectDropdownItems === 'function') additionManager.injectDropdownItems(container, dataManager, _allowedExtensions);
-				if (typeof additionManager.injectAutoInitAdditions === 'function') additionManager.injectAutoInitAdditions(container, dataManager, _allowedExtensions);
-			}
-		},
-		configurable: true
-	});
+			get() { return _allowedExtensions; },
+			set(val) {
+				_allowedExtensions = Array.isArray(val) ? val : (val ? [val] : null);
+				if (typeof additionManager !== 'undefined') {
+					if (typeof additionManager.injectToolbarButtons === 'function') additionManager.injectToolbarButtons(container, dataManager, _allowedExtensions);
+					if (typeof additionManager.injectDropdownItems === 'function') additionManager.injectDropdownItems(container, dataManager, _allowedExtensions);
+					if (typeof additionManager.injectAutoInitAdditions === 'function') additionManager.injectAutoInitAdditions(container, dataManager, _allowedExtensions);
+				}
+			},
+			configurable: true
+		});
 
 	if (originalElement && typeof additionManager !== 'undefined' && additionManager.registry) {
 		for (const def of additionManager.registry.values()) {
@@ -169,22 +270,22 @@ function createOptTextInstance(originalElement = null, initialData = null) {
 						container[`_${config.property}`] = false;
 					}
 					Object.defineProperty(container, config.property, {
-						get() { return this[`_${config.property}`] === true; },
-						set(val) {
-							this[`_${config.property}`] = Boolean(val);
-							const el = container.querySelector(`[data-addition-id="${def.id}"]`);
-							if (el) {
-								if (stateName === 'disabled') {
-									el.disabled = this[`_${config.property}`];
-									if (this[`_${config.property}`]) el.setAttribute('aria-disabled', 'true');
-									else el.removeAttribute('aria-disabled');
-								} else if (stateName === 'hidden') {
-									el.style.display = this[`_${config.property}`] ? 'none' : '';
+							get() { return this[`_${config.property}`] === true; },
+							set(val) {
+								this[`_${config.property}`] = Boolean(val);
+								const el = container.querySelector(`[data-addition-id="${def.id}"]`);
+								if (el) {
+									if (stateName === 'disabled') {
+										el.disabled = this[`_${config.property}`];
+										if (this[`_${config.property}`]) el.setAttribute('aria-disabled', 'true');
+										else el.removeAttribute('aria-disabled');
+									} else if (stateName === 'hidden') {
+										el.style.display = this[`_${config.property}`] ? 'none' : '';
+									}
 								}
-							}
-						},
-						configurable: true
-					});
+							},
+							configurable: true
+						});
 				}
 			}
 		}
@@ -194,7 +295,6 @@ function createOptTextInstance(originalElement = null, initialData = null) {
 	ctx = canvas.getContext('2d', { alpha: false });
 	toolbar = container.querySelector('.opt-text-toolbar');
 	dropdown = container.querySelector('.opt-text-dropdown');
-	hiddenInput = container.querySelector('.opt-text-hidden-input');
 	cursorPreview = container.querySelector('.opt-text-cursor-preview');
 	loadingEl = container.querySelector('.opt-text-loading');
 	vScroll = container.querySelector('.opt-text-scrollbar.vertical');
@@ -212,25 +312,39 @@ function createOptTextInstance(originalElement = null, initialData = null) {
 	container._internalUndo = _undo;
 	container._internalRedo = _redo;
 
+	container._handleKey = _handleKey;
+	container._showGotoModal = _showGotoModal;
+	container._insertTextAtCursor = _insertTextAtCursor;
+	container._gotoInput = gotoInput;
+	container._modalOverlay = modalOverlay;
+
+	container.focus = _enterEdit;
+	container.blur = () => { 
+		if (activeInstance === container) { 
+			sharedHiddenInput.blur(); 
+			activeInstance = null; 
+		} 
+	};
+
 	container.addEventListener('optText:cursor:set', (e) => {
-		const { line, col } = e.detail;
-		if (line >= 0 && line < lines.length) {
-			cursor.line = line; cursor.col = Math.min(col, (lines[line] || '').length);
-			_adjustScrollForCursor(cursor.line, cursor.col); needsRender = true;
-		}
-	});
+			const { line, col } = e.detail;
+			if (line >= 0 && line < lines.length) {
+				cursor.line = line; cursor.col = Math.min(col, (lines[line] || '').length);
+				_adjustScrollForCursor(cursor.line, cursor.col); needsRender = true;
+			}
+		});
 	container.addEventListener('optText:selection:set', (e) => {
-		const { anchor, focus } = e.detail;
-		selection.active = true; selection.anchor = { ...anchor }; selection.focus = { ...focus };
-		insertionPoint = { type: 'focus', ref: selection.focus }; needsRender = true;
-	});
+			const { anchor, focus } = e.detail;
+			selection.active = true; selection.anchor = { ...anchor }; selection.focus = { ...focus };
+			insertionPoint = { type: 'focus', ref: selection.focus }; needsRender = true;
+		});
 	container.addEventListener('optText:scroll:to', (e) => {
-		const { line, col } = e.detail;
-		if (line >= 0 && line < lines.length) {
-			_adjustScrollForCursor(line, Math.min(col, (lines[line] || '').length));
-			needsRender = true;
-		}
-	});
+			const { line, col } = e.detail;
+			if (line >= 0 && line < lines.length) {
+				_adjustScrollForCursor(line, Math.min(col, (lines[line] || '').length));
+				needsRender = true;
+			}
+		});
 	container.addEventListener('optText:change', () => { needsRender = true; });
 
 	container._pushAdditionHistory = (snapBefore, reason) => {
@@ -259,24 +373,24 @@ function createOptTextInstance(originalElement = null, initialData = null) {
 	}
 
 	Object.defineProperty(container, 'value', {
-		get() { return lines.join('\n'); },
-		set(newValue) {
-			if (typeof newValue === 'string') {
-				const snapshotBefore = _getDocumentSnapshot();
-				lines.length = 0; lines.push(...newValue.split('\n'));
-				if (lines.length === 0) lines.push('');
-				_updateMetrics(); needsRender = true;
-				const snapshotAfter = _getDocumentSnapshot();
-				const cmd = _createDiffCommand(snapshotBefore, snapshotAfter, 'value-set');
-				if (cmd && dataManager.current) {
-					dataManager.current.history.push(cmd);
-					_updateUndoRedoButtons();
+			get() { return lines.join('\n'); },
+			set(newValue) {
+				if (typeof newValue === 'string') {
+					const snapshotBefore = _getDocumentSnapshot();
+					lines.length = 0; lines.push(...newValue.split('\n'));
+					if (lines.length === 0) lines.push('');
+					_updateMetrics(); needsRender = true;
+					const snapshotAfter = _getDocumentSnapshot();
+					const cmd = _createDiffCommand(snapshotBefore, snapshotAfter, 'value-set');
+					if (cmd && dataManager.current) {
+						dataManager.current.history.push(cmd);
+						_updateUndoRedoButtons();
+					}
+					if (dataManager?.current) dataManager.current.markModified();
+					if (instanceOnChange) instanceOnChange.call(container, { target: container });
 				}
-				if (dataManager?.current) dataManager.current.markModified();
-				if (instanceOnChange) instanceOnChange.call(container, { target: container });
-			}
-		}, configurable: true
-	});
+			}, configurable: true
+		});
 
 	Object.defineProperty(container, 'onchange', { get() { return instanceOnChange; }, set(fn) { instanceOnChange = typeof fn === 'function' ? fn : null; }, configurable: true });
 	Object.defineProperty(container, 'oninput', { get() { return instanceOnInput; }, set(fn) { instanceOnInput = typeof fn === 'function' ? fn : null; }, configurable: true });
@@ -301,10 +415,11 @@ function createOptTextInstance(originalElement = null, initialData = null) {
 	container.values = {};
 
 	const PROTECTED_OPT_PROPS = new Set([
-		'value', 'onchange', 'oninput', 'cursor', 'selection', 'dataManager',
-		'switchContext', 'addContext', 'removeContext', 'listContexts', 'toJSON',
-		'_internalUndo', '_internalRedo', '_pushAdditionHistory', 'contextId', 'values', 'extensions'
-	]);
+			'value', 'onchange', 'oninput', 'cursor', 'selection', 'dataManager',
+			'switchContext', 'addContext', 'removeContext', 'listContexts', 'toJSON',
+			'_internalUndo', '_internalRedo', '_pushAdditionHistory', 'contextId', 'values', 'extensions',
+			'_handleKey', '_showGotoModal', '_insertTextAtCursor', '_gotoInput', '_modalOverlay', 'focus', 'blur'
+		]);
 
 	container.defineProperty = function(name, descriptor) {
 		if (PROTECTED_OPT_PROPS.has(name)) throw new Error(`[optText] Cannot define protected property: '${name}'`);
@@ -314,7 +429,7 @@ function createOptTextInstance(originalElement = null, initialData = null) {
 			this[name] = descriptor;
 		}
 		return this;
-	}; 
+	};
 
 	container.removeContext = (identifier) => {
 		if (!dataManager) return false;
@@ -331,24 +446,24 @@ function createOptTextInstance(originalElement = null, initialData = null) {
 	};
 
 	Object.defineProperty(container, 'contextId', {
-		get() { return dataManager?.current?.id ?? null; },
-		set(newId) {
-			if (!dataManager || !newId) return;
-			const exists = dataManager.contexts.some(c => c.id === newId || c.name === newId);
-			if (!exists) {
-				dataManager.addContext(newId, [''], { switchTo: true });
-			} else {
-				dataManager.setCurrent(newId);
-			}
-			lines = dataManager.current.lines;
-			if (lines.length === 0) lines.push('');
-			scroll.x = 0; scroll.y = 0; cursor.line = 0; cursor.col = 0; selection.active = false;
-			if (dataManager.current) dataManager.current.history.clear();
-			_updateMetrics(); needsRender = true; _updateUndoRedoButtons();
-			container.dispatchEvent(new CustomEvent('optText:change', { detail: { type: 'context-switched', id: newId } }));
-		},
-		configurable: true
-	});
+			get() { return dataManager?.current?.id ?? null; },
+			set(newId) {
+				if (!dataManager || !newId) return;
+				const exists = dataManager.contexts.some(c => c.id === newId || c.name === newId);
+				if (!exists) {
+					dataManager.addContext(newId, [''], { switchTo: true });
+				} else {
+					dataManager.setCurrent(newId);
+				}
+				lines = dataManager.current.lines;
+				if (lines.length === 0) lines.push('');
+				scroll.x = 0; scroll.y = 0; cursor.line = 0; cursor.col = 0; selection.active = false;
+				if (dataManager.current) dataManager.current.history.clear();
+				_updateMetrics(); needsRender = true; _updateUndoRedoButtons();
+				container.dispatchEvent(new CustomEvent('optText:change', { detail: { type: 'context-switched', id: newId } }));
+			},
+			configurable: true
+		});
 
 	function _updateMetrics() {
 		const rect = container.getBoundingClientRect();
@@ -441,7 +556,7 @@ function createOptTextInstance(originalElement = null, initialData = null) {
 			ctx.fillStyle = '#0066cc'; ctx.fillRect(cursorX, cursorY, 2 / scale, CONFIG.lineHeight);
 		}
 		_updateScrollbars(); _showScrollbars();
-		_updateSelectButtonState(); 
+		_updateSelectButtonState();
 	}
 
 	function _drawSelectionHandles() { if (!selection.active) return; const scale = zoom.active ? CONFIG.zoomLevel : 1; _drawHandle(selection.focus.line, selection.focus.col, selectedHandle === 'focus', scale, 'focus'); _drawHandle(selection.anchor.line, selection.anchor.col, selectedHandle === 'anchor', scale, 'anchor'); }
@@ -567,16 +682,50 @@ function createOptTextInstance(originalElement = null, initialData = null) {
 	function _logHistory(label) { if (!CONFIG.debugHistory) return; const ctxData = dataManager.current; console.log(`[History ${label}]`, { undo: ctxData ? ctxData.history.undoStack.length : 0, redo: ctxData ? ctxData.history.redoStack.length : 0, cursor: { ...cursor }, sel: selection.active ? { a: { ...selection.anchor }, f: { ...selection.focus } } : null }); }
 	function _goToLine(ln, col = 0) { if (isLoading) return false; const tL = _clamp(Math.floor(ln) - 1, 0, lines.length - 1); const tC = _clamp(Math.floor(col), 0, (lines[tL] || '').length); scroll.y = _clamp(tL * CONFIG.lineHeight, 0, metrics.maxScrollY); cursor.line = tL; cursor.col = tC; if (!selection.active) { insertionPoint.type = 'cursor'; insertionPoint.ref = cursor; } _forceCursorPositionVisible(tL, tC); needsRender = true; _showScrollbars(); if (!isEditing) _enterEdit(); return true; }
 	function _showGotoModal() { if (gotoMaxLabel) gotoMaxLabel.textContent = lines.length; if (gotoInput) { gotoInput.value = cursor.line + 1; gotoInput.max = lines.length; } gotoModal.classList.add('visible'); setTimeout(() => { gotoInput?.focus(); gotoInput?.select(); }, 200); }
-	function _hideGotoModal() { gotoModal.classList.remove('visible'); if (isEditing && hiddenInput) hiddenInput.focus(); }
+	
+	function _hideGotoModal() { 
+		gotoModal.classList.remove('visible'); 
+		if (isEditing) {
+			activeInstance = container;
+			ensureSharedHiddenInput().focus();
+		}
+	}
+
 	function _getEventPoint(e) { if (e.touches?.[0]) return { x: e.touches[0].clientX, y: e.touches[0].clientY }; if (e.changedTouches?.[0]) return { x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY }; return { x: e.clientX, y: e.clientY }; }
 	function _isTouchEvent(e) { return e.type.startsWith('touch'); }
 	function _shouldPreventDefault(e, isScrolling) { return _isTouchEvent(e) && (isScrolling || zoom.active || touch.touchedHandle); }
 
+	// ✅ FIX: Completely overhauled _onPointerDown to detect double-tap early
 	function _onPointerDown(e) {
 		if (isLoading || (e.button !== undefined && e.button !== 0)) return;
 		if (_isTouchEvent(e) && (selection.active || zoom.active || touch.touchedHandle)) e.preventDefault();
-		const pt = _getEventPoint(e); touch.startY = touch.lastY = pt.y; touch.startX = touch.lastX = pt.x; 
-		touch.startTime = touch.lastTime = Date.now(); touch.isScrolling = false; touch.touchedHandle = null; touch.didScroll = false; _stopMomentum();
+
+		const pt = _getEventPoint(e);
+		const now = Date.now();
+		const inputType = _isTouchEvent(e) ? 'touch' : 'mouse';
+		const lastTime = lastTapTime[inputType];
+		const lastPos = lastTapPos[inputType];
+		const distFromLast = Math.sqrt((pt.y - lastPos.y) ** 2 + (pt.x - lastPos.x) ** 2);
+		
+		// ✅ Detect potential double tap immediately on touch down
+		touch.isDoubleTapPending = lastTime > 0 && (now - lastTime) < DOUBLE_TAP_THRESHOLD && distFromLast < DOUBLE_TAP_DISTANCE;
+
+		touch.isDown = true;
+		touch.isTouchSequence = _isTouchEvent(e);
+		touch.startY = touch.lastY = pt.y;
+		touch.startX = touch.lastX = pt.x;
+		touch.startTime = touch.lastTime = now;
+		touch.isScrolling = false;
+		touch.touchedHandle = null;
+		touch.didScroll = false;
+		_stopMomentum();
+
+		// ✅ If it's a potential double tap, disable handle grabbing and zoom logic
+		if (touch.isDoubleTapPending) {
+			_cancelZoomTimer();
+			return; 
+		}
+
 		if (selection.active && !zoom.active) {
 			const h = _getHandleAtPosition(pt.x, pt.y);
 			if (h) {
@@ -590,10 +739,24 @@ function createOptTextInstance(originalElement = null, initialData = null) {
 		_cancelZoomTimer(); zoom.timer = setTimeout(() => _activateZoom(pt.x, pt.y), CONFIG.longPressDelay);
 	}
 
+	// ✅ FIX: Ignore move events if double tap is pending
 	function _onPointerMove(e) {
 		if (isLoading) return;
+		if (e.type === 'mousemove' && e.buttons === 0) {
+			touch.isDown = false;
+			touch.isScrolling = false;
+			_cancelZoomTimer();
+			return;
+		}
+		if (touch.isTouchSequence && !_isTouchEvent(e)) return;
+		if (!touch.isDown) return;
+
+		// ✅ Ignore movement during double tap to prevent accidental handle dragging or scrolling
+		if (touch.isDoubleTapPending) return;
+
 		const pt = _getEventPoint(e);
 		const now = Date.now();
+
 		const dy = pt.y - touch.lastY;
 		const dx = pt.x - touch.lastX;
 		const dt = now - touch.lastTime;
@@ -639,6 +802,57 @@ function createOptTextInstance(originalElement = null, initialData = null) {
 		needsRender = true; return true;
 	}
 
+	function _selectWordAt(x, y) {
+		const rect = canvas.getBoundingClientRect();
+		const vx = x - rect.left;
+		if (vx < CONFIG.lineNumWidth) {
+			_placeCursorOrHandle(x, y, 'cursor');
+			return;
+		}
+		const vy = y - rect.top;
+		let cx, cy;
+		if (zoom.active) {
+			const s = CONFIG.zoomLevel;
+			const ox = zoom.viewportX * (1 - s);
+			const oy = zoom.viewportY * (1 - s);
+			cx = scroll.x + (vx - ox) / s;
+			cy = scroll.y + (vy - oy) / s;
+		} else {
+			cx = scroll.x + vx;
+			cy = scroll.y + vy;
+		}
+		const line = Math.floor(cy / CONFIG.lineHeight);
+		if (line < 0 || line >= lines.length) {
+			_placeCursorOrHandle(x, y, 'cursor');
+			return;
+		}
+		const cl = _clamp(line, 0, lines.length - 1);
+		const lt = lines[cl] || '';
+		const targetVisualCol = Math.max(0, Math.floor((cx - CONFIG.lineNumWidth - 8) / metrics.charWidth));
+		let cc = _getCharIndexFromVisualColumn(lt, targetVisualCol);
+		if (cc >= lt.length || /\s/.test(lt[cc])) {
+			_placeCursorOrHandle(x, y, 'cursor');
+			return;
+		}
+		const isWordChar = (c) => /[a-zA-Z0-9_]/.test(c);
+		let startCol = cc;
+		let endCol = cc;
+		if (isWordChar(lt[cc])) {
+			while (startCol > 0 && isWordChar(lt[startCol - 1])) startCol--;
+			while (endCol < lt.length && isWordChar(lt[endCol])) endCol++;
+		} else {
+			const isPunct = (c) => !/\s/.test(c) && !isWordChar(c);
+			while (startCol > 0 && isPunct(lt[startCol - 1])) startCol--;
+			while (endCol < lt.length && isPunct(lt[endCol])) endCol++;
+		}
+		selection.active = true;
+		selection.anchor = { line: cl, col: startCol };
+		selection.focus = { line: cl, col: endCol };
+		insertionPoint = { type: 'focus', ref: selection.focus };
+		_adjustScrollForCursor(cl, endCol);
+		needsRender = true;
+	}
+
 	function _adjustScrollForCursor(line, col) {
 		if (!metrics.charWidth) metrics.charWidth = 9;
 		const ly = line * CONFIG.lineHeight;
@@ -661,45 +875,35 @@ function createOptTextInstance(originalElement = null, initialData = null) {
 	function _activateZoom(sx, sy) { if (isLoading || zoom.active) return; const r = canvas.getBoundingClientRect(); zoom.viewportX = sx - r.left; zoom.viewportY = sy - r.top; zoom.active = true; zoom.dragStart = { x: sx, y: sy }; canvas.style.boxShadow = '0 0 0 4px rgba(59,130,246,0.5), 0 10px 30px rgba(0,0,0,0.2)'; _updateCursorPreview(sx, sy); needsRender = true; }
 	function _deactivateZoom(place = true) { if (!zoom.active) return; zoom.active = false; canvas.style.boxShadow = 'none'; cursorPreview.classList.remove('visible'); clearTimeout(zoom.fadeTimer); zoom.fadeTimer = setTimeout(() => { canvas.style.transition = 'none'; }, CONFIG.zoomFadeDelay); if (place) _updateCursorFromPreview(); needsRender = true; }
 	function _cancelZoomTimer() { if (zoom.timer) { clearTimeout(zoom.timer); zoom.timer = null; } }
-	
-	// ✅ FIXED: Zoom preview now scrolls the canvas and pins perfectly to the pointer
+
 	function _updateCursorPreview(sx, sy) {
 		if (!zoom.active) { cursorPreview.classList.remove('visible'); return; }
-		const r = canvas.getBoundingClientRect(); 
-		const s = CONFIG.zoomLevel; 
-		const vx = sx - r.left; 
+		const r = canvas.getBoundingClientRect();
+		const s = CONFIG.zoomLevel;
+		const vx = sx - r.left;
 		const vy = sy - r.top;
-		const ox = zoom.viewportX * (1 - s); 
+		const ox = zoom.viewportX * (1 - s);
 		const oy = zoom.viewportY * (1 - s);
-		const cx = scroll.x + (vx - ox) / s; 
+		const cx = scroll.x + (vx - ox) / s;
 		const cy = scroll.y + (vy - oy) / s;
-		const l = Math.floor(cy / CONFIG.lineHeight); 
+		const l = Math.floor(cy / CONFIG.lineHeight);
 		const c = Math.floor((cx - CONFIG.lineNumWidth - 8) / metrics.charWidth);
-		
-		// Allow clamping even if pointer is slightly outside text bounds to enable edge scrolling
-		const cl = _clamp(l, 0, lines.length - 1); 
+		const cl = _clamp(l, 0, lines.length - 1);
 		const lt = lines[cl] || '';
 		const cc = Math.max(0, Math.min(c, lt.length));
-		
-		cursor.line = cl; 
-		cursor.col = cc; 
+		cursor.line = cl;
+		cursor.col = cc;
 		cursor.visible = true;
-		
-		if (selection.active && selectedHandle) { 
-			const t = selectedHandle === 'anchor' ? selection.anchor : selection.focus; 
-			t.line = cl; 
-			t.col = cc; 
+		if (selection.active && selectedHandle) {
+			const t = selectedHandle === 'anchor' ? selection.anchor : selection.focus;
+			t.line = cl;
+			t.col = cc;
 		}
-		
-		// ✅ Scroll the canvas to keep the cursor/handle in view while dragging during zoom
 		_adjustScrollForCursor(cl, cc);
-		
-		// ✅ Pin the preview directly to the pointer location relative to the container
 		const containerRect = container.getBoundingClientRect();
-		cursorPreview.style.left = (sx - containerRect.left) + 'px'; 
-		cursorPreview.style.top = (sy - containerRect.top) + 'px'; 
+		cursorPreview.style.left = (sx - containerRect.left) + 'px';
+		cursorPreview.style.top = (sy - containerRect.top) + 'px';
 		cursorPreview.classList.add('visible');
-		
 		needsRender = true;
 	}
 
@@ -714,7 +918,7 @@ function createOptTextInstance(originalElement = null, initialData = null) {
 			_scrollBy(touch.velocityY * dt, touch.velocityX * dt);
 			touch.velocityY *= CONFIG.momentumFriction;
 			touch.velocityX *= CONFIG.momentumFriction;
-			const speed = Math.sqrt(touch.velocityY ** 2 + touch.velocityX ** 2); 
+			const speed = Math.sqrt(touch.velocityY ** 2 + touch.velocityX ** 2);
 			if (speed > CONFIG.momentumMinSpeed) {
 				touch.momentumId = requestAnimationFrame(animate);
 			} else {
@@ -728,7 +932,16 @@ function createOptTextInstance(originalElement = null, initialData = null) {
 		touch.momentumId = requestAnimationFrame(animate);
 	}
 	function _stopMomentum() { if (touch.momentumId) { cancelAnimationFrame(touch.momentumId); touch.momentumId = null; } touch.velocityY = 0; touch.velocityX = 0; }
-	function _enterEdit() { isEditing = true; hiddenInput.value = ''; hiddenInput.focus(); hiddenInput.setSelectionRange(0, 0); }
+	
+	function _enterEdit() { 
+		isEditing = true; 
+		activeInstance = container; 
+		const input = ensureSharedHiddenInput();
+		input.value = ''; 
+		lastInputValue = ''; 
+		input.focus(); 
+		input.setSelectionRange(0, 0);
+	}
 
 	function _insertTextAtCursor(text, recordHistory = true) {
 		if (!selection.active && insertionPoint.type !== 'cursor') insertionPoint = { type: 'cursor', ref: cursor };
@@ -802,7 +1015,7 @@ function createOptTextInstance(originalElement = null, initialData = null) {
 		const t = selection.active ? _getSelectedText() : (lines[cursor.line] || '');
 		if (!t) { showToast('No text selected', container); return; }
 		try {
-			if (navigator.clipboard?.writeText) { await navigator.clipboard.writeText(t); showToast(`Copied ${t.length} chars`, container); } 
+			if (navigator.clipboard?.writeText) { await navigator.clipboard.writeText(t); showToast(`Copied ${t.length} chars`, container); }
 			else _fallbackCopy(t);
 		} catch { _fallbackCopy(t); }
 	}
@@ -817,7 +1030,7 @@ function createOptTextInstance(originalElement = null, initialData = null) {
 
 	async function _handleCut() {
 		if (!isEditing) { _enterEdit(); return; }
-		let t = ''; let r = null; 
+		let t = ''; let r = null;
 		if (selection.active) {
 			t = _getSelectedText(); r = _getSelectionRange();
 			if (!t) { showToast('No text selected', container); return; }
@@ -850,13 +1063,19 @@ function createOptTextInstance(originalElement = null, initialData = null) {
 			}
 		} catch { showToast('Cut failed', container); }
 	}
- 
+
 	async function _handlePaste() {
 		if (!isEditing) { _enterEdit(); await new Promise(r => setTimeout(r, 50)); }
 		try {
 			let ct = '';
 			if (navigator.clipboard?.readText) ct = await navigator.clipboard.readText();
-			else { hiddenInput.focus(); await new Promise(r => setTimeout(r, 100)); ct = hiddenInput.value; hiddenInput.value = ''; }
+			else { 
+				const input = ensureSharedHiddenInput();
+				input.focus(); 
+				await new Promise(r => setTimeout(r, 100)); 
+				ct = input.value; 
+				input.value = ''; 
+			}
 			if (!ct) { showToast('Clipboard is empty', container); return; }
 			if (selection.active) {
 				const r = _getSelectionRange();
@@ -877,7 +1096,13 @@ function createOptTextInstance(originalElement = null, initialData = null) {
 		try {
 			let ct = '';
 			if (navigator.clipboard?.readText) ct = await navigator.clipboard.readText();
-			else { hiddenInput.focus(); await new Promise(r => setTimeout(r, 100)); ct = hiddenInput.value; hiddenInput.value = ''; }
+			else { 
+				const input = ensureSharedHiddenInput();
+				input.focus(); 
+				await new Promise(r => setTimeout(r, 100)); 
+				ct = input.value; 
+				input.value = ''; 
+			}
 			if (!ct) { showToast('Clipboard is empty', container); return; }
 			pendingClipboardText = ct;
 			const mc = modalOverlay.querySelector('[data-ref="current"]');
@@ -906,7 +1131,7 @@ function createOptTextInstance(originalElement = null, initialData = null) {
 		if (instanceOnChange) instanceOnChange.call(container, { target: container });
 	}
 
-	function _hideModal() { modalOverlay.classList.remove('visible'); pendingClipboardText = ''; } 
+	function _hideModal() { modalOverlay.classList.remove('visible'); pendingClipboardText = ''; }
 
 	function _handleKey(e) {
 		if (e.ctrlKey || e.metaKey) {
@@ -921,71 +1146,71 @@ function createOptTextInstance(originalElement = null, initialData = null) {
 		const line = lines[cursor.line] || '';
 		switch (e.key) {
 			case 'ArrowUp':
-				if (cursor.line > 0) { cursor.line--; cursor.col = Math.min(cursor.col, (lines[cursor.line] || '').length); _forceCursorPositionVisible(cursor.line, cursor.col); }
-				needsRender = true; e.preventDefault(); break;
+			if (cursor.line > 0) { cursor.line--; cursor.col = Math.min(cursor.col, (lines[cursor.line] || '').length); _forceCursorPositionVisible(cursor.line, cursor.col); }
+			needsRender = true; e.preventDefault(); break;
 			case 'ArrowDown':
-				if (cursor.line < lines.length - 1) { cursor.line++; cursor.col = Math.min(cursor.col, (lines[cursor.line] || '').length); _forceCursorPositionVisible(cursor.line, cursor.col); }
-				needsRender = true; e.preventDefault(); break;
+			if (cursor.line < lines.length - 1) { cursor.line++; cursor.col = Math.min(cursor.col, (lines[cursor.line] || '').length); _forceCursorPositionVisible(cursor.line, cursor.col); }
+			needsRender = true; e.preventDefault(); break;
 			case 'ArrowLeft':
-				if (cursor.col > 0) cursor.col--;
-				else if (cursor.line > 0) { cursor.line--; cursor.col = (lines[cursor.line] || '').length; _forceCursorPositionVisible(cursor.line, cursor.col); }
-				needsRender = true; e.preventDefault(); break;
+			if (cursor.col > 0) cursor.col--;
+			else if (cursor.line > 0) { cursor.line--; cursor.col = (lines[cursor.line] || '').length; _forceCursorPositionVisible(cursor.line, cursor.col); }
+			needsRender = true; e.preventDefault(); break;
 			case 'ArrowRight':
-				if (cursor.col < line.length) cursor.col++;
-				else if (cursor.line < lines.length - 1) { cursor.line++; cursor.col = 0; _forceCursorPositionVisible(cursor.line, cursor.col); }
-				needsRender = true; e.preventDefault(); break;
+			if (cursor.col < line.length) cursor.col++;
+			else if (cursor.line < lines.length - 1) { cursor.line++; cursor.col = 0; _forceCursorPositionVisible(cursor.line, cursor.col); }
+			needsRender = true; e.preventDefault(); break;
 			case 'Enter':
-				if (selection.active && _deleteCurrentSelection()) { needsRender = true; e.preventDefault(); return; }
-				{
-					const command = new EditCommand('insert', cursor.line, cursor.col, cursor.line, cursor.col, '\n', { line: cursor.line + 1, col: 0 }, { active: false });
-					if (dataManager.current) dataManager.current.history.push(command);
-					command.execute({ lines, cursor, selection, updateMetrics: _updateMetrics, setNeedsRender: () => { needsRender = true; } });
-					_updateUndoRedoButtons();
-				}
-				_forceCursorPositionVisible(cursor.line, cursor.col);
-				needsRender = true; e.preventDefault(); break;
+			if (selection.active && _deleteCurrentSelection()) { needsRender = true; e.preventDefault(); return; }
+			{
+				const command = new EditCommand('insert', cursor.line, cursor.col, cursor.line, cursor.col, '\n', { line: cursor.line + 1, col: 0 }, { active: false });
+				if (dataManager.current) dataManager.current.history.push(command);
+				command.execute({ lines, cursor, selection, updateMetrics: _updateMetrics, setNeedsRender: () => { needsRender = true; } });
+				_updateUndoRedoButtons();
+			}
+			_forceCursorPositionVisible(cursor.line, cursor.col);
+			needsRender = true; e.preventDefault(); break;
 			case 'Backspace':
-				if (selection.active && _deleteCurrentSelection()) { needsRender = true; e.preventDefault(); return; }
-				if (cursor.col > 0) {
-					const command = new EditCommand('delete', cursor.line, cursor.col - 1, cursor.line, cursor.col, '', { line: cursor.line, col: cursor.col - 1 }, { active: false });
-					if (dataManager.current) dataManager.current.history.push(command);
-					command.execute({ lines, cursor, selection, updateMetrics: _updateMetrics, setNeedsRender: () => { needsRender = true; } });
-					_updateUndoRedoButtons();
-				} else if (cursor.line > 0) {
-					const prevLineLen = (lines[cursor.line - 1] || '').length;
-					const command = new EditCommand('delete', cursor.line - 1, prevLineLen, cursor.line, 0, '', { line: cursor.line - 1, col: prevLineLen }, { active: false });
-					if (dataManager.current) dataManager.current.history.push(command);
-					command.execute({ lines, cursor, selection, updateMetrics: _updateMetrics, setNeedsRender: () => { needsRender = true; } });
-					_updateUndoRedoButtons();
-				}
-				needsRender = true; e.preventDefault(); break;
+			if (selection.active && _deleteCurrentSelection()) { needsRender = true; e.preventDefault(); return; }
+			if (cursor.col > 0) {
+				const command = new EditCommand('delete', cursor.line, cursor.col - 1, cursor.line, cursor.col, '', { line: cursor.line, col: cursor.col - 1 }, { active: false });
+				if (dataManager.current) dataManager.current.history.push(command);
+				command.execute({ lines, cursor, selection, updateMetrics: _updateMetrics, setNeedsRender: () => { needsRender = true; } });
+				_updateUndoRedoButtons();
+			} else if (cursor.line > 0) {
+				const prevLineLen = (lines[cursor.line - 1] || '').length;
+				const command = new EditCommand('delete', cursor.line - 1, prevLineLen, cursor.line, 0, '', { line: cursor.line - 1, col: prevLineLen }, { active: false });
+				if (dataManager.current) dataManager.current.history.push(command);
+				command.execute({ lines, cursor, selection, updateMetrics: _updateMetrics, setNeedsRender: () => { needsRender = true; } });
+				_updateUndoRedoButtons();
+			}
+			needsRender = true; e.preventDefault(); break;
 			case 'Delete':
-				if (selection.active && _deleteCurrentSelection()) { needsRender = true; e.preventDefault(); return; }
-				if (cursor.col < line.length) {
-					const command = new EditCommand('delete', cursor.line, cursor.col, cursor.line, cursor.col + 1, '', { line: cursor.line, col: cursor.col }, { active: false }); 
-					if (dataManager.current) dataManager.current.history.push(command);
-					command.execute({ lines, cursor, selection, updateMetrics: _updateMetrics, setNeedsRender: () => { needsRender = true; } });
-					_updateUndoRedoButtons();
-				} else if (cursor.line < lines.length - 1) {
-					const command = new EditCommand('delete', cursor.line, (lines[cursor.line] || '').length, cursor.line + 1, 0, '', { line: cursor.line, col: (lines[cursor.line] || '').length }, { active: false });
-					if (dataManager.current) dataManager.current.history.push(command);
-					command.execute({ lines, cursor, selection, updateMetrics: _updateMetrics, setNeedsRender: () => { needsRender = true; } });
-					_updateUndoRedoButtons();
-				}
-				_forceCursorPositionVisible(cursor.line, cursor.col);
-				needsRender = true; e.preventDefault(); break;
+			if (selection.active && _deleteCurrentSelection()) { needsRender = true; e.preventDefault(); return; }
+			if (cursor.col < line.length) {
+				const command = new EditCommand('delete', cursor.line, cursor.col, cursor.line, cursor.col + 1, '', { line: cursor.line, col: cursor.col }, { active: false });
+				if (dataManager.current) dataManager.current.history.push(command);
+				command.execute({ lines, cursor, selection, updateMetrics: _updateMetrics, setNeedsRender: () => { needsRender = true; } });
+				_updateUndoRedoButtons();
+			} else if (cursor.line < lines.length - 1) {
+				const command = new EditCommand('delete', cursor.line, (lines[cursor.line] || '').length, cursor.line + 1, 0, '', { line: cursor.line, col: (lines[cursor.line] || '').length }, { active: false });
+				if (dataManager.current) dataManager.current.history.push(command);
+				command.execute({ lines, cursor, selection, updateMetrics: _updateMetrics, setNeedsRender: () => { needsRender = true; } });
+				_updateUndoRedoButtons();
+			}
+			_forceCursorPositionVisible(cursor.line, cursor.col);
+			needsRender = true; e.preventDefault(); break;
 			case 'Tab':
-				e.preventDefault();
-				{
-					const command = new EditCommand('insert', cursor.line, cursor.col, cursor.line, cursor.col, '\t', { line: cursor.line, col: cursor.col + 1 }, { active: false });
-					if (dataManager.current) dataManager.current.history.push(command);
-					command.execute({ lines, cursor, selection, updateMetrics: _updateMetrics, setNeedsRender: () => { needsRender = true; } });
-					_updateUndoRedoButtons();
-				}
-				break;
+			e.preventDefault();
+			{
+				const command = new EditCommand('insert', cursor.line, cursor.col, cursor.line, cursor.col, '\t', { line: cursor.line, col: cursor.col + 1 }, { active: false });
+				if (dataManager.current) dataManager.current.history.push(command);
+				command.execute({ lines, cursor, selection, updateMetrics: _updateMetrics, setNeedsRender: () => { needsRender = true; } });
+				_updateUndoRedoButtons();
+			}
+			break;
 			case 'Escape':
-				if (selection.active) { _clearSelection(); e.preventDefault(); }
-				break;
+			if (selection.active) { _clearSelection(); e.preventDefault(); }
+			break;
 		}
 	}
 
@@ -998,6 +1223,18 @@ function createOptTextInstance(originalElement = null, initialData = null) {
 		canvas.addEventListener('touchend', _onPointerUp, { passive: true }); canvas.addEventListener('mouseup', _onPointerUp);
 		canvas.addEventListener('touchcancel', _onPointerCancel, { passive: true }); canvas.addEventListener('mouseleave', _onPointerLeave);
 
+		canvas.addEventListener('wheel', (e) => {
+				if (isLoading || zoom.active) return;
+				e.preventDefault();
+				_stopMomentum();
+				let dy = e.deltaY;
+				let dx = e.deltaX;
+				if (e.deltaMode === 1) { dy *= CONFIG.lineHeight; dx *= CONFIG.lineHeight; }
+				else if (e.deltaMode === 2) { dy *= metrics.viewportHeight; dx *= metrics.viewportWidth; }
+				_scrollBy(-dy, -dx);
+				_showScrollbars();
+			}, { passive: false });
+
 		let dragging = null, sSY = 0, sSX = 0, sTY = 0, sTX = 0;
 		const onS = (isV, e) => { e.preventDefault?.(); e.stopPropagation(); _stopMomentum(); _cancelZoomTimer(); touch.touchedHandle = null; if (zoom.active) _deactivateZoom(false); dragging = isV ? 'v' : 'h'; const pt = _getEventPoint(e); if (isV) { sTY = pt.y; sSY = scroll.y; } else { sTX = pt.x; sSX = scroll.x; } _showScrollbars(); };
 		const onM = (e) => { if (!dragging) return; const pt = _getEventPoint(e); if (dragging === 'v') { const d = pt.y - sTY; const tH = parseFloat(vThumb.style.height) || 30; const rng = Math.max(1, metrics.fullViewportHeight - tH); scroll.y = _clamp(sSY + (d / rng) * metrics.maxScrollY, 0, metrics.maxScrollY); } else { const d = pt.x - sTX; const tW = parseFloat(hThumb.style.width) || 30; const rng = Math.max(1, metrics.viewportWidth - tW); scroll.x = _clamp(sSX + (d / rng) * metrics.maxScrollX, 0, metrics.maxScrollX); } needsRender = true; _showScrollbars(); };
@@ -1007,65 +1244,38 @@ function createOptTextInstance(originalElement = null, initialData = null) {
 		hScroll.addEventListener('touchstart', e => onS(false, e), { passive: false }); hScroll.addEventListener('mousedown', e => onS(false, e));
 		window.addEventListener('touchmove', onM, { passive: false }); window.addEventListener('mousemove', onM); window.addEventListener('touchend', onE); window.addEventListener('mouseup', onE);
 
-		hiddenInput.addEventListener('input', e => {
-			if (isLoading || !e.data) { hiddenInput.value = ''; return; }
-			_insertTextAtCursor(e.data, true);
-			hiddenInput.value = '';
-			if (instanceOnInput) instanceOnInput.call(container, { target: container });
-		});
-		hiddenInput.addEventListener('keydown', _handleKey);
-
-		document.addEventListener('keydown', e => {
-			if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key === 'z') {
-				const a = document.activeElement;
-				if (a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA' || a.isContentEditable) && a !== hiddenInput) return;
-				e.preventDefault(); _undo();
-			}
-			if ((e.ctrlKey || e.metaKey) && ((e.shiftKey && e.key === 'Z') || e.key === 'y' || e.key === 'Y')) {
-				const a = document.activeElement;
-				if (a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA' || a.isContentEditable) && a !== hiddenInput) return;
-				e.preventDefault(); _redo();
-			}
-			if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key === 'g') {
-				const a = document.activeElement;
-				if (!a || !(a.tagName === 'INPUT' || a.tagName === 'TEXTAREA' || a.isContentEditable) || a === hiddenInput) {
-					e.preventDefault(); _showGotoModal();
-				}
-			}
-		}, { capture: true });
-
 		menuBtn.addEventListener('click', e => { e.stopPropagation(); const o = dropdown.classList.toggle('open'); menuBtn.setAttribute('aria-expanded', o); dropdown.setAttribute('aria-hidden', !o); });
 		document.addEventListener('click', e => { if (!dropdown.contains(e.target) && !menuBtn.contains(e.target)) { dropdown.classList.remove('open'); menuBtn.setAttribute('aria-expanded', 'false'); dropdown.setAttribute('aria-hidden', 'true'); } });
 
 		dropdown.addEventListener('click', e => {
-			const it = e.target.closest('[data-action]'); if (!it) return;
-			dropdown.classList.remove('open');
-			switch (it.dataset.action) {
-				case 'cut': _handleCut(); break;
-				case 'copy': _handleCopy(); break;
-				case 'paste': _handlePaste(); break;
-				case 'copy-all': _handleCopyAll(); break;
-				case 'replace-all': _handleReplaceAll(); break;
-				case 'goto-line': _showGotoModal(); break;
-			}
-		});
+				const it = e.target.closest('[data-action]'); if (!it) return;
+				dropdown.classList.remove('open');
+				switch (it.dataset.action) {
+					case 'cut': _handleCut(); break;
+					case 'copy': _handleCopy(); break;
+					case 'paste': _handlePaste(); break;
+					case 'copy-all': _handleCopyAll(); break;
+					case 'replace-all': _handleReplaceAll(); break;
+					case 'goto-line': _showGotoModal(); break;
+				}
+			});
 
 		container.addEventListener('click', e => {
-			const b = e.target.closest('[data-action]'); if (!b) return;
-			if (b.dataset.action === 'undo') _undo();
-			if (b.dataset.action === 'redo') _redo();
-			if (b.dataset.action === 'toggle-select') {
-				if (selection.active) {
-					_clearSelection();
-				} else {
-					selection.active = true;
-					selection.anchor = { ...cursor };
-					selection.focus = { ...cursor };
-					if (!isEditing) _enterEdit();
-					needsRender = true;
+				const b = e.target.closest('[data-action]'); if (!b) return;
+				if (b.dataset.action === 'undo') _undo();
+				if (b.dataset.action === 'redo') _redo();
+				if (b.dataset.action === 'toggle-select') {
+					if (selection.active) {
+						_clearSelection();
+					} else {
+						selection.active = true;
+						selection.anchor = { ...cursor };
+						selection.focus = { ...cursor };
+						if (!isEditing) _enterEdit();
+						needsRender = true;
+					}
 				}
-			}
-		});
+			});
 
 		gotoModal.querySelector('[data-action="cancel"]').addEventListener('click', _hideGotoModal);
 		gotoModal.querySelector('[data-action="goto"]').addEventListener('click', () => { const v = parseInt(gotoInput.value, 10); if (!isNaN(v) && v >= 1) _goToLine(v, 0); _hideGotoModal(); });
@@ -1079,18 +1289,38 @@ function createOptTextInstance(originalElement = null, initialData = null) {
 
 		window.addEventListener('resize', () => { _setupCanvas(); _updateMetrics(); needsRender = true; });
 		if (window.visualViewport) window.visualViewport.addEventListener('resize', () => {
-			const vh = window.visualViewport.height; const fh = window.innerHeight;
-			if (fh - vh > 100) { metrics.keyboardHeight = fh - vh; metrics.viewportHeight = vh - 28; }
-			else { metrics.keyboardHeight = 0; metrics.viewportHeight = metrics.fullViewportHeight; }
-			_updateMetrics(); if (isEditing) _forceCursorPositionVisible(cursor.line, cursor.col); needsRender = true;
-		});
+				const vh = window.visualViewport.height; const fh = window.innerHeight;
+				if (fh - vh > 100) { metrics.keyboardHeight = fh - vh; metrics.viewportHeight = vh - 28; }
+				else { metrics.keyboardHeight = 0; metrics.viewportHeight = metrics.fullViewportHeight; }
+				_updateMetrics(); if (isEditing) _forceCursorPositionVisible(cursor.line, cursor.col); needsRender = true;
+			});
 	}
 
+	// ✅ FIX: Completely overhauled _onPointerUp to handle early double-tap completion
 	function _onPointerUp(e) {
 		if (isLoading) return;
+		if (touch.isTouchSequence && !_isTouchEvent(e)) return;
+		if (!touch.isDown) return;
+		
 		const pt = _getEventPoint(e);
+		const inputType = touch.isTouchSequence ? 'touch' : 'mouse';
+		
 		_cancelZoomTimer();
-		if (zoom.active) { _deactivateZoom(true); return; }
+		
+		// ✅ If double tap was pending, execute word selection immediately and exit
+		if (touch.isDoubleTapPending) {
+			_selectWordAt(pt.x, pt.y);
+			touch.isDoubleTapPending = false;
+			touch.isDown = false;
+			touch.isScrolling = false;
+			lastTapTime[inputType] = 0; // Reset to prevent triple-tap chaining issues
+			_enterEdit();
+			if (_shouldPreventDefault(e, false)) e.preventDefault();
+			return;
+		}
+
+		if (zoom.active) { _deactivateZoom(true); touch.isDown = false; return; }
+		
 		let prev = false; let focus = false;
 		if (touch.touchedHandle) {
 			_stopMomentum();
@@ -1104,8 +1334,26 @@ function createOptTextInstance(originalElement = null, initialData = null) {
 				prev = true;
 			}
 		} else {
-			if (!touch.isScrolling && !touch.didScroll && Math.sqrt((pt.y - touch.startY) ** 2 + (pt.x - touch.startX) ** 2) < CONFIG.tapThreshold && Date.now() - touch.startTime < CONFIG.tapMaxTime) {
-				focus = _placeCursorOrHandle(pt.x, pt.y, 'cursor');
+			const isTap = !touch.isScrolling && !touch.didScroll && Math.sqrt((pt.y - touch.startY) ** 2 + (pt.x - touch.startX) ** 2) < CONFIG.tapThreshold && Date.now() - touch.startTime < CONFIG.tapMaxTime;
+			if (isTap) {
+				const now = Date.now();
+				const lastTime = lastTapTime[inputType];
+				const lastPos = lastTapPos[inputType];
+				const distFromLast = Math.sqrt((pt.y - lastPos.y) ** 2 + (pt.x - lastPos.x) ** 2);
+				const isDoubleTap = lastTime > 0 && (now - lastTime) < DOUBLE_TAP_THRESHOLD && distFromLast < DOUBLE_TAP_DISTANCE;
+				
+				if (isDoubleTap) {
+					_selectWordAt(pt.x, pt.y);
+					prev = true;
+					focus = true;
+					lastTapTime[inputType] = 0;
+				} else {
+					focus = _placeCursorOrHandle(pt.x, pt.y, 'cursor');
+					lastTapTime[inputType] = now;
+					lastTapPos[inputType] = { x: pt.x, y: pt.y };
+				}
+			} else {
+				lastTapTime[inputType] = 0;
 			}
 		}
 		if (focus) _enterEdit();
@@ -1120,8 +1368,28 @@ function createOptTextInstance(originalElement = null, initialData = null) {
 		touch.isScrolling = false;
 	}
 
-	function _onPointerCancel(e) { _cancelZoomTimer(); if (zoom.active) _deactivateZoom(false); _stopMomentum(); touch.isScrolling = false; touch.touchedHandle = null; touch.didScroll = false; }
-	function _onPointerLeave(e) { _cancelZoomTimer(); if (zoom.active) _deactivateZoom(false); touch.touchedHandle = null; touch.didScroll = false; }
+	// ✅ FIX: Reset isDoubleTapPending on cancel/leave
+	function _onPointerCancel(e) {
+		touch.isDown = false;
+		touch.isTouchSequence = false;
+		touch.isDoubleTapPending = false;
+		_cancelZoomTimer();
+		if (zoom.active) _deactivateZoom(false);
+		_stopMomentum();
+		touch.isScrolling = false;
+		touch.touchedHandle = null;
+		touch.didScroll = false;
+	}
+
+	function _onPointerLeave(e) {
+		_cancelZoomTimer();
+		if (zoom.active) _deactivateZoom(false);
+		touch.touchedHandle = null;
+		touch.didScroll = false;
+		touch.isTouchSequence = false;
+		touch.isDoubleTapPending = false;
+	}
+
 	function _onContextMenu(e) { if (zoom.active) { e.preventDefault(); _deactivateZoom(false); } }
 
 	function _getHandleAtPosition(cx, cy) {
@@ -1189,19 +1457,41 @@ if (typeof globalThis !== 'undefined') {
 	globalThis.newOptText = newOptText;
 }
 
+// ==========================================
+// ✅ FIXED AUTO-INITIALIZATION FROM <opttext> TAG
+// ==========================================
 if (typeof document !== 'undefined') {
 	const processOptTextTags = () => {
 		document.querySelectorAll('opttext').forEach(el => {
-			if (el.dataset.optTextProcessed) return;
-			el.dataset.optTextProcessed = 'true';
-			const p = el.parentNode;
-			if (p) {
-				const instance = newOptText(el);
-				p.replaceChild(instance, el);
-			}
-		});
+				if (el.dataset.optTextProcessed) return;
+				el.dataset.optTextProcessed = 'true';
+
+				let extensions = null;
+				const extAttr = el.getAttribute('extensions');
+				if (extAttr) {
+					try {
+						if (typeof window !== 'undefined' && typeof window[extAttr] !== 'undefined' && Array.isArray(window[extAttr])) {
+							extensions = window[extAttr];
+						} else {
+							extensions = JSON.parse(extAttr);
+						}
+					} catch (e) {
+						extensions = extAttr.split(',').map(s => s.trim()).filter(s => s.length > 0);
+					}
+				}
+
+				const content = el.textContent || '';
+				const normalizedContent = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/^\n+/, '').replace(/\n+$/, '');
+
+				const instance = newOptText(el, extensions);
+				
+				el.textContent = ''; 
+				el.appendChild(instance);
+
+				instance.value = normalizedContent;
+			});
 	};
- 
+
 	if (document.readyState === 'loading') {
 		document.addEventListener('DOMContentLoaded', processOptTextTags);
 	} else {
@@ -1209,22 +1499,22 @@ if (typeof document !== 'undefined') {
 	}
 
 	const observer = new MutationObserver((mutations) => {
-		for (const mutation of mutations) {
-			if (mutation.addedNodes.length > 0) {
-				for (const node of mutation.addedNodes) {
-					if (node.nodeType === 1) {
-						if (node.tagName.toLowerCase() === 'opttext' || node.querySelector('opttext')) {
-							processOptTextTags();
-							break;
+			for (const mutation of mutations) {
+				if (mutation.addedNodes.length > 0) {
+					for (const node of mutation.addedNodes) {
+						if (node.nodeType === 1) {
+							if (node.tagName.toLowerCase() === 'opttext' || node.querySelector('opttext')) {
+								processOptTextTags();
+								break;
+							}
 						}
 					}
 				}
 			}
-		}
-	});
+		});
 
 	observer.observe(document.body || document.documentElement, {
-		childList: true,
-		subtree: true
-	});
+			childList: true,
+			subtree: true
+		});
 }

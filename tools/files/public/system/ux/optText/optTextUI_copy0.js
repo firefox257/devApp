@@ -165,16 +165,15 @@ export function injectStyles() {
 
 	/* ===== SELECTION TOGGLE BUTTON ===== */
 	.opt-text-toolbar-btn[data-action="toggle-select"] {
-		color: #1a73e8; /* Blue circle */
+		color: #1a73e8;
 	}
 	.opt-text-toolbar-btn[data-action="toggle-select"] svg {
 		width: 14px;
 		height: 14px;
 		opacity: 1;
 	}
-	/* When selection is active, turn it red */
 	.opt-text-toolbar-btn[data-action="toggle-select"].active-selection {
-		color: var(--ot-danger, #dc3545); /* Red circle */
+		color: var(--ot-danger, #dc3545);
 		background: rgba(220, 53, 69, 0.08);
 	}
 	.opt-text-toolbar-btn[data-action="toggle-select"].active-selection:hover {
@@ -261,12 +260,21 @@ export function injectStyles() {
 	.opt-text-scrollbar.horizontal .opt-text-scrollbar-thumb { height: 100%; top: 0; }
 
 	/* ===== HIDDEN INPUT ===== */
+	/* ✅ iOS FIX: Use color/background transparent instead of opacity:0, and set font-size */
 	.opt-text-hidden-input {
-	position: absolute;
-	opacity: 0;
+	position: fixed;
+	top: 0;
+	left: 0;
 	width: 1px;
 	height: 1px;
-	top: -1000px;
+	color: transparent;
+	background: transparent;
+	border: none;
+	outline: none;
+	z-index: -1;
+	caret-color: transparent;
+	pointer-events: none;
+	font-size: 16px; /* Crucial for iOS to recognize it as a valid text input */
 	}
 
 	/* ===== CURSOR PREVIEW ===== */
@@ -494,20 +502,6 @@ export function showToast(message, container) {
 	toast.textContent = message;
 	toast.style.cssText = `position: fixed; bottom: 60px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); color: white; padding: 10px 20px; border-radius: 8px; font-size: 13px; z-index: 1001; animation: ot-toast-fade 2s ease; pointer-events: none; white-space: nowrap; -webkit-user-select: none; user-select: none;`;
 
-	if (!document.getElementById('opt-text-toast-style')) {
-		const style = document.createElement('style');
-		style.id = 'opt-text-toast-style';
-		style.textContent = `
-		@keyframes ot-toast-fade {
-		0% { opacity: 0; transform: translateX(-50%) translateY(10px); }
-		15% { opacity: 1; transform: translateX(-50%) translateY(0); }
-		85% { opacity: 1; transform: translateX(-50%) translateY(0); }
-		100% { opacity: 0; transform: translateX(-50%) translateY(-10px); }
-		}
-		`;
-		document.head.appendChild(style);
-	}
-
 	(container || document.body).appendChild(toast);
 	setTimeout(() => toast.remove(), 2000);
 }
@@ -577,14 +571,12 @@ export function createOptTextDOM(originalClass, originalId, placeholder = '') {
 	</svg>
 	</button>
 
-	<!-- ✅ NEW: Permanent Toggle Select Button -->
 	<button class="opt-text-toolbar-btn" data-action="toggle-select" aria-label="Start Select" title="Start Select">
 	<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="8"/></svg>
 	</button>
 
 	<div class="opt-text-toolbar-divider" style="width:1px;height:20px;background:var(--ot-border-toolbar);margin:0 4px"></div>
 
-	<!-- REDO BUTTON -->
 	<button class="opt-text-toolbar-btn" data-action="redo" aria-label="Redo (Ctrl+Y)" disabled>
 	<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
 	<path d="M21 7v6h-6"></path>
@@ -592,7 +584,6 @@ export function createOptTextDOM(originalClass, originalId, placeholder = '') {
 	</svg>
 	</button>
 
-	<!-- UNDO BUTTON -->
 	<button class="opt-text-toolbar-btn" data-action="undo" aria-label="Undo (Ctrl+Z)" disabled>
 	<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
 	<path d="M3 7v6h6"></path>
@@ -601,7 +592,6 @@ export function createOptTextDOM(originalClass, originalId, placeholder = '') {
 	</button>
 
 	<div class="opt-text-dropdown" role="menu" aria-hidden="true">
-	<!-- ✅ REMOVED: "Start Select" and "Clear Selection" -->
 	<button class="opt-text-dropdown-item" data-action="cut">✂ Cut</button>
 	<button class="opt-text-dropdown-item" data-action="copy">📋 Copy</button>
 	<button class="opt-text-dropdown-item" data-action="paste">📥 Paste</button>
@@ -625,7 +615,6 @@ export function createOptTextDOM(originalClass, originalId, placeholder = '') {
 	<div class="opt-text-perf-stats"> Visible: <span data-ref="visible">0</span><br> FPS: <span data-ref="fps">60</span><br> Render: <span data-ref="render">0</span>ms </div>
 	<div class="opt-text-scrollbar vertical"><div class="opt-text-scrollbar-thumb"></div></div>
 	<div class="opt-text-scrollbar horizontal"><div class="opt-text-scrollbar-thumb"></div></div>
-	<input type="text" class="opt-text-hidden-input" autocomplete="off" autocorrect="off" autocapitalize="none" inputmode="text" style="caret-color: transparent">
 	</div>`;
 
 	const wrapper = document.createElement('div');

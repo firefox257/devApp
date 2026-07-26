@@ -52,6 +52,8 @@ body {
 	background: #fff;
 	border-bottom: 1px solid #ddd;
 	z-index: 9;
+	overflow-x: auto; /* Allows horizontal scrolling on small screens */
+	white-space: nowrap;
 }
 .tab-btn {
 	flex: 1;
@@ -64,6 +66,7 @@ body {
 	color: #666;
 	border-bottom: 2px solid transparent;
 	transition: all 0.2s;
+	min-width: fit-content;
 }
 .tab-btn.active {
 	background: #fff;
@@ -91,47 +94,46 @@ body {
 	position: relative;
 }
 
-/* Console Panel */
-#console-panel {
+/* Console Tab */
+#tab-console {
 	background: #1e1e1e;
 	color: #d4d4d4;
 	font-family: 'Menlo', 'Consolas', monospace;
-	font-size: 11px;
-	max-height: 40vh;
-	overflow-y: auto;
-	border-top: 1px solid #444;
-	display: none;
 }
-#console-panel.visible { display: block; }
-.console-header {
+#tab-console .console-header {
 	display: flex;
 	justify-content: space-between;
 	align-items: center;
-	padding: 6px 10px;
+	padding: 10px 12px;
 	background: #2d2d2d;
 	border-bottom: 1px solid #444;
-	position: sticky;
-	top: 0;
+	flex-shrink: 0;
 }
-.console-header span { font-weight: 600; color: #fff; }
-.console-clear {
-	background: none; border: none; color: #888; cursor: pointer; font-size: 11px;
+#tab-console .console-header span { 
+	font-weight: 600; 
+	color: #fff; 
+	font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; 
+	font-size: 14px; 
 }
-.console-clear:hover { color: #fff; }
-.console-entries { padding: 4px 10px; }
+#tab-console .console-entries { 
+	padding: 8px 12px; 
+	overflow-y: auto;
+	flex: 1;
+}
 .console-entry {
-	padding: 3px 0;
+	padding: 6px 0;
 	border-bottom: 1px solid #333;
 	display: flex;
 	gap: 8px;
 	white-space: pre-wrap;
 	word-break: break-word;
+	line-height: 1.4;
 }
 .console-entry.log { color: #d4d4d4; }
 .console-entry.warn { color: #ffa500; }
-.console-entry.error { color: #ff6b6b; }
-.console-time { color: #666; min-width: 50px; flex-shrink: 0; }
-.console-msg { flex: 1; }
+.console-entry.error { color: #ff6b6b; font-weight: bold; }
+.console-time { color: #666; min-width: 60px; flex-shrink: 0; font-size: 11px; }
+.console-msg { flex: 1; font-size: 12px; }
 
 /* Controls Panel */
 #controls-panel {
@@ -181,7 +183,6 @@ body {
 <body>
 <div class="test-header">
 <h1>optText Test Suite</h1>
-<button class="test-btn primary" id="btn-toggle-console">📋 Console</button>
 <button class="test-btn" id="btn-toggle-controls">⚙️ Controls</button>
 <button class="test-btn" id="btn-load-sample">📄 Load Sample</button>
 <button class="test-btn" id="btn-clear">🗑️ Clear</button>
@@ -194,6 +195,7 @@ body {
 <button class="tab-btn" data-tab="tab-html-nosave">2. HTML (No Save)</button>
 <button class="tab-btn" data-tab="tab-html-nobeautify">3. HTML (No Beautify)</button>
 <button class="tab-btn" data-tab="tab-html-global">4. HTML (Global Var)</button>
+<button class="tab-btn" data-tab="tab-console">5. Console</button>
 </div>
 
 <!-- Tab 1: Programmatic JS Init -->
@@ -203,7 +205,6 @@ body {
 
 <!-- Tab 2: HTML Tag with extensions (No Save) -->
 <div id="tab-html-nosave" class="tab-content">
-<!-- The optText.js MutationObserver will automatically find this and replace it -->
 <opttext id="html-editor-nosave" extensions='["searchTool", "beautifyCode", "selectBracket", "pagesManager", "autoIndent"]' class="editor-host"></opttext>
 </div>
 
@@ -214,8 +215,16 @@ body {
 
 <!-- Tab 4: HTML Tag with global variable extensions -->
 <div id="tab-html-global" class="tab-content">
-<!-- References window.minimalConfig defined in the global script block -->
 <opttext id="html-editor-global" extensions="minimalConfig" class="editor-host" save-disabled="true"  beautifycode-disabled="true" pagesmanager-disabled="true"></opttext>
+</div>
+
+<!-- Tab 5: Console -->
+<div id="tab-console" class="tab-content">
+	<div class="console-header">
+		<span>Console Output (<span id="console-count">0</span>)</span>
+		<button class="test-btn danger console-clear" id="btn-clear-console">Clear</button>
+	</div>
+	<div class="console-entries" id="console-entries"></div>
 </div>
 
 <!-- Controls Panel -->
@@ -232,15 +241,6 @@ body {
 <button class="test-btn" id="btn-get-selection">🔲 Get Selection</button>
 <button class="test-btn" id="btn-start-select">✏️ Start Select</button>
 </div>
-</div>
-
-<!-- Console Panel -->
-<div id="console-panel">
-<div class="console-header">
-<span>Console Output</span>
-<button class="console-clear" id="btn-clear-console">Clear</button>
-</div>
-<div class="console-entries" id="console-entries"></div>
 </div>
 
 <script>
@@ -306,11 +306,21 @@ const ConsoleCapture = (() => {
 			entries.push(entry);
 			if (entries.length > maxEntries) entries.shift();
 			render();
+			
+			// Auto-switch to console tab on error for easier mobile debugging
+			if (level === 'error') {
+				const consoleTabBtn = document.querySelector('[data-tab="tab-console"]');
+				if (consoleTabBtn && !document.getElementById('tab-console').classList.contains('active')) {
+					setTimeout(() => consoleTabBtn.click(), 100);
+				}
+			}
 		}
 
 		function render() {
 			const container = document.getElementById('console-entries');
+			const countEl = document.getElementById('console-count');
 			if (!container) return;
+			
 			container.innerHTML = entries.map(e => `
 				<div class="console-entry ${e.level}">
 				<span class="console-time">${e.time}</span>
@@ -318,6 +328,8 @@ const ConsoleCapture = (() => {
 				</div>
 				`).join('');
 			container.scrollTop = container.scrollHeight;
+			
+			if (countEl) countEl.textContent = entries.length;
 		}
 
 		function hook() {
@@ -328,12 +340,8 @@ const ConsoleCapture = (() => {
 		}
 
 		function clear() { entries.length = 0; render(); }
-		function toggle() {
-			const panel = document.getElementById('console-panel');
-			panel?.classList.toggle('visible');
-		}
 
-		return { hook, clear, toggle, render };
+		return { hook, clear, render };
 	})();
 
 ConsoleCapture.hook();
@@ -364,6 +372,8 @@ ${Array.from({length: 50}, (_, i) => `// Line ${i + 1}: Lorem ipsum dolor sit am
 
 function getActiveEditor() {
 	const activeTab = document.querySelector('.tab-content.active');
+	// Ignore console tab when looking for editor
+	if (activeTab && activeTab.id === 'tab-console') return null;
 	return activeTab ? activeTab.querySelector('.opt-text-container-wrapper') : null;
 }
 
@@ -371,11 +381,8 @@ function initJSEditor() {
 	const host = document.getElementById('editor-host-js');
 	if (host.querySelector('.opt-text-container-wrapper')) return; // Already init
 
-	// ✅ Use the unified newOptText function. 
-	// Pass the host element to inherit classes, and initialData for extensions.
 	const editor = newOptText(host, { extensions: ['saveButton'] });
 	
-	// Assign onSave programmatically
 	editor.onSave = function(instance) {
 		const content = instance.value;
 		const msg = `💾 JS Save Triggered! Length: ${content.length} chars`;
@@ -402,7 +409,7 @@ function loadSample() {
 	const editor = getActiveEditor();
 	if (!editor) {
 		const activeTab = document.querySelector('.tab-content.active');
-		if (activeTab.id === 'tab-js') initJSEditor();
+		if (activeTab && activeTab.id === 'tab-js') initJSEditor();
 		return;
 	}
 	editor.value = SAMPLE_DATA;
@@ -464,10 +471,8 @@ function startSelect() {
 // UI EVENT BINDINGS
 // ====================================================================
 document.addEventListener('DOMContentLoaded', () => {
-		// Initialize JS editor on load
 		initJSEditor();
 
-		// Tab switching
 		document.querySelectorAll('.tab-btn').forEach(btn => {
 				btn.addEventListener('click', () => {
 						document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -477,13 +482,10 @@ document.addEventListener('DOMContentLoaded', () => {
 						const tabId = btn.dataset.tab;
 						document.getElementById(tabId).classList.add('active');
 
-						// Trigger resize so the newly visible editor can measure itself and draw
 						window.dispatchEvent(new Event('resize'));
 					});
 			});
 
-		// Header buttons
-		document.getElementById('btn-toggle-console').addEventListener('click', ConsoleCapture.toggle);
 		document.getElementById('btn-toggle-controls').addEventListener('click', () => {
 				document.getElementById('controls-panel')?.classList.toggle('visible');
 			});
@@ -491,13 +493,11 @@ document.addEventListener('DOMContentLoaded', () => {
 		document.getElementById('btn-clear').addEventListener('click', clearEditor);
 		document.getElementById('btn-destroy').addEventListener('click', destroyActiveEditor);
 
-		// Console panel
 		document.getElementById('btn-clear-console').addEventListener('click', () => {
 				ConsoleCapture.clear();
 				showToast('Console cleared');
 			});
 
-		// Controls panel
 		document.getElementById('btn-apply-value').addEventListener('click', applyValue);
 		document.getElementById('btn-get-value').addEventListener('click', getValue);
 		document.getElementById('btn-get-selection').addEventListener('click', getSelection);
@@ -508,6 +508,7 @@ document.addEventListener('DOMContentLoaded', () => {
 		console.log('Tab 2: HTML Tag (Auto-initialized via MutationObserver)');
 		console.log('Tab 3: HTML Tag (Auto-initialized via MutationObserver)');
 		console.log('Tab 4: HTML Tag (Auto-initialized via MutationObserver)');
+		console.log('Tab 5: Console Output (Capturing logs, warnings, and errors)');
 	});
 </script>
 </body>

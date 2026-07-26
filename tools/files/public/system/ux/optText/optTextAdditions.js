@@ -1,30 +1,65 @@
-// ./system/ux/optText/optTextAdditions.js
 import { showToast } from './optTextUI.js';
 
 export class AdditionManager {
 	constructor() {
 		this.registry = new Map();
 		this.activeId = null;
+		this.hooks = new Map();
 	}
 
 	register(def) {
-		// ✅ FIXED: Removed strict `init` requirement so static buttons (like saveButton) can omit it without crashing
 		if (!def.id) {
 			throw new Error('Addition must have an `id`');
 		}
+
+		if (def.hooks && typeof def.hooks === 'object') {
+			for (const [hookType, handler] of Object.entries(def.hooks)) {
+				if (!this.hooks.has(hookType)) {
+					this.hooks.set(hookType, []);
+				}
+				this.hooks.get(hookType).push({ id: def.id, handler });
+			}
+		}
+
 		this.registry.set(def.id, { ...def, active: false });
 		return this;
 	}
 
+	// 🔥 FIXED: Added allowedExtensions parameter to filter hooks per instance
+	triggerHook(hookType, payload, allowedExtensions = null) {
+		const handlers = this.hooks.get(hookType) || [];
+		let resultPayload = { ...payload };
+
+		for (const { id, handler } of handlers) {
+			// 🔥 FIX: Skip this hook if it's not in the allowed extensions list
+			if (Array.isArray(allowedExtensions) && !allowedExtensions.includes(id)) {
+				continue; 
+			}
+
+			try {
+				const response = handler(resultPayload);
+				
+				// ✅ ALWAYS merge the response object FIRST.
+				if (response && typeof response === 'object') {
+					resultPayload = { ...resultPayload, ...response };
+				}
+
+				// ✅ THEN check if we should stop propagation.
+				if (response === false || resultPayload.prevented) {
+					resultPayload.prevented = true;
+					break;
+				}
+			} catch (err) {
+				console.error(`[AdditionManager] Hook error in '${id}' for '${hookType}':`, err);
+			}
+		}
+		return resultPayload;
+	}
+
 	injectDropdownItems(container, dataManager, allowedExtensions = null) {
 		for (const def of this.registry.values()) {
-			// ✅ FIXED: Skip ONLY if allowedExtensions is explicitly an array AND it doesn't include this ID.
-			if (Array.isArray(allowedExtensions) && !allowedExtensions.includes(def.id)) {
-				continue;
-			}
-			if (def.dropdownItem) {
-				this._ensureDropdownItem(container, def, dataManager);
-			}
+			if (Array.isArray(allowedExtensions) && !allowedExtensions.includes(def.id)) continue;
+			if (def.dropdownItem) this._ensureDropdownItem(container, def, dataManager);
 		}
 	}
 
@@ -33,10 +68,7 @@ export class AdditionManager {
 		if (!toolbar) return;
 
 		for (const def of this.registry.values()) {
-			// ✅ FIXED: Same universal array check as above
-			if (Array.isArray(allowedExtensions) && !allowedExtensions.includes(def.id)) {
-				continue;
-			}
+			if (Array.isArray(allowedExtensions) && !allowedExtensions.includes(def.id)) continue;
 			if (def.isStaticToolbarButton && def.toolbarButton) {
 				if (toolbar.querySelector(`[data-addition-id="${def.id}"]`)) continue;
 
@@ -51,37 +83,25 @@ export class AdditionManager {
 						this.deactivate(container);
 						return;
 					}
-					
-					// ✅ CLEAR SEPARATION: Check for one-off 'action' first
 					if (typeof def.action === 'function') {
 						def.action(this._createAPI(container, dataManager), container, dataManager);
-					} 
-					// ✅ If it has a toolUI, activate it (which calls init)
-					else if (def.toolUI && typeof def.toolUI === 'function') {
+					} else if (def.toolUI && typeof def.toolUI === 'function') {
 						this.activate(def.id, container, dataManager);
-					} 
-					// ✅ Legacy fallback for toolbarButton.action
-					else if (def.toolbarButton && typeof def.toolbarButton.action === 'function') {
+					} else if (def.toolbarButton && typeof def.toolbarButton.action === 'function') {
 						def.toolbarButton.action(this._createAPI(container, dataManager), container);
 					}
 				});
 
 				const undoBtn = toolbar.querySelector('[data-action="undo"]');
-				if (undoBtn) {
-					undoBtn.insertAdjacentElement('afterend', btn);
-				} else {
-					toolbar.appendChild(btn);
-				}
+				if (undoBtn) undoBtn.insertAdjacentElement('afterend', btn);
+				else toolbar.appendChild(btn);
 			}
 		}
 	}
 
-	// ✅ UNIVERSAL AUTO-INIT: Runs `init` for ANY addition that has one. No `isAutoInit` flag needed.
 	injectAutoInitAdditions(container, dataManager, allowedExtensions = null) {
 		for (const def of this.registry.values()) {
-			if (Array.isArray(allowedExtensions) && !allowedExtensions.includes(def.id)) {
-				continue;
-			}
+			if (Array.isArray(allowedExtensions) && !allowedExtensions.includes(def.id)) continue;
 			if (typeof def.init === 'function') {
 				def.init(this._createAPI(container, dataManager), container, dataManager);
 			}
@@ -91,7 +111,6 @@ export class AdditionManager {
 	activate(id, container, dataManager) {
 		const def = this.registry.get(id);
 		if (!def) throw new Error(`Addition '${id}' not registered`);
-
 		if (this.activeId) this.deactivate(container);
 
 		this.activeId = id;
@@ -115,14 +134,11 @@ export class AdditionManager {
 		closeBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`;
 		closeBtn.title = 'Exit';
 		closeBtn.addEventListener('click', () => this.deactivate(container));
-
 		toolEl.appendChild(closeBtn);
 
 		const toolbar = container.querySelector('.opt-text-toolbar');
 		toolbar.appendChild(toolEl);
 
-		// ✅ INIT is strictly for initializing the persistent tool UI state, NOT for one-off actions.
-		// (Removed debug alert(2) from here)
 		if (typeof def.init === 'function') {
 			def.init(this._createAPI(container, dataManager), container, dataManager);
 		}
@@ -130,14 +146,12 @@ export class AdditionManager {
 
 	deactivate(container) {
 		if (!this.activeId) return;
-
 		const def = this.registry.get(this.activeId);
 		def?.cleanup?.();
 		def.active = false;
 
 		const toolEl = container.querySelector('#opt-addition-active-tool');
 		if (toolEl) toolEl.remove();
-
 		this.activeId = null;
 
 		const additionBtns = container.querySelectorAll('.opt-text-addition-btn');
@@ -158,17 +172,12 @@ export class AdditionManager {
 
 		btn.addEventListener('click', () => {
 			dropdown.classList.remove('open');
-			
-			// ✅ CLEAR SEPARATION: If an 'action' is defined, execute it immediately as a one-off command.
 			if (typeof def.action === 'function') {
 				def.action(this._createAPI(container, dataManager), container, dataManager);
-			} 
-			// ✅ Otherwise, fall back to 'activate' which initializes a persistent tool UI and calls 'init'.
-			else {
+			} else {
 				this.activate(def.id, container, dataManager);
 			}
 		});
-
 		dropdown.appendChild(btn);
 	}
 
