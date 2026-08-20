@@ -1,6 +1,5 @@
+//  /system/js/wasm-runtime.js
 
-
-//wasm-runtime.js
 export class WasmRuntime {
 	constructor(options = {}) {
 		this.options = options;
@@ -12,6 +11,7 @@ export class WasmRuntime {
 	}
 
 	// 🚨 FIX 5: Bulletproof memory accessor
+	// Handles both WebAssembly.Memory objects and raw ArrayBuffers/SharedArrayBuffers
 	get memBuffer() {
 		return this.memory instanceof WebAssembly.Memory ? this.memory.buffer : this.memory;
 	}
@@ -20,6 +20,9 @@ export class WasmRuntime {
 		this.wasiImports = {
 			proc_exit: (code) => { throw { name: 'ExitStatus', code }; },
 
+			// ==========================================
+			// CONSOLE I/O (std::cout, std::cerr)
+			// ==========================================
 			fd_write: (fd, iovsPtr, iovsLen, nwrittenPtr) => {
 				if (fd !== 1 && fd !== 2) return 8; // 8 = EBADF
 
@@ -28,6 +31,7 @@ export class WasmRuntime {
 				let total = 0;
 				const chunks = [];
 
+				// 🚨 FIX 1: Collect all chunks first to prevent splitting multi-byte UTF-8 chars
 				for (let i = 0; i < iovsLen; i++) {
 					const ptr = view.getUint32(iovsPtr + i * 8, true);
 					const len = view.getUint32(iovsPtr + i * 8 + 4, true);
@@ -35,6 +39,7 @@ export class WasmRuntime {
 					total += len;
 				}
 
+				// Combine into a single contiguous buffer before decoding
 				const combined = new Uint8Array(total);
 				let offset = 0;
 				for (const chunk of chunks) {
@@ -50,35 +55,43 @@ export class WasmRuntime {
 				return 0;
 			},
 
+			// ==========================================
+			// 🚨 FIX 3: Enable isatty() for ANSI Colors!
+			// ==========================================
 			fd_fdstat_get: (fd, bufPtr) => {
 				if (fd === 1 || fd === 2) {
 					const view = new DataView(this.memBuffer);
+					// Tell C++ this is a Character Device (enables isatty() and colors)
 					view.setUint8(bufPtr, 2); // 2 = __WASI_FILETYPE_CHARACTER_DEVICE
-					view.setUint16(bufPtr + 2, 0, true); 
-					view.setBigUint64(bufPtr + 8, 0xFFFFFFFFFFFFFFFFn, true); 
-					view.setBigUint64(bufPtr + 16, 0xFFFFFFFFFFFFFFFFn, true); 
+					view.setUint16(bufPtr + 2, 0, true); // flags
+					view.setBigUint64(bufPtr + 8, 0xFFFFFFFFFFFFFFFFn, true); // rights base
+					view.setBigUint64(bufPtr + 16, 0xFFFFFFFFFFFFFFFFn, true); // rights inheriting
 					return 0;
 				}
-				return 8; 
+				return 8; // EBADF for other FDs
 			},
 
+			// ==========================================
+			// 🚨 FIX 2: Implement sleep() via poll_oneoff
+			// ==========================================
 			poll_oneoff: (subPtr, retPtr, nSubs, nEventsPtr) => {
 				const view = new DataView(this.memBuffer);
 				let eventsWritten = 0;
 
 				for (let i = 0; i < nSubs; i++) {
-					const subBase = subPtr + i * 48; 
+					const subBase = subPtr + i * 48; // WASI subscription is 48 bytes
 					const userdata = view.getBigUint64(subBase, true);
-					const type = view.getUint8(subBase + 8); 
+					const type = view.getUint8(subBase + 8); // 0 = clock, 1 = fd_read, 2 = fd_write
 
-					const retBase = retPtr + eventsWritten * 32; 
+					const retBase = retPtr + eventsWritten * 32; // WASI event is 32 bytes
 					view.setBigUint64(retBase, userdata, true);
 					view.setUint8(retBase + 10, type);
 
-					if (type === 0) { 
+					if (type === 0) { // CLOCK subscription
 						const flags = view.getUint16(subBase + 40, true);
 						let timeoutNs = view.getBigUint64(subBase + 24, true);
 
+						// If flag & 1 is true, it's an absolute timestamp. Convert to relative.
 						if (flags & 1) {
 							const nowNs = BigInt(Date.now()) * 1000000n;
 							const diffNs = timeoutNs - nowNs;
@@ -87,17 +100,20 @@ export class WasmRuntime {
 
 						const timeoutMs = Number(timeoutNs / 1000000n);
 
+						// Block the thread synchronously using Atomics.wait
 						if (typeof Atomics !== 'undefined') {
 							const waitBuffer = new Int32Array(new SharedArrayBuffer(4));
 							Atomics.wait(waitBuffer, 0, 0, timeoutMs);
 						} else {
+							// Fallback busy-wait (only if SharedArrayBuffer is somehow disabled)
 							const start = Date.now();
 							while (Date.now() - start < timeoutMs) {}
 						}
 
-						view.setUint16(retBase + 8, 0, true); 
+						view.setUint16(retBase + 8, 0, true); // error = success
 						eventsWritten++;
 					} else {
+						// For FD_READ / FD_WRITE, return ENOSYS
 						view.setUint16(retBase + 8, 44, true);
 						eventsWritten++;
 					}
@@ -107,17 +123,45 @@ export class WasmRuntime {
 				return 0;
 			},
 
-			fd_read: () => 8, fd_pread: () => 8, fd_pwrite: () => 8, fd_close: () => 0,
-			fd_seek: () => 8, fd_tell: () => 8, fd_fdstat_set_flags: () => 0, fd_fdstat_set_rights: () => 0,
-			fd_filestat_get: () => 44, fd_filestat_set_size: () => 0, fd_filestat_set_times: () => 0,
-			fd_advise: () => 44, fd_allocate: () => 44, fd_datasync: () => 44, fd_sync: () => 44,
-			fd_readdir: () => 44, fd_renumber: () => 8, fd_prestat_get: () => 8, fd_prestat_dir_name: () => 8,
+			// ==========================================
+			// 100% COMPLETE WASI PREVIEW1 STUBS
+			// ==========================================
+			fd_read: () => 8,
+			fd_pread: () => 8,
+			fd_pwrite: () => 8,
+			fd_close: () => 0,
+			fd_seek: () => 8,
+			fd_tell: () => 8,
+			fd_fdstat_set_flags: () => 0,
+			fd_fdstat_set_rights: () => 0,
+			fd_filestat_get: () => 44,
+			fd_filestat_set_size: () => 0,
+			fd_filestat_set_times: () => 0,
+			fd_advise: () => 44,
+			fd_allocate: () => 44,
+			fd_datasync: () => 44,
+			fd_sync: () => 44,
+			fd_readdir: () => 44,
+			fd_renumber: () => 8,
 
-			path_open: () => 44, path_filestat_get: () => 44, path_filestat_set_times: () => 44,
-			path_create_directory: () => 44, path_link: () => 44, path_readlink: () => 44,
-			path_remove_directory: () => 44, path_rename: () => 44, path_symlink: () => 44, path_unlink_file: () => 44,
+			fd_prestat_get: () => 8,
+			fd_prestat_dir_name: () => 8,
 
-			sock_accept: () => 44, sock_recv: () => 44, sock_send: () => 44, sock_shutdown: () => 44,
+			path_open: () => 44,
+			path_filestat_get: () => 44,
+			path_filestat_set_times: () => 44,
+			path_create_directory: () => 44,
+			path_link: () => 44,
+			path_readlink: () => 44,
+			path_remove_directory: () => 44,
+			path_rename: () => 44,
+			path_symlink: () => 44,
+			path_unlink_file: () => 44,
+
+			sock_accept: () => 44,
+			sock_recv: () => 44,
+			sock_send: () => 44,
+			sock_shutdown: () => 44,
 
 			args_get: () => 0,
 			args_sizes_get: (argcPtr, argvBufSizePtr) => {
@@ -144,10 +188,11 @@ export class WasmRuntime {
 				return 0;
 			},
 
-			// ✅ OPTIMIZED: Zero-copy random generation
+			// 🚨 FIX 4: Safe random generation for SharedArrayBuffer
 			random_get: (bufPtr, bufLen) => {
-				const memView = new Uint8Array(this.memBuffer, bufPtr, bufLen);
-				crypto.getRandomValues(memView);
+				const temp = new Uint8Array(bufLen);
+				crypto.getRandomValues(temp);
+				new Uint8Array(this.memBuffer).set(temp, bufPtr);
 				return 0;
 			},
 
@@ -160,6 +205,7 @@ export class WasmRuntime {
 		this._customImports[namespace][name] = func;
 	}
 
+	// wasm-runtime.js (Update your instantiate method)
 	async instantiate(wasmSource) {
 		const importObject = {
 			wasi_snapshot_preview1: this.wasiImports,
@@ -168,6 +214,7 @@ export class WasmRuntime {
 
 		if (!importObject.env) importObject.env = {};
 		if (!importObject.env.memory) {
+			// 🚨 NEW: Accept externally created Shared Memory from Main Thread
 			if (this.options.memory && this.options.memory instanceof WebAssembly.Memory) {
 				importObject.env.memory = this.options.memory;
 			} else {
@@ -183,9 +230,12 @@ export class WasmRuntime {
 
 		try {
 			let instance;
+			// 🚨 FIX: WebAssembly.instantiate behaves differently for Modules vs Buffers
 			if (wasmSource instanceof WebAssembly.Module) {
+				// If it's a compiled Module, it returns the Instance directly
 				instance = await WebAssembly.instantiate(wasmSource, importObject);
 			} else {
+				// If it's a Buffer, it returns a { module, instance } ResultObject
 				const result = await WebAssembly.instantiate(wasmSource, importObject);
 				instance = result.instance;
 			}
@@ -241,8 +291,7 @@ export class WasmRuntime {
 	}
 
 	freeString(ptr) {
-		// 🐛 FIXED: Was checking for malloc, now correctly checks for free
-		if (!this.exports.free) throw new Error("C++ must export 'free'.");
+		if (!this.exports.malloc) throw new Error("C++ must export 'free'.");
 		this.exports.free(ptr);
 	}
 }

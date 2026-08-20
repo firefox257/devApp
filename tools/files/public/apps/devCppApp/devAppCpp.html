@@ -1009,7 +1009,7 @@ worker.onmessage = async (e) => {
 };
 
 async function executeWasm(wasmBinary) {
-	addConsoleLog('🚀 Initializing WasmRuntime...', 'info');
+	addConsoleLog('🚀 Initializing WasmRuntime...\r\n', 'info');
 	const runtime = new WasmRuntime({
 			initialMemory: 256, maxMemory: 512,
 			onStdout: (msg) => addConsoleLog(msg, 'info'),
@@ -1127,7 +1127,7 @@ async function runProject() {
 		return;
 	}
 	clearConsole();
-	addConsoleLog('🚀 Running compiled project...', 'info');
+	addConsoleLog('🚀 Running compiled project...\r\n', 'info');
 	await executeWasm(state.currentProject.wasmBinary);
 }
 

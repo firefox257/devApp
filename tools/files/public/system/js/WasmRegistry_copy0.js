@@ -1,77 +1,4 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>WASM Console</title>
-
-<style>
-html, body {
-	margin: 0;
-	padding: 0;
-	width: 100%;
-	height: 100%;
-	background-color: #0d1117;
-	color: #c9d1d9;
-	font-family: 'Consolas', 'Courier New', monospace;
-	font-size: 14px;
-	overflow: hidden;
-}
-#console {
-	width: 100%;
-	height: 100%;
-	padding: 12px;
-	box-sizing: border-box;
-	overflow-y: auto;
-	white-space: pre-wrap;
-	word-break: break-all;
-}
-.log-info { color: #58a6ff; }
-.log-warn { color: #d29922; }
-.log-error { color: #f85149; }
-</style>
-</head>
-<body>
-<div id="console"></div>
-
-<script type="module">
-import { WasmRuntime } from '/system/js/wasm-runtime.js';
-import { WasmRegistry } from '/system/js/WasmRegistry.js';
-
-
-
-const consoleEl = document.getElementById('console');
-
-function appendToConsole(msg, type = 'log') {
-	const line = document.createElement('div');
-	line.className = `log-${type}`;
-	const time = new Date().toLocaleTimeString('en-US', { hour12: false });
-	const formattedMsg = typeof msg === 'string' ? msg : JSON.stringify(msg, null, 2);
-	line.textContent = `[${time}] ${formattedMsg}`;
-	consoleEl.appendChild(line);
-	consoleEl.scrollTop = consoleEl.scrollHeight;
-}
-
-function addToConsole(msg, type = 'log') {
-	const line = document.createElement('span');
-	line.className = `log-${type}`;
-	const formattedMsg = typeof msg === 'string' ? msg : JSON.stringify(msg, null, 2);
-	line.textContent = `${formattedMsg}`;
-	consoleEl.appendChild(line);
-	consoleEl.scrollTop = consoleEl.scrollHeight;
-}
-
-// ==========================================
-// 1. Intercept native console
-// ==========================================
-const _origLog = console.log, _origWarn = console.warn, _origError = console.error, _origInfo = console.info;
-console.log = (...args) => { appendToConsole(args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' '), 'log'); _origLog.apply(console, args); };
-console.info = (...args) => { appendToConsole(args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' '), 'info'); _origInfo.apply(console, args); };
-console.warn = (...args) => { appendToConsole(args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' '), 'warn'); _origWarn.apply(console, args); };
-console.error = (...args) => { appendToConsole(args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' '), 'error'); _origError.apply(console, args); };
-
-/*
-var WasmRegistry = {
+export var WasmRegistry = {
 	_workers: {},
 	_promises: {},
 	_peerPromises: {},
@@ -97,7 +24,7 @@ var WasmRegistry = {
 		return this._promises[id];
 	},
 
-	loadWorker: function (url, id, workerScriptUrl = './try1wasm-worker.js') {
+	loadWorker: function (url, id, workerScriptUrl = './cppworker.js') {
 		if (!this._promises[id]) {
 			this._promises[id] = (async () => {
 					if (this._workers[id] === undefined) {
@@ -136,7 +63,9 @@ var WasmRegistry = {
 							const { type, payload, workerId } = e.data;
 							if (type === 'stdout') console.log(`[Worker ${workerId}] ${payload}`);
 							else if (type === 'stderr') console.error(`[Worker ${workerId}] ${payload}`);
-							else console.log(`[Worker ${workerId} Event: ${type}]`, payload);
+							else {
+								console.log(`[Worker ${workerId} Event: ${type}]`, payload);
+							}
 						};
 
 						workerObj.msgChannel = new MessageChannel();
@@ -221,79 +150,6 @@ var WasmRegistry = {
 	waitPeerAll: function() {
 		return Promise.all(Object.values(this._peerPromises));
 	}
-};
-//*/
-
-// ==========================================
-// 2. WASM Execution (Testing P2P Mesh)
-// ==========================================
-async function runWasm() {
-	console.info('Starting WASM and Workers...');
-	try {
-		// 1. Use INTEGER IDs! 0 = Main, 1 = Worker 1, 2 = Worker 2
-		WasmRegistry.load('./try1.wasm', 0);
-		WasmRegistry.loadWorker('./try1.wasm', 1);
-		WasmRegistry.loadWorker('./try1.wasm', 2);
-
-		console.info('Waiting for all modules and workers to initialize...');
-		await WasmRegistry.waitLoadAll();
-		console.info('✅ All systems initialized!');
-
-		// 2. Wire up the mesh network
-		console.info('Setting up peer-to-peer mesh network...');
-		WasmRegistry.setupPeers();
-		await WasmRegistry.waitPeerAll();
-		console.info('🔗 All peer-to-peer ports and shared memory views connected!');
-
-		// 3. Run the Main Thread WASM
-		var mainWasm = WasmRegistry._workers[0];
-		const runtime = new WasmRuntime({
-			memory: mainWasm.memory,
-			onStdout: (msg) => addToConsole(msg, 'log'),
-			onStderr: (msg) => addToConsole(msg, 'error'),
-			imports: {
-				sys: {
-					jstry: (num) => console.info(`[SYS] jstry called with: ${num}`),
-					jsSendToPeer: (targetId, srcPtr, size) => {
-						// Stub for main thread sending to peer (if your C++ main() calls it)
-						console.info(`[Main Thread] Sending to peer ${targetId}`);
-					}
-				},
-				env: {
-					jsCout: (ptr) => addToConsole(runtime.readString(ptr), 'log')
-				}
-			}
-		});
-		
-		console.info('Instantiating Main Thread WebAssembly module...');
-		await runtime.instantiate(mainWasm.module);
-		
-		console.info('Executing main()...');
-		const exitCode = runtime.run();
-
-		if (exitCode === 0) {
-			console.info('🏁 Main thread finished successfully (Exit Code 0).');
-		} else {
-			console.warn(`⚠️ Main thread exited with code: ${exitCode}`);
-		}
-
-		// 4. Trigger the P2P Test! (Worker 1 sends to Worker 2)
-		console.info('Triggering P2P test: Worker 1 -> Worker 2');
-		const w1 = WasmRegistry._workers[1];
-		w1.worker.postMessage({ 
-			type: 'runTest', 
-			targetId: 2, 
-			msg: 'Hello from Worker 1! 🚀' 
-		});
-
-	} catch (err) {
-		_origError('❌ FATAL ERROR:', err);
-		const stackTrace = err instanceof Error ? err.stack : String(err);
-		appendToConsole(`❌ FATAL ERROR: ${err.message || err}\n\nStack Trace:\n${stackTrace}`, 'error');
-	}
 }
 
-runWasm();
-</script>
-</body>
-</html>
+

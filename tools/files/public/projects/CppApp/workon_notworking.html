@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WASM Thread Pool Console</title>
+
+<!-- Required for SharedArrayBuffer (WASM pthreads) -->
+<meta http-equiv="Cross-Origin-Opener-Policy" content="same-origin">
+<meta http-equiv="Cross-Origin-Embedder-Policy" content="require-corp">
+
+<style>
+html, body {
+	margin: 0;
+	padding: 0;
+	width: 100%;
+	height: 100%;
+	background-color: #0d1117;
+	color: #c9d1d9;
+	font-family: 'Consolas', 'Courier New', monospace;
+	font-size: 14px;
+	overflow: hidden;
+}
+#console {
+	width: 100%;
+	height: 100%;
+	padding: 12px;
+	box-sizing: border-box;
+	overflow-y: auto;
+	white-space: pre-wrap;
+	word-break: break-all;
+}
+.log-info { color: #58a6ff; }
+.log-warn { color: #d29922; }
+.log-error { color: #f85149; }
+</style>
+</head>
+<body>
+<div id="console"></div>
+
+<script type="module">
+import { WasmRuntime } from '/system/js/wasm-runtime.js';
+import { WorkerRegistry } from '/system/js/worker-registry.js';
+
+const consoleEl = document.getElementById('console');
+
+function appendToConsole(msg, type = 'log') {
+	const line = document.createElement('div');
+	line.className = `log-${type}`;
+	const time = new Date().toLocaleTimeString('en-US', { hour12: false });
+	const formattedMsg = typeof msg === 'string' ? msg : JSON.stringify(msg, null, 2);
+	line.textContent = `[${time}] ${formattedMsg}`;
+	consoleEl.appendChild(line);
+	consoleEl.scrollTop = consoleEl.scrollHeight;
+}
+
+function addToConsole(msg, type = 'log') {
+	const line = document.createElement('span');
+	line.className = `log-${type}`;
+	const formattedMsg = typeof msg === 'string' ? msg : JSON.stringify(msg, null, 2);
+	line.textContent = `${formattedMsg}`;
+	consoleEl.appendChild(line);
+	consoleEl.scrollTop = consoleEl.scrollHeight;
+}
+
+// ==========================================
+// 1. Intercept native console (with safe Error formatting)
+// ==========================================
+const _origLog = console.log, _origWarn = console.warn, _origError = console.error, _origInfo = console.info;
+const formatArg = (arg) => {
+	if (arg instanceof Error) return `${arg.name}: ${arg.message}\n${arg.stack || 'No stack trace'}`;
+	try { return typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg); } catch (e) { return String(arg); }
+};
+console.log = (...args) => { appendToConsole(args.map(formatArg).join(' '), 'log'); _origLog.apply(console, args); };
+console.info = (...args) => { appendToConsole(args.map(formatArg).join(' '), 'info'); _origInfo.apply(console, args); };
+console.warn = (...args) => { appendToConsole(args.map(formatArg).join(' '), 'warn'); _origWarn.apply(console, args); };
+console.error = (...args) => { appendToConsole(args.map(formatArg).join(' '), 'error'); _origError.apply(console, args); };
+
+// ==========================================
+// 2. Node.js Polyfills
+// ==========================================
+const stdoutWrite = (chunk) => addToConsole(typeof chunk === 'string' ? chunk : String(chunk), 'log');
+const stderrWrite = (chunk) => addToConsole(typeof chunk === 'string' ? chunk : String(chunk), 'error');
+
+// ==========================================
+// 3. WASM Execution & Pool Wiring
+// ==========================================
+async function runWasm() {
+	console.info('Fetching workon.wasm...');
+	try {
+		const response = await fetch('./workon.wasm');
+		if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+		const wasmBuffer = await response.arrayBuffer();
+		const wasmMod = await WebAssembly.compile(wasmBuffer);
+
+		// Create Shared Memory (16MB initial, 256MB max)
+		const sharedMemory = new WebAssembly.Memory({ initial: 256, maximum: 4096, shared: true });
+
+		// The registry is the ONLY JS state — just maps workerId → Worker
+		const registry = new WorkerRegistry(wasmMod, sharedMemory);
+
+		let runtime;
+
+		runtime = new WasmRuntime({
+			memory: sharedMemory,
+			onStdout: (msg) => console.log(msg),
+			onStderr: (msg) => console.error(msg),
+			imports: {
+				sys: {
+					jstry: (num) => { alert(num); }
+				},
+				env: {
+					// JS is now a dumb kernel. C++ drives everything.
+					jsCreateWorker: (workerId) => {
+						registry.createWorker(workerId, runtime);
+					},
+					jsExecuteOnWorker: (workerId, taskPtr, threadIndex, totalThreads) => {
+						registry.executeOnWorker(workerId, taskPtr, threadIndex, totalThreads);
+					},
+					jsDestroyWorker: (workerId) => {
+						registry.destroyWorker(workerId);
+					},
+					jsCout: (ptr) => {
+						const message = runtime.readString(ptr);
+						stdoutWrite(message);
+					}
+				}
+			},
+		});
+
+		// Wire up the registry so workers can call back into C++ when they finish
+		registry.setRuntime(runtime);
+
+		console.info('Instantiating WebAssembly module...');
+		await runtime.instantiate(wasmMod);
+
+		console.info('Executing main()...');
+		const exitCode = runtime.run();
+
+		if (exitCode === 0) console.info('🏁 Application finished successfully (Exit Code 0).');
+		else console.warn(`⚠️ Application exited with code: ${exitCode}`);
+
+	} catch (err) {
+		_origError('❌ FATAL ERROR:', err);
+		const stackTrace = err instanceof Error ? err.stack : String(err);
+		appendToConsole(`❌ FATAL ERROR: ${err.message || err}\n\nStack Trace:\n${stackTrace}`, 'error');
+		
+		if (err.message && err.message.includes('SharedArrayBuffer')) {
+			console.error('🛑 HINT: Ensure server sends COOP and COEP HTTP headers.');
+		}
+	}
+}
+
+runWasm();
+</script>
+</body>
+</html>

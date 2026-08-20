@@ -16,7 +16,6 @@
 		'-Wl,--max-memory=268435456',
 		'-Wl,--no-check-features',
 		'-Wl,--allow-undefined',
-		'-D','WASM',
 		//'-Wl,--export-all'
 	]
 }

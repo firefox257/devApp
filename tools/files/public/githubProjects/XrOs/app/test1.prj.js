@@ -1,11 +1,11 @@
 {
-	"main": "try1.cpp",
-	"output": "try1.wasm",
+	"main": "test1.cpp",
+	"output": "test1.wasm",
 	"args": [
 		'clang++',
-		'-std=c++17',
+		'-std=c++20',
 		'-O2',
-		'-I', '@/public/projects/CppApp',
+		'-I', '@/public/githubProjects/XrOs/app/CppApp',
 		'-pthread',
 		'-fno-exceptions',
 		'-fno-rtti',

@@ -36,9 +36,6 @@ html, body {
 
 <script type="module">
 import { WasmRuntime } from '/system/js/wasm-runtime.js';
-import { WasmRegistry } from '/system/js/WasmRegistry.js';
-
-
 
 const consoleEl = document.getElementById('console');
 
@@ -70,7 +67,9 @@ console.info = (...args) => { appendToConsole(args.map(a => typeof a === 'object
 console.warn = (...args) => { appendToConsole(args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' '), 'warn'); _origWarn.apply(console, args); };
 console.error = (...args) => { appendToConsole(args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' '), 'error'); _origError.apply(console, args); };
 
-/*
+
+
+
 var WasmRegistry = {
 	_workers: {},
 	_promises: {},
@@ -156,15 +155,14 @@ var WasmRegistry = {
 	// Peer-to-Peer Mesh Network Setup
 	// ==========================================
 	setupPeers: function() {
-		// Object.keys() returns strings, so we map them back to Numbers (integers)
-		const ids = Object.keys(this._workers).map(Number);
+		const ids = Object.keys(this._workers);
 		this._peerPromises = {}; // Reset for a fresh mesh setup
 
 		// Create an N x N full mesh network
 		for (let i = 0; i < ids.length; i++) {
 			for (let j = i + 1; j < ids.length; j++) {
-				const idA = ids[i]; // Integer
-				const idB = ids[j]; // Integer
+				const idA = ids[i];
+				const idB = ids[j];
 				const workerA = this._workers[idA];
 				const workerB = this._workers[idB];
 
@@ -221,71 +219,62 @@ var WasmRegistry = {
 	waitPeerAll: function() {
 		return Promise.all(Object.values(this._peerPromises));
 	}
-};
+};;
 //*/
 
+
+
+
 // ==========================================
-// 2. WASM Execution (Testing P2P Mesh)
+// 2. WASM Execution (Strictly Single-Threaded)
 // ==========================================
 async function runWasm() {
-	console.info('Starting WASM and Workers...');
+	console.info('Fetching try1.wasm...');
 	try {
-		// 1. Use INTEGER IDs! 0 = Main, 1 = Worker 1, 2 = Worker 2
-		WasmRegistry.load('./try1.wasm', 0);
-		WasmRegistry.loadWorker('./try1.wasm', 1);
-		WasmRegistry.loadWorker('./try1.wasm', 2);
 
-		console.info('Waiting for all modules and workers to initialize...');
-		await WasmRegistry.waitLoadAll();
-		console.info('✅ All systems initialized!');
+		var g= await WasmRegistry.load('./try1.wasm',0);
 
-		// 2. Wire up the mesh network
-		console.info('Setting up peer-to-peer mesh network...');
-		WasmRegistry.setupPeers();
-		await WasmRegistry.waitPeerAll();
-		console.info('🔗 All peer-to-peer ports and shared memory views connected!');
 
-		// 3. Run the Main Thread WASM
-		var mainWasm = WasmRegistry._workers[0];
+		console.info('Initializing WasmRuntime...');
 		const runtime = new WasmRuntime({
-			memory: mainWasm.memory,
-			onStdout: (msg) => addToConsole(msg, 'log'),
-			onStderr: (msg) => addToConsole(msg, 'error'),
-			imports: {
-				sys: {
-					jstry: (num) => console.info(`[SYS] jstry called with: ${num}`),
-					jsSendToPeer: (targetId, srcPtr, size) => {
-						// Stub for main thread sending to peer (if your C++ main() calls it)
-						console.info(`[Main Thread] Sending to peer ${targetId}`);
+				memory:g.memory,
+				onStdout: (msg) => addToConsole(msg, 'log'),
+				onStderr: (msg) => addToConsole(msg, 'error'),
+				imports: {
+					sys: {
+						jstry: (num) => {
+							// Synchronous alert from C++
+							console.info(`[SYS] jstry called with: ${num}`);
+						}
+					},
+					env: {
+						jsCout: (ptr) => {
+							const message = runtime.readString(ptr);
+							addToConsole(message, 'log');
+						}
 					}
-				},
-				env: {
-					jsCout: (ptr) => addToConsole(runtime.readString(ptr), 'log')
 				}
-			}
-		});
-		
-		console.info('Instantiating Main Thread WebAssembly module...');
-		await runtime.instantiate(mainWasm.module);
-		
+			});
+
+		console.info('Instantiating WebAssembly module...');
+		await runtime.instantiate(g.module);//wasmMod);
+
 		console.info('Executing main()...');
 		const exitCode = runtime.run();
 
+		console.info('Calling greet("Alice")...');
+		const namePtr = runtime.writeString("Alice");
+		const resultPtr = runtime.callExport('greet', namePtr);
+		const greeting = runtime.readString(resultPtr);
+		console.info(`Result from C++: "${greeting}"`);
+
+		runtime.freeString(namePtr);
+
 		if (exitCode === 0) {
-			console.info('🏁 Main thread finished successfully (Exit Code 0).');
+			console.info('🏁 Application finished successfully (Exit Code 0).');
 		} else {
-			console.warn(`⚠️ Main thread exited with code: ${exitCode}`);
+			console.warn(`⚠️ Application exited with code: ${exitCode}`);
 		}
-
-		// 4. Trigger the P2P Test! (Worker 1 sends to Worker 2)
-		console.info('Triggering P2P test: Worker 1 -> Worker 2');
-		const w1 = WasmRegistry._workers[1];
-		w1.worker.postMessage({ 
-			type: 'runTest', 
-			targetId: 2, 
-			msg: 'Hello from Worker 1! 🚀' 
-		});
-
 	} catch (err) {
 		_origError('❌ FATAL ERROR:', err);
 		const stackTrace = err instanceof Error ? err.stack : String(err);

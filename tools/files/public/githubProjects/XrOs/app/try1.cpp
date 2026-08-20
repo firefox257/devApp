@@ -1,8 +1,17 @@
+
+
+//try1.cpp
+
 #include <iostream>
 #include <string>
 #include <cstdlib>
 #include <cstring> // Required for std::strlen
 #include <cstddef> // Required for size_t
+#include <cstdint>
+
+using namespace std;
+
+
 
 // Declare the external JS functions (Synchronous imports)
 extern "C"
@@ -12,7 +21,7 @@ void jsCout(const char* str);
 extern "C"
 // 🚀 JS bridge for sending data to peers
 __attribute__((import_module("sys"), import_name("jsSendToPeer")))
-void jsSendToPeer(int targetId, const void* srcPtr, size_t size);
+void jsSendToPeer(int targetId, int targetSectionId, const void* srcPtr, size_t size);
 
 
 // Standard memory management exports
@@ -31,8 +40,23 @@ void * wasm_realloc(void* ptr, std::size_t size) {
 	return std::realloc(ptr, size);
 }
 
+class Factory
+{
+	private:
+	static int _atid;
+	
+	public:
+	
+	
+};
+
+
+
+
+
+
 // Custom synchronous logger
-namespace wasm {
+namespace std {
 	class logImplement {
 		public:
 		logImplement() {}
@@ -41,28 +65,39 @@ namespace wasm {
 			jsCout(v ? "true" : "false");
 			return *this;
 		}
-		logImplement & operator << (int v) {
+		logImplement & operator << (int8_t v) {
 			jsCout(std::to_string(v).c_str());
 			return *this;
 		}
-		logImplement & operator << (long v) {
+		logImplement & operator << (int16_t v) {
 			jsCout(std::to_string(v).c_str());
 			return *this;
 		}
-		// 🚀 FIX: Removed size_t to prevent duplicate signatures.
-		// unsigned long and unsigned long long cover size_t perfectly!
-		logImplement & operator << (unsigned int v) {
+		logImplement & operator << (int32_t v) {
 			jsCout(std::to_string(v).c_str());
 			return *this;
 		}
-		logImplement & operator << (unsigned long v) {
+		logImplement & operator << (int64_t v) {
 			jsCout(std::to_string(v).c_str());
 			return *this;
 		}
-		logImplement & operator << (unsigned long long v) {
+		logImplement & operator << (uint8_t v) {
 			jsCout(std::to_string(v).c_str());
 			return *this;
 		}
+		logImplement & operator << (uint16_t v) {
+			jsCout(std::to_string(v).c_str());
+			return *this;
+		}
+		logImplement & operator << (uint32_t v) {
+			jsCout(std::to_string(v).c_str());
+			return *this;
+		}
+		logImplement & operator << (uint64_t v) {
+			jsCout(std::to_string(v).c_str());
+			return *this;
+		}
+		
 		logImplement & operator << (float v) {
 			jsCout(std::to_string(v).c_str());
 			return *this;
@@ -88,38 +123,81 @@ namespace wasm {
 			return *this;
 		}
 	};
+	
+	logImplement info;
+	
 }
+#ifdef WASM
+#define cout info
+#endif
+//*/
 
-wasm::logImplement info;
 
-// Simple synchronous task classes (replacing pWorker)
-class Task1 {
-	public:
-	Task1() {}
-	~Task1() { info << "at Task1 destructor\r\n"; }
-	void run() { info << "at Task1 run\r\n"; }
-};
 
-class Task2 {
-	public:
-	Task2() {}
-	~Task2() { info << "at Task2 destructor\r\n"; }
-	void run() { info << "at Task2 run\r\n"; }
-};
-int fun()
+
+
+class MsgBase 
 {
-	return 999;
-}
-int tt=fun();
+	public:
+	MsgBase()
+	{
+		
+	}
+	virtual void func()
+	{
+		cout << "MsgBase\r\n";
+	}
+	virtual int size() {
+		return sizeof(MsgBase);
+	}
+	
+	
+};
+
+
+class try1Msg : public MsgBase
+{
+	public:
+	try1Msg()
+	{
+		
+	}
+	int size() {
+		return sizeof(try1Msg);
+	}
+	virtual void func()
+	{
+		cout << "try1Msg\r\n";
+	}
+};
+
+class try2Msg : public MsgBase
+{
+	public:
+	try2Msg()
+	{
+		
+	}
+	int size() {
+		return sizeof(try2Msg);
+	}
+	virtual void func()
+	{
+		cout << "****try2Msg\r\n";
+		cout <<"blaqwe";
+	}
+};
 
 
 // 🚀 Called by JS when a P2P message arrives and memory is copied
-extern "C" __attribute__((export_name("onPeerMessage")))
-void onPeerMessage(int srcId, const void* destPtr, size_t size) {
-	const char* receivedStr = static_cast<const char*>(destPtr);
-	if(tt==999) info<<"here1***";
-
-	info << "📥 [P2P] Received " << size << " bytes from peer " << srcId << ": " << receivedStr << "\n";
+extern "C" __attribute__((export_name("onJsPeerMessage")))
+void onJsPeerMessage(int srcId, int secId, const void* destPtr, size_t size) {
+	
+	
+	MsgBase* ptr = (MsgBase*)destPtr;
+	ptr->func();
+	delete(ptr);
+	
 }
 
 
@@ -127,29 +205,28 @@ void onPeerMessage(int srcId, const void* destPtr, size_t size) {
 
 // 🚀 Called by JS to trigger a P2P send
 extern "C" __attribute__((export_name("testSend")))
-void testSend(int targetId, const char* msg) {
-	size_t len = std::strlen(msg) + 1; // +1 for null terminator
-	info << "📤 [P2P] Sending to peer " << targetId << ": " << msg << "\n";
-	jsSendToPeer(targetId, msg, len);
+void testSend(int targetId, int targetSectionId, const char* msg) {
+	//size_t len = std::strlen(msg) + 1; // +1 for null terminator
+	//info << "📤 [P2P] Sending to peer " << targetId << ": " << msg << "\n";
+	//jsSendToPeer(targetId, msg, len);
+	
+	MsgBase * d = new try2Msg();
+	jsSendToPeer(targetId,targetSectionId, d, d->size());
+	delete(d);
 }
 
-extern "C" __attribute__((export_name("greet")))
-const char* greet(const char* name) {
-	info << "C++ received name: " << name << "\n";
-	return "Hello from C++!";
-}
+
+
+
+
+
+
 
 int main() {
-	tt=123;
-	std::cout << "Starting main execution...\r\n";
-
-	// Synchronous instantiation and execution
-	Task1 t1;
-	Task2 t2;
-
-	t1.run();
-	t2.run();
-
-	info << "Main execution finished.\r\n";
+	
+	
+	cout << "@@@@@Main execution finished.\r\n";
+	//testSend(2, 0,  "hhh");
+	
 	return 0;
 }

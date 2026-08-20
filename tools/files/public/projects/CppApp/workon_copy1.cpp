@@ -27,7 +27,6 @@ void * wasm_realloc(void* ptr, std::size_t size) {
     return std::realloc(ptr, size);
 }
 
-
 // Custom synchronous logger
 namespace wasm {
     class logImplement {
@@ -75,12 +74,6 @@ namespace wasm {
 
 wasm::logImplement info;
 
-extern "C" __attribute__((export_name("tryout")))
-void tryout(int i)
-{
-	info << "number is "<< i << "\r\n";
-}
-
 // Simple synchronous task classes (replacing pWorker)
 class Task1 {
 public:
@@ -104,7 +97,7 @@ const char* greet(const char* name) {
 
 int main() {
     jstry(123);
-    std::cout << "Starting main execution...\r\n";
+    info << "Starting main execution...\r\n";
     
     // Synchronous instantiation and execution
     Task1 t1;
