@@ -35,8 +35,8 @@ html, body {
 <div id="console"></div>
 
 <script type="module">
-import { WasmRuntime } from '/system/js/wasm-runtime.js';
-import { WasmRegistry } from '/system/js/WasmRegistry.js';
+import { WasmRuntime } from '/system/wasmcpp/wasm-runtime.js';
+import { WasmRegistry } from '/system/wasmcpp/WasmRegistry.js';
 
 
 
@@ -100,13 +100,13 @@ async function runWasm() {
 		var main = WasmRegistry._workers[0];
 		main.runtime.exports.testSend(2,0,0);
 		
-		//const w1 = WasmRegistry._workers[1];
-		//w1.worker.postMessage({ 
-		//	type: 'runTest', 
-		//	targetId: 2, 
-		//	
-		//	msg: 'Hello from Worker 1! 🚀' 
-		//});
+		const w1 = WasmRegistry._workers[1];
+		w1.worker.postMessage({ 
+			type: 'runTest', 
+			targetId: 2, 
+			
+			msg: 'Hello from Worker 1! 🚀' 
+		});
 		
 		
 		

@@ -15,40 +15,64 @@ using namespace std;
 
 // Declare the external JS functions (Synchronous imports)
 extern "C"
-__attribute__((import_module("env"), import_name("jsCout")))
+__attribute__((import_module("__jssys"), import_name("jsCout")))
 void jsCout(const char* str);
 
 extern "C"
 // 🚀 JS bridge for sending data to peers
-__attribute__((import_module("sys"), import_name("jsSendToPeer")))
+__attribute__((import_module("__jssys"), import_name("jsSendToPeer")))
 void jsSendToPeer(int targetId, int targetSectionId, const void* srcPtr, size_t size);
 
 
+
+
+
+
+
+
+
+
+
+///required for messaging
+extern "C" 
+__attribute__((export_name("__cppAllocateMsg")))
+void* __cppAllocateMsg(int targetSectionId, size_t size) {
+	
+	// used to effecintly allocate or reuse message memory.
+	//stubbed in malloc for now  but this need to change for an more effecient allocation like reusing
+	
+	void * ptr= std::malloc(size);
+	//set used to true
+	((bool*)ptr)[0]=true;
+	
+	return ptr;
+}
+
+
+
+
 // Standard memory management exports
-extern "C" __attribute__((export_name("malloc")))
+//__attribute__((import_module("__jssys"), import_name("jsCout")))
+extern "C" 
+__attribute__((export_name("malloc")))
 void* wasm_malloc(size_t size) {
 	return std::malloc(size);
 }
 
-extern "C" __attribute__((export_name("free")))
+extern "C"
+ __attribute__((export_name("free")))
 void wasm_free(void* ptr) {
 	std::free(ptr);
-}
+} 
 
-extern "C" __attribute__((export_name("realloc")))
+extern "C" 
+__attribute__((export_name("realloc")))
 void * wasm_realloc(void* ptr, std::size_t size) {
 	return std::realloc(ptr, size);
 }
 
-class Factory
-{
-	private:
-	static int _atid;
-	
-	public:
-	
-	
-};
+
+
 
 
 
@@ -135,68 +159,147 @@ namespace std {
 
 
 
-
-class MsgBase 
+class tryMsg1
 {
 	public:
-	MsgBase()
+	bool used = true;
+	
+	private:
+	
+	char _msg[255];
+	
+	
+	public:
+	tryMsg1()
 	{
 		
-	}
-	virtual void func()
-	{
-		cout << "MsgBase\r\n";
-	}
-	virtual int size() {
-		return sizeof(MsgBase);
 	}
 	
 	
-};
+	tryMsg1 & msg(char * m)
+	{
+		int i= 0;
+		
+		do
+		{
+			_msg[i]= m[i];
+			i++;
+		}
+		while(m[i]!=0);
+		_msg[i]=0;
+		return *this;
+		
+	}
+	void msg(const char * m)
+	{
+		int i= 0;
+		
+		do
+		{
+			_msg[i]= m[i];
+			i++;
+		}
+		while(m[i]!=0);
+		_msg[i]=0;
+		
+	}
+	char * msg()
+	{
+		return _msg;
+	}
+	
+}__attribute__((packed));
 
 
-class try1Msg : public MsgBase
+class tryMsg2
 {
 	public:
-	try1Msg()
+	bool used=true;
+	private:
+	
+	char _msg[255];
+	
+	
+	public:
+	tryMsg2()
 	{
 		
 	}
-	int size() {
-		return sizeof(try1Msg);
-	}
-	virtual void func()
+	
+	
+	tryMsg2 & msg(char * m)
 	{
-		cout << "try1Msg\r\n";
-	}
-};
-
-class try2Msg : public MsgBase
-{
-	public:
-	try2Msg()
-	{
+		int i= 0;
+		
+		do
+		{
+			_msg[i]= m[i];
+			i++;
+		}
+		while(m[i]!=0);
+		_msg[i]=0;
+		return *this;
 		
 	}
-	int size() {
-		return sizeof(try2Msg);
-	}
-	virtual void func()
+	void msg(const char * m)
 	{
-		cout << "****try2Msg\r\n";
-		cout <<"blaqwe";
+		int i= 0;
+		
+		do
+		{
+			_msg[i]= m[i];
+			i++;
+		}
+		while(m[i]!=0);
+		_msg[i]=0;
+		
 	}
+	char * msg()
+	{
+		return _msg;
+	}
+	
+}__attribute__((packed));
+
+
+void tryMsg1Handler(void *d)
+{
+	tryMsg1 * at = (tryMsg1*)d;
+	
+	cout <<"tryMsg1:" << at->msg()<<" used: " << at->used << "\r\n";
+	delete(at);
+}
+
+void tryMsg2Handler(void *d)
+{
+	tryMsg2 * at = (tryMsg2*)d;
+	
+	cout <<"tryMsg2:" << at->msg()<<" used: " << at->used <<"\r\n";
+	delete(at);
+}
+
+
+
+
+enum class tryMsgType
+{
+	tryMsg1_t,
+	tryMsg2_t,
+	endSize
 };
+
+void (*Handlers[])(void*) = {tryMsg1Handler,tryMsg2Handler};
+
 
 
 // 🚀 Called by JS when a P2P message arrives and memory is copied
 extern "C" __attribute__((export_name("onJsPeerMessage")))
-void onJsPeerMessage(int srcId, int secId, const void* destPtr, size_t size) {
+void onJsPeerMessage(int srcId, int secId, void* destPtr, size_t size) {
 	
 	
-	MsgBase* ptr = (MsgBase*)destPtr;
-	ptr->func();
-	delete(ptr);
+	
+	Handlers[secId](destPtr);
+
 	
 }
 
@@ -206,13 +309,21 @@ void onJsPeerMessage(int srcId, int secId, const void* destPtr, size_t size) {
 // 🚀 Called by JS to trigger a P2P send
 extern "C" __attribute__((export_name("testSend")))
 void testSend(int targetId, int targetSectionId, const char* msg) {
-	//size_t len = std::strlen(msg) + 1; // +1 for null terminator
-	//info << "📤 [P2P] Sending to peer " << targetId << ": " << msg << "\n";
-	//jsSendToPeer(targetId, msg, len);
+	tryMsg1 * m1 = new tryMsg1();
+	m1->msg("blaa hi there at@ 1234\r\n");
+	jsSendToPeer(targetId, (int)tryMsgType::tryMsg1_t, m1, sizeof(*m1));
 	
-	MsgBase * d = new try2Msg();
-	jsSendToPeer(targetId,targetSectionId, d, d->size());
-	delete(d);
+	
+	tryMsg2 * m2 = new tryMsg2();
+	m2->msg("hi and more at@ 1234\r\n");
+	jsSendToPeer(targetId, (int)tryMsgType::tryMsg2_t, m2, sizeof(*m2));
+	
+	
+	//delete(m1);
+	//delete(m2);
+	
+	
+	
 }
 
 

@@ -35,8 +35,8 @@ html, body {
 <div id="console"></div>
 
 <script type="module">
-import { WasmRuntime } from '/system/js/wasm-runtime.js';
-import { WasmRegistry } from '/system/js/WasmRegistry.js';
+import { WasmRuntime } from '/system/wasmcpp/wasm-runtime.js';
+import { WasmRegistry } from '/system/wasmcpp/WasmRegistry.js';
 
 
 
@@ -72,14 +72,50 @@ console.error = (...args) => { appendToConsole(args.map(a => typeof a === 'objec
 
 
 
+
+
 // ==========================================
 // 2. WASM Execution (Testing P2P Mesh)
 // ==========================================
 async function runWasm() {
 	try {
-		WasmRegistry.load('./try1.wasm', 0);
-		WasmRegistry.loadWorker('./try1.wasm', 1);
-		WasmRegistry.loadWorker('./try1.wasm', 2);
+
+
+
+
+		let jsalert=(msg) => {
+			const {payload} = msg;
+			alert(payload);
+		};
+
+
+		var atmain = await WasmRegistry.load(
+			{
+				wasmUrl: './try1.wasm',
+				id: 0,
+				imports: {
+					myfuncs:{
+						jsalert: function(msg) {
+							//jsalert({payload:WasmRegistry._workers[0].runtime.readString(msg)});
+							jsalert({payload:atmain.runtime.readString(msg)});
+						}
+					}
+				}
+			});
+
+
+		WasmRegistry.loadWorker({
+				wasmUrl:'./try1.wasm',
+				id:1,
+				workerScriptUrl:'./cppworker.js',
+				msgHandels:{jsalert}
+			});
+		WasmRegistry.loadWorker({
+				wasmUrl:'./try1.wasm',
+				id:2,
+				//workerScriptUrl:'./cppworker.js',
+				msgHandels:{jsalert}
+			});
 
 		console.info('Waiting for all modules and workers to initialize...');
 		await WasmRegistry.waitLoadAll();
@@ -90,19 +126,27 @@ async function runWasm() {
 		await WasmRegistry.waitPeerAll();
 		console.info('🔗 All peer-to-peer ports and shared memory views connected!');
 
-		// 🚀 Extract the runtime directly from the Registry
-		const mainThread = WasmRegistry._workers[0];
-		const runtime = mainThread.runtime;
+		// 🚀 NEW: Trigger run() on all threads simultaneously
+		console.info('Executing runtime.run() on all modules...');
+		WasmRegistry.runAll();
 
-		console.info('Executing main()...');
-		const exitCode = runtime.run();
+		// Wait for all main() functions to return or exit
+		const exitCodes = await WasmRegistry.waitRunAll();
+		console.info('🏁 All runtimes finished! Exit codes:', exitCodes);
+		var main = WasmRegistry._workers[0];
+		main.runtime.exports.testSend(2,0,0);
 
-		console.info('Triggering P2P test: Main Thread -> Worker 2');
 
-		// Send a test message using the registry's runtime
-		const ptr = runtime.writeString("Hello from Main Thread! 🚀");
-		runtime.exports.testSend(2, ptr);
-		runtime.freeString(ptr);
+		const w1 = WasmRegistry._workers[1];
+		w1.worker.postMessage({
+				type: 'runTest',
+				targetId: 2,
+
+				msg: 'Hello from Worker 1! 🚀'
+			});
+
+
+
 
 	} catch (err) {
 		console.error('❌ FATAL ERROR:', err);

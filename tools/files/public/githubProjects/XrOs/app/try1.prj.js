@@ -5,7 +5,7 @@
 		'clang++',
 		'-std=c++20',
 		'-O2',
-		'-I', '@/public/githubProjects/XrOs/app/CppApp',
+		'-I', '@/public/system/wasmcpp/example',
 		'-pthread',
 		'-fno-exceptions',
 		'-fno-rtti',
