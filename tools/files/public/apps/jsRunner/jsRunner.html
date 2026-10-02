@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Mobile JS Runner & Console</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            padding: 0;
+            height: 100dvh;
+            display: flex;
+            flex-direction: column;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #ffffff;
+            color: #1c1c1e;
+            overflow: hidden;
+        }
+
+        .tabs {
+            display: flex;
+            background-color: #f2f2f7;
+            border-bottom: 1px solid #d1d1d6;
+            flex-shrink: 0;
+        }
+        .tab-btn {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            background: transparent;
+            font-size: 15px;
+            font-weight: 600;
+            color: #8e8e93;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            transition: all 0.2s;
+        }
+        .tab-btn.active {
+            color: #007aff;
+            border-bottom-color: #007aff;
+            background-color: #ffffff;
+        }
+
+        .tab-content {
+            flex: 1;
+            display: none;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .tab-content.active {
+            display: flex;
+        }
+
+        #code-input {
+            flex: 1;
+            width: 100%;
+            border: none;
+            padding: 12px;
+            font-family: "Menlo", "Monaco", "Courier New", monospace;
+            font-size: 14px;
+            line-height: 1.5;
+            resize: none;
+            outline: none;
+            background-color: #ffffff;
+            color: #1c1c1e;
+        }
+        #code-input:focus {
+            background-color: #fafafa;
+        }
+
+        #log-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 12px;
+            background: #1e1e1e;
+            color: #f8f8f2;
+            font-family: "Menlo", "Monaco", "Courier New", monospace;
+            font-size: 12px;
+            line-height: 1.4;
+            -webkit-overflow-scrolling: touch;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .controls-compact {
+            display: flex;
+            gap: 8px;
+            padding: 8px 12px;
+            background-color: #f2f2f7;
+            border-top: 1px solid #d1d1d6;
+            flex-shrink: 0;
+        }
+        .controls-compact button {
+            flex: 1;
+            padding: 10px 8px;
+            font-size: 14px;
+            font-weight: 600;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: opacity 0.2s, transform 0.1s;
+        }
+        .controls-compact button:active {
+            transform: scale(0.97);
+            opacity: 0.8;
+        }
+        .btn-run { background-color: #34c759; color: white; }
+        .btn-clear { background-color: #8e8e93; color: white; }
+        .btn-copy { background-color: #007aff; color: white; }
+
+        .log-entry {
+            margin-bottom: 8px;
+            padding-bottom: 6px;
+            border-bottom: 1px solid #333;
+        }
+        .log-info { color: #8be9fd; }
+        .log-log { color: #f8f8f2; }
+        .log-warn { color: #f1fa8c; background: #3a3a00; padding: 6px; border-radius: 6px; }
+        .log-error { color: #ff5555; background: #3a0000; padding: 6px; border-radius: 6px; font-weight: bold; }
+        
+        .stack-trace {
+            color: #bd93f9;
+            font-size: 11px;
+            margin-top: 6px;
+            margin-left: 8px;
+            opacity: 0.9;
+            border-left: 2px solid #6272a4;
+            padding-left: 8px;
+        }
+        .timestamp { color: #6272a4; font-size: 11px; }
+    </style>
+</head>
+<body>
+
+    <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('editor')">📝 Editor</button>
+        <button class="tab-btn" onclick="switchTab('console')">💻 Console <span id="log-badge" style="display:none; background:#ff3b30; color:white; font-size:10px; padding:2px 6px; border-radius:10px; margin-left:4px;">0</span></button>
+    </div>
+
+    <div id="tab-editor" class="tab-content active">
+        <textarea id="code-input" spellcheck="false" placeholder="Paste or type JavaScript here...">// Welcome! Tap 'Run' to execute.
+console.log("Hello from isolated iframe!", { device: "iOS", test: true });
+
+console.warn("This is a test warning");
+
+// Test scope isolation:
+let myVar = "I am isolated";
+// window.runCode = function() { console.log("I tried to break the runner"); }; // This will NOT affect the parent
+
+// Test error capturing:
+// throw new Error("Oops! Something went wrong.");
+// Promise.reject(new Error("Async network failure"));</textarea>
+        <div class="controls-compact">
+            <button class="btn-run" onclick="runCode()">▶ Run Code</button>
+            <button class="btn-clear" onclick="clearCode()">🗑 Clear</button>
+        </div>
+    </div>
+
+    <div id="tab-console" class="tab-content">
+        <div id="log-container"></div>
+        <div class="controls-compact">
+            <button class="btn-copy" onclick="copyLogs()">📋 Copy All</button>
+            <button class="btn-clear" onclick="clearLogs()">🧹 Clear Logs</button>
+        </div</div>
+
+    <script>
+        const logContainer = document.getElementById('log-container');
+        const codeInput = document.getElementById('code-input');
+        const logBadge = document.getElementById('log-badge');
+        let logCount = 0;
+
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            document.getElementById(`tab-${tabName}`).classList.add('active');
+
+            if (tabName === 'console') {
+                logCount = 0;
+                logBadge.style.display = 'none';
+            }
+        }
+
+        function updateBadge() {
+            if (!document.getElementById('tab-console').classList.contains('active')) {
+                logCount++;
+                logBadge.textContent = logCount > 99 ? '99+' : logCount;
+                logBadge.style.display = 'inline-block';
+            }
+        }
+
+        function formatArgs(args) {
+            return args.map(arg => {
+                if (typeof arg === 'object' && arg !== null) {
+                    try { return JSON.stringify(arg, null, 2); } 
+                    catch (e) { return String(arg); }
+                }
+                return String(arg);
+            }).join(' ');
+        }
+
+        function appendLog(type, args, stack = null) {
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${type}`;
+            
+            const timestamp = new Date().toLocaleTimeString();
+            const message = Array.isArray(args) ? formatArgs(args) : String(args);
+
+            entry.innerHTML = `<span class="timestamp">[${timestamp}]</span> <strong>[${type.toUpperCase()}]</strong> ${message}`;
+            
+            if (stack) {
+                const stackEl = document.createElement('div');
+                stackEl.className = 'stack-trace';
+                stackEl.textContent = stack;
+                entry.appendChild(stackEl);
+            }
+
+            logContainer.appendChild(entry);
+            logContainer.scrollTop = logContainer.scrollHeight;
+            updateBadge();
+        }
+
+        // --- TRUE ISOLATION: Listen for messages from the sandboxed iframe ---
+        window.addEventListener('message', (event) => {
+            // Verify the message structure for security
+            if (event.data && event.data.type === 'console') {
+                appendLog(event.data.level, event.data.args, event.data.stack);
+            }
+        });
+
+        function runCode() {
+            const code = codeInput.value;
+            if (!code.trim()) {
+                appendLog('warn', ['No code to run!']);
+                return
+            }
+            
+            appendLog('info', ['--- ▶ Running User Code ---']);
+
+            // 1. Remove old iframe to ensure a completely clean slate (no lingering variables)
+            const oldIframe = document.getElementById('runner-iframe');
+            if (oldIframe) {
+                oldIframe.remove();
+            }
+
+            // 2. Create a new sandboxed iframe
+            const iframe = document.createElement('iframe');
+            iframe.id = 'runner-iframe';
+            iframe.style.display = 'none';
+            // sandbox="allow-scripts" prevents access to parent DOM/cookies, but allows JS to run.
+            // allow-modals ensures alert()/confirm() don't crash the runner.
+            iframe.sandbox = "allow-scripts allow-modals"; 
+            
+            // 3. Inject the isolation wrapper and user code
+            const htmlContent = `
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <script>
+                        // Helper to safely serialize and send logs to parent
+                        const sendToParent = (level, args, stack = null) => {
+                            try {
+                                const serialized = args.map(arg => {
+                                    if (typeof arg === 'object' && arg !== null) {
+                                        try { return JSON.stringify(arg, null, 2); } 
+                                        catch (e) { return String(arg); }
+                                    }
+                                    return String(arg);
+                                });
+                                window.parent.postMessage({ type: 'console', level: level, args: serialized, stack: stack }, '*');
+                            } catch (e) {
+                                window.parent.postMessage({ type: 'console', level: 'error', args: ['Failed to serialize log: ' + e.message] }, '*');
+                            }
+                        };
+
+                        // Intercept Console
+                        console.log = (...args) => sendToParent('log', args);
+                        console.info = (...args) => sendToParent('info', args);
+                        console.warn = (...args) => sendToParent('warn', args);
+                        console.error = (...args) => sendToParent('error', args);
+
+                        // Intercept Global Errors
+                        window.onerror = (message, source, lineno, colno, error) => {
+                            sendToParent('error', ['🚨 UNCAUGHT ERROR: ' + message], error ? error.stack : null);
+                            return true; // Prevent default browser error UI
+                        };
+
+                        // Intercept Unhandled Promise Rejections
+                        window.onunhandledrejection = (event) => {
+                            const reason = event.reason;
+                            const msg = reason instanceof Error ? reason.message : String(reason);
+                            const stack = reason instanceof Error ? reason.stack : null;
+                            sendToParent('error', ['⚠️ UNHANDLED PROMISE REJECTION: ' + msg], stack);
+                            event.preventDefault();
+                        };
+
+                        // Execute User Code
+                        try {
+                            ${code}
+                        } catch (e) {
+                            sendToParent('error', ['❌ EXECUTION FAILED: ' + e.message], e.stack);
+                        }
+                    <\/script>
+                </head>
+                <body></body>
+                </html>
+            `;
+            
+            document.body.appendChild(iframe);
+            // Assigning to srcdoc triggers the execution in the isolated context
+            iframe.srcdoc = htmlContent;
+        }
+
+        function clearCode() {
+            codeInput.value = '';
+            codeInput.focus();
+        }
+
+        function clearLogs() {
+            logContainer.innerHTML = '';
+            logCount = 0;
+            logBadge.style.display = 'none';
+        }
+
+        function copyLogs() {
+            const text = logContainer.innerText;
+            if (!text.trim()) {
+                appendLog('warn', ['No logs to copy!']);
+                return;
+            }
+            navigator.clipboard.writeText(text).then(() => {
+                const btn = document.querySelector('.btn-copy');
+                const originalText = btn.textContent;
+                btn.textContent = '✅ Copied!';
+                setTimeout(() => { btn.textContent = originalText; }, 1500);
+            }).catch(err => {
+                appendLog('error', ['Failed to copy logs: ', err.message]);
+            });
+        }
+
+        window.addEventListener('load', () => {
+            appendLog('info', ['Mobile console capture initialized. Ready.']);
+        });
+    </script>
+</body>
+</html>

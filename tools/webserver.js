@@ -254,7 +254,7 @@ const serverOptions = {
     cert: './files/cert.crt',
     additionalMethods: []
 };
-
+/*
 const allowHead = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'OPTIONS, POST, GET, PUT, PATCH, DELETE',
@@ -265,6 +265,25 @@ const allowHead = {
     'Cross-Origin-Embedder-Policy': 'require-corp',
     'Cross-Origin-Resource-Policy': 'cross-origin'
 };
+*/
+
+
+
+const allowHead = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'OPTIONS, POST, GET, PUT, PATCH, DELETE',
+    'Access-Control-Max-Age': 2592000,
+    'Access-Control-Allow-Headers': 'Origin, X-Requested-With, Content-Type, Accept, Authorization, X-LS-Path, X-Read-File, X-Read-File-Binary, X-Save-File, X-File-Path, X-File-Content, X-MKPATH, X-MV-Source, X-MV-Destination, X-DEL-Path, X-COPY-Source, X-COPY-Destination, X-RN-Source, X-RN-Destination, X-CMD, X-SRC, X-DST',
+    
+    'Access-Control-Expose-Headers': 'Content-Length, Content-Range, Accept-Ranges',
+    
+    'Cross-Origin-Opener-Policy': 'same-origin',
+    'Cross-Origin-Embedder-Policy': 'require-corp',
+    'Cross-Origin-Resource-Policy': 'cross-origin'
+};
+
+
+
 
 // ==========================================================
 // ===== RESPONSE HELPERS =====
@@ -997,9 +1016,18 @@ function webHandler(req, res) {
     }
 	
 	 
+	//res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');    
+	//res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');   
+	//res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');    
+	
+	// Inside function webHandler(req, res)
 	res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');    
 	res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');   
-	res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');    
+	res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+
+// 👇 ADD THIS LINE HERE TOO 👇
+	res.setHeader('Access-Control-Expose-Headers', 'Content-Length, Content-Range, Accept-Ranges');
+	
 	
     
     if (req.method === 'OPTIONS') { res.writeHead(204, allowHead); res.end(); return; }

@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Small Language (SL) Compiler Documentation</title>
+    <style>
+        :root {
+            --bg-color: #ffffff;
+            --text-color: #1f2328;
+            --sidebar-bg: #f6f8fa;
+            --border-color: #d0d7de;
+            --link-color: #0969da;
+            --code-bg: #f6f8fa;
+            --inline-code-bg: rgba(175, 184, 193, 0.2);
+            --note-bg: #ddf4ff;
+            --note-border: #0969da;
+            --warning-bg: #fff8c5;
+            --warning-border: #9a6700;
+            --header-bg: #ffffff;
+        }
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg-color: #0d1117;
+                --text-color: #e6edf3;
+                --sidebar-bg: #161b22;
+                --border-color: #30363d;
+                --link-color: #2f81f7;
+                --code-bg: #161b22;
+                --inline-code-bg: rgba(110, 118, 129, 0.4);
+                --note-bg: rgba(56, 139, 253, 0.15);
+                --note-border: #2f81f7;
+                --warning-bg: rgba(187, 128, 9, 0.15);
+                --warning-border: #d29922;
+                --header-bg: #010409;
+            }
+        }
+
+        *, *::before, *::after { box-sizing: border-box; }
+        
+        html {
+            scroll-behavior: smooth;
+            -webkit-text-size-adjust: 100%;
+            text-size-adjust: 100%;
+        }
+
+        body {
+            display: flex;
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            color: var(--text-color);
+            background-color: var(--bg-color);
+            line-height: 1.65;
+            font-size: 16px;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        a {
+            color: var(--link-color);
+            text-decoration: none;
+            text-decoration-thickness: 1px;
+            text-underline-offset: 2px;
+        }
+        a:hover, a:focus {
+            text-decoration: underline;
+        }
+
+        /* Mobile Header */
+        .mobile-header {
+            display: none;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 280px;
+            height: 100vh;
+            position: sticky;
+            top: 0;
+            overflow-y: auto;
+            background-color: var(--sidebar-bg);
+            border-right: 1px solid var(--border-color);
+            padding: 24px 20px;
+            flex-shrink: 0;
+            -webkit-overflow-scrolling: touch;
+        }
+        .sidebar h3 {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-color);
+            opacity: 0.6;
+            margin-top: 0;
+            margin-bottom: 16px;
+            font-weight: 600;
+        }
+        .sidebar ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .sidebar li {
+            margin-bottom: 2px;
+        }
+        .sidebar a {
+            display: block;
+            padding: 6px 0;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+        .sidebar .sub {
+            padding-left: 16px;
+        }
+        .sidebar .sub a {
+            font-size: 13px;
+            opacity: 0.85;
+        }
+
+        /* Content */
+        .content {
+            flex: 1;
+            max-width: 800px;
+            padding: 40px 48px;
+            margin: 0 auto;
+            min-width: 0;
+        }
+
+        h1, h2, h3, h4 {
+            margin-top: 40px;
+            margin-bottom: 16px;
+            font-weight: 600;
+            line-height: 1.3;
+            color: var(--text-color);
+            scroll-margin-top: 20px;
+        }
+        h1 { 
+            font-size: 2em; 
+            border-bottom: 1px solid var(--border-color); 
+            padding-bottom: 0.3em; 
+            margin-top: 0;
+        }
+        h2 { 
+            font-size: 1.5em; 
+            border-bottom: 1px solid var(--border-color); 
+            padding-bottom: 0.3em; 
+        }
+        h3 { font-size: 1.25em; }
+        h4 { font-size: 1.1em; }
+
+        p { margin-bottom: 16px; }
+
+        /* Code Blocks */
+        pre {
+            background-color: var(--code-bg);
+            border-radius: 8px;
+            padding: 16px;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            border: 1px solid var(--border-color);
+            margin-bottom: 20px;
+            font-size: 14px;
+            line-height: 1.55;
+            white-space: pre;
+            word-wrap: normal;
+        }
+        code {
+            font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+            font-size: 85%;
+        }
+        p code, li code, td code {
+            background-color: var(--inline-code-bg);
+            padding: 0.2em 0.4em;
+            border-radius: 4px;
+            font-size: 85%;
+            word-break: break-word;
+        }
+
+        /* Tables */
+        .table-wrapper {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            margin-bottom: 24px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background-color: var(--sidebar-bg);
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            min-width: 400px;
+        }
+        th, td {
+            border-bottom: 1px solid var(--border-color);
+            padding: 12px 16px;
+            text-align: left;
+            font-size: 15px;
+        }
+        th {
+            background-color: var(--code-bg);
+            font-weight: 600;
+            position: sticky;
+            top: 0;
+        }
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        ul, ol {
+            padding-left: 1.5em;
+            margin-bottom: 16px;
+        }
+        li {
+            margin-bottom: 8px;
+        }
+
+        .note, .warning {
+            padding: 16px 20px;
+            margin: 24px 0;
+            border-radius: 8px;
+            border-left: 4px solid;
+            font-size: 15px;
+            line-height: 1.6;
+        }
+        .note {
+            background-color: var(--note-bg);
+            border-left-color: var(--note-border);
+        }
+        .warning {
+            background-color: var(--warning-bg);
+            border-left-color: var(--warning-border);
+        }
+
+        /* Mobile Optimizations */
+        @media (max-width: 768px) {
+            body { 
+                flex-direction: column; 
+            }
+            .mobile-header {
+                display: flex;
+                align-items: center;
+                position: sticky;
+                top: 0;
+                background: var(--header-bg);
+                border-bottom: 1px solid var(--border-color);
+                padding: 12px 16px;
+                padding-top: calc(12px + env(safe-area-inset-top));
+                z-index: 100;
+                font-weight: 600;
+                font-size: 1.1em;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            }
+            .sidebar {
+                width: 100%;
+                height: auto;
+                max-height: 45vh;
+                position: relative;
+                border-right: none;
+                border-bottom: 2px solid var(--border-color);
+                padding: 16px;
+            }
+            .sidebar a {
+                padding: 8px 0;
+                font-size: 15px;
+            }
+            .sidebar .sub a {
+                font-size: 14px;
+            }
+            .content {
+                padding: 24px 16px;
+                width: 100%;
+            }
+            h1 { font-size: 1.75em; }
+            h2 { font-size: 1.4em; }
+            h3 { font-size: 1.2em; }
+            
+            h1, h2, h3, h4 {
+                scroll-margin-top: 70px;
+            }
+            
+            pre {
+                font-size: 13px;
+                padding: 12px;
+                border-radius: 6px;
+            }
+            
+            th, td {
+                padding: 10px 12px;
+                font-size: 14px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="mobile-header">
+        SL Documentation
+    </header>
+
+    <nav class="sidebar">
+        <h3>Contents</h3>
+        <ul>
+            <li><a href="#doc-notes">0. Documentation Notes</a></li>
+            <li><a href="#overview">1. Overview</a>
+                <ul><li class="sub"><a href="#comments">1.1 Comments</a></li></ul>
+            </li>
+            <li><a href="#primitive-types">2. Primitive Types</a>
+                <ul>
+                    <li class="sub"><a href="#chars-and-strings">2.1 Characters and Strings</a></li>
+                    <li class="sub"><a href="#escape-chars">2.2 Escape Characters</a></li>
+                    <li class="sub"><a href="#type-qualifiers">2.3 Type Qualifiers (const)</a></li>
+                </ul>
+            </li>
+            <li><a href="#operators">3. Operators</a></li>
+            <li><a href="#functions">4. Functions</a></li>
+            <li><a href="#classes-and-structs">5. Classes and Structs</a></li>
+            <li><a href="#modules-and-exporting">6. Modules and Exporting</a></li>
+            <li><a href="#templates">7. Templates</a></li>
+            <li><a href="#typedef">8. Typedef</a></li>
+            <li><a href="#control-flow">9. Control Flow</a></li>
+            <li><a href="#deferred-resolution">10. Deferred Resolution</a></li>
+            <li><a href="#key-design-choices">11. Key Design Choices</a></li>
+            <li><a href="#execution-model">12. Execution Model</a></li>
+            <li><a href="#memory-management">13. Memory Management</a></li>
+            <li><a href="#advanced-type-system">14. Advanced Type System</a></li>
+            <li><a href="#modules-imports">15. Modules, Imports, Interop</a></li>
+            <li><a href="#functions-scope-namespaces">16. Functions, Scope, Namespaces</a></li>
+            <li><a href="#oo-refinements">17. Object-Oriented Refinements</a></li>
+            <li><a href="#expressions-literals-casting">18. Expressions, Literals, Casting</a></li>
+            <li><a href="#error-handling">19. Error Handling</a></li>
+            <li><a href="#compiler-directives">20. Compiler Directives</a></li>
+            <li><a href="#preprocessor-macros">21. Preprocessor Macros</a></li>
+            <li><a href="#variadic-functions">22. Variadic Functions</a></li>
+            <li><a href="#type-function-hashing">23. Type and Function Hashing</a></li>
+        </ul>
+    </nav>
+
+    <main class="content">
+        <h1 id="doc-notes">Small Language (SL) Compiler Documentation</h1>
+
+        <div class="warning">
+            <strong>Documentation Note:</strong> In this documentation, three backticks are never used. This prevents confusion for front-end AIs, ensuring they do not mistakenly interpret them as the end of a code block.
+        </div>
+
+        <h2 id="overview">1. OVERVIEW</h2>
+        <p>Small Language (SL) is a lightweight, high-performance programming language with C++-like syntax. It emphasizes explicit memory management, predictable data layout, and a strict separation between data structures (classes) and behavior (functions).</p>
+
+        <h3 id="comments">1.1 COMMENTS</h3>
+        <p>Comments are used to document code and are ignored by the compiler.</p>
+        <ul>
+            <li>Single-line comments start with <code>//</code>
+                <pre><code>// This is a single-line comment</code></pre>
+            </li>
+            <li>Multi-line comments are enclosed in <code>/*</code> and <code>*/</code>
+                <pre><code>/*
+This is a
+multi-line comment
+*/</code></pre>
+            </li>
+        </ul>
+
+        <h2 id="primitive-types">2. PRIMITIVE TYPES</h2>
+        <p>SL provides a strict set of primitive types with guaranteed sizes.</p>
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr><th>Type</th><th>Description</th><th>Size</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td><code>void</code></td><td>No type / empty</td><td>-</td></tr>
+                    <tr><td><code>bool</code></td><td>Boolean value (true or false)</td><td>1 byte</td></tr>
+                    <tr><td><code>char</code></td><td>Single character</td><td>1 byte</td></tr>
+                    <tr><td><code>int8</code></td><td>8-bit signed integer</td><td>1 byte</td></tr>
+                    <tr><td><code>int16</code></td><td>16-bit signed integer</td><td>2 bytes</td></tr>
+                    <tr><td><code>int32</code></td><td>32-bit signed integer</td><td>4 bytes</td></tr>
+                    <tr><td><code>int64</code></td><td>64-bit signed integer</td><td>8 bytes</td></tr>
+                    <tr><td><code>uint8</code></td><td>8-bit unsigned integer</td><td>1 byte</td></tr>
+                    <tr><td><code>uint16</code></td><td>16-bit unsigned integer</td><td>2 bytes</td></tr>
+                    <tr><td><code>uint32</code></td><td>32-bit unsigned integer</td><td>4 bytes</td></tr>
+                    <tr><td><code>uint64</code></td><td>64-bit unsigned integer</td><td>8 bytes</td></tr>
+                    <tr><td><code>float32</code></td><td>32-bit floating-point number</td><td>4 bytes</td></tr>
+                    <tr><td><code>float64</code></td><td>64-bit floating-point number</td><td>8 bytes</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <p><strong>Pointer Types:</strong> Any primitive type can be suffixed with <code>*</code> to denote a pointer (memory address):<br>
+        <code>void*, bool*, char*, int8*, int16*, int32*, int64*, uint8*, uint16*, uint32*, uint64*, float32*, float64*</code></p>
+        <div class="note">
+            <strong>Note:</strong> For pointer-sized arithmetic or sizes, <code>uint64</code> is used universally to maintain cross-platform consistency (e.g., between 32-bit and 64-bit targets).
+        </div>
+
+        <h3 id="chars-and-strings">2.1 Characters and Strings</h3>
+        <ul>
+            <li><strong>Character Definition:</strong>
+                <pre><code>char c = 'a';</code></pre>
+                (Must be exactly one character. Using multiple characters like <code>char c = 'ab';</code> will result in a compiler error. Single quotes are strictly reserved for <code>char</code>).
+            </li>
+            <li><strong>String Definition:</strong> Strings (both single-line and multi-line) are enclosed in double quotes (<code>"</code>):
+                <pre><code>"This is a single-line string"
+"
+This is a
+multi-line string
+"</code></pre>
+            </li>
+            <li><strong>String Interpolation:</strong> Variables can be embedded directly into double-quoted strings using the <code>${}</code> syntax:
+                <pre><code>int32 age = 25;
+print("Age is ${age}"); // Outputs: Age is 25</code></pre>
+            </li>
+        </ul>
+
+        <h3 id="escape-chars">2.2 Escape Characters</h3>
+        <p>The following escape characters are supported within character and string literals:</p>
+        <div class="table-wrapper">
+            <table>
+                <tbody>
+                    <tr><td><code>\n</code></td><td>Newline</td><td><code>\t</code></td><td>Horizontal tab</td></tr>
+                    <tr><td><code>\r</code></td><td>Carriage return</td><td><code>\\</code></td><td>Backslash</td></tr>
+                    <tr><td><code>\'</code></td><td>Single quote</td><td><code>\"</code></td><td>Double quote</td></tr>
+                    <tr><td><code>\$</code></td><td>Literal dollar sign</td><td><code>\${</code></td><td>Literal dollar sign and brace</td></tr>
+                    <tr><td><code>\0</code></td><td>Null character (NUL)</td><td><code>\b</code></td><td>Backspace</td></tr>
+                    <tr><td><code>\f</code></td><td>Form feed</td><td><code>\a</code></td><td>Alert / Bell</td></tr>
+                    <tr><td><code>\v</code></td><td>Vertical tab</td><td><code>\xHH</code></td><td>Hexadecimal code (e.g., \x41)</td></tr>
+                    <tr><td><code>\ooo</code></td><td>Octal code (e.g., \101)</td><td></td><td></td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h3 id="type-qualifiers">2.3 Type Qualifiers (const)</h3>
+        <p>The <code>const</code> keyword enforces read-only immutability for variables, pointers, parameters, and object instances. This helps prevent unintended modifications and enables compiler optimizations.</p>
+        <pre><code>// 1. Constant variable
+const int32 MAX_SIZE = 100;
+
+// 2. Pointer to constant data (data cannot be modified)
+const char* str = "hello";
+
+// 3. Constant pointer (pointer address cannot be modified)
+const int32* ptr = &amp;some_int;
+
+// 4. Const parameter in functions
+void printValue(const int32* value) {
+    // *value = 5; // Error: cannot modify a const object
+}
+
+// 5. Const explicit 'this' pointer (read-only method)
+public int32 try1::getValue(const try1* this) {
+    // this-&gt;x = 10; // Error: cannot modify member via const this pointer
+    return this-&gt;x;
+}</code></pre>
+
+        <h2 id="operators">3. OPERATORS</h2>
+        <p>SL supports a comprehensive set of C++-style operators, categorized by function:</p>
+        
+        <h3>3.1 Arithmetic Operators</h3>
+        <div class="table-wrapper">
+            <table><tbody>
+                <tr><td><code>+</code></td><td>Addition (also unary plus)</td><td><code>-</code></td><td>Subtraction (also unary minus)</td></tr>
+                <tr><td><code>*</code></td><td>Multiplication</td><td><code>/</code></td><td>Division</td></tr>
+                <tr><td><code>%</code></td><td>Modulo (remainder)</td><td><code>++</code></td><td>Increment (prefix/postfix)</td></tr>
+                <tr><td><code>--</code></td><td>Decrement (prefix/postfix)</td><td></td><td></td></tr>
+            </tbody></table>
+        </div>
+
+        <h3>3.2 Relational / Comparison Operators</h3>
+        <div class="table-wrapper">
+            <table><tbody>
+                <tr><td><code>==</code></td><td>Equal to</td><td><code>!=</code></td><td>Not equal to</td></tr>
+                <tr><td><code>&gt;</code></td><td>Greater than</td><td><code>&lt;</code></td><td>Less than</td></tr>
+                <tr><td><code>&gt;=</code></td><td>Greater than or equal to</td><td><code>&lt;=</code></td><td>Less than or equal to</td></tr>
+            </tbody></table>
+        </div>
+
+        <h3>3.3 Logical Operators</h3>
+        <div class="table-wrapper">
+            <table><tbody>
+                <tr><td><code>&amp;&amp;</code></td><td>Logical AND</td><td><code>||</code></td><td>Logical OR</td><td><code>!</code></td><td>Logical NOT</td></tr>
+            </tbody></table>
+        </div>
+
+        <h3>3.4 Bitwise Operators</h3>
+        <div class="table-wrapper">
+            <table><tbody>
+                <tr><td><code>&amp;</code></td><td>Bitwise AND</td><td><code>|</code></td><td>Bitwise OR</td><td><code>^</code></td><td>Bitwise XOR</td></tr>
+                <tr><td><code>~</code></td><td>Bitwise NOT</td><td><code>&lt;&lt;</code></td><td>Bitwise Left Shift</td><td><code>&gt;&gt;</code></td><td>Bitwise Right Shift</td></tr>
+            </tbody></table>
+        </div>
+
+        <h3>3.5 Assignment Operators</h3>
+        <p><code>=</code>, <code>+=</code>, <code>-=</code>, <code>*=</code>, <code>/=</code>, <code>%=</code>, <code>&amp;=</code>, <code>|=</code>, <code>^=</code>, <code>&lt;&lt;=</code>, <code>&gt;&gt;=</code></p>
+
+        <h3>3.6 Member and Pointer Access Operators</h3>
+        <div class="table-wrapper">
+            <table><tbody>
+                <tr><td><code>.</code></td><td>Member access (dot)</td><td><code>-&gt;</code></td><td>Member access via pointer (arrow)</td></tr>
+                <tr><td><code>.*</code></td><td>Pointer-to-member (via object)</td><td><code>-&gt;*</code></td><td>Pointer-to-member (via pointer)</td></tr>
+                <tr><td><code>*</code></td><td>Dereference</td><td><code>&amp;</code></td><td>Address-of</td></tr>
+            </tbody></table>
+        </div>
+
+        <h3>3.7 Miscellaneous / Special Operators</h3>
+        <ul>
+            <li><code>?:</code> : Ternary / Conditional operator</li>
+            <li><code>,</code> : Comma operator</li>
+            <li><code>::</code> : Scope resolution operator</li>
+            <li><code>()</code> : Function call / Type casting / Initialization</li>
+            <li><code>[]</code> : Subscript / Array indexing operator</li>
+            <li><code>sizeof</code> : Returns the size (in bytes) of a type or object.</li>
+            <li><code>typeof</code> : Compile-time type introspection operator. Evaluates to the type's name as a <code>const char*</code> string.</li>
+            <li><code>hashtype</code> : Compile-time type hash operator. Evaluates to the <code>uint64</code> hash of the type's fully-qualified name. A result of 0 means the type is unknown.</li>
+        </ul>
+        <pre><code>int32 x;
+const char* name = typeof(x);   // "int32", usable for printing
+uint64 h = hashtype(x);         // hash of "int32"
+
+// Comparisons: Note that comparing two const char* values with == compares their 
+// memory addresses, not their string contents. To compare type names as strings, 
+// use a string comparison function like cmpstr(typeof(x), "int32"). For zero-cost 
+// compile-time type checking, use the hashtype operator.
+if (hashtype(x) == hashtype(int32)) { } // explicit hash compare</code></pre>
+
+        <h2 id="functions">4. FUNCTIONS</h2>
+        <p>Functions are defined with a return type, name, and parameter list.</p>
+        <pre><code>int32 strlen(char* str) {
+    int16 i = 0;
+    while (str[i] != 0) {
+        i++;
+    }
+    return i;
+}</code></pre>
+
+        <h2 id="classes-and-structs">5. CLASSES AND STRUCTS</h2>
+        <p>Classes in SL define data layout only. By default, the compiler lays out members with normal alignment and padding for performance. For a predictable, padding-free layout (networking, serialization, file I/O), opt in explicitly with <code>__attribute__((packed))</code>.</p>
+
+        <h3>5.1 Class Definition Rules</h3>
+        <ol>
+            <li><strong>No Inline Functions:</strong> Classes cannot have functions defined inside the class body. All methods must be defined externally.</li>
+            <li><strong>Access Modifiers:</strong> <code>public</code>, <code>protected</code>, and <code>private</code> are supported for both data members and class functions.</li>
+            <li><strong>Inheritance:</strong> Supports <code>public</code>, <code>protected</code>, and <code>private</code> inheritance.</li>
+        </ol>
+
+        <h3>5.2 Class Declaration Syntax</h3>
+        <pre><code>class classname : public classname2 {
+public:
+    int32 x;
+protected:
+    // protected members
+private:
+    // private members
+};</code></pre>
+
+        <h3>5.2.1 Packed Alignment (Opt-In)</h3>
+        <p>Packing is never implicit. To get a packed layout with no padding, declare it explicitly:</p>
+        <pre><code>class classname {
+    int8 a;
+    int32 b;
+} __attribute__((packed));</code></pre>
+
+        <h3>5.3 Flexible Out-of-Line Method Definitions</h3>
+        <p>Functions belonging to a class are defined flexibly anywhere in the code using the scope resolution operator <code>::</code>. The <code>this</code> pointer must be explicitly declared as the first parameter.</p>
+        <pre><code>// Regular method with access modifier
+public void classname::func(classname* this, int32 i) {
+    this-&gt;x = i;
+}
+
+// Constructor (explicit this pointer)
+classname::classname(classname* this) {
+    // Constructor logic
+}
+
+// Destructor (explicit this pointer)
+classname::~classname(classname* this) {
+    // Destructor logic
+}</code></pre>
+
+        <h3>5.3.1 Constructor Initializer Lists</h3>
+        <p>SL supports C++-style constructor initializer lists, which are evaluated immediately after memory allocation but before the constructor body executes.</p>
+        <pre><code>class MyClass {
+public:
+    const int32 id;
+    int32&amp; refValue;
+    int32 normalValue;
+};
+
+// Constructor using an initializer list
+MyClass::MyClass(MyClass* this, int32 initId, int32&amp; initRef, int32 initNormal) 
+    : id(initId), refValue(initRef), normalValue(initNormal) {
+    // Constructor body executes AFTER all members in the initializer list are initialized.
+}</code></pre>
+        <p><strong>Rules:</strong> Members are initialized in the exact order they are declared in the class definition. Base class constructors and destructors are automatically invoked by the compiler.</p>
+
+        <h3>5.4 Static Constructors and Destructors</h3>
+        <pre><code>// Static constructor: Runs once at application startup, before main()
+static classname::classname() { }
+
+// Static destructor: Runs once when the application closes
+static classname::~classname() { }</code></pre>
+
+        <h3>5.5 Operator Overloading</h3>
+        <p>SL supports operator overloading for classes using the <code>operator</code> keyword. The explicit <code>this</code> pointer is always the first parameter.</p>
+        <pre><code>// Overloading the array subscript operator []
+public classname&amp; classname::operator[](classname* this, int32 index) {
+    // Return reference to element at index
+}</code></pre>
+
+        <h3>5.6 Instantiation and Method Calls</h3>
+        <pre><code>classname n1;
+n1.func(123); // Compiler translates this to: classname::func(&amp;n1, 123);</code></pre>
+
+        <h3>5.7 Abstract Classes and Polymorphism</h3>
+        <p>SL supports abstract class patterns by allowing method declarations without definitions. The compiler will not error on a missing definition as long as the method is not invoked on an instance of that exact base class.</p>
+        <pre><code>class tryabstract {
+public:
+    int32 x;
+};
+
+// Declaration only (acts as an abstract method).
+public int32 tryabstract::getX(tryabstract* this);
+
+// Derived class implementing the method
+class imptry : public tryabstract { };
+
+public int32 imptry::getX(imptry* this) {
+    return this-&gt;x;
+}</code></pre>
+
+        <h2 id="modules-and-exporting">6. MODULES AND EXPORTING</h2>
+        <p>To make functions or class methods visible to other compilation units, dynamic libraries, or external linkers, use the <code>export</code> keyword.</p>
+        <pre><code>export void func() { } // The export name is "func"
+export(othername) void func() { } // The export name is "othername"</code></pre>
+        <p><strong>Forward Export:</strong> <code>export func;</code> or <code>export classname::func;</code></p>
+        <p><strong>Importing:</strong> <code>#import "file.sl"</code> includes ONLY exported symbols. <code>#include "file.sl"</code> performs full textual inclusion.</p>
+
+        <h2 id="templates">7. TEMPLATES</h2>
+        <p>SL supports generics through templates.</p>
+        <h3>7.1 Function Templates</h3>
+        <pre><code>template&lt;A&gt;
+void func(A bla) {
+    // Function logic using type A
+}</code></pre>
+
+        <h3>7.2 Class Templates</h3>
+        <pre><code>template&lt;N&gt;
+class try1 : public N {
+public:
+    N value;
+};</code></pre>
+
+        <h3>7.3 Templated Class Method Definitions</h3>
+        <p>Class-level template parameters automatically propagate into the function scope. The class name in the out-of-line definition does not need to explicitly repeat the template arguments.</p>
+        <pre><code>template&lt;K, V&gt;
+class Dictionary {
+public:
+    K key;
+    V value;
+};
+
+// No need to write Dictionary&lt;K, V&gt;::setValue
+public void Dictionary::setValue(Dictionary* this, K k, V v) {
+    this-&gt;key = k;
+    this-&gt;value = v;
+}</code></pre>
+
+        <h3>7.5 Template Instantiation Syntax</h3>
+        <p>Function templates support explicit instantiation (<code>printValue&lt;int32&gt;(42)</code>) or type inference (<code>printValue(100)</code>). Class templates always require explicit instantiation (<code>try1&lt;int32&gt; t1;</code>).</p>
+
+        <h2 id="typedef">8. TYPEDEF</h2>
+        <p>The <code>typedef</code> keyword creates an alias for an existing type without creating a new distinct type.</p>
+        <pre><code>typedef int32 Score;
+typedef char* String;</code></pre>
+
+        <h2 id="control-flow">9. CONTROL FLOW</h2>
+        <p>SL supports standard control flow: <code>if</code>, <code>else</code>, <code>while</code>, <code>do-while</code>, <code>for</code>, <code>switch</code>, <code>case</code>, <code>default</code>, <code>break</code>, <code>continue</code>, <code>return</code>.</p>
+
+        <h3>9.1 Pattern Matching (<code>match</code>)</h3>
+        <p>The <code>match</code> expression is a modern, safe alternative to traditional C-style switch statements. It is an <strong>expression</strong> (evaluates to a value), <strong>never falls through</strong>, and enforces <strong>exhaustiveness checking</strong>.</p>
+        <pre><code>enum class Status : int32 { OK = 0, ERROR = 1, PENDING = 2 };
+
+int32 handleStatus(Status s) {
+    return match (s) {
+        Status::OK =&gt; 0,
+        Status::ERROR =&gt; -1,
+        Status::PENDING =&gt; 1
+    };
+}</code></pre>
+
+        <h3>9.1.3 Tagged Union Destructuring (Sum Types)</h3>
+        <pre><code>enum class Result : int32 {
+    Success(int32 code),
+    Error(char* msg)
+};
+
+void processResult(Result res) {
+    match (res) {
+        Result::Success(code) =&gt; { print("Code: ${code}"); }
+        Result::Error(msg) =&gt; { print("Error: ${msg}"); }
+    }
+}</code></pre>
+
+        <h3>9.2 Compile-Time Type Matching (<code>match type</code>)</h3>
+        <p>Evaluates the static compile-time type of an expression. Inside a matched branch, the expression is <strong>smart-cast</strong> to the matched type.</p>
+        <pre><code>template&lt;T&gt;
+void analyze(T data) {
+    match type (data) {
+        int32 =&gt; { print(data + 10); }
+        float32 =&gt; { print(data * 1.5); }
+        MyClass* =&gt; { data-&gt;update(); }
+        _ =&gt; { print("Unknown type"); } // Wildcard is mandatory for generic T
+    }
+}</code></pre>
+
+        <h2 id="deferred-resolution">10. DEFERRED RESOLUTION AND ORDERING</h2>
+        <p>The SL compiler employs a multi-pass deferred resolution strategy. The order of declarations and definitions in the source file does not strictly matter, as long as all symbols are eventually defined within the compilation unit.</p>
+
+        <h2 id="key-design-choices">11. SUMMARY OF KEY DESIGN CHOICES</h2>
+        <ol>
+            <li><strong>Explicit <code>this</code>:</strong> Promotes clarity and C-style ABI compatibility.</li>
+            <li><strong>No Inline Class Methods:</strong> Keeps class definitions clean, acting strictly as data schemas.</li>
+            <li><strong>Predictable Layout On Request:</strong> Natural alignment by default; <code>__attribute__((packed))</code> for padding-free layout.</li>
+            <li><strong>Static Lifecycle Hooks:</strong> Built-in startup and shutdown logic per class/module.</li>
+            <li><strong>Flexible Export Naming:</strong> Precise control over symbol names for FFI.</li>
+            <li><strong>Explicit Templating:</strong> Clear separation between class-level and method-level type parameters.</li>
+            <li><strong>Deferred Resolution:</strong> Eliminates rigid top-down ordering requirements.</li>
+        </ol>
+
+        <h2 id="execution-model">12. EXECUTION MODEL AND ENTRY POINT</h2>
+        <p>Every SL executable must define a global entry point function named <code>main</code>.</p>
+        <pre><code>int32 main() { return 0; }
+// or
+int32 main(int32 argc, char** argv) { return 0; }</code></pre>
+        <p><strong>Lifecycle:</strong> OS loads binary &rarr; SL Runtime initializes &rarr; Static constructors run &rarr; <code>main()</code> called &rarr; Static destructors run in reverse &rarr; Process terminates.</p>
+
+        <h2 id="memory-management">13. MEMORY MANAGEMENT</h2>
+        <p>SL provides low-level C-style memory management and high-level object-oriented allocation keywords. Under the hood, <code>new</code> and <code>delete</code> utilize <code>malloc</code>, <code>realloc</code>, and <code>free</code>.</p>
+        <pre><code>MyClass* obj = new MyClass();
+delete obj;
+
+int32* arr = new int32[100];
+delete[] arr; // Required for arrays to invoke destructors correctly</code></pre>
+        <p>The keyword <code>null</code> represents a null pointer (address of zero).</p>
+
+        <h2 id="advanced-type-system">14. ADVANCED TYPE SYSTEM</h2>
+        <h3>14.1 Reference Types (<code>&amp;</code>)</h3>
+        <p>References provide an alias to an existing variable. They cannot be null, cannot be reseated, and do not require explicit dereferencing.</p>
+
+        <h3>14.2 Array Types</h3>
+        <p>Fixed-size arrays decay to pointers when passed to functions. SL fixed-size arrays do NOT have a <code>.length</code> property or automatic runtime bounds checking.</p>
+
+        <h3>14.3 Enumerations</h3>
+        <pre><code>enum class Direction : int8 { UP = 1, DOWN = -1 };
+Direction d = Direction::UP;</code></pre>
+
+        <h3>14.5 Tuple Returns via Reference Displacement</h3>
+        <p>To maintain strict C-ABI compatibility and optimize for WebAssembly, SL implements tuple returns as syntactic sugar for out-parameters. No hidden struct copying occurs.</p>
+        <pre><code>// Definition with named returns.
+// The compiler transforms this into: void calculate(int32* out_code, float32* out_value)
+(int32 code, float32 value) calculate() {
+    code = 200;
+    value = 3.14;
+    return; // Bare return exits the function
+}
+
+// Call Site:
+int32 c;
+float32 v;
+(c, v) = calculate(); // Compiles to: calculate(&amp;c, &amp;v)</code></pre>
+
+        <h2 id="modules-imports">15. MODULES, IMPORTS, AND INTEROPERABILITY</h2>
+        <ul>
+            <li><code>#import "file.sl"</code>: Includes ONLY exported symbols.</li>
+            <li><code>#include "file.sl"</code>: Full textual inclusion (use with caution).</li>
+            <li><code>extern "C"</code>: Disables SL name mangling and enforces C calling convention for interoperability.</li>
+        </ul>
+
+        <h2 id="functions-scope-namespaces">16. FUNCTIONS, SCOPE, AND NAMESPACES</h2>
+        <h3>16.1 Namespaces</h3>
+        <pre><code>namespace Math {
+    int32 add(int32 a, int32 b) { return a + b; }
+}
+int32 result = Math::add(5, 10);</code></pre>
+
+        <h3>16.4 Anonymous Functions (Lambdas)</h3>
+        <p>Lambdas can be assigned to function pointers. The compiler automatically generates a hidden thunk to bridge any captured closure state to the function pointer call, ensuring memory safety.</p>
+        <pre><code>int32 multiplier = 5;
+int32(*multiply)(int32) = int32(int32 x)-&gt;{
+    return x * multiplier; // Safely copied by value into hidden closure
+};</code></pre>
+
+        <h2 id="oo-refinements">17. OBJECT-ORIENTED REFINEMENTS</h2>
+        <h3>17.1 <code>struct</code> vs <code>class</code></h3>
+        <p>Identical in behavior. The only difference is default visibility: <code>class</code> defaults to <code>private</code>, <code>struct</code> defaults to <code>public</code>.</p>
+
+        <h3>17.2 Virtual Methods and Explicit Abstract Classes</h3>
+        <p>A class with at least one unimplemented <code>virtual</code> method is strictly abstract. Classes with virtual methods receive an explicit, accessible integer field named <code>_systemVtableIndex</code>. This index is directly readable/writable, making objects fully serializable for network/WASM transportation without pointer invalidation.</p>
+
+        <h2 id="expressions-literals-casting">18. EXPRESSIONS, LITERALS, AND CASTING</h2>
+        <ul>
+            <li><strong>Literals:</strong> Decimal (<code>123</code>), Hex (<code>0xFF</code>), Binary (<code>0b1010</code>). Suffix <code>U</code> for unsigned, <code>LL</code> for 64-bit, <code>f</code> for 32-bit float.</li>
+            <li><strong>Explicit Safe Cast:</strong> <code>cast&lt;Type&gt;(expression)</code>. Performs runtime checks by comparing the object's vtable index against the target type's compile-time index.</li>
+        </ul>
+
+        <h2 id="error-handling">19. ERROR HANDLING AND DIAGNOSTICS</h2>
+        <h3>19.1 Assertions</h3>
+        <p><code>assert(ptr != null);</code> halts execution and prints diagnostics if false.</p>
+
+        <h3>19.2 Exceptions (<code>try</code>, <code>catch</code>, <code>throw</code>, <code>throwable</code>)</h3>
+        <p>SL uses a lightweight, zero-overhead exception mechanism based on explicit error propagation via tuple-based error returns under the hood.</p>
+        <pre><code>void openFile(const char* path) throwable {
+    if (!fileExists(path)) {
+        throw new Error("File not found"); 
+    }
+}
+
+try {
+    openFile("data.txt");
+} catch (Error* err) {
+    print("Failed: ");
+    print(err-&gt;getMessage());
+} catch (...) {
+    print("Unknown error");
+}</code></pre>
+        <p><strong>Under the Hood:</strong> A <code>throwable</code> function is lowered as a tuple-returning function. The error pair (<code>void** err_ptr, uint64** type_id</code>) is placed FIRST, ahead of return values and parameters. The error object is automatically deleted after the <code>catch</code> block finishes.</p>
+
+        <h2 id="compiler-directives">20. COMPILER DIRECTIVES AND QUALIFIERS</h2>
+        <ul>
+            <li><code>volatile</code>: Prevents compiler optimization of accesses (essential for hardware registers).</li>
+            <li><code>inline</code>: Suggests inlining at the call site (does not apply to class methods).</li>
+            <li><code>defer</code>: Schedules an expression to be executed when the current <code>{}</code> scope exits. Invaluable for localized cleanup.</li>
+            <li><code>refclass</code>: A class with automatic, compiler-managed reference counting.</li>
+            <li><code>auto</code>: Local variable type inference.</li>
+        </ul>
+
+        <h2 id="preprocessor-macros">21. PREPROCESSOR MACROS AND CONDITIONAL COMPILATION</h2>
+        <p>Preprocessor logic blocks are enclosed between <code>#&lt;</code> and <code>#&gt;</code>.</p>
+        <pre><code>#&lt;
+#token var DEBUG_MODE = true;
+#token var TARGET_WASM = 1;
+#&gt;
+
+#ifdef TARGET_WASM
+extern "C" { export void wasm_specific_init(); }
+#else
+void native_specific_init();
+#endif</code></pre>
+        <div class="note">
+            <strong>Compiler Restrictions:</strong> The SLP implementation adheres to strict constraints: <code>-fno-exceptions</code> and <code>-fno-rtti</code>. Memory management uses reference-counted objects to prevent leaks.
+        </div>
+
+        <h2 id="variadic-functions">22. VARIADIC FUNCTIONS AND COMPILER INTRINSICS</h2>
+        <p>SL does not use traditional C-style <code>va_list</code> macros. Instead, it provides explicit compiler intrinsics for variadic argument handling to ensure seamless WebAssembly support and memory safety.</p>
+        <ul>
+            <li><code>__builtin_va_list</code>: Opaque type representing the argument list buffer.</li>
+            <li><code>__builtin_va_start(ap, last_param)</code>: Initializes the list.</li>
+            <li><code>__builtin_va_arg(ap, type)</code>: Extracts the next argument.</li>
+            <li><code>__builtin_va_current_type(ap)</code>: Returns the <code>uint64</code> type hash of the next argument without advancing the pointer.</li>
+            <li><code>__builtin_va_end(ap)</code>: Cleans up the list (automatically injects <code>release()</code> for unextracted <code>refclass</code> objects).</li>
+        </ul>
+        <pre><code>void printNumbers(int32 count, ...) {
+    __builtin_va_list ap;
+    __builtin_va_start(ap, count);
+    
+    int32 i = 0;
+    while (i &lt; count) {
+        int32 val = __builtin_va_arg(ap, int32);
+        print("Number: ${val}");
+        i++;
+    }
+    __builtin_va_end(ap);
+}</code></pre>
+
+        <h2 id="type-function-hashing">23. TYPE AND FUNCTION IDENTITY HASHING</h2>
+        <p>A single hashing scheme provides identity for types and functions, used by <code>hashtype</code>, <code>typeof</code> comparisons, <code>match type</code>, and variadic intrinsics.</p>
+        <ul>
+            <li><strong>Primitive types:</strong> Hashes the type name (e.g., "int32").</li>
+            <li><strong>Pointer/Reference types:</strong> Base name with suffix (e.g., "int32*").</li>
+            <li><strong>Classes/Structs/Enums:</strong> FULLY-QUALIFIED name, including namespace (e.g., "Math::Vector").</li>
+            <li><strong>Functions:</strong> Fully-qualified name PLUS parameter types, separated by underscores (e.g., "Math::add_int32_int32"). Return types are not part of the hash.</li>
+        </ul>
+        <p>A hash value of <code>0</code> is reserved to mean "unknown or unresolvable." The compiler defaults to using the highly efficient <strong>WyHash v4</strong> algorithm unless a custom algorithm is specified in the C++ backend.</p>
+
+    </main>
+</body>
+</html>

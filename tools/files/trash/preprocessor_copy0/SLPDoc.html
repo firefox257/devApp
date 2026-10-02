@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Small Language Preprocessor (SLP) Documentation</title>
+    <style>
+        :root {
+            --bg-color: #f9f9f9;
+            --text-color: #333;
+            --code-bg: #2d2d2d;
+            --code-text: #f8f8f2;
+            --accent-color: #0066cc;
+            --border-color: #ddd;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            line-height: 1.6;
+            color: var(--text-color);
+            background-color: var(--bg-color);
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: #fff;
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        }
+        h1, h2, h3 {
+            color: #111;
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 8px;
+            margin-top: 32px;
+        }
+        h1 { font-size: 2.2em; border-bottom: 3px solid var(--accent-color); }
+        h2 { font-size: 1.6em; }
+        h3 { font-size: 1.2em; border-bottom: 1px solid var(--border-color); }
+        p, li { margin-bottom: 12px; }
+        ul { padding-left: 24px; }
+        code {
+            background-color: #f0f0f0;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+            font-size: 0.9em;
+            color: #d63384;
+        }
+        pre {
+            background-color: var(--code-bg);
+            color: var(--code-text);
+            padding: 16px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+            font-size: 0.9em;
+            line-height: 1.5;
+        }
+        .note {
+            background-color: #e7f3ff;
+            border-left: 4px solid var(--accent-color);
+            padding: 12px 16px;
+            border-radius: 4px;
+            margin: 16px 0;
+        }
+        .warning {
+            background-color: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 12px 16px;
+            border-radius: 4px;
+            margin: 16px 0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 16px 0;
+        }
+        th, td {
+            border: 1px solid var(--border-color);
+            padding: 10px;
+            text-align: left;
+        }
+        th { background-color: #f4f4f4; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Small Language Preprocessor (SLP)</h1>
+        <p><strong>Version:</strong> 1.0 &nbsp;|&nbsp; <strong>Target:</strong> C++17 and later</p>
+
+        <h2>1. Introduction</h2>
+        <p>The Small Language Preprocessor (SLP) is a lightweight, JavaScript-like scripting interpreter designed to be embedded in C++ applications. It processes script definitions, maintains state across multiple evaluations, and exposes specific variables or functions as preprocessor tokens that return string values.</p>
+
+        <h2>2. System Overview</h2>
+        <p>The SLP system consists of two main components:</p>
+        <ul>
+            <li><strong>SLP Interpreter Engine:</strong> Parses and executes SLP script code, managing memory, lexical scope, and execution flow without C++ exceptions or RTTI.</li>
+            <li><strong>C++ Host API:</strong> Provides an interface for the host application to load scripts, persist global state, and invoke marked preprocessor tokens with a variadic number of arguments.</li>
+        </ul>
+
+        <h2>3. Language Syntax & Features</h2>
+        
+        <h3>3.1 Data Types</h3>
+        <table>
+            <tr><th>Type</th><th>Description</th></tr>
+            <tr><td><code>undefined</code></td><td>Uninitialized variables.</td></tr>
+            <tr><td><code>integer</code></td><td>Whole numbers, internally implemented as <code>uint64_t</code> (BigInt) to guarantee full 64-bit unsigned integer support without precision loss.</td></tr>
+            <tr><td><code>float</code></td><td>Floating-point numbers (float64).</td></tr>
+            <tr><td><code>boolean</code></td><td><code>true</code> or <code>false</code>.</td></tr>
+            <tr><td><code>string</code></td><td>8-bit character sequences. Supports single (<code>'...'</code>), double (<code>"..."'</code>), and backtick (<code>`...`</code>) quotes. Backticks support <code>${variable}</code> interpolation.</td></tr>
+            <tr><td><code>array</code></td><td>Ordered lists of values (e.g., <code>[1, "two"]</code>).</td></tr>
+            <tr><td><code>object</code></td><td>Key-value pair collections (e.g., <code>{ key: value }</code>).</td></tr>
+            <tr><td><code>function</code></td><td>Callable blocks of code defined via arrow syntax.</td></tr>
+        </table>
+
+        <h3>3.2 Operators</h3>
+        <ul>
+            <li><strong>Arithmetic:</strong> <code>+</code>, <code>-</code>, <code>*</code>, <code>/</code>, <code>%</code>, <code>**</code> (exponentiation), <code>++</code>, <code>--</code></li>
+            <li><strong>Assignment:</strong> <code>=</code>, <code>+=</code>, <code>-=</code>, <code>*=</code>, <code>/=</code>, <code>%=</code>, <code>&lt;&lt;=</code>, <code>&gt;&gt;=</code>, <code>&amp;=</code>, <code>^=</code>, <code>|=</code></li>
+            <li><strong>Comparison:</strong> <code>==</code>, <code>!=</code>, <code>&gt;</code>, <code>&gt;=</code>, <code>&lt;</code>, <code>&lt;=</code> (Note: <code>==</code> and <code>!=</code> perform type coercion)</li>
+            <li><strong>Logical:</strong> <code>&amp;&amp;</code>, <code>||</code>, <code>!</code></li>
+            <li><strong>Bitwise:</strong> <code>&amp;</code>, <code>|</code>, <code>^</code>, <code>~</code>, <code>&lt;&lt;</code>, <code>&gt;&gt;</code></li>
+            <li><strong>Conditional:</strong> <code>condition ? true_expr : false_expr</code></li>
+            <li><strong>Type Check:</strong> <code>typeof &lt;expression&gt;</code></li>
+        </ul>
+
+        <h3>3.3 Control Flow & Functions</h3>
+        <ul>
+            <li><strong>Conditionals:</strong> <code>if</code>, <code>else if</code>, <code>else</code>, <code>switch</code> (with <code>case</code>, <code>default</code>, and <code>break</code>)</li>
+            <li><strong>Loops:</strong> <code>for</code>, <code>for...in</code> (iterates object keys or array indices), <code>while</code>, <code>do...while</code></li>
+            <li><strong>Flow Control:</strong> <code>break</code>, <code>continue</code>, <code>return</code></li>
+            <li><strong>Function Definition:</strong> <code>var func = (args) -&gt; { ... }</code></li>
+            <li><strong>Arguments:</strong> Accessible by name and via the built-in <code>args</code> array (e.g., <code>args[0]</code>).</li>
+            <li><strong>Scoping:</strong> Lexical scoping is supported. Inner functions access outer scopes. Variables declared with <code>var</code> inside a function are local.</li>
+        </ul>
+
+        <h3>3.4 Objects and Arrays</h3>
+        <ul>
+            <li><strong>Object Literals:</strong> <code>var obj = { key: value };</code> Access via <code>obj.key</code> or <code>obj["key"]</code>.</li>
+            <li><strong>Array Methods:</strong> <code>arr.push(value)</code>, <code>arr.unshift(value)</code>, <code>arr.pop()</code>, <code>arr.shift()</code></li>
+            <li><strong>Array Properties:</strong> <code>arr.length</code> returns the number of elements.</li>
+        </ul>
+
+        <h3>3.5 Preprocessor Directives</h3>
+        <p>The <code>#token</code> directive registers a variable or function as a preprocessor entry point.</p>
+        <pre><code>#token var name = 123;                 // Inline variable token
+#token var namefunc = (x) -&gt; { ... };  // Inline function token
+var name = 123; 
+#token name;                           // Post-declaration marking</code></pre>
+        <div class="note">
+            <strong>Behavior:</strong> When accessed via the C++ API, variables return their stringified value. Functions are invoked with provided arguments and return their stringified result.
+        </div>
+
+        <h2>4. C++ API Reference</h2>
+        <pre><code>#include "slp.cpp"
+
+class SLP {
+public:
+    // 1. Initialization: Instantiates a new, isolated interpreter state.
+    SLP(); 
+
+    // 2. Script Definition: Parses and executes the provided script. 
+    // Maintains global state across multiple calls. 
+    // Returns "OK" on success, or a descriptive error message.
+    std::string define(const std::string& script);
+
+    // 3. Token Execution (Variadic): Evaluates a variable or invokes a 
+    // function marked with #token. Accepts a variable amount of arguments.
+    template &lt;typename... Args&gt;
+    std::string get(const std::string& token_name, Args&amp;&amp;... args);
+};</code></pre>
+
+        <h2>5. Usage Example</h2>
+        <pre><code>#include "slp.cpp"
+#include &lt;iostream&gt;
+
+int main() {
+    SLP slp;
+
+    // Define global state and tokens
+    slp.define(R"(
+        #token var globalmsg = 123;
+        var func1 = (x, y) -&gt; { return x + " " + y; }
+        #token func1;
+    )");
+
+    // Invoke variable token (args ignored)
+    std::cout &lt;&lt; slp.get("globalmsg") &lt;&lt; "\n"; // Output: 123
+
+    // Invoke function token with variadic arguments
+    std::cout &lt;&lt; slp.get("func1", 123, 124) &lt;&lt; "\n"; // Output: 123 124
+
+    // State persists across define calls
+    slp.define(R"( globalmsg += "hi"; )");
+    std::cout &lt;&lt; slp.get("globalmsg") &lt;&lt; "\n"; // Output: 123hi
+
+    return 0;
+}</code></pre>
+
+        <h2>6. Implementation & Compiler Restrictions</h2>
+        <p>To ensure maximum portability and minimal overhead, the SLP implementation adheres to strict compiler constraints:</p>
+        <ul>
+            <li><strong><code>-fno-exceptions</code>:</strong> No C++ exceptions (<code>throw</code>, <code>try</code>, <code>catch</code>) are used. Errors are handled via return types (e.g., <code>"Error: ..."</code> strings).</li>
+            <li><strong><code>-fno-rtti</code>:</strong> No Run-Time Type Information (<code>dynamic_cast</code>, <code>typeid</code>) is used. Type checking relies on explicit type tags (enums).</li>
+            <li><strong>Memory Management:</strong> Uses reference-counted <code>std::shared_ptr&lt;Value&gt;</code> objects to prevent memory leaks during repeated <code>define</code>/<code>get</code> calls.</li>
+        </ul>
+
+        <h2>7. Testing Best Practices</h2>
+        <div class="warning">
+            <strong>Warning:</strong> Because global state persists across <code>define()</code> calls, tests should be scoped using curly braces <code>{ }</code> to prevent global namespace pollution.
+        </div>
+        <pre><code>// GOOD PRACTICE: Scoped execution
+slp.define(R"({
+    var x = 123;
+    var testFunc = () -&gt; { return x; }
+    #token testFunc;
+})"); // 'x' is evaluated but test logic remains isolated.</code></pre>
+    </div>
+</body>
+</html>

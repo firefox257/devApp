@@ -1,0 +1,53 @@
+int SHARED_LOCK_ADDR = 1022976; // 0xf8000 + 0x3000
+int SHARED_BRK_ADDR = 1019904;  // 0xf8000 + 0x1000
+
+void lock_acquire() {
+    // Spin until we successfully change the lock from 0 to 1
+    while (__atomic_exchange(SHARED_LOCK_ADDR, 1) == 1) {
+        // spin
+    }
+}
+
+void lock_release() {
+    __atomic_store(SHARED_LOCK_ADDR, 0);
+}
+
+int* sbrk_custom(int increment) {
+    int* shared_brk = (int*)SHARED_BRK_ADDR;
+    int safe_start = 65536; 
+    
+    // Atomically set to safe_start if it's currently 0
+    int expected = 0;
+    int old_brk = __atomic_cmpxchg(shared_brk, expected, safe_start);
+    if (old_brk == expected) old_brk = safe_start;
+    
+    // Atomically reserve the requested increment
+    int current_brk = __atomic_load(shared_brk);
+    int new_brk;
+    int success = 0;
+    
+    while (!success) {
+        new_brk = current_brk + increment;
+        int old = __atomic_cmpxchg(shared_brk, current_brk, new_brk);
+        if (old == current_brk) {
+            success = 1;
+        } else {
+            current_brk = old; // Retry with new expected value
+        }
+    }
+    
+    // Grow Wasm memory if needed
+    int current_pages = __wasm_memory_size();
+    int current_memory_end = current_pages * 65536;
+    
+    if (new_brk > current_memory_end) {
+        int pages_needed = (new_brk - current_memory_end + 65535) / 65536;
+        int result = __wasm_memory_grow(pages_needed);
+        if (result == -1) {
+            __atomic_fetch_sub(shared_brk, increment); // Rollback
+            __builtin_trap(); // Abort
+        }
+    }
+    
+    return (int*)old_brk;
+}

@@ -10,7 +10,8 @@ async function start()
 
 
 
-	var mainObj= await createWorker({
+	var mainObj= await createWorker(
+		{
 			self,
 			imports:{
 				myfuncs: {
@@ -36,7 +37,8 @@ async function start()
 					}
 				}
 			}
-		});
+		}
+	);
 
 }
 

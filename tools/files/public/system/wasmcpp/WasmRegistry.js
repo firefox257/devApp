@@ -11,18 +11,25 @@ function defaultReplace(obj, defaultObj) {
 	return obj;
 }
 
-
+var __sharedMemory = new WebAssembly.Memory({
+		initial: 16, maximum: 4096, shared: true
+	});
 
 export var WasmRegistry = {
 	_workers: {},
 	_promises: {},
 	_peerPromises: {},
 	_runPromises: {}, // 🚀 NEW: Track execution promises
+	
+	getWorker:function(id)
+	{
+		return this._workers[id];
+	},
 
 	// ==========================================
 	// 1. Load for Main Thread
 	// ==========================================
-	load: function (argsobj){//url, id, imports={}) {
+	load: function (argsobj){
 
 		var {wasmUrl, id, imports} = defaultReplace(argsobj, {imports:{}});
 
@@ -35,15 +42,14 @@ export var WasmRegistry = {
 						if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 						const wasmBuffer = await response.arrayBuffer();
 						workerObj.module = await WebAssembly.compile(wasmBuffer);
-						workerObj.memory = new WebAssembly.Memory({
-								initial: 16, maximum: 4096, shared: true
-							});
+						
+						workerObj.memory=__sharedMemory;
 
 						imports.__jssys= {
-							jsSendToPeer: (targetId, targetSecId, srcPtr, size) => {
+							jsSendToPeer: (targetId, targetSecId, srcPtr, argsPtr) => {
 								const targetPeer = workerObj.ports ? workerObj.ports[targetId] : null;
 								if (targetPeer) {
-									targetPeer.postMessage({ srcId: id, secId: targetSecId, srcPtr, size });
+									targetPeer.postMessage({ srcId: id, secId: targetSecId, srcPtr, argsPtr });
 								} else {
 									console.error(`[Main ${id}] Cannot send to peer ${targetId}: port not found`);
 								}
@@ -61,9 +67,9 @@ export var WasmRegistry = {
 
 						await runtime.instantiate(workerObj.module);
 
-						if (!runtime.exports.__cppAllocateMsg) {
-							console.error(`[Main ${selfId}] Wasm module missing __cppAllocateMsg export`);
-							return;
+						if (!runtime.exports.onJsPeerMessage)
+						{
+							console.error(`[Main ${id}] Wasm module missing onJsPeerMessage export`);
 						}
 
 
@@ -95,9 +101,10 @@ export var WasmRegistry = {
 						if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 						const wasmBuffer = await response.arrayBuffer();
 						workerObj.module = await WebAssembly.compile(wasmBuffer);
-						workerObj.memory = new WebAssembly.Memory({
-								initial: 16, maximum: 4096, shared: true
-							});
+						//workerObj.memory = new WebAssembly.Memory({
+						//		initial: 16, maximum: 4096, shared: true
+						//	});
+						workerObj.memory=__sharedMemory;
 						workerObj.worker = new Worker(workerScriptUrl, { type: 'module' });
 
 						await new Promise((resolveWorker, rejectWorker) => {
@@ -207,46 +214,13 @@ export var WasmRegistry = {
 					workerObj.peerBuffers[peerId] = peerMemoryBuffer;
 
 					port.addEventListener('message', async (e) => {
-							try {
-								//const { srcId, srcPtr, size } = e.data;
-								const { srcId, secId, srcPtr, size } = e.data;
+							try
+							{
+								const { srcId, secId, srcPtr, argsPtr, size } = e.data;
+								//runtime.exports.onJsPeerMessage(srcId, srcPtr, size);
+								runtime.exports[secId](srcPtr, argsPtr);
 
 
-								const numericSrcId = parseInt(srcId, 10);
-								if (size === 0) return;
-
-								const peerMemBuffer = workerObj.peerBuffers[numericSrcId];
-								if (!peerMemBuffer) {
-									console.error(`[Main ${selfId}] No shared memory buffer for peer ${numericSrcId}`);
-									return;
-								}
-
-								// ✅ FIXED: Create a fresh view to handle memory growth safely
-								const peerMemView = new Uint8Array(peerMemBuffer);
-								const dataSlice = peerMemView.subarray(srcPtr, srcPtr + size);
-								const runtime = workerObj.runtime;
-
-								//const destPtr = runtime.exports.malloc(size);
-								const destPtr = runtime.exports.__cppAllocateMsg(secId, size);
-								//console.log("at here: "+destPt[0]);
-
-								if (!destPtr) {
-									console.error(`[Main ${selfId}] malloc failed for size ${size}`);
-									return;
-								}
-
-								const selfMemView = new Uint8Array(runtime.memBuffer);
-								selfMemView.set(dataSlice, destPtr);
-								//set memory to 0 as this indecates not being used any more.
-								dataSlice[0]=0;
-
-								if (runtime.exports.onJsPeerMessage) {
-									runtime.exports.onJsPeerMessage(numericSrcId, destPtr, size);
-									// ✅ FIXED: Removed synchronous free to prevent use-after-free
-								} else {
-									console.error(`[Main ${selfId}] Wasm module missing onJsPeerMessage export`);
-									if (runtime.exports.free) runtime.exports.free(destPtr);
-								}
 							} catch (err) {
 								console.error(`[Main ${selfId}] Error handling peer message: ${err.message}`);
 							}
@@ -287,15 +261,16 @@ export var WasmRegistry = {
 						};
 						workerObj.worker.addEventListener('message', handler);
 
-						workerObj.worker.postMessage({ type: '__executeRun' });
+						workerObj.worker.postMessage({ type: '__executeRun', processId:i });
 					});
 			} else {
 				// --- Main Thread Logic ---
 				this._runPromises[id] = (async () => {
 						try {
-							const exitCode = workerObj.runtime.run();
-							console.info(`[Main ${id}] Execution finished with exit code: ${exitCode}`);
-							return exitCode;
+							workerObj.runtime.run(i);
+							//const exitCode = workerObj.runtime.run();
+							//console.info(`[Main ${id}] Execution finished with exit code: ${exitCode}`);
+							//return exitCode;
 						} catch (err) {
 							console.error(`[Main ${id}] Execution failed:`, err);
 							throw err;
@@ -310,5 +285,18 @@ export var WasmRegistry = {
 	// ==========================================
 	waitRunAll: function() {
 		return Promise.all(Object.values(this._runPromises));
+	},
+	
+	initAll: async function()
+	{
+		await this.waitLoadAll();
+		
+		this.setupPeers();
+		await this.waitPeerAll();
+		
+		this.runAll();
+		
+		await this.waitRunAll();
+		
 	}
 }

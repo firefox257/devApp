@@ -30,6 +30,12 @@ import './additions/searchToolButton.js';
 import './additions/beautifyCodeButton.js';
 //import './additions/beautifyCodeDropdown.js';
 
+//insert tab
+//import './additions/insertTabDropdown.js';
+import './additions/insertTabButton.js';
+
+
+
 // Select Bracket Split
 import './additions/selectBracketButton.js';
 //import './additions/selectBracketDropdown.js';

@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SL Compiler Test Runner</title>
+    <style>
+        :root { --bg: #1e1e1e; --card-bg: #252526; --text: #d4d4d4; --accent: #007acc; --success: #4ec9b0; --error: #f48771; --border: #3e3e42; --running: #ffcc66; --warn: #ffcc66; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: var(--bg); color: var(--text); margin: 0; padding: 15px; font-size: 14px; }
+        h1 { text-align: center; color: var(--success); font-size: 1.5em; margin-bottom: 15px; }
+        #debug-console { background-color: #111; border: 2px solid var(--error); border-radius: 6px; padding: 10px; margin-bottom: 20px; max-height: 400px; overflow-y: auto; font-family: 'Courier New', Courier, monospace; font-size: 12px; display: none; }
+        #debug-console.visible { display: block; }
+        #debug-console h3 { margin: 0 0 8px 0; color: var(--error); font-size: 14px; border-bottom: 1px solid var(--border); padding-bottom: 4px; position: sticky; top: 0; background: #111; z-index: 10; }
+        .debug-entry { margin: 4px 0; padding: 4px; border-left: 3px solid #555; background: #1a1a1a; word-wrap: break-word; }
+        .debug-entry.error { border-left-color: var(--error); color: #ff9999; }
+        .debug-entry.warn { border-left-color: var(--warn); color: #ffe699; }
+        .debug-entry.info { border-left-color: var(--accent); color: #99ccff; }
+        .debug-entry.step { border-left-color: #4ec9b0; color: #99ffcc; font-weight: bold; }
+        .debug-entry.critical { border-left-color: #ff0000; color: #ffffff; background: #550000; font-weight: bold; padding: 8px; }
+        .controls { text-align: center; margin-bottom: 20px; }
+        button { background-color: var(--accent); color: white; border: none; padding: 12px 24px; border-radius: 6px; cursor: pointer; font-size: 16px; margin: 4px; width: 100%; max-width: 300px; font-weight: bold; }
+        button:active { background-color: #005f9e; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+        button.copy-btn { background-color: #3e3e42; font-size: 11px; padding: 4px 8px; width: auto; font-weight: normal; border-radius: 3px; }
+        button.copy-all-btn { background-color: var(--accent); font-size: 13px; padding: 8px 12px; width: auto; font-weight: bold; border-radius: 4px; flex: 1; }
+        button.expand-btn { background-color: #3e3e42; font-size: 13px; padding: 8px 12px; width: auto; font-weight: bold; border-radius: 4px; flex: 1; }
+        .test-card { background-color: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 15px; margin-bottom: 20px; }
+        .test-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 8px; margin-bottom: 8px; }
+        .test-name { font-size: 1.1em; font-weight: bold; color: var(--success); }
+        .status { font-weight: bold; }
+        .status.pass { color: var(--success); }
+        .status.fail { color: var(--error); }
+        .status.running { color: var(--running); }
+        .test-actions { display: flex; gap: 10px; margin-bottom: 12px; }
+        .details-section { margin-top: 10px; border-top: 1px solid var(--border); padding-top: 10px; }
+        .section { margin-bottom: 12px; position: relative; }
+        .section-label { font-size: 0.85em; color: #9cdcfe; margin-bottom: 4px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 5px; }
+        pre { background-color: #111; border: 1px solid var(--border); border-radius: 4px; padding: 10px; overflow-x: auto; font-family: 'Courier New', monospace; font-size: 12px; white-space: pre-wrap; word-wrap: break-word; }
+        .error-msg { color: var(--error); }
+    </style>
+</head>
+<body>
+    <div id="debug-console"><h3>📱 Device Debug Console</h3><div id="debug-entries"></div></div>
+    <h1>SL Compiler Test Runner</h1>
+    <div class="controls"><button id="runAllBtn" onclick="if(window.triggerRunTests) window.triggerRunTests();">Run All Tests</button></div>
+    <div id="results"></div>
+
+    <script>
+        const debugConsole = document.getElementById('debug-console');
+        const debugEntries = document.getElementById('debug-entries');
+        function addDebugLog(message, type = 'info') {
+            debugConsole.classList.add('visible');
+            const entry = document.createElement('div');
+            entry.className = `debug-entry ${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${type.toUpperCase()}: ${message}`;
+            debugEntries.appendChild(entry);
+            debugConsole.scrollTop = debugConsole.scrollHeight;
+        }
+        ['log', 'warn', 'error'].forEach(method => {
+            const orig = console[method];
+            console[method] = function(...args) {
+                orig.apply(console, args);
+                addDebugLog(args.join(' '), method === 'error' ? 'error' : method === 'warn' ? 'warn' : 'info');
+            };
+        });
+        window.addEventListener('error', e => { addDebugLog(`GLOBAL ERROR: ${e.message}`, 'error'); e.preventDefault(); });
+        window.addEventListener('unhandledrejection', e => { addDebugLog(`UNHANDLED PROMISE: ${e.reason}`, 'error'); e.preventDefault(); });
+    </script>
+
+    <script type="module">
+        async function init() {
+            try {
+                const compilerModule = await import('./compiler.js');
+                const testsModule = await import('./tests.js');
+                const utilsModule = await import('./utils.js');
+                const toWasmHex = utilsModule.toWasmHex;
+                
+                let wasmModule;
+                try {
+                    wasmModule = await import('/system/wasmcpp/wasm-runtime.js');
+                } catch (importErr) {
+                    console.error("💥 CRITICAL: FAILED TO LOAD wasm-runtime.js!", 'critical');
+                    return; 
+                }
+
+                const resultsDiv = document.getElementById('results');
+                const runAllBtn = document.getElementById('runAllBtn');
+                const worker = new Worker('/system/clang/compiler.worker.js', { type: 'module' });
+
+                const compileSL = compilerModule.compileSL;
+                const tests = testsModule.allTestsList || testsModule.tests;
+                const WasmRuntime = wasmModule.WasmRuntime;
+                const pendingTests = new Map();
+                let currentTestLogs = []; 
+
+                worker.onmessage = (e) => {
+                    const data = e.data;
+                    if (data.type === 'log') currentTestLogs.push(`[${data.level || 'info'}] ${data.msg}`);
+                    else if (data.type === 'result') {
+                        const resolve = pendingTests.get(data.id);
+                        if (resolve) {
+                            data.workerLogs = [...currentTestLogs]; 
+                            currentTestLogs = []; 
+                            resolve(data);
+                            pendingTests.delete(data.id);
+                        }
+                    }
+                };
+
+                worker.onerror = (err) => {
+                    currentTestLogs.push(`[ERROR] Worker script failed: ${err.message}`);
+                    for (const [id, resolve] of pendingTests.entries()) {
+                        resolve({ success: false, error: "Worker script failed.", workerLogs: [...currentTestLogs] });
+                        pendingTests.delete(id);
+                    }
+                    currentTestLogs = [];
+                };
+
+                window.triggerRunTests = async () => { await runAllTests(); };
+                runAllBtn.addEventListener('click', (e) => { e.preventDefault(); runAllTests(); });
+
+                async function runThroughWorker(testName, llvmIR) {
+                    return new Promise((resolve) => {
+                        const testId = `test-${Date.now()}-${Math.random()}`;
+                        pendingTests.set(testId, resolve);
+                        currentTestLogs = []; 
+                        worker.postMessage({
+                            id: testId, sourcePath: "main.ll", sourceCode: llvmIR,
+                            args: ['clang', '-v', '-O2', '-x', 'ir', '-Wl,--allow-undefined', '-Wl,--export-all', '-Wl,--no-check-features', '-o', 'app.wasm', 'main.ll']
+                        });
+                        setTimeout(() => {
+                            if (pendingTests.has(testId)) {
+                                currentTestLogs.push("[ERROR] Worker timeout (15s)");
+                                resolve({ success: false, error: "Worker timeout (15s)", workerLogs: [...currentTestLogs] });
+                                pendingTests.delete(testId);
+                            }
+                        }, 15000);
+                    });
+                }
+
+                function copyToClipboard(text, btnElement) {
+                    navigator.clipboard.writeText(text).then(() => {
+                        const originalText = btnElement.innerText;
+                        btnElement.innerText = "Copied!";
+                        setTimeout(() => { btnElement.innerText = originalText; }, 1500);
+                    }).catch(() => alert("Failed to copy to clipboard."));
+                }
+
+                function createCopyButton(text, label) {
+                    const btn = document.createElement('button');
+                    btn.className = 'copy-btn';
+                    btn.innerText = `Copy ${label}`;
+                    btn.onclick = () => copyToClipboard(text, btn);
+                    return btn;
+                }
+
+                function createTestCard(test) {
+                    const card = document.createElement('div');
+                    card.className = 'test-card';
+                    card.innerHTML = `
+                        <div class="test-header"><span class="test-name">${test.name}</span><span class="status running">Pending</span></div>
+                        <div class="test-actions">
+                            <button class="copy-all-btn">Copy All Details</button>
+                            <button class="expand-btn">▼ Expand Details</button>
+                        </div>
+                        <div class="details-section" id="details-${test.id}" style="display: none;"></div>
+                    `;
+                    card.querySelector('.copy-all-btn').onclick = () => {
+                        const r = card._latestResults || {};
+                        const c = r.compileResult || { success: false, error: 'Not run', llvmIR: '', llvmIRHex: '' };
+                        const status = card.querySelector('.status').innerText;
+                        let displayError = c.error || 'None';
+                        if (c.workerLogs?.length) displayError += '\n\n--- Worker Logs ---\n' + c.workerLogs.join('\n');
+                        copyToClipboard(`=== ${test.name} ===\nStatus: ${status}\n\n[SL Code]\n${test.slCode}\n\n[Expected Output]\n${test.expectedOutput}\n\n[Actual Output]\n${r.actualOutput !== undefined ? r.actualOutput : '(Not run)'}\n\n[LLVM IR Text]\n${c.llvmIR}\n\n[LLVM IR Hex]\n${c.llvmIRHex}\n\n[WASM Hex]\n${r.wasmHex || 'N/A'}\n\n[Error]\n${displayError}`, card.querySelector('.copy-all-btn'));
+                    };
+                    card.querySelector('.expand-btn').onclick = () => {
+                        const detailsDiv = card.querySelector(`#details-${test.id}`);
+                        const isHidden = detailsDiv.style.display === 'none';
+                        detailsDiv.style.display = isHidden ? 'block' : 'none';
+                        card.querySelector('.expand-btn').innerText = isHidden ? '▲ Collapse Details' : '▼ Expand Details';
+                    };
+                    return card;
+                }
+
+                function updateTestCard(card, test, compileResult, actualOutput, wasmHex) {
+                    card._latestResults = { compileResult, actualOutput, wasmHex };
+                    const statusEl = card.querySelector('.status');
+                    const detailsDiv = document.getElementById(`details-${test.id}`);
+                    detailsDiv.innerHTML = '';
+
+                    const buildSection = (id, label, content, copyLabel, isError = false) => {
+                        const section = document.createElement('div');
+                        section.className = 'section';
+                        const labelDiv = document.createElement('div');
+                        labelDiv.className = 'section-label';
+                        labelDiv.innerText = label;
+                        labelDiv.appendChild(createCopyButton(content, copyLabel));
+                        const pre = document.createElement('pre');
+                        pre.id = id;
+                        pre.innerText = content;
+                        if (isError) pre.className = 'error-msg';
+                        section.appendChild(labelDiv);
+                        section.appendChild(pre);
+                        return section;
+                    };
+
+                    detailsDiv.appendChild(buildSection(`sl-code-${test.id}`, "SL Code", test.slCode, "SL Code"));
+                    detailsDiv.appendChild(buildSection(`expected-${test.id}`, "Expected Output", test.expectedOutput, "Expected"));
+
+                    if (!compileResult.success) {
+                        statusEl.className = 'status fail';
+                        statusEl.innerText = 'FAIL';
+                        detailsDiv.appendChild(buildSection(`llvm-ir-fail-${test.id}`, "LLVM IR (Text)", compileResult.llvmIR, "LLVM IR Text"));
+                        let displayError = compileResult.error || 'Unknown error';
+                        if (compileResult.workerLogs?.length) displayError += '\n\n--- Worker Logs ---\n' + compileResult.workerLogs.join('\n');
+                        detailsDiv.innerHTML += `<div class="section"><div class="section-label error-msg">Compilation / Execution Error</div><pre class="error-msg">${displayError}</pre></div>`;
+                    } else {
+                        const passed = actualOutput === test.expectedOutput;
+                        statusEl.className = `status ${passed ? 'pass' : 'fail'}`;
+                        statusEl.innerText = passed ? 'PASS' : 'FAIL';
+                        detailsDiv.appendChild(buildSection(`actual-${test.id}`, "Actual Output", actualOutput || "(empty)", "Actual"));
+                        detailsDiv.appendChild(buildSection(`llvm-ir-${test.id}`, "LLVM IR (Text)", compileResult.llvmIR, "LLVM IR Text"));
+                        detailsDiv.appendChild(buildSection(`llvm-hex-${test.id}`, "LLVM IR Byte Code (Hex)", compileResult.llvmIRHex, "LLVM IR Hex"));
+                        detailsDiv.appendChild(buildSection(`wasm-hex-${test.id}`, "WASM Byte Code (Hex)", wasmHex || "N/A", "WASM Hex"));
+                    }
+                }
+
+                async function runAllTests() {
+                    runAllBtn.disabled = true;
+                    runAllBtn.innerText = 'Running...';
+                    resultsDiv.innerHTML = '';
+                    const cards = new Map();
+                    for (const test of tests) {
+                        const card = createTestCard(test);
+                        cards.set(test.id, card);
+                        resultsDiv.appendChild(card);
+                    }
+
+                    for (const test of tests) {
+                        const compileResult = compileSL(test.slCode);
+                        let actualOutput = "";
+                        let wasmHex = "N/A";
+                        
+                        if (compileResult.success) {
+                            try {
+                                const workerResult = await runThroughWorker(test.name, compileResult.llvmIR);
+                                if (!workerResult.success) {
+                                    compileResult.success = false;
+                                    compileResult.error = `Worker Error: ${workerResult.error}`;
+                                    compileResult.workerLogs = workerResult.workerLogs;
+                                } else {
+                                    const wasmBinary = workerResult.files['app.wasm'] || Object.values(workerResult.files).find(f => f instanceof Uint8Array);
+                                    if (!wasmBinary) {
+                                        compileResult.success = false;
+                                        compileResult.error = "No WASM binary found in worker result.";
+                                    } else {
+                                        wasmHex = toWasmHex(wasmBinary);
+                                        const runtime = new WasmRuntime({
+                                            initialMemory: 256, maxMemory: 512,
+                                            onStdout: (msg) => { actualOutput += msg; },
+                                            onStderr: (msg) => { console.warn(`[STDERR ${test.name}]:`, msg); }
+                                        });
+                                        if (typeof runtime.addImport === 'function') {
+                                            runtime.addImport('env', 'sl_print', (ptr) => { actualOutput += runtime.readString(ptr) + '\n'; });
+                                            // FIXED: Added missing '=' for proper string concatenation
+                                            runtime.addImport('env', 'sl_print_int', (val) => { actualOutput += val + '\n'; });
+                                        }
+                                        await runtime.instantiate(wasmBinary);
+                                        if (runtime.exports?.main) runtime.exports.main();
+                                        else if (typeof runtime.run === 'function') runtime.run();
+                                    }
+                                }
+                            } catch (err) {
+                                compileResult.success = false;
+                                compileResult.error = `Execution Error: ${err.message}`;
+                            }
+                        }
+                        updateTestCard(cards.get(test.id), test, compileResult, actualOutput, wasmHex);
+                    }
+                    runAllBtn.disabled = false;
+                    runAllBtn.innerText = 'Run All Tests';
+                }
+            } catch (err) {
+                console.error("💥 FATAL MODULE INITIALIZATION ERROR:", err);
+            }
+        }
+        init();
+    </script>
+</body>
+</html>

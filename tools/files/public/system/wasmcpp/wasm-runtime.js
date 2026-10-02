@@ -1,6 +1,4 @@
-
-
-//wasm-runtime.js
+// wasm-runtime.js
 export class WasmRuntime {
 	constructor(options = {}) {
 		this.options = options;
@@ -8,6 +6,7 @@ export class WasmRuntime {
 		this.memory = null;
 		this.exports = {};
 		this._customImports = options.imports || {};
+		//this._cppExceptionTag = null; // Will hold the Wasm Exception Tag
 		this._initWasi();
 	}
 
@@ -54,12 +53,12 @@ export class WasmRuntime {
 				if (fd === 1 || fd === 2) {
 					const view = new DataView(this.memBuffer);
 					view.setUint8(bufPtr, 2); // 2 = __WASI_FILETYPE_CHARACTER_DEVICE
-					view.setUint16(bufPtr + 2, 0, true); 
-					view.setBigUint64(bufPtr + 8, 0xFFFFFFFFFFFFFFFFn, true); 
-					view.setBigUint64(bufPtr + 16, 0xFFFFFFFFFFFFFFFFn, true); 
+					view.setUint16(bufPtr + 2, 0, true);
+					view.setBigUint64(bufPtr + 8, 0xFFFFFFFFFFFFFFFFn, true);
+					view.setBigUint64(bufPtr + 16, 0xFFFFFFFFFFFFFFFFn, true);
 					return 0;
 				}
-				return 8; 
+				return 8;
 			},
 
 			poll_oneoff: (subPtr, retPtr, nSubs, nEventsPtr) => {
@@ -67,15 +66,15 @@ export class WasmRuntime {
 				let eventsWritten = 0;
 
 				for (let i = 0; i < nSubs; i++) {
-					const subBase = subPtr + i * 48; 
+					const subBase = subPtr + i * 48;
 					const userdata = view.getBigUint64(subBase, true);
-					const type = view.getUint8(subBase + 8); 
+					const type = view.getUint8(subBase + 8);
 
-					const retBase = retPtr + eventsWritten * 32; 
+					const retBase = retPtr + eventsWritten * 32;
 					view.setBigUint64(retBase, userdata, true);
 					view.setUint8(retBase + 10, type);
 
-					if (type === 0) { 
+					if (type === 0) {
 						const flags = view.getUint16(subBase + 40, true);
 						let timeoutNs = view.getBigUint64(subBase + 24, true);
 
@@ -95,7 +94,7 @@ export class WasmRuntime {
 							while (Date.now() - start < timeoutMs) {}
 						}
 
-						view.setUint16(retBase + 8, 0, true); 
+						view.setUint16(retBase + 8, 0, true);
 						eventsWritten++;
 					} else {
 						view.setUint16(retBase + 8, 44, true);
@@ -161,12 +160,24 @@ export class WasmRuntime {
 	}
 
 	async instantiate(wasmSource) {
+		// 1. Create the C++ Exception Tag (requires an 'i32' parameter for the memory pointer)
+		//wasm-exceptions  ot supported
+		//const cppExceptionTag = new WebAssembly.Tag({ parameters: ['i32'] });
+
+		// 2. Build base imports (safely spreads custom imports)
 		const importObject = {
 			wasi_snapshot_preview1: this.wasiImports,
 			...this._customImports
 		};
 
-		if (!importObject.env) importObject.env = {};
+		// 3. EXPLICITLY build the 'env' object AFTER the spread.
+		// This guarantees __cpp_exception is ALWAYS present and added LAST.
+		importObject.env = {
+			...(this._customImports.env || {}), // 1. User's custom env imports (e.g., js_alert)
+			//__cpp_exception: cppExceptionTag    // 2. The required C++ exception tag (added LAST)
+		};
+
+		// 4. Handle Memory setup
 		if (!importObject.env.memory) {
 			if (this.options.memory && this.options.memory instanceof WebAssembly.Memory) {
 				importObject.env.memory = this.options.memory;
@@ -180,6 +191,7 @@ export class WasmRuntime {
 		}
 
 		this.memory = importObject.env.memory;
+		//this._cppExceptionTag = cppExceptionTag; // Save for error handling
 
 		try {
 			let instance;
@@ -213,22 +225,40 @@ export class WasmRuntime {
 
 	callExport(name, ...args) { return this.getExport(name)(...args); }
 
-	run() {
-		if (!this.exports._start) throw new Error("No _start function found.");
-		try {
-			this.exports._start();
-			return 0;
-		} catch (e) {
-			if (e.name === 'ExitStatus') return e.code;
-			throw e;
+	run(processId) {
+		//__initSharedAllocator
+
+		if (this.exports.__initSharedAllocator)//throw new Error("No __initSharedAllocator function found.");
+		{
+			try {
+				this.exports.__initSharedAllocator();
+				this.exports.__initProcess(processId);
+				//return 0;
+			} catch (e) {
+				if (e.name === 'ExitStatus') return e.code;
+				throw e;
+			}
 		}
+		else
+		{
+			if (!this.exports._start) throw new Error("No _start function found.");
+			try {
+				this.exports._start();
+				return 0;
+			} catch (e) {
+				if (e.name === 'ExitStatus') return e.code;
+				throw e;
+			}
+		}
+		//initilize processId
+		this.exports.__initProcess(processId);
 	}
 
 	writeString(str) {
-		if (!this.exports.malloc) throw new Error("C++ must export 'malloc'.");
+		if (!this.exports.cppmalloc) throw new Error("C++ must export 'cppmalloc'.");
 		const encoder = new TextEncoder();
 		const bytes = encoder.encode(str + '\0');
-		const ptr = this.exports.malloc(bytes.length);
+		const ptr = this.exports.cppmalloc(bytes.length);
 		new Uint8Array(this.memBuffer).set(bytes, ptr);
 		return ptr;
 	}
@@ -241,8 +271,8 @@ export class WasmRuntime {
 	}
 
 	freeString(ptr) {
-		// 🐛 FIXED: Was checking for malloc, now correctly checks for free
-		if (!this.exports.free) throw new Error("C++ must export 'free'.");
-		this.exports.free(ptr);
+		// 🐛 FIXED: Was checking for cppmalloc, now correctly checks for cppfree
+		if (!this.exports.cppfree) throw new Error("C++ must export 'cppfree'.");
+		this.exports.cppfree(ptr);
 	}
 }

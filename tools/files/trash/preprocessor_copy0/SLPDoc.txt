@@ -1,0 +1,163 @@
+================================================================================
+                    SMALL LANGUAGE PREPROCESSOR (SLP)
+                          DOCUMENTATION v1.0
+================================================================================
+
+1. INTRODUCTION
+--------------------------------------------------------------------------------
+The Small Language Preprocessor (SLP) is a lightweight, JavaScript-like scripting 
+interpreter designed to be embedded in C++ applications. It processes script 
+definitions, maintains state across multiple evaluations, and exposes specific 
+variables or functions as preprocessor tokens that return string values.
+
+2. SYSTEM OVERVIEW
+--------------------------------------------------------------------------------
+The SLP system consists of two main components:
+  1. SLP Interpreter Engine: Parses and executes SLP script code, managing 
+     memory, lexical scope, and execution flow without C++ exceptions or RTTI.
+  2. C++ Host API: Provides an interface for the host application to load 
+     scripts, persist global state, and invoke marked preprocessor tokens with 
+     a variadic number of arguments.
+
+3. LANGUAGE SYNTAX & FEATURES
+--------------------------------------------------------------------------------
+3.1 Comments
+  - Single-line: // comment
+  - Multi-line:  /* comment */
+
+3.2 Data Types
+  - undefined : Uninitialized variables.
+  - integer   : Whole numbers, internally implemented as uint64_t (BigInt) to 
+                guarantee full 64-bit unsigned integer support without precision loss.
+  - float     : Floating-point numbers (double/float64).
+  - boolean   : true or false.
+  - string    : 8-bit character sequences. Supports single ('...'), double ("..."), 
+                and backtick (`...`) quotes. Backticks support ${variable} interpolation.
+  - array     : Ordered lists of values (e.g., [1, "two"]).
+  - object    : Key-value pair collections (e.g., { key: value }).
+  - function  : Callable blocks of code defined via arrow syntax.
+
+3.3 Operators
+  - Arithmetic: +, -, *, /, %, ** (exponentiation), ++, --
+  - Assignment: =, +=, -=, *=, /=, %=, <<=, >>=, &=, ^=, |=
+  - Comparison: ==, !=, >, >=, <, <= (Note: == and != perform type coercion)
+  - Logical:    &&, ||, !
+  - Bitwise:    &, |, ^, ~, <<, >>
+  - String:     + (concatenation)
+  - Conditional: condition ? true_expr : false_expr
+  - Type Check: typeof <expression>
+
+3.4 Control Flow
+  - Conditional: if, else if, else, switch (with case, default, and break)
+  - Loops: 
+      * for (var i = 0; i < limit; i++) { ... }
+      * for (var key in obj) { ... } (iterates object keys or array indices)
+      * while (condition) { ... }
+      * do { ... } while (condition);
+  - Flow Control: break, continue, return
+
+3.5 Functions and Scoping
+  - Definition: var func = (args) -> { ... }
+  - Arguments: Accessible by name and via the built-in `args` array (e.g., args[0]).
+  - Scoping: Lexical scoping is supported. Inner functions access outer scopes. 
+             Variables declared with `var` inside a function are local to that function.
+
+3.6 Objects and Arrays
+  - Object Literals: var obj = { key: value }; obj.key or obj["key"] for access.
+  - Array Methods: 
+      * arr.push(value)    : Adds to the end.
+      * arr.unshift(value) : Adds to the beginning.
+      * arr.pop()          : Removes and returns the last element.
+      * arr.shift()        : Removes and returns the first element.
+  - Array Properties: arr.length returns the number of elements.
+
+3.7 Preprocessor Directives
+  - #token Directive: Registers a variable or function as a preprocessor entry point.
+  - Syntax Patterns:
+      #token var name = 123;                 // Inline variable token
+      #token var namefunc = (x) -> { ... };  // Inline function token
+      var name = 123; #token name;           // Post-declaration marking
+  - Behavior: When accessed via the C++ API, variables return their stringified 
+              value. Functions are invoked with provided arguments and return 
+              their stringified result.
+
+4. C++ API REFERENCE
+--------------------------------------------------------------------------------
+#include "slp.cpp"
+
+class SLP {
+public:
+  // 1. Initialization
+  SLP(); 
+  // Instantiates a new, isolated interpreter state.
+
+  // 2. Script Definition
+  std::string define(const std::string& script);
+  // Parses and executes the provided script. Maintains global state across 
+  // multiple calls. Returns "OK" on success, or a descriptive error message.
+
+  // 3. Token Execution (Variadic)
+  template <typename... Args>
+  std::string get(const std::string& token_name, Args&&... args);
+  // Evaluates a variable or invokes a function marked with #token.
+  // Accepts a variable amount of arguments (integers, floats, strings, booleans).
+  // Arguments are ignored if the token is a variable.
+  // Returns the result as a std::string.
+};
+
+5. USAGE EXAMPLE
+--------------------------------------------------------------------------------
+#include "slp.cpp"
+#include <iostream>
+
+int main() {
+    SLP slp;
+
+    // Define global state and tokens
+    slp.define(R"(
+        #token var globalmsg = 123;
+        var func1 = (x, y) -> { return x + " " + y; }
+        #token func1;
+    )");
+
+    // Invoke variable token (args ignored)
+    std::cout << slp.get("globalmsg") << "\n"; // Output: 123
+
+    // Invoke function token with variadic arguments
+    std::cout << slp.get("func1", 123, 124) << "\n"; // Output: 123 124
+
+    // State persists across define calls
+    slp.define(R"( globalmsg += "hi"; )");
+    std::cout << slp.get("globalmsg") << "\n"; // Output: 123hi
+
+    return 0;
+}
+
+6. IMPLEMENTATION & COMPILER RESTRICTIONS
+--------------------------------------------------------------------------------
+To ensure maximum portability and minimal overhead, the SLP implementation 
+adheres to strict compiler constraints:
+  -fno-exceptions : No C++ exceptions (throw, try, catch) are used. Errors are 
+                    handled via return types (e.g., "Error: ..." strings).
+  -fno-rtti       : No Run-Time Type Information (dynamic_cast, typeid) is used. 
+                    Type checking relies on explicit type tags (enums).
+  - Memory Management: Uses reference-counted std::shared_ptr<Value> objects to 
+                       prevent memory leaks during repeated define/get calls.
+
+7. TESTING BEST PRACTICES
+--------------------------------------------------------------------------------
+Because global state persists across define() calls, tests should be scoped 
+using curly braces `{ }` to prevent global namespace pollution.
+
+BAD:
+  slp.define("var x = 123;");
+  slp.define("var x = 456;"); // May cause unexpected behavior
+
+GOOD:
+  slp.define(R"({
+      var x = 123;
+      var testFunc = () -> { return x; }
+      #token testFunc;
+  })"); // 'x' is evaluated but test logic remains isolated.
+
+================================================================================

@@ -1,0 +1,195 @@
+# Software Requirements Specification (SRS)
+## Small Language Preprocessor (SLP)
+
+### 1. Introduction
+#### 1.1 Purpose
+The purpose of this document is to define the functional and non-functional requirements for the Small Language Preprocessor (SLP). SLP is a lightweight, JavaScript-like scripting interpreter designed to be embedded in C++ applications. It processes script definitions, maintains state across multiple evaluations, and exposes specific functions or variables as preprocessor tokens that return string values.
+
+#### 1.2 Scope
+The SLP will be implemented as a C++ library. It shall parse and execute a custom, simplified subset of JavaScript. It must support variable declaration, basic data types (with integers represented as BigInt to guarantee uint64 support), arithmetic/logical/bitwise operations, control flow, functions, objects, arrays, and lexical scoping. It must also provide a C++ API to feed scripts into the interpreter and retrieve evaluated results from designated preprocessor tokens using a variable number of arguments.
+
+---
+
+### 2. System Overview
+The SLP system consists of two main components:
+1. **The SLP Interpreter Engine**: Parses and executes SLP script code, managing memory, scope, and execution flow.
+2. **The C++ Host API**: Provides an interface for the host C++ application to load scripts (define), persist state, and invoke or retrieve marked preprocessor tokens (get) with a variadic (variable) number of arguments.
+
+---
+
+### 3. Functional Requirements
+
+#### 3.1 Language Syntax & Lexical Elements
+* FR-1.1 Comments: The interpreter shall support single-line comments (//) and multi-line comments (/* ... */).
+* FR-1.2 Variable Declaration: Variables shall be declared using the var keyword. 
+  Examples: var x; (undefined), var x = 123;, var x = undefined;.
+* FR-1.3 Template Literals: The interpreter shall support string interpolation using ${variable} syntax within double-quoted (") or backtick-quoted strings.
+
+#### 3.2 Data Types
+The interpreter shall support the following data types, identifiable via the typeof operator:
+* FR-2.1 undefined: Uninitialized variables.
+* FR-2.2 integer: Whole numbers. This type MUST be implemented internally as BigInt to guarantee full support for 64-bit unsigned integers (uint64) without precision loss or overflow.
+* FR-2.3 float: Floating-point numbers (float64).
+* FR-2.4 boolean: true or false.
+* FR-2.5 string: 8-bit character sequences. Supports both single-line ('...') and multi-line ("...") formats.
+* FR-2.6 array: Ordered lists of values.
+* FR-2.7 object: Key-value pair collections (object literals).
+
+#### 3.3 Operators
+The interpreter shall support the following operator categories:
+* FR-3.1 Arithmetic: +, -, *, /, %, ** (exponentiation), ++, --. (Arithmetic on integer types shall utilize BigInt semantics).
+* FR-3.2 Assignment: =, +=, -=, *=, /=, %=, <<=, >>=, &=, ^=, |=.
+* FR-3.3 Comparison: ==, !=, >, >=, <, <=. (Note: == and != shall perform type coercion).
+* FR-3.4 Logical: &&, ||, !.
+* FR-3.5 Bitwise: &, |, ^, ~, <<, >>. (Note: Standard bitwise operations shall treat operands as a set of 32-bit binary numbers, unless explicitly operating on BigInt contexts where 64-bit semantics may apply).
+* FR-3.6 String: + for concatenation.
+* FR-3.7 Conditional: Ternary operator condition ? true_expr : false_expr.
+
+#### 3.4 Control Flow
+* FR-4.1 Conditional Statements: Support for if, else if, else, and switch statements.
+* FR-4.2 Loops: Support for:
+  - Standard for loops: for(var i=0; i < limit; i++) { ... }
+  - for...in loops for object keys: for(var key in obj) { ... }
+  - while loops.
+  - do...while loops.
+
+#### 3.5 Functions and Scoping
+* FR-5.1 Function Definition: Functions shall be defined using arrow syntax assigned to a variable: var func = (args) -> { ... }.
+* FR-5.2 Arguments Access: Function arguments shall be accessible by name and via a built-in args array (e.g., args[0], args[1]).
+* FR-5.3 Lexical Scoping: 
+  - Inner functions shall have access to variables in outer scopes.
+  - Variables declared with var inside a function shall be local to that function and inaccessible from the outside.
+* FR-5.4 Return Values: Functions shall use the return keyword. 
+
+#### 3.6 Objects and Arrays
+* FR-6.1 Object Literals: Support for declaration (var obj = { key: value }), dynamic property assignment (obj['x'] = 123 or obj.x = 123), and property access (obj.x or obj['x']).
+* FR-6.2 Array Literals: Support for declaration (var a = [] or var a = [1, "two"]).
+* FR-6.3 Array Methods: The interpreter shall provide built-in array methods:
+  - a.push(value): Adds to the end.
+  - a.unshift(value): Adds to the beginning.
+  - a.pop(): Removes and returns the last element.
+  - a.shift(): Removes and returns the first element.
+* FR-6.4 Array Properties: a.length shall return the number of elements in the array.
+
+#### 3.7 Preprocessor Directives
+* FR-7.1 #token Directive: The script shall support a #token directive to register a variable or function as a preprocessor entry point.
+* FR-7.2 Token Syntax: The directive supports both inline declaration and post-declaration marking. The full implementation of defining tokens includes the following valid patterns:
+
+defining tokens
+
+#token var name = 123; // where name is the token name
+#token var namefunc = () -> { return 134; } // namefunc is the token
+
+var name = 123;
+#token name;
+var namefunc = () -> { return 123; }
+#token namefunc;
+
+* FR-7.3 Token Behavior: Any variable or function marked with #token shall be registered as a preprocessor entry point. When accessed via the C++ API:
+  - If the token is a variable, its current value shall be coerced and returned as a string.
+  - If the token is a function, it shall be invoked with the provided arguments, and its return value shall be coerced and returned as a string.
+
+---
+
+### 4. C++ API Requirements
+
+#### 4.1 Core Interface
+The C++ library shall expose an SLP class with the following minimum interface:
+* FR-8.1 Initialization: SLP slp; shall instantiate a new, isolated interpreter state.
+* FR-8.2 Script Definition: std::string slp.define(const std::string& script); 
+  - Shall parse and execute the provided script.
+  - Shall maintain global state across multiple define calls (e.g., variables defined in call 1 are accessible in call 2).
+  - Returns "OK" on success along with a list of tokens string names defined, or a descriptive error message string on failure.
+* FR-8.3 Token Execution (Variadic): template <typename... Args> std::string slp.get(const std::string& token_name, Args&&... args);
+  - Shall evaluate the variable or invoke the function previously marked with #token <token_name>.
+  - Shall accept a variable amount of arguments (variadic template) to pass into the SLP function seamlessly (arguments are ignored if the token is a variable).
+  - Shall convert the variadic C++ arguments into internal SLP values (handling integers/BigInt, floats, strings, booleans, etc.).
+  - Shall return the result (either the variable's stringified value or the function's stringified return value) as a std::string.
+
+---
+
+### 5. Non-Functional Requirements
+
+* NFR-1 Performance: The interpreter shall be optimized for fast startup and low-overhead execution, suitable for preprocessor-style text generation tasks. BigInt operations shall be optimized for typical 64-bit ranges.
+* NFR-2 Error Handling: The interpreter shall gracefully handle syntax errors, type errors, and out-of-bounds array accesses, returning descriptive error messages to the C++ host (e.g., via std::string error returns from define/get).
+* NFR-3 Memory Management: The interpreter shall manage its own memory (e.g., via reference-counted std::shared_ptr<Value> objects) to prevent memory leaks during repeated define and get calls.
+* NFR-4 Portability: The C++ implementation shall be compatible with C++17 or later and be compilable on major platforms (Windows, Linux, macOS).
+* NFR-5 Compiler Restrictions: The implementation must compile cleanly with -fno-exceptions and -fno-rtti. Error handling must rely on return codes or Result-style types rather than C++ exceptions, and RTTI features like dynamic_cast must not be used.
+
+---
+
+### 6. Example Usage (Acceptance Criteria)
+
+The implementation shall successfully execute the following C++ code snippet, demonstrating state persistence, BigInt handling, and variadic argument passing:
+
+    #include "slp.cpp"
+    #include <iostream>
+    #include <string>
+
+    int main() {
+        SLP slp;
+
+        // First definition: Setup global state, a variable token, and a function token
+        std::string res1 = slp.define(R"(
+            #token var globalmsg = 123; // Inline variable token definition
+
+            var func1 = (x, y) -> {
+                return x + " " + y; 
+            }
+            #token func1; // Post-declaration function token definition
+        )");
+
+        // Invoke the variable token (arguments are ignored)
+        std::string varResult = slp.get("globalmsg");
+        // Expected varResult: "123"
+
+        // Invoke the function token from C++, passing a variable amount of arguments (2 args)
+        std::string result1 = slp.get("func1", 123, 124);
+        // Expected result1: "123 124"
+
+        // Second definition: State persists, can modify existing globals
+        std::string res2 = slp.define(R"(
+            globalmsg += "hi"; 
+            #token var func2 = (a, b, c) -> {
+                return "msg: " + globalmsg + ", args: " + a + "," + b + "," + c;
+            } // Inline function token definition
+        )");
+
+        // Invoke the token with a different variable amount of arguments (3 args)
+        std::string result2 = slp.get("func2", 10, 20, 30);
+        // Expected result2: "msg: 123hi, args: 10,20,30"
+
+        return 0;
+    }
+
+---
+
+### 7. Implementation Restrictions & Testing Guidelines
+
+#### 7.1 Compiler Restrictions
+The compiler has the following strict restrictions:
+* -fno-exceptions: No C++ exceptions (throw, try, catch) may be used. Errors must be handled via return types (e.g., std::string error messages or Result structs).
+* -fno-rtti: No Run-Time Type Information (dynamic_cast, typeid) may be used. Type checking must rely on explicit type tags or enums.
+
+#### 7.2 Testing Guidelines (Avoiding Global Pollution)
+When writing tests, it is important not to pollute the global namespace, as state persists across define() calls. 
+
+Bad Practice (Global Pollution):
+    // Test 1
+    slp.define(R"(
+        var x = 123;
+    )");
+
+    // Test 2 (Fails or behaves unexpectedly because 'x' is already defined globally)
+    slp.define(R"(
+        var x = 123; 
+    )");
+
+Best Practice (Scoped Execution):
+Wrap test definitions in a block { } to limit scope and prevent global namespace pollution. Variables declared inside the block will still be processed, but the test logic remains isolated.
+    // Good Practice
+    slp.define(R"({
+        var x = 123; // No global pollution, isolated to this block evaluation
+        var testFunc = () -> { return x; }
+        #token testFunc;
+    })");

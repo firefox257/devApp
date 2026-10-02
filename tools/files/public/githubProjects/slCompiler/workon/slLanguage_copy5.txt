@@ -1,0 +1,1358 @@
+# SMALL LANGUAGE (SL) COMPILER DOCUMENTATION
+
+## 0 Documentstion notes
+In the documentation never use three back ticks.
+This confuses front end ai's amd thins itnis end a code block.
+
+## 1. OVERVIEW
+Small Language (SL) is a lightweight, high-performance programming language with C++-like syntax. It emphasizes explicit memory management, predictable data layout, and a strict separation between data structures (classes) and behavior (functions).
+
+### 1.1 COMMENTS
+Comments are used to document code and are ignored by the compiler.
+- Single-line comments start with `//`
+// This is a single-line comment
+
+- Multi-line comments are enclosed in `/*` and `*/`
+/*
+This is a
+multi-line comment
+*/
+
+## 2. PRIMITIVE TYPES
+SL provides a strict set of primitive types with guaranteed sizes.
+Type      Description                     Size
+----      -----------                     ----
+void      No type / empty                 -
+bool      Boolean value (true or false)   1 byte
+char      Single character                1 byte
+int8      8-bit signed integer            1 byte
+int16     16-bit signed integer           2 bytes
+int32     32-bit signed integer           4 bytes
+int64     64-bit signed integer           8 bytes
+uint8     8-bit unsigned integer          1 byte
+uint16    16-bit unsigned integer         2 bytes
+uint32    32-bit unsigned integer         4 bytes
+uint64    64-bit unsigned integer         8 bytes
+float32   32-bit floating-point number    4 bytes
+float64   64-bit floating-point number    8 bytes
+
+Pointer Types:
+Any primitive type can be suffixed with `*` to denote a pointer (memory address):
+void*, bool*, char*, int8*, int16*, int32*, int64*, uint8*, uint16*, uint32*, uint64*, float32*, float64*
+
+### 2.1 Characters and Strings
+- Character Definition:
+char c = 'a';
+(Must be exactly one character. Using multiple characters like `char c = 'ab';` will result in a compiler error. Single quotes are strictly reserved for `char`).
+
+- String Definition:
+Strings (both single-line and multi-line) are enclosed in double quotes (`"`):
+"This is a single-line string"
+"
+This is a
+multi-line string
+"
+
+- String Interpolation:
+Variables can be embedded directly into double-quoted strings using the `${}` syntax:
+int32 age = 25;
+print("Age is ${age}"); // Outputs: Age is 25
+
+### 2.2 Escape Characters
+The following escape characters are supported within character and string literals:
+\n  : Newline
+\t  : Horizontal tab
+\r  : Carriage return
+\\  : Backslash
+\'  : Single quote
+\"  : Double quote
+\0  : Null character (NUL)
+\b  : Backspace
+\f  : Form feed
+\a  : Alert / Bell
+\v  : Vertical tab
+\xHH: Hexadecimal character code (e.g., \x41 for 'A')
+\ooo: Octal character code (e.g., \101 for 'A')
+
+### 2.3 Type Qualifiers (const)
+The `const` keyword enforces read-only immutability for variables, pointers, parameters, and object instances. This helps prevent unintended modifications and enables compiler optimizations.
+
+// 1. Constant variable
+const int32 MAX_SIZE = 100;
+
+// 2. Pointer to constant data (data cannot be modified)
+const char* str = "hello";
+
+// 3. Constant pointer (pointer address cannot be modified)
+int32* const ptr = &some_int;
+
+// 4. Const parameter in functions
+void printValue(const int32* value) {
+    // *value = 5; // Error: cannot modify a const object
+}
+
+// 5. Const explicit 'this' pointer (read-only method)
+public int32 try1::getValue(const try1* this) {
+    // this->x = 10; // Error: cannot modify member via const this pointer
+    return this->x;
+}
+
+## 3. OPERATORS
+SL supports a comprehensive set of C++-style operators, categorized by function:
+
+### 3.1 Arithmetic Operators
++   : Addition (also unary plus)
+-   : Subtraction (also unary minus/negation)
+*   : Multiplication
+/   : Division
+%   : Modulo (remainder)
+++  : Increment (prefix or postfix)
+--  : Decrement (prefix or postfix)
+
+### 3.2 Relational / Comparison Operators
+==  : Equal to
+!=  : Not equal to
+>   : Greater than
+<   : Less than
+>=  : Greater than or equal to
+<=  : Less than or equal to
+
+### 3.3 Logical Operators
+&&  : Logical AND
+||  : Logical OR
+!   : Logical NOT
+
+### 3.4 Bitwise Operators
+&   : Bitwise AND
+|   : Bitwise OR
+^   : Bitwise XOR (exclusive OR)
+~   : Bitwise NOT (One's complement)
+<<  : Bitwise Left Shift
+>>  : Bitwise Right Shift
+
+### 3.5 Assignment Operators
+=   : Simple assignment
++=  : Add and assign
+-=  : Subtract and assign
+*=  : Multiply and assign
+/=  : Divide and assign
+%=  : Modulo and assign
+&=  : Bitwise AND and assign
+|=  : Bitwise OR and assign
+^=  : Bitwise XOR and assign
+<<= : Bitwise Left Shift and assign
+>>= : Bitwise Right Shift and assign
+
+### 3.6 Member and Pointer Access Operators
+.   : Member access (dot operator)
+->  : Member access via pointer (arrow operator)
+.*  : Pointer-to-member access (via object)
+->* : Pointer-to-member access (via pointer)
+*   : Dereference (access value at address)
+&   : Address-of (get memory address)
+
+### 3.7 Miscellaneous / Special Operators
+?:     : Ternary / Conditional operator (condition ? expr1 : expr2)
+,      : Comma operator
+::     : Scope resolution operator
+()     : Function call operator / Type casting / Initialization
+[]     : Subscript / Array indexing operator
+sizeof : Returns the size (in bytes) of a type or object.
+sizeof(int32);       // is 4
+sizeof(int64);       // is 8
+int32 x; sizeof(x);  // is 4
+class try1 { private: char c; public: int32 x; };
+sizeof(try1);        // is 5 (packed)
+int32 array[3]; sizeof(array); // is 12
+
+typeof : Compile-time type introspection operator. Evaluates to a boolean 
+         indicating whether the static type of the left-hand expression 
+         exactly matches the right-hand type. Because it is resolved 
+         entirely at compile time, it carries zero runtime overhead.
+
+// 1. Primitive Types
+int32 x;
+if (x typeof int32) { 
+    // This branch is constant-folded to 'true' by the compiler
+}
+
+// 2. Classes and Structs
+class classname { public: int32 val; };
+classname c1;
+if (c1 typeof classname) { 
+    // Evaluates to true
+}
+
+// 3. Pointers (Parentheses required for pointer types)
+classname* cptr;
+if (cptr typeof (classname*)) { 
+    // Evaluates to true
+}
+
+## 4. FUNCTIONS
+Functions are defined with a return type, name, and parameter list.
+Standard Function Example:
+int32 strlen(char* str) {
+    int16 i = 0;
+    while (str[i] != 0) {
+        i++;
+    }
+    return i;
+}
+
+## 5. CLASSES AND STRUCTS
+Classes in SL define data layout only. They are always packed and aligned for predictable memory representation (no implicit compiler padding).
+
+### 5.1 Class Definition Rules
+1. No Inline Functions: Classes cannot have functions defined inside the class body. All methods must be defined externally.
+2. Access Modifiers: `public`, `protected`, and `private` are supported for both data members and class functions.
+3. Inheritance: Supports `public`, `protected`, and `private` inheritance.
+
+### 5.2 Class Declaration Syntax
+class classname : public classname2 {
+public:
+    int32 x;
+protected:
+    // protected members
+private:
+    // private members
+};
+
+### 5.2.1 Packed Alignment
+To explicitly enforce packed alignment (though classes are packed by default), use the `__attribute__((packed))` syntax:
+class classname {
+    int8 a;
+    int32 b;
+} __attribute__((packed));
+
+### 5.3 Flexible Out-of-Line Method Definitions
+Functions belonging to a class are defined flexibly anywhere in the code using the scope resolution operator `::`.
+The `this` pointer must be explicitly declared as the first parameter.
+Access modifiers (`public`, `protected`, `private`) must be stated in the definition if they apply.
+
+// Regular method with access modifier
+public void classname::func(classname* this, int32 i) {
+    this->x = i;
+}
+
+// Constructor (explicit this pointer)
+classname::classname(classname* this) {
+    // Constructor logic
+}
+
+// Destructor (explicit this pointer)
+classname::~classname(classname* this) {
+    // Destructor logic
+}
+
+### 5.3.1 Constructor Initializer Lists
+SL supports C++-style constructor initializer lists, which are evaluated immediately after memory allocation but before the constructor body executes. This mechanism is strictly required for initializing `const` members, reference (`&`) members, and base class subobjects, as these cannot be legally assigned to after construction has begun.
+
+[CODE]
+class MyClass {
+public:
+    const int32 id;
+    int32& refValue;
+    int32 normalValue;
+};
+
+// Constructor using an initializer list
+MyClass::MyClass(MyClass* this, int32 initId, int32& initRef, int32 initNormal) 
+    : id(initId), refValue(initRef), normalValue(initNormal) {
+    // Constructor body executes AFTER all members in the initializer list are initialized.
+    // 'id' and 'refValue' cannot be assigned here; they must be in the initializer list.
+}
+[/CODE]
+
+Rules for Initializer Lists:
+1. Syntax: The initializer list follows the parameter list and is preceded by a colon (:).
+2. Separation: Multiple members are separated by commas (,).
+3. Initialization Order: Members are initialized in the exact order they are declared in the class definition, not the order they appear in the initializer list. The compiler will emit a warning if the initializer list order does not match the declaration order to prevent subtle dependency bugs.
+4. Fallback Initialization: If a member is omitted from the initializer list, it will be default-initialized (or use its in-class default value as defined in Section 17.3) before the constructor body runs.
+5. Explicit `this`: The explicit `this` pointer remains the first parameter of the constructor signature, but it is not included in the initializer list itself.
+
+### 5.4 Static Constructors and Destructors
+SL supports module-level static initialization and teardown for classes.
+
+// Static constructor: Runs once at application startup, before main()
+static classname::classname() {
+    // Global initialization logic
+}
+
+// Static destructor: Runs once when the application closes
+static classname::~classname() {
+    // Global cleanup logic
+}
+
+### 5.5 Operator Overloading
+SL supports operator overloading for classes. Operators are defined similarly to methods, using the `operator` keyword followed by the symbol being overloaded. The explicit `this` pointer is always the first parameter. Access modifiers can be applied.
+
+Supported Overloadable Operators:
+- Arithmetic: +, -, *, /, %, ++, --
+- Relational: ==, !=, <, >, <=, >=
+- Bitwise: &, |, ^, ~, <<, >>
+- Assignment: =, +=, -=, *=, /=, %=, &=, |=, ^=, <<=, >>=
+- Access/Call: [], (), ->, .*, ->*
+
+Examples:
+// Overloading the array subscript operator []
+public classname& classname::operator[](classname* this, int32 index) {
+    // Return reference to element at index
+}
+
+// Overloading the addition operator +
+public classname classname::operator+(classname* this, classname& other) {
+    // Addition logic
+}
+
+### 5.6 Instantiation and Method Calls
+When a method is called using dot notation (`.`), the compiler automatically passes the object's address as the explicit `this` parameter, providing clean syntax while maintaining C-style ABI compatibility.
+
+classname n1;
+n1.func(123); // Compiler translates this to: classname::func(&n1, 123);
+
+### 5.7 Abstract Classes and Polymorphism
+SL supports abstract class patterns by allowing method declarations without definitions. The compiler will not error on a missing definition as long as the method is not invoked on an instance of that exact base class. To use the functionality, a derived class must implement the method.
+
+class tryabstract {
+public:
+    int32 x;
+};
+
+// Declaration only (acts as an abstract method). No compiler error here.
+// Errors only if it is trying to be called on the base class directly.
+public int32 tryabstract::getX(tryabstract* this);
+
+// Derived class implementing the method
+class imptry : public tryabstract {
+};
+
+public int32 imptry::getX(imptry* this) {
+    return this->x;
+}
+
+// --- VALID USAGE ---
+// 1. Instantiating derived class and calling the method
+imptry it;
+print(it.getX());
+
+// 2. Polymorphic usage via pointer
+tryabstract* at = new imptry();
+print(at->getX());
+
+// --- INVALID USAGE ---
+// 3. Instantiating base class and calling unimplemented method will result in an error
+// tryabstract at;
+// print(at.getX()); // Error: getX is not implemented for tryabstract
+
+## 6. MODULES AND EXPORTING
+To make functions or class methods visible to other compilation units, dynamic libraries, or external linkers, use the `export` keyword.
+
+### 6.1 Exporting with Definition
+export void func() { // The export name is "func"
+    // Function body
+}
+
+// Note: The exported name will naturally be classname::func
+export void classname::func() { // The export name is "classname::func"
+    // Method body
+}
+
+// Alternative Names: You can define an alternative exported name using parentheses
+export(othername) void func() { // The export name is "othername"
+    // Function body exported as "othername"
+}
+
+export(CustomInit) static classname::classname() { // The export name is "CustomInit"
+    // Static constructor exported as "CustomInit"
+}
+
+### 6.2 Forward Export (Declaration Only)
+You can also export a function or method by declaration alone, allowing the definition to remain internal or be resolved at link time.
+export func;
+export classname::func;
+export(AliasName) func;
+
+### 6.3 Export Class
+export class classname {
+private:
+    int32 _id;
+public:
+    int16 x;
+    int16 y;
+};
+
+public void classname::printout(char* str) {
+    print(str);
+}
+
+// All the classname public members and public functions are exported.
+// export "classname::_id" is not visible since it is private.
+// export "classname::x" is visible.
+// export "classname::y" is visible.
+// export "classname::printout" is visible.
+
+export(tryclass) class classname {};
+void classname::func() {};
+// export "tryclass::func" is visible.
+
+### 6.4 How Exports and Imports are Used
+Imports are used to include only what is exported from a file, effectively managing the global namespace.
+
+// In file1.sl
+int32 x = 123; // Not exported, remains internal
+
+export int32 func1() {
+    return x;
+}
+
+void func2() { // Not exported, remains internal
+}
+
+// In file2.sl
+#import "file1.sl"
+// func1 is available.
+// x is NOT available.
+// func2 is NOT available.
+
+// Contrast with #include:
+// #include "file1.sl"
+// func1, func2, and x are ALL available.
+
+## 7. TEMPLATES
+SL supports generics through templates, allowing functions and classes to operate with generic types.
+
+### 7.1 Function Templates
+Functions can be templated by declaring template parameters before the function signature.
+template<A>
+void func(A bla) {
+    // Function logic using type A
+}
+
+### 7.2 Class Templates
+Classes can also be templated. Template parameters propagate to the class scope and can be used for inheritance or member definitions.
+template<N>
+class try1 : public N {
+public:
+    N value;
+};
+
+### 7.3 Templated Class Method Definitions
+When defining methods for a templated class outside the class body, the class-level template parameters automatically propagate into the function scope. The explicit `this` pointer retains the class type.
+
+// The template parameter 'N' from the class is available here
+public void try1::func(try1* this, N bla) {
+    this->value = bla;
+}
+
+### 7.4 Additional Method-Level Template Parameters
+You can introduce new template parameters specifically for a class method, in addition to the class-level template parameters.
+template<B>
+public void try1::func(try1* this, N bla, B other) {
+    // Logic using both class template 'N' and method template 'B'
+}
+
+### 7.5 Template Instantiation Syntax
+Templates must be instantiated with concrete types before the compiler can generate the final code. SL supports both explicit instantiation and automatic type inference.
+
+#### 7.5.1 Function Template Instantiation
+For function templates, you can either explicitly specify the template arguments using angle brackets `< >`, or rely on the compiler to infer the types from the function arguments.
+
+[CODE]
+template<T>
+void printValue(T val) {
+    // Logic to print val
+}
+
+int32 main() {
+    // 1. Explicit Instantiation: The developer specifies the type.
+    printValue<int32>(42);
+    printValue<float32>(3.14);
+
+    // 2. Type Inference: The compiler deduces 'T' from the argument type.
+    printValue(100);    // Compiler infers T = int32
+    printValue(2.71);   // Compiler infers T = float64
+
+    return 0;
+}
+[/CODE]
+
+#### 7.5.2 Class Template Instantiation
+Class templates always require explicit instantiation. The compiler cannot infer class template parameters from a declaration alone. Angle brackets `< >` are used immediately following the class name.
+
+[CODE]
+template<N>
+class try1 {
+public:
+    N value;
+};
+
+int32 main() {
+    // Explicit instantiation of a class template
+    try1<int32> t1;
+    t1.value = 42;
+
+    try1<float32> t2;
+    t2.value = 3.14;
+
+    // Pointers to templated classes also require explicit types
+    try1<int32>* ptr = new try1<int32>();
+    delete ptr;
+
+    return 0;
+}
+[/CODE]
+
+#### 7.5.3 Mixed Inference and Explicit Parameters
+If a function template has multiple parameters, you can explicitly specify some and let the compiler infer the rest. Explicit parameters are resolved from left to right.
+
+[CODE]
+template<A, B>
+void process(A id, B data) {
+    // Logic using A and B
+}
+
+int32 main() {
+    // Explicitly specify 'A' as int32, let compiler infer 'B' as float32
+    process<int32>(10, 3.14); 
+    
+    // Explicitly specify both 'A' and 'B'
+    process<int32, float32>(10, 3.14);
+
+    return 0;
+}
+[/CODE]
+
+## 8. TYPEDEF
+The `typedef` keyword is used to create an alias for an existing type.
+This improves code readability and maintainability without creating a new distinct type.
+
+### 8.1 Syntax
+typedef <existing_type> <new_type_name>;
+
+### 8.2 Examples
+// Alias for a primitive type
+typedef int32 Score;
+typedef uint64 MemoryAddress;
+
+// Alias for a pointer type
+typedef char* String;
+
+// Alias for a class type
+typedef try1<int32> IntTry1;
+
+### 8.3 Usage Rules
+- Typedefs can be used anywhere a primitive or class type is expected.
+- Typedefs do not create strong typing; a `Score` is still fully compatible with an `int32`.
+- Typedefs can be declared at the global scope or within a specific scope (e.g., inside a function or class).
+
+## 9. CONTROL FLOW
+SL supports standard control flow structures:
+- Conditional: `if`, `else`
+- Loops: `while`, `do-while`, `for`
+- Branching: `switch`, `case`, `default`, and modern `match`
+- Jump Statements: `break`, `continue`, `return`
+
+### 9.1 Pattern Matching (`match`)
+The `match` expression is a modern, safe, and powerful alternative to traditional C-style `switch` statements, specifically designed for evaluating `enum` and `union` types.
+Unlike `switch`, `match` is an **expression** (it evaluates to a value), **never falls through**, and enforces **exhaustiveness checking** at compile time.
+
+#### 9.1.1 Basic Syntax and Expression Usage
+Because `match` evaluates to a value, it can be directly assigned to a variable or returned from a function.
+[CODE]
+enum class Status : int32 {
+    OK = 0,
+    ERROR = 1,
+    PENDING = 2
+}
+
+int32 handleStatus(Status s) {
+    // 'match' evaluates to an int32, so we can return it directly.
+    // The compiler enforces that all variants are covered.
+    return match (s) {
+        Status::OK => 0,
+        Status::ERROR => -1,
+        Status::PENDING => 1
+    };
+}
+[/CODE]
+
+#### 9.1.2 Statement Usage and Wildcards
+If you only need to execute code blocks without returning a value, you can use block syntax. The `_` symbol acts as a catch-all wildcard (similar to `default` in a `switch`), which is required if not all enum variants are explicitly listed.
+[CODE]
+match (s) {
+    Status::OK => {
+        print("Success");
+    }
+    Status::ERROR => {
+        print("Failed");
+    }
+    _ => {
+        // Wildcard handles PENDING or any future variants added to the enum
+        print("Unknown state");
+    }
+}
+[/CODE]
+
+#### 9.1.3 Tagged Union Destructuring (Sum Types)
+Raw C-style `union` types (Section 14.4) do not track which member is active, making them unsafe for pattern matching. To solve this, SL introduces **Tagged Unions** (Sum Types) using parameterized `enum class` declarations. 
+
+A parameterized `enum class` compiles down to a highly efficient, packed C-struct containing an integer tag and a raw union. The `match` statement can safely destructure these types, automatically binding the inner data to local variables based on the active tag.
+[CODE]
+// 1. Defining a Tagged Union
+enum class Result : int32 {
+    Success(int32 code),
+    Error(char* msg)
+}
+
+// 2. Safe Destructuring via `match`
+void processResult(Result res) {
+    match (res) {
+        // 'code' is automatically bound and available as int32
+        Result::Success(code) => {
+            print("Code: ${code}");
+        },
+        // 'msg' is automatically bound and available as char*
+        Result::Error(msg) => {
+            print("Error: ${msg}");
+        }
+    }
+}
+
+// 3. Wildcards and Ignoring Data
+// Use '_' to ignore the bound data if you only care about the variant
+match (res) {
+    Result::Success(_) => print("Operation succeeded"),
+    _ => print("Operation failed")
+}
+[/CODE]
+
+#### 9.1.4 Key Advantages over `switch`
+1. **No Fall-through**: Each branch is strictly isolated. Forgetting a `break` is impossible.
+2. **Exhaustiveness Checking**: The compiler guarantees all possible states are handled, preventing silent logical bugs when new enum variants are added.
+3. **Zero Runtime Cost**: `match` compiles down to the exact same highly optimized LLVM `switch` instruction or jump table as a traditional C `switch`. The safety guarantees are 100% compile-time.
+
+### 9.2 Compile-Time Type Matching (`match type`)
+While standard `match` evaluates runtime values, `match type` evaluates the **static compile-time type** of an expression. It is used to write type-specific logic, particularly within templates, without incurring any runtime overhead or requiring RTTI.
+
+#### 9.2.1 Syntax and Smart Casting
+The `match type` construct compares the static type of an expression against a list of types. Inside a matched branch, the expression is **smart-cast** (narrowed) to the matched type, allowing direct access to type-specific members without explicit casting.
+[CODE]
+template<T>
+void analyze(T data) {
+    match type (data) {
+        int32 => {
+            // 'data' is treated as int32 here.
+            print(data + 10);
+        },
+        float32 => {
+            // 'data' is treated as float32 here.
+            print(data * 1.5);
+        },
+        MyClass* => {
+            // 'data' is treated as MyClass* here.
+            data->update();
+        },
+        _ => {
+            // Wildcard handles any other type.
+            print("Unknown type");
+        }
+    }
+}
+[/CODE]
+
+#### 9.2.2 Exhaustiveness and Zero-Cost Guarantee
+- **Zero Runtime Cost:** The compiler resolves `match type` entirely during compilation. The generated LLVM IR contains **only** the code for the matching branch. All other branches are dead-code eliminated.
+- **Exhaustiveness:** If the expression's type is fully resolved (e.g., a concrete variable), the compiler enforces that all possibilities are covered or a `_` wildcard is provided. If the expression is a generic template parameter (e.g., `T`), a `_` wildcard is **mandatory** because the compiler cannot guarantee all possible instantiations are covered.
+
+## 10. DEFERRED RESOLUTION AND ORDERING
+The SL compiler employs a multi-pass deferred resolution strategy. This means the order of declarations and definitions in the source file does not strictly matter, as long as all symbols are eventually defined within the compilation unit. This allows for flexible code organization without the strict need for forward declarations.
+
+// Function using 'try1' before it is defined
+void out(try1 t) {
+    // Compiler defers type resolution
+}
+
+// Class defined later in the file
+class try1 {
+public:
+    int32 x;
+};
+
+Note: While deferred resolution handles most cases, explicit forward declarations (e.g., `class try1;`) are still supported and recommended for resolving complex circular dependencies or when returning pointers/references to incomplete types.
+
+## 11. SUMMARY OF KEY DESIGN CHOICES
+1. Explicit `this`: Promotes clarity, prevents hidden magic, and makes SL highly compatible with C-style ABIs.
+2. No Inline Class Methods: Keeps class definitions clean, acting strictly as data schemas (similar to C structs or Rust's trait/implementation separation).
+3. Packed and Aligned: Guarantees predictable memory layouts, ideal for systems programming, networking, serialization, and file I/O.
+4. Static Lifecycle Hooks: Provides built-in, deterministic startup and shutdown logic per class/module without requiring manual registration.
+5. Flexible Export Naming: Allows precise control over symbol names in compiled binaries for seamless FFI (Foreign Function Interface) and dynamic linking.
+6. Explicit Templating: Provides powerful generic programming capabilities while maintaining clear separation between class-level and method-level type parameters.
+7. Deferred Resolution: Eliminates rigid top-down ordering requirements, allowing functions and classes to reference each other freely as long as they are defined within the compilation unit.
+
+## 12. EXECUTION MODEL AND ENTRY POINT
+Every SL executable must define a global entry point function named `main`. The runtime environment handles static initialization (static constructors) before transferring control to `main`.
+
+### 12.1 The `main` Function
+The `main` function can be defined with or without command-line arguments. It must return an `int32` representing the exit code to the operating system (0 for success).
+
+// Standard entry point without arguments
+int32 main() {
+    return 0;
+}
+
+// Entry point with command-line arguments
+int32 main(int32 argc, char** argv) {
+    // argc: argument count
+    // argv: array of string pointers (null-terminated)
+    return 0;
+}
+
+### 12.2 Execution Lifecycle
+1. OS loads the binary.
+2. SL Runtime initializes.
+3. All `static` class constructors (Section 5.4) are executed in dependency order.
+4. `main()` is called.
+5. Upon `main()` returning, all `static` class destructors are executed in reverse order.
+6. Process terminates with the return value of `main()`.
+
+## 13. MEMORY MANAGEMENT
+SL provides both low-level C-style memory management and high-level object-oriented allocation keywords. Under the hood, `new` and `delete` are syntactic sugar that utilize `malloc`, `realloc`, and `free` via the C standard library (compiled with Clang/LLVM).
+
+### 13.1 Allocation and Deallocation
+- `malloc(uint64 size)`: Allocates a raw block of memory of the specified size in bytes.
+- `realloc(void* ptr, uint64 size)`: Resizes a previously allocated memory block.
+- `free(void* ptr)`: Deallocates a raw memory block.
+- `new`: Allocates memory for an object or array on the heap, automatically calculating the size, and calls its constructor.
+- `delete`: Calls the object's destructor and frees the memory (using `free` under the hood).
+- `delete[]`: Specifically used to free dynamically allocated arrays, ensuring all destructors in the array are called.
+
+MyClass* obj = new MyClass();
+delete obj;
+
+int32* arr = new int32[100];
+delete[] arr;
+
+### 13.2 The Null Pointer Literal
+The keyword `null` represents a null pointer (an address of zero). It can be assigned to any pointer type. Dereferencing `null` results in undefined behavior (typically a segmentation fault).
+
+int32* ptr = null;
+if (ptr != null) {
+    // safe to use
+}
+
+## 14. ADVANCED TYPE SYSTEM
+
+### 14.1 Reference Types (`&`)
+References provide an alias to an existing variable. Unlike pointers, references cannot be null, cannot be reseated (reassigned to point to a different variable), and do not require explicit dereferencing.
+
+int32 x = 10;
+int32& ref = x; // ref is an alias for x
+ref = 20;       // x is now 20
+
+// References are heavily used in function parameters to avoid pointer syntax
+void modifyValue(int32& val) {
+    val = 100;
+}
+
+### 14.2 Array Types
+Fixed-size arrays are declared using square brackets. Arrays are value types but decay to pointers when passed to functions expecting a pointer, ensuring C-ABI compatibility.
+
+int32 numbers[5] = {1, 2, 3, 4, 5};
+char buffer[256];
+
+// Array decay
+void process(int32* data, int32 length) { ... }
+process(numbers, 5); // 'numbers' decays to int32*
+
+### 14.3 Enumerations (`enum` and `enum class`)
+Enumerations define a set of named integer constants. By default, they start at 0 and increment by 1. The underlying type defaults to `int32` but can be specified.
+
+// Unscoped enumeration (values leak into the enclosing scope)
+enum Color {
+    RED,
+    GREEN,
+    BLUE
+};
+
+enum Status : uint8 {
+    OK = 0,
+    ERROR = 1,
+    PENDING = 2
+};
+
+Color c = GREEN;
+
+// Scoped enumeration (`enum class`)
+// Values are strictly scoped to the enum name and do not implicitly convert to integers, providing stronger type safety.
+enum class Direction : int8 {
+    UP = 1,
+    DOWN = -1
+};
+
+Direction d = Direction::UP;
+// int32 val = d; // Error: requires explicit cast
+int32 val = (int32)d; // Valid explicit cast
+
+### 14.3.1 Tagged Unions (Parameterized Enum Classes)
+By adding data payloads to an `enum class`, you create a **Tagged Union** (Sum Type). The compiler generates a packed struct containing the underlying integer tag and a raw union of the payload types. This provides the safety of pattern matching with the zero-overhead, C-ABI compatible memory layout of a raw struct.
+[CODE]
+enum class Shape : int8 {
+    Circle(float32 radius),
+    Rectangle(float32 width, float32 height)
+}
+
+// Underlying Memory Layout (Packed):
+// struct Shape {
+//     int8 tag;
+//     union {
+//         float32 Circle_radius;
+//         struct { float32 Rectangle_width; float32 Rectangle_height; } Rectangle_data;
+//     } data;
+// };
+
+Shape s = Shape::Circle(5.0);
+[/CODE]
+
+### 14.4 Union Types
+Unions allow storing different data types in the same memory location. The size of a union is the size of its largest member. Like classes, unions are packed and aligned.
+[CODE]
+union Data {
+    int32 i;
+    float32 f;
+    char c;
+};
+
+Data d;
+d.i = 42;
+// d.f now holds the float representation of the bits in d.i
+[/CODE]
+
+### 14.5 Tuple Returns via Reference Displacement
+To maintain strict C-ABI compatibility, guarantee predictable memory layouts, and optimize for WebAssembly (which natively handles multi-value returns via pointers), SL implements tuple returns as **syntactic sugar for out-parameters**.
+Instead of returning a copied struct, the compiler displaces the tuple elements to the front of the function's argument list as references (pointers). No hidden struct copying occurs; the function writes directly to the caller's memory.
+
+#### 14.5.1 Named Tuple Returns (Recommended)
+For the best readability, you can name the return variables directly in the signature. The compiler displaces them to the front as out-parameters, but inside the function body, they act as pre-declared aliases to those out-parameters.
+
+// Definition with named returns.
+// The compiler transforms this into: void calculate(int32* out_code, float32* out_value)
+(int32 code, float32 value) calculate() {
+    // You can assign to the named returns directly throughout the function.
+    code = 200;
+    value = 3.14;
+    
+    // A bare 'return;' exits the function, returning the current values.
+    return;
+}
+
+// You can also use the `return (val1, val2)` syntax candy:
+(int32 code, float32 value) calculateAlt() {
+    // Equivalent to: code = 200; value = 3.14; return;
+    return (200, 3.14);
+}
+
+// Call Site: Destructuring into existing variables.
+// The compiler translates this to: calculate(&c, &v)
+int32 c;
+float32 v;
+(c, v) = calculate();
+print(c); // Prints 200
+print(v); // Prints 3.14
+
+// Or declare and destructure in one step:
+(int32 c2, float32 v2) = calculate();
+
+#### 14.5.2 Anonymous Tuple Returns
+You can also define a tuple return using references without naming them. The caller still provides the memory.
+
+// Definition: The compiler transforms this into void getValues(int32* out0, float32* out1)
+(int32&, float32&) getValues() {
+    return (123, 3.14);
+}
+
+// Call Site: The compiler translates this to getValues(&x, &y)
+int32 x;
+float32 y;
+(x, y) = getValues();
+
+#### 14.5.3 Mixing with Standard Parameters
+Reference tuple returns are always displaced to the *front* of the parameter list to maintain a consistent ABI.
+
+(int32 x, float32 y) compute(int32 multiplier, float32 offset) {
+    x = 10 * multiplier;
+    y = 2.5 + offset;
+    return;
+}
+
+int32 a;
+float32 b;
+(a, b) = compute(5, 1.0); // Compiles to: compute(&a, &b, 5, 1.0)
+
+#### 14.5.4 Class Implementations and Exports
+When defining a class function with tuples, this is how the class function is defined.
+(int32& x, float32& y) classname::func(classname* this, int32 param)
+
+On export, the out-parameters are always placed after `this` to preserve C-style naming and ABI conventions.
+void classname::func(classname* this, int32& x, float32& y, int32 param);
+
+#### 14.5.5 Implementation Details
+- **No hidden struct copying occurs.** The function writes directly to the caller's memory.
+- **WASM/LLVM ABI:** This maps 1:1 to WebAssembly's pointer-based multi-value return ABI. In LLVM IR, the function signature becomes `define void @calculate(i32* %out_code, float* %out_value)`.
+- **Named Aliases:** When named returns are used, the compiler maps the local variable names (`code`, `value`) directly to the out-parameter pointers in the LLVM IR environment.
+- **Bare Return:** A bare `return;` in a tuple-returning function simply generates `ret void` in LLVM IR, since the values have already been written to the out-parameters.
+
+## 15. MODULES, IMPORTS, AND INTEROPERABILITY
+
+### 15.1 Importing Modules
+To use definitions from other SL files, use the `import` (or `#import`) keyword. This tells the compiler to include only the exported symbols from the specified file.
+import "math_utils.sl";
+import "networking.sl";
+
+### 15.2 C Interoperability (`extern`)
+To call functions from external C libraries or expose SL functions to C, use the `extern "C"` block. This disables SL's name mangling and enforces the C calling convention.
+extern "C" {
+    // Importing a C standard library function
+    void* malloc(uint64 size);
+    void free(void* ptr);
+
+    // Exporting an SL function to C
+    export int32 sl_calculate(int32 a, int32 b);
+}
+
+## 16. FUNCTIONS, SCOPE, AND NAMESPACES
+
+### 16.1 Namespaces
+Namespaces provide a way to group related symbols and prevent name collisions. The `::` operator is used to access namespace members.
+namespace Math {
+    int32 add(int32 a, int32 b) { return a + b; }
+    
+    namespace Trigonometry {
+        float32 sin(float32 angle);
+    }
+}
+
+int32 result = Math::add(5, 10);
+float32 val = Math::Trigonometry::sin(3.14);
+
+### 16.2 Function Overloading
+SL supports function overloading. Multiple functions can share the same name as long as their parameter lists (types, counts, or const-qualifiers) differ. The compiler resolves the correct function at compile time.
+void print(int32 val);
+void print(float32 val);
+void print(const char* val);
+
+print(42);    // Calls print(int32)
+print(3.14);  // Calls print(float32)
+
+### 16.3 Default Parameters and Variadic Functions
+Functions can specify default values for trailing parameters. Variadic functions accept a variable number of arguments using `...`.
+void drawRect(int32 x, int32 y, int32 width = 10, int32 height = 10);
+drawRect(5, 5);        // width=10, height=10
+drawRect(5, 5, 20);    // width=20, height=10
+
+// Variadic function (similar to C's printf)
+void log(const char* format, ...);
+
+### 16.4 Anonymous Functions (Lambdas)
+SL supports anonymous functions (lambdas) for inline logic and callbacks. To maintain clean syntax while guaranteeing memory safety, SL uses automatic reference-counted closures.
+
+// 1. Basic Syntax and Type Inference
+// The 'auto' keyword deduces the lambda's hidden closure type.
+// Return types can be omitted if the compiler can infer them from 'return' statements.
+auto greet = () -> {
+    print("Hello, World!");
+};
+
+auto add = (int32 a, int32 b) -> int32 {
+    return a + b;
+};
+
+// 2. Automatic Safe Capturing (Hidden refclass)
+// If a lambda accesses an outer local variable, the compiler automatically
+// wraps the captured state in a hidden 'refclass' behind the scenes.
+// This ensures the captured variables remain alive as long as the lambda exists,
+// preventing dangling stack pointers without requiring explicit capture lists.
+int32 multiplier = 5;
+auto multiply = (int32 x) -> int32 {
+    return x * multiplier; // 'multiplier' is safely captured by reference count
+};
+
+// 3. Variable Shadowing
+// Declaring a variable with the same name inside the lambda shadows the outer variable.
+int32 x = 123;
+auto shadowTest = () -> void {
+    int32 x = 0; // This is a local 'x', it does not affect the outer 'x'
+    print(x);    // Prints 0
+};
+
+// 4. Passing Lambdas to Functions
+// Use 'typedef' to define clean function signatures for accepting lambdas.
+typedef int32(int32, int32) MathOperation;
+
+public void calculate(MathOperation* op, int32 a, int32 b) {
+    int32 result = op(a, b); // Invoke the passed lambda
+    print(result);
+}
+
+int32 main() {
+    auto myOp = (int32 a, int32 b) -> int32 { return a * b; };
+    calculate(&myOp, 5, 4); // Pass address of the lambda closure
+    return 0;
+}
+
+## 17. OBJECT-ORIENTED REFINEMENTS
+
+### 17.1 `struct` vs `class`
+Both `struct` and `class` define data layouts. The only difference is default visibility:
+- `class`: Members default to `private`.
+- `struct`: Members default to `public`.
+Otherwise, they are identical (both support inheritance, no inline methods, explicit `this`).
+
+### 17.2 Virtual Methods and Explicit Abstract Classes
+To enable dynamic dispatch (polymorphism) and explicitly mark a class as abstract, use the `virtual` keyword. A class with at least one unimplemented `virtual` method is strictly abstract and cannot be instantiated.
+
+class Shape {
+public:
+    int32 x, y;
+};
+
+// Explicitly virtual. If not implemented in a derived class, Shape is abstract.
+public virtual void Shape::draw(Shape* this);
+
+class Circle : public Shape {
+};
+
+// Implementation makes Circle concrete
+public void Circle::draw(Circle* this) {
+    // draw circle logic
+}
+
+Shape* s = new Circle();
+s->draw(); // Calls Circle::draw via dynamic dispatch
+
+Note: Virtual methods use a vtable index number rather than a direct function pointer. This design ensures that classes with virtual methods can safely cross network boundaries and WebAssembly shared memory worker boundaries without pointer invalidation.
+
+### 17.3 Member Initialization
+Class members can be initialized directly in the class definition. These default values are applied before the constructor body executes.
+class Config {
+public:
+    int32 timeout = 30;
+    bool isEnabled = true;
+    const char* name = "default";
+};
+
+## 18. EXPRESSIONS, LITERALS, AND CASTING
+
+### 18.1 Literal Formats
+- Integers: Decimal (`123`), Hexadecimal (`0xFF`), Octal (`077`), Binary (`0b1010`). Suffix `U` for unsigned (e.g., `123U`), `LL` for 64-bit (e.g., `123LL`).
+- Floats: Decimal (`3.14`), Scientific (`1.5e-3`). Suffix `f` for 32-bit float (e.g., `3.14f`), otherwise defaults to 64-bit `float64`.
+- Booleans: `true` and `false`.
+
+### 18.2 Type Casting
+SL supports both implicit safe casting and explicit unsafe casting.
+- Implicit: Smaller to larger types (e.g., `int8` to `int32`), non-pointer to `void*`.
+- Explicit C-style: `(Type)expression`. Used for narrowing conversions or pointer casting.
+- Explicit Safe Cast: `cast<Type>(expression)`. Performs runtime checks if applicable (e.g., downcasting polymorphic pointers).
+
+int32 i = 100;
+int8 small = (int8)i; // Explicit narrowing
+
+void* ptr = null;
+int32* intPtr = (int32*)ptr; // Explicit pointer cast
+
+Shape* base = new Circle();
+Circle* derived = cast<Circle*>(base); // Safe downcast
+
+## 19. ERROR HANDLING AND DIAGNOSTICS
+
+### 19.1 Assertions
+The `assert` keyword evaluates a boolean expression. If false, it halts execution and prints diagnostic information (file, line, expression). Used for catching logical errors during development.
+assert(ptr != null);
+assert(index >= 0 && index < length);
+
+### 19.2 Exceptions (`try`, `catch`, `throw`, `throwable`)
+For recoverable runtime errors, SL provides a lightweight, zero-overhead exception mechanism based on explicit error propagation. Unlike traditional stack-unwinding exceptions, SL uses tuple-based error returns under the hood, ensuring C-ABI compatibility and predictable performance.
+
+#### 19.2.1 The `throwable` Keyword
+Any function or class method that can throw an exception must explicitly declare the `throwable` keyword in its signature. 
+If a function calls a `throwable` function, it must either:
+1. Encapsulate the call within a `try-catch` block.
+2. Declare itself as `throwable`, allowing the error to bubble up the call stack.
+
+If a non-`throwable` function calls a `throwable` function without encapsulating it in a `try-catch` block, the compiler will emit a compile error.
+
+    // A function that can throw an error
+    void openFile(const char* path) throwable {
+        if (!fileExists(path)) {
+            throw new Error("File not found"); 
+        }
+    }
+
+#### 19.2.2 Developer Syntax: `try`, `catch`, and `throw`
+Developers use standard `try` and `catch` blocks to handle exceptions. The `catch` block specifies the expected error type (e.g., a pointer to an `Error` class). The variable declared in the `catch` condition is strictly scoped to the `catch` block body.
+
+    try {
+        openFile("data.txt");
+    } catch (Error* err) {
+        print("Failed to open file: ");
+        print(err->getMessage());
+    } catch (...) {
+        // Catch-all block for any other exception type
+        print("Unknown error occurred");
+    }
+
+To partially handle an error and bubble it up to the next level, use a standalone `throw;` statement inside the `catch` block. This re-throws the exact same error object to the next enclosing scope without allocating new memory.
+
+#### 19.2.3 Compiler Implementation (Under the Hood)
+To maintain strict C-ABI compatibility and avoid hidden stack unwinding, the SL compiler transforms `throwable` functions by returning an internal error routing structure. This structure contains a `void*` (the error object pointer) and a `uint64` (the type ID), allowing the compiler to route the error to the correct `catch` block based on type matching.
+
+1. Void Functions:
+    // Developer writes:
+    void func() throwable { ... }
+
+    // Compiler transforms to:
+    (void* err_ptr, uint64 type_id) func() { ... }
+
+2. Functions with Return Values:
+    // Developer writes:
+    int32 func() throwable { ... }
+
+    // Compiler transforms to:
+    (void* err_ptr, uint64 type_id, int32 ___ret) func() { ... }
+
+3. Class Methods:
+    // Developer writes:
+    void classname::func(classname* this) throwable { ... }
+
+    // Compiler transforms to:
+    (void* err_ptr, uint64 type_id) classname::func(classname* this) { ... }
+
+4. Tuple Returns with Throwable:
+    // Developer writes:
+    (int32 code, float32 value) calculate() throwable { ... }
+
+    // Compiler transforms to (Error payload becomes primary return, out-params follow):
+    (void* err_ptr, uint64 type_id) calculate(int32* out_code, float32* out_value) { ... }
+
+#### 19.2.4 Execution Flow and Error Propagation
+- On `throw`: Inside a `throwable` function, executing a `throw` statement populates the internal error structure with the object's pointer and its compile-time type ID, then returns immediately. No stack unwinding is necessary. However, all `defer` statements in the current scope are guaranteed to execute in reverse order before the function actually returns.
+- On Success: If the function completes normally without throwing, the hidden error pointer is automatically set to `0` (`null`) and `type_id` to `0` before returning.
+- Caller Check: The calling (upper) function receives the tuple. The compiler automatically inserts a check: if the error pointer is non-zero, it compares the `type_id` against the available `catch` blocks. If a match is found, it performs a small, direct jump to that `catch` block. If the error pointer is `0`, it executes as normal.
+
+#### 19.2.5 Error Memory Lifecycle
+When an exception is thrown using `throw new Error(...)`, memory is allocated on the heap for the error object. This object is passed up the call stack via the hidden error pointer. 
+
+Crucially, the error object is automatically deleted and freed from memory immediately after the `catch` block finishes executing. The compiler automatically injects the necessary cleanup code (equivalent to `delete err;`) at the end of the catch scope. 
+
+- Re-throw Logic: If a `catch` block executes a standalone `throw;` to re-propagate the error, the compiler recognizes the error pointer is unchanged and skips deletion. If the `catch` block throws a *new* error (e.g., `throw new Error("...");`), the compiler automatically deletes the original error pointer before propagating the new one, preventing memory leaks.
+- Catch-All Cleanup: When using `catch (...)`, the compiler does not have a named variable to delete. To prevent memory leaks, the compiler automatically injects a call to a universal runtime deallocator to free the heap-allocated object safely based on the internal type ID.
+
+Note on Constructors and Destructors: Graceful backtracking during object construction is the responsibility of the developer. If a constructor throws, the compiler has already allocated the object's memory, but it does not automatically unwind or destroy partially initialized members. Developers should use `defer` or explicit cleanup within the constructor to handle partial allocation failures safely.
+
+This design guarantees that exception handling has zero runtime overhead when no errors occur, and provides deterministic, explicit error propagation and cleanup that maps perfectly to WebAssembly and native LLVM targets.
+
+## 20. COMPILER DIRECTIVES AND QUALIFIERS
+
+### 20.1 `volatile` Qualifier
+The `volatile` keyword tells the compiler not to optimize accesses to a variable, ensuring every read/write goes directly to memory. Essential for memory-mapped hardware registers and signal handlers.
+volatile int32* hardwareRegister = (int32*)0x40021000;
+*hardwareRegister = 0xFF; // Guaranteed to write to memory
+
+### 20.2 `inline` Hint
+The `inline` keyword suggests to the compiler that a function's body should be inserted at the call site to reduce function call overhead. (Note: This does not apply to class methods, which are never inline per Section 5.1).
+inline int32 square(int32 x) {
+    return x * x;
+}
+
+### 20.3 Operator Precedence
+SL follows standard C/C++ operator precedence. For example, `*` and `/` bind tighter than `+` and `-`. Parentheses `()` should be used to clarify complex expressions.
+
+### 20.4 `defer` Statement
+SL supports the `defer` statement (similar to Go or Zig). A `defer` block schedules an expression or statement to be executed when the current scope exits. This is invaluable for localized cleanup (e.g., `defer free(ptr);`) without needing wrapper classes or complex try/finally blocks.
+
+### 20.5 Reference Counted Classes (`refclass`)
+A `refclass` is like a `class`, but behind the scenes, the compiler implements a full reference-counting mechanism.
+- The constructor initializes the reference count to 1.
+- When a `refclass` instance is assigned or copied, the count is incremented.
+- The `=` operator checks if the argument is the same instance (via pointer comparison) to avoid self-assignment issues.
+- The destructor decrements the count and frees the memory automatically when the count reaches zero.
+
+refclass classname {
+    // Same syntax and rules as a standard class
+};
+
+Class functions are declared the same way as standard classes. `export refclass` and `refclass` inheritance follow the same rules as standard classes.
+
+### 20.6 Type Inference (`auto`)
+The `auto` keyword is supported for local variable type inference, allowing the compiler to deduce the type directly from the initializer expression.
+auto x = 123; // Compiler deduces 'int32'
+
+## 21. PREPROCESSOR MACROS AND CONDITIONAL COMPILATION
+Preprocessor macros in SL are handled by the Small Language Preprocessor (SLP) interpreter.
+Refer to `SLPDoc.txt` for complete SLP documentation.
+
+Preprocessor logic blocks are enclosed between `#<` and `>#`. Within these blocks, you can define `#token` variables that drive both macro substitution and conditional compilation.
+
+### 21.1 Defining Tokens
+#<
+#token var DEBUG_MODE = true;
+#token var TARGET_WASM = 1;
+#>
+
+### 21.2 Conditional Compilation Directives
+SL supports standard conditional compilation directives that evaluate the existence and truthiness of SLP `#token`s. This is highly useful for targeting different environments (e.g., Native LLVM vs. WebAssembly) or toggling debug features without runtime overhead.
+
+Supported Directives:
+- `#ifdef TOKEN_NAME` : Includes the block if the token is defined and evaluates to true.
+- `ifndef TOKEN_NAME`: Includes the block if the token is NOT defined or evaluates to false.
+- `#else`             : Fallback block if the preceding `#ifdef`/`#ifndef` condition fails.
+- `#elif TOKEN_NAME`  : Else-if condition, checked sequentially.
+- `#endif`            : Terminates the conditional block.
+
+Example Usage:
+#<
+#token var TARGET_WASM = true;
+#>
+
+#ifdef TARGET_WASM
+// This code is ONLY compiled when TARGET_WASM is true
+extern "C" {
+    export void wasm_specific_init();
+}
+#else
+// This code is compiled for native targets
+void native_specific_init();
+#endif
+
+int32 main() {
+#ifdef DEBUG_MODE
+    print("Running in debug mode");
+#endif
+    return 0;
+}
+
+### 21.3 Preprocessor Block Syntax
+All SLP logic, including token definitions and conditional directives, 
+can be placed anywhere in the SL source file, 
+but must be enclosed in the `#<` and `>#` delimiters if they contain SLP script logic.
+Standalone `#ifdef`/`#endif` directives outside of `#< >#` blocks are also valid and will reference tokens defined globally or in previously evaluated SLP blocks.
+
+### 21.4 IMPLEMENTATION & COMPILER RESTRICTIONS
+To ensure maximum portability and minimal overhead, the SLP implementation 
+adheres to strict compiler constraints:
+  -fno-exceptions : No C++ exceptions (throw, try, catch) are used. Errors are 
+                    handled via return types (e.g., "Parse Error: ..." or 
+                    "Runtime Error: ..." strings from define(), and "Error: ..." 
+                    strings from get()).
+  -fno-rtti       : No Run-Time Type Information (dynamic_cast, typeid) is used. 
+                    Type checking relies on explicit type tags (enums).
+  - Memory Management: Uses reference-counted std::shared_ptr<Value> objects to 
+                       prevent memory leaks during repeated define/get calls.
+
+## 22. VARIADIC FUNCTIONS AND COMPILER INTRINSICS
+
+To maintain strict C-ABI compatibility, guarantee predictable memory layouts, and ensure seamless WebAssembly support, SL does not use traditional C-style `va_list` macros. Instead, SL provides explicit compiler intrinsics for variadic argument handling. This approach avoids "hidden magic" and gives the compiler full control over memory management, especially for complex types like `refclass`.
+
+### 22.1 Compiler Intrinsics
+The SL compiler exposes the following built-in intrinsics for variadic operations:
+
+- `__builtin_va_list` : An opaque type representing the argument list buffer.
+- `__builtin_va_start(ap, last_param)` : Initializes the list, pointing it to the memory immediately following `last_param`.
+- `__builtin_va_arg(ap, type)` : Extracts the next argument from the list, interpreting it as the specified `type`.
+- `__builtin_va_current_type(ap)` : Returns the compile-time `uint64` Type ID of the next argument in the list without advancing the pointer. Used for handling unknown types.
+- `__builtin_type_id(Type)` : A compile-time intrinsic that returns the `uint64` Type ID for a known type, allowing comparison with `__builtin_va_current_type`.
+- `__builtin_va_end(ap)` : Cleans up the list. For `refclass` objects, the compiler automatically injects memory release logic here.
+
+### 22.2 Memory and Lifecycle Management
+Under the hood, the compiler manages the variadic buffer differently based on the type being passed:
+
+1. **Primitives and Standard `class`**: The compiler uses the `sizeof` operator to calculate the exact byte size. The raw bytes are copied into the variadic buffer. When extracted, the bytes are read back. If a standard `class` with an explicit destructor is left in the buffer when `__builtin_va_end` is called, the compiler injects a call to its destructor.
+2. **`refclass`**: Because `refclass` relies on reference counting, a raw memory copy would cause dangling pointers. When a `refclass` is pushed into the variadic list, the compiler automatically injects a `retain()` call to increment the reference count. When extracted via `__builtin_va_arg`, another `retain()` is injected for the new local variable. Finally, when `__builtin_va_end` is called, the compiler iterates through any unextracted `refclass` pointers in the buffer and injects `release()` calls to prevent memory leaks.
+
+### 22.3 Developer Examples
+
+#### Example 1: Handling Known Types
+When the types of the variadic arguments are known in advance (e.g., a function that takes a count followed by a specific number of integers), use `__builtin_va_arg`.
+
+[CODE]
+void printNumbers(int32 count, ...) {
+    __builtin_va_list ap;
+    __builtin_va_start(ap, count);
+    
+    int32 i = 0;
+    while (i < count) {
+        // Extract the next argument as an int32
+        int32 val = __builtin_va_arg(ap, int32);
+        print("Number: ${val}");
+        i++;
+    }
+    
+    // Clean up the variadic list
+    __builtin_va_end(ap);
+}
+
+int32 main() {
+    printNumbers(3, 10, 20, 30);
+    return 0;
+}
+[/CODE]
+
+#### Example 2: Traversing Unknown Types
+When the function accepts a mix of unknown types, use `__builtin_va_current_type` to inspect the Type ID of the next argument before extracting it. This allows safe traversal and type-specific logic using SL's `match` expression.
+
+[CODE]
+void logMixedArgs(int32 count, ...) {
+    __builtin_va_list ap;
+    __builtin_va_start(ap, count);
+    
+    int32 i = 0;
+    while (i < count) {
+        // Inspect the type of the current argument without advancing the pointer
+        uint64 current_type = __builtin_va_current_type(ap);
+        
+        match (current_type) {
+            __builtin_type_id(int32) => {
+                int32 val = __builtin_va_arg(ap, int32);
+                print("Got integer: ${val}");
+            },
+            __builtin_type_id(float32) => {
+                float32 val = __builtin_va_arg(ap, float32);
+                print("Got float: ${val}");
+            },
+            __builtin_type_id(MyClass) => {
+                // Extracting a standard class copies the raw bytes
+                MyClass obj = __builtin_va_arg(ap, MyClass);
+                print("Got MyClass instance");
+            },
+            __builtin_type_id(MyRefClass) => {
+                // Extracting a refclass automatically increments the ref count
+                MyRefClass obj = __builtin_va_arg(ap, MyRefClass);
+                print("Got MyRefClass instance (ref count managed)");
+            },
+            _ => {
+                print("Encountered unknown or unsupported type");
+                // To prevent infinite loops or corruption, break or skip
+                break; 
+            }
+        }
+        i++;
+    }
+    
+    // __builtin_va_end automatically cleans up any unextracted refclass objects
+    __builtin_va_end(ap);
+}
+
+int32 main() {
+    MyClass c1;
+    MyRefClass r1 = new MyRefClass();
+    
+    // Passing a mix of primitives, classes, and refclasses
+    logMixedArgs(4, 42, 3.14, c1, r1);
+    
+    return 0;
+}
+[/CODE]
+
+### 22.4 Implementation Notes for the Compiler Backend
+- **Native LLVM Targets**: The intrinsics map directly to `llvm.va_start`, `llvm.va_arg`, and `llvm.va_end`. The backend uses the target's specific ABI rules for register and stack alignment.
+- **WebAssembly Targets**: Because WASM lacks a traditional stack pointer for `va_list` traversal, the compiler transforms the call site. It allocates a contiguous, packed memory buffer in WASM linear memory, writes the arguments (and their Type IDs) into this buffer, and passes the buffer's pointer as the `__builtin_va_list`. `__builtin_va_arg` simply reads from this linear buffer and advances the pointer by `sizeof(type)`.

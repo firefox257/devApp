@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>C to Wasm Compiler - Test Suite</title>
+    <style>
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+            background: #1e1e1e; 
+            color: #d4d4d4; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            padding: 20px; 
+            margin: 0; 
+        }
+        h1 { color: #569cd6; margin-bottom: 20px; font-size: 1.5rem; text-align: center; }
+        .container { width: 95%; max-width: 1000px; }
+        
+        button#runBtn { 
+            width: 100%;
+            padding: 14px 24px; 
+            background: #0e639c; 
+            color: white; 
+            border: none; 
+            border-radius: 6px; 
+            cursor: pointer; 
+            font-size: 16px; 
+            font-weight: bold; 
+            transition: background 0.2s;
+            margin-bottom: 15px;
+            -webkit-tap-highlight-color: transparent;
+        }
+        button#runBtn:hover { background: #1177bb; }
+        button#runBtn:active { background: #0a4a75; }
+        button#runBtn:disabled { background: #555; cursor: not-allowed; }
+
+        .console-output {
+            background: #000000;
+            color: #4ec9b0;
+            font-family: 'Consolas', 'Courier New', monospace;
+            font-size: 14px;
+            padding: 15px;
+            border-radius: 6px;
+            border: 1px solid #3c3c3c;
+            min-height: 60px;
+            max-height: 250px;
+            overflow-y: auto;
+            margin-bottom: 20px;
+            white-space: pre-wrap;
+            word-break: break-all;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.5);
+        }
+        .console-output:empty::before {
+            content: "Console output will appear here when tests run...";
+            color: #555;
+            font-style: italic;
+        }
+
+        .summary {
+            text-align: center;
+            margin-bottom: 20px;
+            padding: 15px;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: bold;
+        }
+        .summary.all-pass { background: #2d4a2d; color: #4ec9b0; border: 1px solid #4ec9b0; }
+        .summary.has-fail { background: #4a2d2d; color: #f48771; border: 1px solid #f48771; }
+
+        .test-case {
+            background: #252526;
+            border: 1px solid #3c3c3c;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            overflow: hidden;
+        }
+        .test-header {
+            padding: 12px 15px;
+            font-weight: bold;
+            font-size: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .test-header.pass { background: #2d4a2d; color: #4ec9b0; border-bottom: 1px solid #3c3c3c; }
+        .test-header.fail { background: #4a2d2d; color: #f48771; border-bottom: 1px solid #3c3c3c; }
+        
+        .test-body {
+            padding: 15px;
+            display: flex;
+            gap: 15px;
+            flex-direction: column;
+        }
+        
+        @media (min-width: 768px) {
+            .test-body { flex-direction: row; }
+        }
+        
+        .test-code {
+            flex: 1;
+            background: #1e1e1e;
+            padding: 12px;
+            border-radius: 4px;
+            overflow-x: auto;
+            border: 1px solid #333;
+        }
+        .test-code pre {
+            margin: 0;
+            font-family: 'Consolas', 'Courier New', monospace;
+            font-size: 13px;
+            color: #d4d4d4;
+            white-space: pre-wrap;
+        }
+
+        .test-results {
+            flex: 1;
+            font-size: 14px;
+            line-height: 1.8;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .result-row {
+            display: flex;
+            align-items: flex-start;
+            margin-bottom: 8px;
+        }
+        .result-row .label {
+            min-width: 70px;
+            margin-right: 10px;
+            margin-top: 2px;
+            color: #9cdcfe;
+            font-weight: bold;
+        }
+        .result-value {
+            flex: 1;
+            color: #d4d4d4;
+            font-family: 'Consolas', 'Courier New', monospace;
+            font-size: 13px;
+            word-break: break-all;
+            line-height: 1.5;
+        }
+        .error-text { color: #f48771; }
+
+        /* NEW: Styling for the WASM Hex display */
+        .wasm-hex {
+            background: #111;
+            color: #ce9178;
+            font-family: 'Consolas', 'Courier New', monospace;
+            font-size: 11px;
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #333;
+            margin: 0;
+            max-height: 80px;
+            overflow-y: auto;
+            word-break: break-all;
+            line-height: 1.4;
+        }
+
+        .copy-btn {
+            background: #3c3c3c;
+            color: #d4d4d4;
+            border: 1px solid #555;
+            border-radius: 4px;
+            padding: 6px 12px;
+            font-size: 13px;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            cursor: pointer;
+            margin-left: 10px;
+            margin-top: 2px;
+            transition: all 0.2s;
+            white-space: nowrap;
+            -webkit-tap-highlight-color: transparent;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .copy-btn:active { transform: scale(0.95); }
+        .copy-btn:hover { background: #505050; border-color: #777; color: #ffffff; }
+        .copy-btn.copied { background: #2d4a2d; color: #4ec9b0; border-color: #4ec9b0; }
+    </style>
+</head>
+<body>
+    <h1>Subset C ➔ WebAssembly Test Suite</h1>
+    <div class="container">
+        <button id="runBtn">▶ Run All Tests</button>
+        <div id="console-output" class="console-output"></div>
+        <div id="output"></div>
+    </div>
+
+    <script type="module">
+        import { runTests } from './tests.js';
+        
+        if (typeof SharedArrayBuffer === 'undefined') {
+            document.body.innerHTML = `
+                <div style="color: #f48771; background: #4a2d2d; padding: 20px; border-radius: 6px; max-width: 800px; margin: 20px auto; border: 1px solid #f48771; font-family: sans-serif;">
+                    <h2 style="margin-top:0;">⚠️ SharedArrayBuffer is not available</h2>
+                    <p>To run tests with shared memory and atomic operations (like <code>malloc</code>), your local server MUST serve this page with the following HTTP headers:</p>
+                    <pre style="background:#1e1e1e; padding:15px; border-radius:4px; color:#d4d4d4; font-family: monospace; font-size: 13px;">Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Embedder-Policy: require-corp</pre>
+                    <p><strong>Quick Fix for VS Code:</strong> Install the "Live Server" extension, create a <code>.vscode/settings.json</code> file, and add:</p>
+                    <pre style="background:#1e1e1e; padding:15px; border-radius:4px; color:#d4d4d4; font-family: monospace; font-size: 13px;">{
+  "liveServer.settings.headers": {
+    "Cross-Origin-Opener-Policy": "same-origin",
+    "Cross-Origin-Embedder-Policy": "require-corp"
+  }
+}</pre>
+                </div>
+            `;
+        } else {
+            document.getElementById('runBtn').addEventListener('click', runTests);
+        }
+    </script>
+</body>
+</html>

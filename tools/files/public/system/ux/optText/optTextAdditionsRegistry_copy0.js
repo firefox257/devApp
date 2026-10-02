@@ -39,4 +39,7 @@ import './additions/selectBracketButton.js';
 import './additions/pagesManagerDropdown.js';
 import './additions/autoIndent.js';
 
+
+
+
 export { additionManager };

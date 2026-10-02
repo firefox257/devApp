@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FNV-1a 64-bit Hash Tool</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            max-width: 600px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+            background-color: #f9fafb;
+            color: #111827;
+        }
+        .container {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+        }
+        h1 {
+            font-size: 1.5rem;
+            margin-top: 0;
+            margin-bottom: 1.5rem;
+            color: #1f2937;
+        }
+        label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: #374151;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 0.75rem;
+            font-size: 1rem;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            box-sizing: border-box;
+            margin-bottom: 1.5rem;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+        .hash-display {
+            background-color: #f3f4f6;
+            padding: 1rem;
+            border-radius: 6px;
+            border: 1px solid #e5e7eb;
+            margin-bottom: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 1rem;
+        }
+        .hash-display:last-child {
+            margin-bottom: 0;
+        }
+        .hash-info {
+            flex: 1;
+            min-width: 0; /* Prevents flex item from overflowing */
+        }
+        .hash-label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #6b7280;
+            margin-bottom: 0.25rem;
+            font-weight: 600;
+        }
+        .hash-value {
+            color: #059669;
+            font-weight: 500;
+            font-family: "Menlo", "Monaco", "Courier New", monospace;
+            font-size: 0.9rem;
+            word-break: break-all;
+        }
+        .empty-state {
+            color: #9ca3af;
+        }
+        .copy-btn {
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+            padding: 0.5rem 0.75rem;
+            background-color: #ffffff;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            color: #374151;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+        .copy-btn:hover:not(:disabled) {
+            background-color: #f9fafb;
+            border-color: #9ca3af;
+            color: #111827;
+        }
+        .copy-btn:active:not(:disabled) {
+            background-color: #f3f4f6;
+            transform: translateY(1px);
+        }
+        .copy-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .copy-btn.copied {
+            background-color: #d1fae5;
+            border-color: #10b981;
+            color: #065f46;
+        }
+        .copy-btn svg {
+            width: 16px;
+            height: 16px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>FNV-1a 64-bit Hash Tool</h1>
+        
+        <label for="nameInput">Enter Name:</label>
+        <input type="text" id="nameInput" placeholder="Type a name..." autocomplete="off">
+        
+        <div class="hash-display">
+            <div class="hash-info">
+                <div class="hash-label">Hexadecimal</div>
+                <div class="hash-value empty-state" id="hexHash">-</div>
+            </div>
+            <button class="copy-btn" id="copyHexBtn" onclick="copyToClipboard('hexHash', this)" disabled>
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
+                <span>Copy</span>
+            </button>
+        </div>
+        
+        <div class="hash-display">
+            <div class="hash-info">
+                <div class="hash-label">Decimal (BigInt)</div>
+                <div class="hash-value empty-state" id="decHash">-</div>
+            </div>
+            <button class="copy-btn" id="copyDecBtn" onclick="copyToClipboard('decHash', this)" disabled>
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
+                <span>Copy</span>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * FNV-1a 64-bit hash function (JavaScript)
+         * @param {string} str - The string to hash
+         * @param {bigint} [hash=14695981039346656037n] - Initial 64-bit FNV offset basis
+         * @returns {bigint} The 64-bit unsigned integer hash
+         */
+        function hashString64(str, hash = 14695981039346656037n) {
+            const bytes = new TextEncoder().encode(str);
+            const prime = 1099511628211n; // 64-bit FNV prime
+            const mask = 0xFFFFFFFFFFFFFFFFn; // Keep it within 64 bits
+
+            for (let i = 0; i < bytes.length; i++) {
+                hash ^= BigInt(bytes[i]);
+                hash = (hash * prime) & mask;
+            }
+            
+            return hash;
+        }
+
+        const nameInput = document.getElementById('nameInput');
+        const hexHashOutput = document.getElementById('hexHash');
+        const decHashOutput = document.getElementById('decHash');
+        const copyHexBtn = document.getElementById('copyHexBtn');
+        const copyDecBtn = document.getElementById('copyDecBtn');
+
+        function updateHash() {
+            const name = nameInput.value;
+            
+            if (!name) {
+                hexHashOutput.textContent = '-';
+                hexHashOutput.classList.add('empty-state');
+                decHashOutput.textContent = '-';
+                decHashOutput.classList.add('empty-state');
+                
+                copyHexBtn.disabled = true;
+                copyDecBtn.disabled = true;
+                resetCopyButton(copyHexBtn);
+                resetCopyButton(copyDecBtn);
+                return;
+            }
+            
+            const hash = hashString64(name);
+            
+            // Pad with leading zeros to ensure it's always 16 hex characters for a full 64-bit representation
+            const hexString = hash.toString(16).padStart(16, '0');
+            
+            hexHashOutput.textContent = `0x${hexString}`;
+            hexHashOutput.classList.remove('empty-state');
+            
+            decHashOutput.textContent = hash.toString(10);
+            decHashOutput.classList.remove('empty-state');
+            
+            copyHexBtn.disabled = false;
+            copyDecBtn.disabled = false;
+        }
+
+        async function copyToClipboard(elementId, btn) {
+            const textToCopy = document.getElementById(elementId).textContent;
+            
+            if (!textToCopy || textToCopy === '-') return;
+
+            try {
+                await navigator.clipboard.writeText(textToCopy);
+                
+                // Visual feedback
+                const originalText = btn.querySelector('span').textContent;
+                btn.classList.add('copied');
+                btn.querySelector('span').textContent = 'Copied!';
+                
+                // Revert after 1.5 seconds
+                setTimeout(() => {
+                    resetCopyButton(btn);
+                }, 1500);
+                
+            } catch (err) {
+                console.error('Failed to copy text: ', err);
+                alert('Failed to copy to clipboard. Please try manually.');
+            }
+        }
+
+        function resetCopyButton(btn) {
+            btn.classList.remove('copied');
+            btn.querySelector('span').textContent = 'Copy';
+        }
+
+        // Update in real-time as the user types
+        nameInput.addEventListener('input', updateHash);
+    </script>
+</body>
+</html>

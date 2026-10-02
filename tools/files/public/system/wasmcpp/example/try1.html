@@ -113,28 +113,15 @@ async function runWasm() {
 		WasmRegistry.loadWorker({
 				wasmUrl:'./try1.wasm',
 				id:2,
-				//workerScriptUrl:'./cppworker.js',
+				workerScriptUrl:'./cppworker.js',
 				msgHandels:{jsalert}
 			});
-
-		console.info('Waiting for all modules and workers to initialize...');
-		await WasmRegistry.waitLoadAll();
-		console.info('✅ All systems initialized!');
-
-		console.info('Setting up peer-to-peer mesh network...');
-		WasmRegistry.setupPeers();
-		await WasmRegistry.waitPeerAll();
-		console.info('🔗 All peer-to-peer ports and shared memory views connected!');
-
-		// 🚀 NEW: Trigger run() on all threads simultaneously
-		console.info('Executing runtime.run() on all modules...');
-		WasmRegistry.runAll();
-
-		// Wait for all main() functions to return or exit
-		const exitCodes = await WasmRegistry.waitRunAll();
-		console.info('🏁 All runtimes finished! Exit codes:', exitCodes);
-		var main = WasmRegistry._workers[0];
-		main.runtime.exports.testSend(2,0,0);
+			
+		
+		await WasmRegistry.initAll();
+		
+		var main = WasmRegistry.getWorker(0);
+		main.runtime.exports.testSend(1,0,0);
 
 
 		const w1 = WasmRegistry._workers[1];

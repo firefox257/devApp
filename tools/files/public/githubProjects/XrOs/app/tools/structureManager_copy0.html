@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Structure Manager</title>
+
+<script type="importmap">
+{
+	"imports": {
+		"apiCalls": "/system/js/apiCalls.js",
+		"filePicker": "/system/ux/filePicker.js",
+		"filePickerUI": "/system/ux/filePickerUI.js"
+	}
+}
+</script>
+
+<style>
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color: transparent; }
+body {
+	font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', monospace;
+	background:#1e1e1e; color:#ccc;
+	height:100vh; width:100vw;
+	overflow:hidden; font-size:14px;
+}
+
+.container { display:flex; flex-direction:column; height:100vh; width:100vw; }
+.content { flex-grow:1; position:relative; background:#1e1e1e; overflow:hidden; }
+
+.page {
+	position:absolute; top:0; left:0; width:100%; height:100%;
+	visibility: hidden; pointer-events: none; opacity: 0;
+	transition: opacity 0.1s ease; z-index: 0;
+	display: flex; flex-direction: column;
+}
+.page.active { visibility: visible; pointer-events: auto; opacity: 1; z-index: 1; }
+
+/* ==========================================
+   COMPACT TOOLBAR
+   ========================================== */
+.toolbar {
+	background:#252526; padding:4px 6px; display:flex; 
+	align-items:center; gap:6px; border-bottom:1px solid #3e3e42; flex-shrink: 0;
+}
+select, button {
+	background:#3c3c3c; color:#ccc; border:1px solid #3e3e42; border-radius:4px;
+	padding:6px 10px; font-family:inherit; font-size:13px; cursor:pointer;
+	flex: 0 0 auto; 
+}
+button:active { background:#505050; }
+.btn-primary { background:#007acc; color:white; border-color:#007acc; }
+.btn-success { background:#13a10e; color:white; border-color:#13a10e; }
+.btn-danger { background:transparent; color:#c50f1f; border-color:#c50f1f; padding:4px 8px; }
+
+.main-content { flex-grow: 1; overflow-y: auto; padding: 8px; -webkit-overflow-scrolling: touch; }
+
+/* ==========================================
+   STRUCTURE LIST (COMPACT)
+   ========================================== */
+.struct-list { list-style-position: outside; padding-left: 20px; color:#888; }
+.struct-list > li { margin-bottom: 6px; }
+.struct-list > li::marker { color:#007acc; font-weight:bold; }
+
+.item-card { background:#252526; border:1px solid #3e3e42; border-radius:6px; overflow:hidden; }
+.item-header {
+	display:flex; flex-wrap:wrap; align-items:center; gap:4px; padding:8px;
+	background:#2d2d30; cursor:pointer; user-select:none;
+}
+.item-header:active { background:#3e3e42; }
+
+.toggle-icon { font-size:10px; color:#888; width:12px; transition:transform 0.15s; flex: 0 0 auto; }
+.toggle-icon.expanded { transform:rotate(90deg); }
+
+.badge {
+	font-size:9px; padding:2px 6px; border-radius:3px;
+	font-weight:bold; text-align:center; flex: 0 0 auto;
+}
+.badge.class { background:#007acc; color:white; }
+.badge.func { background:#13a10e; color:white; }
+
+/* iOS ZOOM PREVENTION: Must be 16px for inputs */
+.input-field {
+	background:#3c3c3c; color:#ccc; border:1px solid #3e3e42; border-radius:4px;
+	padding:6px 8px; font-family:inherit; font-size:16px; 
+	flex: 1 1 100%; min-width: 0;
+}
+.input-field:focus { outline:none; border-color:#007acc; }
+.input-name { flex: 2 1 120px; }
+.input-type { flex: 1 1 80px; }
+
+/* Access Modifier Dropdown */
+.access-select {
+	background: #2d2d30; color: #ccc; border: 1px solid #3e3e42; 
+	border-radius: 4px; padding: 5px 6px; font-family: inherit; 
+	font-size: 14px; flex: 0 0 auto; cursor: pointer;
+}
+.access-select:focus { outline: none; border-color: #007acc; }
+
+.item-body { display:none; padding:8px; border-top:1px solid #3e3e42; background:#1e1e1e; }
+.item-body.expanded { display:block; }
+
+.section { margin-bottom:10px; }
+.section-title { color:#888; font-size:11px; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px; }
+
+.nested-list { margin-left: 6px; border-left: 2px solid #3e3e42; padding-left: 6px; }
+
+.impl-textarea {
+	width:100%; min-height:80px; background:#252526; color:#d4d4d4;
+	border:1px solid #3e3e42; border-radius:4px; padding:8px;
+	font-family:inherit; font-size:16px; resize:vertical;
+}
+.impl-textarea:focus { outline:none; border-color:#007acc; }
+
+.row { display:flex; flex-wrap:wrap; gap:4px; align-items:center; margin-bottom:4px; }
+.empty-state { text-align:center; color:#666; padding:30px 10px; font-style:italic; font-size:13px; }
+
+.add-btn {
+	background:#3c3c3c; color:#ccc; border:1px solid #3e3e42; border-radius:4px;
+	padding:4px 8px; font-size:11px; cursor:pointer; margin-top:4px;
+}
+.add-btn:active { background:#505050; }
+
+/* ==========================================
+   FILE PICKER & TOAST
+   ========================================== */
+.fp-container { width:100%; height:100%; }
+.fp-placeholder {
+	height:100%; display:flex; align-items:center; justify-content:center;
+	color:#666; font-size:13px; flex-direction:column; gap:8px;
+}
+.spinner {
+	border:2px solid #333; border-top:2px solid #007acc; border-radius:50%;
+	width:20px; height:20px; animation:spin 1s linear infinite;
+}
+@keyframes spin { to { transform:rotate(360deg); } }
+
+.toast {
+	position:fixed; bottom:10px; left:50%; transform:translateX(-50%) translateY(100px); 
+	background:#2d2d30; color:#fff; padding:8px 16px; border-radius:20px; 
+	box-shadow:0 4px 12px rgba(0,0,0,0.4); font-size:12px; 
+	transition:transform 0.2s; z-index:10000; max-width:90%; text-align:center;
+}
+.toast.show { transform:translateX(-50%) translateY(0); }
+.toast.error { background:#c50f1f; }
+.toast.success { background:#13a10e; }
+.toast.info { background:#007acc; }
+</style>
+</head>
+<body>
+
+<div class="container">
+	<div class="content">
+		<!-- Main Page -->
+		<div id="mainPage" class="page active">
+			<div class="toolbar">
+				<select id="langSelect">
+					<option value="cpp">C++</option>
+					<option value="js">JS</option>
+				</select>
+				<button id="btnLoad" title="Load">📂</button>
+				<button id="btnSave" class="btn-primary" title="Save">💾</button>
+				<button id="btnAddClass" class="btn-success" title="Add Class">+🏛️</button>
+				<button id="btnAddFunc" class="btn-success" title="Add Function">+⚡</button>
+			</div>
+			<div class="main-content">
+				<ol id="structureList" class="struct-list"></ol>
+				<div id="emptyState" class="empty-state">
+					Tap +🏛️ or +⚡ to add items.
+				</div>
+			</div>
+		</div>
+
+		<!-- File Picker Page -->
+		<div id="filePickerPage" class="page">
+			<div class="fp-container" id="filePickerContainer">
+				<div class="fp-placeholder">
+					<div class="spinner"></div>
+					<div>Loading files...</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script type="module">
+const mods = { api: null, fp: null };
+try {
+	const apiMod = await import('apiCalls');
+	mods.api = apiMod.api;
+	await import('filePickerUI');
+	const fpMod = await import('filePicker');
+	mods.fp = fpMod.createfilePicker;
+} catch (e) {
+	console.error('Module load failed:', e);
+	document.body.innerHTML = `<div style="color:#c50f1f;padding:20px;">❌ Failed to load modules: ${e.message}</div>`;
+}
+
+// ==========================================
+// STATE & UTILS
+// ==========================================
+const state = { 
+	lang: 'cpp', 
+	items: [],
+	expandedIds: new Set()
+};
+const toastEl = document.getElementById('toast');
+let fpMode = null;
+
+function showToast(msg, type = 'info') {
+	toastEl.textContent = msg;
+	toastEl.className = `toast ${type}`;
+	toastEl.classList.add('show');
+	setTimeout(() => toastEl.classList.remove('show'), 2500);
+}
+
+function genId() { return 'id-' + Math.random().toString(36).substr(2, 9); }
+
+function switchPage(id) {
+	document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+	document.getElementById(id).classList.add('active');
+}
+
+// ==========================================
+// FILE PICKER
+// ==========================================
+let fpInitialized = false;
+function initFilePicker() {
+	if (fpInitialized) return;
+	const fpContainer = document.getElementById('filePickerContainer');
+	
+	try {
+		fpContainer.innerHTML = '<div class="fp-placeholder"><div class="spinner"></div><div>Init...</div></div>';
+		const wrapper = mods.fp();
+		const picker = wrapper.querySelector('.file-picker-container-wrapper');
+		if (!picker) throw new Error('Picker not found');
+
+		picker.addEventListener('filepick', async (e) => {
+			const filePath = e.detail.filePath;
+			if (fpMode === 'load') await handleLoad(filePath);
+			else if (fpMode === 'save') await handleSave(filePath);
+			switchPage('mainPage');
+		});
+
+		picker.addEventListener('close', () => switchPage('mainPage'));
+		picker.addEventListener('cancel', () => switchPage('mainPage'));
+		
+		const closeBtn = picker.querySelector('.close-btn, .fp-close, [title="Close"], button.close');
+		if (closeBtn) {
+			closeBtn.addEventListener('click', (e) => {
+				e.preventDefault(); e.stopPropagation();
+				switchPage('mainPage');
+			});
+		}
+
+		fpContainer.innerHTML = '';
+		fpContainer.appendChild(picker);
+		fpInitialized = true;
+	} catch (e) {
+		fpContainer.innerHTML = `<div class="fp-placeholder" style="color:#c50f1f">Error: ${e.message}</div>`;
+		console.error('Picker init failed:', e);
+	}
+}
+
+async function handleLoad(filePath) {
+	try {
+		const content = await mods.api.readFile(filePath);
+		if (!content || !content.trim()) {
+			state.items = [];
+			state.expandedIds.clear();
+			showToast('📄 Empty file', 'info');
+		} else {
+			const data = JSON.parse(content);
+			state.lang = data.lang || 'cpp';
+			state.items = data.items || [];
+			state.expandedIds.clear();
+			
+			// Backwards compatibility for older saves
+			state.items.forEach(item => {
+				item.templates = item.templates || [];
+				if (item.type === 'class') {
+					item.extends = item.extends || [];
+				}
+			});
+
+			document.getElementById('langSelect').value = state.lang;
+			showToast(`✅ Loaded`, 'success');
+		}
+		render();
+	} catch (err) { showToast(`❌ Load failed`, 'error'); }
+}
+
+async function handleSave(filePath) {
+	try {
+		const data = { lang: state.lang, items: state.items };
+		await mods.api.saveFile(filePath, JSON.stringify(data, null, 2));
+		showToast(`✅ Saved`, 'success');
+	} catch (err) { showToast(`❌ Save failed`, 'error'); }
+}
+
+// ==========================================
+// RENDER LOGIC
+// ==========================================
+function render() {
+	const listEl = document.getElementById('structureList');
+	const emptyEl = document.getElementById('emptyState');
+	listEl.innerHTML = '';
+
+	if (state.items.length === 0) { emptyEl.style.display = 'block'; return; }
+	emptyEl.style.display = 'none';
+
+	state.items.forEach((item, i) => {
+		const li = document.createElement('li');
+		li.appendChild(buildItem(item, state.items, i, false));
+		listEl.appendChild(li);
+	});
+}
+
+function buildItem(item, parentArr, index, isClassMethod = false) {
+	const isClass = item.type === 'class';
+	const card = document.createElement('div');
+	card.className = 'item-card';
+
+	// HEADER
+	const header = document.createElement('div');
+	header.className = 'item-header';
+
+	const toggle = document.createElement('span');
+	toggle.className = 'toggle-icon';
+	toggle.textContent = '▶';
+	if (state.expandedIds.has(item.id)) toggle.classList.add('expanded');
+
+	const badge = document.createElement('span');
+	badge.className = `badge ${isClass ? 'class' : 'func'}`;
+	badge.textContent = isClass ? 'CLS' : 'FN';
+
+	const inputs = [];
+
+	// Access Modifier for Class Methods
+	if (isClassMethod) {
+		const acc = document.createElement('select');
+		acc.className = 'access-select';
+		acc.innerHTML = `<option value="public">pub</option><option value="protected">prot</option><option value="private">priv</option>`;
+		acc.value = item.access || 'public';
+		acc.addEventListener('change', e => { item.access = e.target.value; });
+		acc.addEventListener('click', e => e.stopPropagation());
+		inputs.push(acc);
+	}
+
+	if (!isClass) {
+		const ret = document.createElement('input');
+		ret.className = 'input-field input-type';
+		ret.value = item.returnType || ''; ret.placeholder = 'Return';
+		ret.addEventListener('input', e => { item.returnType = e.target.value; });
+		ret.addEventListener('click', e => e.stopPropagation());
+		inputs.push(ret);
+	}
+
+	const name = document.createElement('input');
+	name.className = 'input-field input-name';
+	name.value = item.name || ''; name.placeholder = isClass ? 'ClassName' : 'funcName';
+	name.addEventListener('input', e => { item.name = e.target.value; });
+	name.addEventListener('click', e => e.stopPropagation());
+	inputs.push(name);
+
+	const del = document.createElement('button');
+	del.className = 'btn-danger'; del.textContent = '✕';
+	del.addEventListener('click', e => {
+		e.stopPropagation();
+		state.expandedIds.delete(item.id);
+		parentArr.splice(index, 1); 
+		render();
+	});
+
+	header.append(toggle, badge, ...inputs, del);
+
+	// BODY
+	const body = document.createElement('div');
+	body.className = 'item-body';
+	if (state.expandedIds.has(item.id)) body.classList.add('expanded');
+
+	header.addEventListener('click', () => {
+		const open = body.classList.toggle('expanded');
+		toggle.classList.toggle('expanded', open);
+		
+		if (open) state.expandedIds.add(item.id);
+		else state.expandedIds.delete(item.id);
+	});
+
+	// --- TEMPLATES (For both Class and Function) ---
+	const tempSec = document.createElement('div');
+	tempSec.className = 'section';
+	tempSec.innerHTML = '<div class="section-title">Templates</div>';
+	const tempList = document.createElement('div');
+	tempList.className = 'nested-list';
+
+	const templatesArr = item.templates || [];
+	templatesArr.forEach((t, ti) => {
+		const row = document.createElement('div'); row.className = 'row';
+		const inp = document.createElement('input');
+		inp.className = 'input-field input-name'; 
+		inp.value = t.value || ''; 
+		inp.placeholder = 'e.g. typename T';
+		inp.addEventListener('input', e => { t.value = e.target.value; });
+		inp.addEventListener('click', e => e.stopPropagation());
+		
+		const d = document.createElement('button');
+		d.className = 'btn-danger'; d.textContent = '✕';
+		d.addEventListener('click', () => { templatesArr.splice(ti, 1); render(); });
+		
+		row.append(inp, d);
+		tempList.appendChild(row);
+	});
+
+	const addTemp = document.createElement('button');
+	addTemp.className = 'add-btn';
+	addTemp.textContent = '+ Template';
+	addTemp.addEventListener('click', () => {
+		if (!item.templates) item.templates = [];
+		item.templates.push({ value: '' });
+		render();
+	});
+
+	tempSec.append(tempList, addTemp);
+	body.appendChild(tempSec);
+
+	if (isClass) {
+		// --- EXTENDS (BASE CLASSES) ---
+		const extSec = document.createElement('div');
+		extSec.className = 'section';
+		extSec.innerHTML = '<div class="section-title">Extends</div>';
+		const extList = document.createElement('div');
+		extList.className = 'nested-list';
+
+		const extendsArr = item.extends || [];
+		extendsArr.forEach((ext, ei) => {
+			const row = document.createElement('div'); row.className = 'row';
+			
+			const eAcc = document.createElement('select');
+			eAcc.className = 'access-select';
+			eAcc.innerHTML = `<option value="public">pub</option><option value="protected">prot</option><option value="private">priv</option>`;
+			eAcc.value = ext.access || 'public';
+			eAcc.addEventListener('change', e => { ext.access = e.target.value; });
+			eAcc.addEventListener('click', e => e.stopPropagation());
+
+			const n = document.createElement('input');
+			n.className = 'input-field input-name'; n.value = ext.name || ''; n.placeholder = 'BaseClass';
+			n.addEventListener('input', e => { ext.name = e.target.value; });
+			n.addEventListener('click', e => e.stopPropagation());
+
+			const d = document.createElement('button');
+			d.className = 'btn-danger'; d.textContent = '✕';
+			d.addEventListener('click', () => { extendsArr.splice(ei, 1); render(); });
+
+			row.append(eAcc, n, d);
+			extList.appendChild(row);
+		});
+
+		const addExt = document.createElement('button');
+		addExt.className = 'add-btn';
+		addExt.textContent = '+ Extend';
+		addExt.addEventListener('click', () => {
+			if (!item.extends) item.extends = [];
+			item.extends.push({ name: '', access: 'public' });
+			render();
+		});
+
+		extSec.append(extList, addExt);
+		body.appendChild(extSec);
+
+		// --- CLASS PROPERTIES ---
+		const propSec = document.createElement('div');
+		propSec.className = 'section';
+		propSec.innerHTML = '<div class="section-title">Properties</div>';
+		const propList = document.createElement('div');
+		propList.className = 'nested-list';
+
+		item.properties.forEach((p, pi) => {
+			const row = document.createElement('div'); row.className = 'row';
+			
+			const pAcc = document.createElement('select');
+			pAcc.className = 'access-select';
+			pAcc.innerHTML = `<option value="public">pub</option><option value="protected">prot</option><option value="private">priv</option>`;
+			pAcc.value = p.access || 'public';
+			pAcc.addEventListener('change', e => { p.access = e.target.value; });
+			pAcc.addEventListener('click', e => e.stopPropagation());
+
+			const t = document.createElement('input');
+			t.className = 'input-field input-type'; t.value = p.type || ''; t.placeholder = 'Type';
+			t.addEventListener('input', e => { p.type = e.target.value; });
+			const n = document.createElement('input');
+			n.className = 'input-field input-name'; n.value = p.name || ''; n.placeholder = 'Name';
+			n.addEventListener('input', e => { p.name = e.target.value; });
+			const d = document.createElement('button');
+			d.className = 'btn-danger'; d.textContent = '✕';
+			d.addEventListener('click', () => { item.properties.splice(pi, 1); render(); });
+			
+			row.append(pAcc, t, n, d); propList.appendChild(row);
+		});
+
+		const addP = document.createElement('button');
+		addP.className = 'add-btn';
+		addP.textContent = '+ Prop';
+		addP.addEventListener('click', () => { 
+			item.properties.push({ type: '', name: '', access: 'public' }); 
+			render(); 
+		});
+		propSec.append(propList, addP); body.appendChild(propSec);
+
+		// --- CLASS FUNCTIONS ---
+		const funcSec = document.createElement('div');
+		funcSec.className = 'section';
+		funcSec.innerHTML = '<div class="section-title">Functions</div>';
+		const funcList = document.createElement('div');
+		funcList.className = 'nested-list';
+		
+		item.functions.forEach((f, fi) => funcList.appendChild(buildItem(f, item.functions, fi, true)));
+		
+		const addF = document.createElement('button');
+		addF.className = 'add-btn';
+		addF.textContent = '+ Func';
+		addF.addEventListener('click', () => {
+			item.functions.push({ 
+				id: genId(), type: 'function', name: '', 
+				templates: [],
+				returnType: 'void', params: [], implementation: '', 
+				access: 'public' 
+			});
+			render();
+		});
+		funcSec.append(funcList, addF); body.appendChild(funcSec);
+	} else {
+		// --- FUNCTION PARAMETERS ---
+		const paramSec = document.createElement('div');
+		paramSec.className = 'section';
+		paramSec.innerHTML = '<div class="section-title">Parameters</div>';
+		const paramList = document.createElement('div');
+		paramList.className = 'nested-list';
+
+		item.params.forEach((p, pi) => {
+			const row = document.createElement('div'); row.className = 'row';
+			const t = document.createElement('input');
+			t.className = 'input-field input-type'; t.value = p.type || ''; t.placeholder = 'Type';
+			t.addEventListener('input', e => { p.type = e.target.value; });
+			const n = document.createElement('input');
+			n.className = 'input-field input-name'; n.value = p.name || ''; n.placeholder = 'Name';
+			n.addEventListener('input', e => { p.name = e.target.value; });
+			const d = document.createElement('button');
+			d.className = 'btn-danger'; d.textContent = '✕';
+			d.addEventListener('click', () => { item.params.splice(pi, 1); render(); });
+			row.append(t, n, d); paramList.appendChild(row);
+		});
+
+		const addParam = document.createElement('button');
+		addParam.className = 'add-btn';
+		addParam.textContent = '+ Param';
+		addParam.addEventListener('click', () => {
+			item.params.push({ type: '', name: '' });
+			render();
+		});
+		paramSec.append(paramList, addParam); body.appendChild(paramSec);
+
+		// --- FUNCTION IMPLEMENTATION ---
+		const implSec = document.createElement('div');
+		implSec.className = 'section';
+		implSec.innerHTML = '<div class="section-title">Implementation</div>';
+		const ta = document.createElement('textarea');
+		ta.className = 'impl-textarea'; ta.value = item.implementation || '';
+		ta.placeholder = '// Code...';
+		ta.addEventListener('input', e => { item.implementation = e.target.value; });
+		ta.addEventListener('click', e => e.stopPropagation());
+		implSec.appendChild(ta); body.appendChild(implSec);
+	}
+
+	card.append(header, body);
+	return card;
+}
+
+// ==========================================
+// EVENT LISTENERS
+// ==========================================
+document.getElementById('langSelect').addEventListener('change', e => { state.lang = e.target.value; });
+
+document.getElementById('btnLoad').addEventListener('click', () => { fpMode = 'load'; initFilePicker(); switchPage('filePickerPage'); });
+document.getElementById('btnSave').addEventListener('click', () => { fpMode = 'save'; initFilePicker(); switchPage('filePickerPage'); });
+
+document.getElementById('btnAddClass').addEventListener('click', () => {
+	state.items.push({ 
+		id: genId(), 
+		type: 'class', 
+		name: 'NewClass', 
+		templates: [],
+		extends: [], 
+		properties: [], 
+		functions: [] 
+	});
+	render();
+});
+
+document.getElementById('btnAddFunc').addEventListener('click', () => {
+	state.items.push({ 
+		id: genId(), type: 'function', name: 'newFunction', 
+		templates: [],
+		returnType: state.lang === 'cpp' ? 'void' : '', 
+		params: [], 
+		implementation: '' 
+	});
+	render();
+});
+
+render();
+</script>
+</body>
+</html>

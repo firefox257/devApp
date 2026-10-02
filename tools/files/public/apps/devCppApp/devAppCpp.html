@@ -6,7 +6,7 @@
 <title>Dev</title>
 
 <!-- PDF.js Library -->
-<script src="/system/js/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script>
 // Set PDF.js worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
@@ -396,6 +396,13 @@ select:focus { outline:none; border-color:#007acc; }
 	word-break: break-word;
 	line-height: 1.4;
 }
+.console-output .log-info,
+.console-output .log-warn,
+.console-output .log-error,
+.console-output .log-success {
+	display: block;
+	white-space: pre-wrap;
+}
 .console-output .log-info { color: #d4d4d4; }
 .console-output .log-warn { color: #ffcc66; }
 .console-output .log-error { color: #ff8888; }
@@ -511,9 +518,9 @@ select:focus { outline:none; border-color:#007acc; }
 <button id="navConsoleToggleBtn" class="console-toggle-btn" title="Toggle Console (Ctrl+`)">💻</button>
 
 <div class="project-controls">
-	<button id="setProjectBtn" class="nav-action-btn" style="display:none;" title="Set as Current Project">📁</button>
-	<button id="compileProjectBtn" class="nav-action-btn" style="display:none;" title="Compile Project">⚙️</button>
-	<button id="runProjectBtn" class="nav-action-btn run" style="display:none;" title="Run Project">▶️</button>
+<button id="setProjectBtn" class="nav-action-btn" style="display:none;" title="Set as Current Project">📁</button>
+<button id="compileProjectBtn" class="nav-action-btn" style="display:none;" title="Compile Project">⚙️</button>
+<button id="runProjectBtn" class="nav-action-btn run" style="display:none;" title="Run Project">▶️</button>
 </div>
 </div>
 
@@ -528,6 +535,7 @@ Dev Environment v1.0<br>
 • File Editor: Canvas-based code editing (optText)<br>
 • File Viewer: Live preview with refresh<br>
 • PDF Viewer: Built-in PDF rendering<br>
+• JS Viewer: Sandboxed runtime with console capture<br>
 • Settings: Persistent configuration<br>
 • <strong>C++ Compiler:</strong> Integrated Clang → WASM pipeline with Project support (.prj.js)
 </p>
@@ -551,6 +559,7 @@ Dev Environment v1.0<br>
 <div class="console-header">
 <span>Compiler & Runtime Output</span>
 <div class="console-controls">
+<button id="copyConsoleBtn" title="Copy All Output">📋</button>
 <button id="clearConsoleBtn" title="Clear">🗑️</button>
 <button id="toggleConsoleBtn" title="Toggle">▼</button>
 </div>
@@ -585,7 +594,7 @@ Viewer URL: <span id="viewerUrlPreview" style="color:#555;"></span>
 </div>
 
 <script type="module">
-import { WasmRuntime } from './wasm-runtime.js';
+import { WasmRuntime } from '/system/wasmcpp/wasm-runtime.js';
 
 // Load modules
 const mods = { api: null, fp: null, optText: null };
@@ -631,6 +640,7 @@ const viewerUrlPreview = document.getElementById('viewerUrlPreview');
 // ===== STATE PERSISTENCE =====
 const TABS_STATE_KEY = 'devCppEnvOpenTabs';
 const ACTIVE_TAB_KEY = 'devCppEnvActiveTab';
+let pendingFilePath = null;
 
 function debounce(fn, delay) {
 	let timeoutId;
@@ -863,6 +873,12 @@ function addTab(id, name, el, editor, filePath, content) {
 
 function removeTab(id) {
 	if (!state.tabs[id]) return;
+
+	// Cleanup editor resources if they exist
+	if (state.tabs[id].editor && typeof state.tabs[id].editor.destroy === 'function') {
+		state.tabs[id].editor.destroy();
+	}
+
 	const opt = Array.from(pageSel.options).find(o => o.value === id);
 	if (opt) pageSel.removeChild(opt);
 	if (state.tabs[id].el.parentNode) {
@@ -873,7 +889,7 @@ function removeTab(id) {
 }
 
 // ===== COMPILER & CONSOLE LOGIC =====
-const worker = new Worker('./compiler.worker.js', { type: 'module' });
+const worker = new Worker('/system/clang/compiler.worker.js', { type: 'module' });
 const consoleOutputEl = document.getElementById('consoleOutput');
 const consolePanel = document.getElementById('consolePanel');
 
@@ -881,69 +897,34 @@ function showConsole() {
 	consolePanel.style.display = 'flex';
 }
 
-let activeSpan = null;
-let pendingNewline = false;
+let currentLogElement = null;
 
 function addConsoleLog(msg, type = 'info') {
 	if (msg === null || msg === undefined || type === 'end') {
-		if (activeSpan) {
-			activeSpan.appendChild(document.createElement('br'));
-			activeSpan = null;
-		}
-		pendingNewline = false;
+		currentLogElement = null;
 		return;
 	}
 
 	showConsole();
 
-	if (!activeSpan || activeSpan.className !== `log-${type}`) {
-		activeSpan = document.createElement('span');
-		activeSpan.className = `log-${type}`;
-		consoleOutputEl.appendChild(activeSpan);
-		pendingNewline = false;
+	const normalizedMsg = msg.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+	if (!currentLogElement || currentLogElement.dataset.logType !== type) {
+		currentLogElement = document.createElement('div');
+		currentLogElement.className = `log-${type}`;
+		currentLogElement.dataset.logType = type;
+		consoleOutputEl.appendChild(currentLogElement);
 	}
 
-	if (pendingNewline) {
-		activeSpan.appendChild(document.createElement('br'));
-		activeSpan = document.createElement('span');
-		activeSpan.className = `log-${type}`;
-		consoleOutputEl.appendChild(activeSpan);
-		pendingNewline = false;
-		
-		if (msg.startsWith('\n')) {
-			msg = msg.substring(1);
-		}
-	}
-
-	if (msg.endsWith('\r')) {
-		pendingNewline = true;
-		msg = msg.slice(0, -1);
-	}
-
-	const parts = msg.split(/\r\n|\n|\r/);
-
-	for (let i = 0; i < parts.length; i++) {
-		if (parts[i]) {
-			activeSpan.appendChild(document.createTextNode(parts[i]));
-		}
-		
-		if (i < parts.length - 1) {
-			activeSpan.appendChild(document.createElement('br'));
-			
-			activeSpan = document.createElement('span');
-			activeSpan.className = `log-${type}`;
-			consoleOutputEl.appendChild(activeSpan);
-		}
-	}
-
+	currentLogElement.textContent += normalizedMsg;
 	consoleOutputEl.scrollTop = consoleOutputEl.scrollHeight;
 }
 
 function clearConsole() {
 	consoleOutputEl.innerHTML = '';
+	currentLogElement = null;
 }
 
-// Robust toggle function that checks actual computed style
 function toggleConsole() {
 	const isHidden = window.getComputedStyle(consolePanel).display === 'none';
 	consolePanel.style.display = isHidden ? 'flex' : 'none';
@@ -962,7 +943,7 @@ worker.onmessage = async (e) => {
 
 	if (data.type === 'result') {
 		if (data.success) {
-			addConsoleLog(`✅ Compilation successful`, 'success');
+			addConsoleLog(`✅ Compilation successful\n`, 'success');
 
 			if (state.currentProject) {
 				const outputName = state.currentProject.config.output;
@@ -970,7 +951,7 @@ worker.onmessage = async (e) => {
 
 				if (wasmBinary) {
 					state.currentProject.wasmBinary = wasmBinary;
-					addConsoleLog(`💾 Saving compiled binary to project directory...`, 'info');
+					addConsoleLog(`💾 Saving compiled binary to project directory...\n`, 'info');
 
 					try {
 						const savePath = state.currentProject.directory
@@ -978,10 +959,10 @@ worker.onmessage = async (e) => {
 						: outputName;
 
 						await mods.api.saveFile(savePath, wasmBinary);
-						addConsoleLog(`✅ Successfully saved ${outputName} to disk.`, 'success');
+						addConsoleLog(`✅ Successfully saved ${outputName} to disk.\n`, 'success');
 						showToast(`✅ Saved ${outputName}`, 'success');
 					} catch (err) {
-						addConsoleLog(`❌ Failed to save ${outputName}: ${err.message}`, 'error');
+						addConsoleLog(`❌ Failed to save ${outputName}: ${err.message}\n`, 'error');
 						showToast(`❌ Save failed: ${err.message}`, 'error');
 					}
 
@@ -989,7 +970,7 @@ worker.onmessage = async (e) => {
 					updateStatus('✅ Compiled & Saved. Ready to run.');
 				} else {
 					const available = Object.keys(data.files).join(', ') || 'none';
-					addConsoleLog(`❌ Output file '${outputName}' not found in results. Available: ${available}`, 'error');
+					addConsoleLog(`❌ Output file '${outputName}' not found in results. Available: ${available}\n`, 'error');
 					updateStatus('❌ Failed. Check output path in .prj.js');
 				}
 			} else {
@@ -997,19 +978,19 @@ worker.onmessage = async (e) => {
 				if (wasmBinary) {
 					await executeWasm(wasmBinary);
 				} else {
-					addConsoleLog('❌ No output WASM file generated.', 'error');
+					addConsoleLog('❌ No output WASM file generated.\n', 'error');
 					updateStatus('❌ Failed. No output.');
 				}
 			}
 		} else {
-			addConsoleLog(`❌ Compilation failed: ${data.error}`, 'error');
+			addConsoleLog(`❌ Compilation failed: ${data.error}\n`, 'error');
 			updateStatus('❌ Failed. Check logs.');
 		}
 	}
 };
 
 async function executeWasm(wasmBinary) {
-	addConsoleLog('🚀 Initializing WasmRuntime...\r\n', 'info');
+	addConsoleLog('🚀 Initializing WasmRuntime...\n', 'info');
 	const runtime = new WasmRuntime({
 			initialMemory: 256, maxMemory: 512,
 			onStdout: (msg) => addConsoleLog(msg, 'info'),
@@ -1022,7 +1003,7 @@ async function executeWasm(wasmBinary) {
 		});
 	runtime.addImport('env', 'get_random_number', () => {
 			const num = Math.floor(Math.random() * 100);
-			addConsoleLog(`🎲 JS generated random number for C++: ${num}`, 'info');
+			addConsoleLog(`🎲 JS generated random number for C++: ${num}\n`, 'info');
 			return num;
 		});
 
@@ -1033,21 +1014,21 @@ async function executeWasm(wasmBinary) {
 		if (runtime.exports.add_numbers) {
 			const addNumbers = runtime.getExport('add_numbers');
 			const sum = addNumbers(15, 25);
-			addConsoleLog(`🧮 JS called C++ add_numbers(15, 25) = ${sum}`, 'success');
+			addConsoleLog(`🧮 JS called C++ add_numbers(15, 25) = ${sum}\n`, 'success');
 		}
 
 		const exitCode = runtime.run();
-		if (exitCode === 0) addConsoleLog('✅ Application finished successfully', 'success');
-		else addConsoleLog(`⚠️ Application exited with code: ${exitCode}`, 'warn');
+		if (exitCode === 0) addConsoleLog('✅ Application finished successfully\n', 'success');
+		else addConsoleLog(`⚠️ Application exited with code: ${exitCode}\n`, 'warn');
 
 		updateStatus('✓ All done!');
 	} catch (err) {
 		console.error('WASM execution failed:', err);
 		if (err.message && err.message.includes('No _start function found')) {
-			addConsoleLog('ℹ️ No main() function detected. WASM loaded, but nothing to run.', 'info');
+			addConsoleLog('ℹ️ No main() function detected. WASM loaded, but nothing to run.\n', 'info');
 			updateStatus('✓ WASM Loaded (No main)');
 		} else {
-			addConsoleLog(`❌ WASM Execution Error: ${err.message || err}`, 'error');
+			addConsoleLog(`❌ WASM Execution Error: ${err.message || err}\n`, 'error');
 			updateStatus('❌ Execution failed.');
 		}
 	}
@@ -1101,7 +1082,7 @@ async function compileProject() {
 	const mainFilePath = directory ? `${directory}/${config.main}` : config.main;
 
 	clearConsole();
-	addConsoleLog(`🔨 Compiling project: ${config.main}`, 'info');
+	addConsoleLog(`🔨 Compiling project: ${config.main}\n`, 'info');
 	updateStatus('Reading source files...');
 
 	try {
@@ -1116,7 +1097,7 @@ async function compileProject() {
 				args: workerArgs
 			});
 	} catch (e) {
-		addConsoleLog(`❌ Failed to read main file (${mainFilePath}): ${e.message}`, 'error');
+		addConsoleLog(`❌ Failed to read main file (${mainFilePath}): ${e.message}\n`, 'error');
 		updateStatus('❌ Compilation failed.');
 	}
 }
@@ -1127,7 +1108,7 @@ async function runProject() {
 		return;
 	}
 	clearConsole();
-	addConsoleLog('🚀 Running compiled project...\r\n', 'info');
+	addConsoleLog('🚀 Running compiled project...\n', 'info');
 	await executeWasm(state.currentProject.wasmBinary);
 }
 
@@ -1142,7 +1123,7 @@ function compileAndRunCurrentFile() {
 	const fileName = currentTab.name.replace('📝 ', '');
 
 	clearConsole();
-	addConsoleLog(`📝 Preparing to compile: ${fileName}`, 'info');
+	addConsoleLog(`📝 Preparing to compile: ${fileName}\n`, 'info');
 	updateStatus('Sending job to Web Worker...');
 
 	worker.postMessage({
@@ -1155,7 +1136,7 @@ function compileAndRunCurrentFile() {
 				'-O2',
 				'-I', '@/public/projects/emccWasi',
 				'-pthread',
-				'-fno-exceptions',
+				'-fwasm-exceptions',
 				'-fno-rtti',
 				'-matomics',
 				'-mbulk-memory',
@@ -1199,6 +1180,15 @@ document.addEventListener('mouseup', () => {
 		}
 	});
 
+document.getElementById('copyConsoleBtn').addEventListener('click', () => {
+		const textToCopy = consoleOutputEl.innerText;
+		navigator.clipboard.writeText(textToCopy).then(() => {
+				showToast('✅ Console output copied to clipboard', 'success');
+			}).catch(err => {
+				console.error('Failed to copy:', err);
+				showToast('❌ Failed to copy console output', 'error');
+			});
+	});
 document.getElementById('clearConsoleBtn').addEventListener('click', clearConsole);
 document.getElementById('toggleConsoleBtn').addEventListener('click', toggleConsole);
 document.getElementById('navConsoleToggleBtn').addEventListener('click', toggleConsole);
@@ -1233,7 +1223,8 @@ async function openFile(path, options = {}) {
 					'beautifyCode',
 					'selectBracket',
 					'searchTool',
-					'save'
+					'save',
+					'insertTab'
 				]
 			});
 
@@ -1478,11 +1469,112 @@ async function createPDFViewer(tabId, url, fileName) {
 	return { page, pdfState, renderPage };
 }
 
+// ===== JS VIEWER HELPERS =====
+async function getLatestJSContent(filePath) {
+	const editorTab = Object.values(state.tabs).find(t => t.filePath === filePath && (t.type === 'editor' || t.type === undefined));
+	if (editorTab && editorTab.editor) {
+		return editorTab.editor.value;
+	}
+	return await mods.api.readFile(filePath);
+}
+
+function generateJSSrcdoc(tabId, code) {
+	// 1. Append sourceURL so the browser resets line numbers and uses a real filename
+	const codeWithSourceURL = code + "\n//# sourceURL=user-code.js";
+
+	// 2. Prevent user code from accidentally closing the script tag
+	const safeCode = codeWithSourceURL.replace(/<\/script>/gi, '<\\/script>');
+
+	return `<!DOCTYPE html>
+	<html>
+	<head>
+	<meta charset="UTF-8">
+	</head>
+	<body>
+	<script>
+	const tabId = '${tabId}';
+	const originalConsole = { log: console.log, warn: console.warn, error: console.error, info: console.info };
+
+	function formatArg(a) {
+	if (a === null) return 'null';
+	if (a === undefined) return 'undefined';
+	if (a instanceof Error) {
+	return a.stack || (a.name + ': ' + a.message);
+	}
+	if (typeof a === 'object') {
+	try { return JSON.stringify(a, null, 2); } catch(e) { return String(a); }
+	}
+	if (typeof a === 'function') return a.toString();
+	return String(a);
+	}
+
+	function sendToParent(level, args) {
+	try {
+	const formatted = Array.from(args).map(formatArg).join(' ');
+	window.parent.postMessage({ type: 'js-console', tabId: tabId, level: level, msg: formatted }, '*');
+	} catch(e) {}
+	}
+
+	console.log = function(...args) { originalConsole.log(...args); sendToParent('info', args); };
+	console.warn = function(...args) { originalConsole.warn(...args); sendToParent('warn', args); };
+	console.error = function(...args) { originalConsole.error(...args); sendToParent('error', args); };
+	console.info = function(...args) { originalConsole.info(...args); sendToParent('info', args); };
+
+	// Catch Syntax & Runtime Errors
+	window.onerror = function(msg, url, line, col, error) {
+	let trace = '';
+	if (error && error.stack) {
+	trace = error.stack;
+	if (!trace.includes(msg)) trace = msg + '\\n' + trace;
+	} else {
+	trace = msg || 'Unknown Error';
+	}
+
+	if (line !== undefined && col !== undefined) {
+	trace += '\\n\\n📍 Error at Line ' + line + ', Column ' + col;
+	} else if (line !== undefined) {
+	trace += '\\n\\n📍 Error at Line ' + line;
+	}
+
+	sendToParent('error', [trace]);
+	return true;
+	};
+
+	window.onunhandledrejection = function(event) {
+	const reason = event.reason;
+	let trace = 'Unhandled Promise Rejection: ' + (reason instanceof Error ? (reason.stack || reason.message) : String(reason));
+	sendToParent('error', [trace]);
+	};
+
+	try {
+	${safeCode}
+	} catch (err) {
+	let trace = err instanceof Error ? (err.stack || (err.name + ': ' + err.message)) : ('Uncaught Exception: ' + String(err));
+	if (!trace.includes('\\n')) trace += '\\n    at <anonymous>';
+	console.error(trace);
+	}
+	<\/script>
+	</body>
+	</html>`;
+}
+
+function addJSConsoleLog(tabId, level, msg) {
+	const consoleOut = document.getElementById(`jsConsoleOutput-${tabId}`);
+	if (!consoleOut) return;
+	const div = document.createElement('div');
+	div.className = level === 'error' ? 'log-error' : level === 'warn' ? 'log-warn' : 'log-info';
+	div.textContent = msg;
+	consoleOut.appendChild(div);
+	consoleOut.scrollTop = consoleOut.scrollHeight;
+}
+
+// ===== VIEWER OPERATIONS =====
 async function openFileInViewer(filePath, options = {}) {
 	try {
 		const url = convertFilePathToUrl(filePath);
 		const fileName = filePath.split('/').pop() || 'preview';
 		const isPDF = isPDFFile(filePath);
+		const isJS = filePath.toLowerCase().endsWith('.js');
 
 		const existingViewer = Object.values(state.tabs).find(t => t.filePath === filePath && t.type === 'viewer');
 		if (existingViewer) {
@@ -1493,229 +1585,333 @@ async function openFileInViewer(filePath, options = {}) {
 		const tabId = `viewer-${Date.now()}-${encodeURIComponent(filePath)}`;
 		let page, viewerElement;
 
-		if (isPDF) {
-			const pdfViewer = await createPDFViewer(tabId, url, fileName);
-			page = pdfViewer.page;
-			viewerElement = pdfViewer.pdfState;
-			if (options.restoreState) {
-				setTimeout(() => {
-						try {
-							if (options.restoreState.pageNum && viewerElement.pageNum !== options.restoreState.pageNum) {
-								viewerElement.pageNum = options.restoreState.pageNum;
-								if (pdfViewer.renderPage) pdfViewer.renderPage(options.restoreState.pageNum);
-							}
-							if (options.restoreState.scale) {
-								viewerElement.scale = options.restoreState.scale;
-								const zoomSelect = document.getElementById(`pdfZoomSelect-${tabId}`);
-								if (zoomSelect) {
-									const scaleStr = options.restoreState.scale.toString();
-									const matchingOption = Array.from(zoomSelect.options).find(opt => opt.value === scaleStr);
-									if (matchingOption) zoomSelect.value = scaleStr;
-									else {
-										const customOption = document.createElement('option');
-										customOption.value = scaleStr;
-										customOption.textContent = formatScale(options.restoreState.scale);
-										customOption.selected = true;
-										zoomSelect.add(customOption);
-									}
-								}
-							}
-						} catch (e) { console.warn('Could not restore PDF state:', e); }
-					}, 200);
-			}
-		} else {
+		if (isJS) {
+			// === JS VIEWER UI (Console Only) ===
 			page = document.createElement('div');
 			page.className = 'page';
 			page.innerHTML = `
 			<div style="display:flex;flex-direction:column;height:100%;">
-			<div class="app-toolbar" style="display:flex;height:28px;background:#252526;border-bottom:1px solid #3e3e42;padding:2px 6px;align-items:center;">
-			<button class="go-btn" id="refreshBtn-${tabId}" title="Refresh preview" style="width:28px;height:24px;font-size:16px;padding:0;display:flex;align-items:center;justify-content:center;">🔄</button>
-			<div style="color:#888;font-size:11px;margin-left:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${url}</div>
+			<div class="app-toolbar" style="display:flex;height:28px;background:#252526;border-bottom:1px solid #3e3e42;padding:2px 6px;align-items:center;gap:8px;flex-shrink:0;">
+			<button id="jsRunBtn-${tabId}" title="Run Code" style="background:#13a10e;color:white;border:none;border-radius:2px;padding:2px 10px;cursor:pointer;font-size:12px;display:flex;align-items:center;gap:4px;">▶ Run</button>
+			<button id="jsCopyConsoleBtn-${tabId}" title="Copy Console" style="background:#3c3c3c;color:#ccc;border:1px solid #3e3e42;border-radius:2px;padding:2px 8px;cursor:pointer;font-size:12px;">📋 Copy</button>
+			<button id="jsClearConsoleBtn-${tabId}" title="Clear Console" style="background:#3c3c3c;color:#ccc;border:1px solid #3e3e42;border-radius:2px;padding:2px 8px;cursor:pointer;font-size:12px;">🗑️ Clear</button>
+			<div style="color:#888;font-size:11px;margin-left:auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">JS Runtime — ${fileName}</div>
 			</div>
-			<div class="iframe-container" style="flex-grow:1;position:relative;">
-			<iframe id="viewerFrame-${tabId}" src="${url}" style="width:100%;height:100%;border:none;display:block;" allowfullscreen loading="lazy" sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-modals"></iframe>
-			<div class="iframe-fallback" id="viewerFallback-${tabId}" style="display:none;">
-			<h3>⚠️ Preview Unavailable</h3>
-			<p>Could not load preview for:</p>
-			<p style="color:#007acc;margin:8px 0;font-size:13px;">${fileName}</p>
-			<p id="viewerError-${tabId}" style="color:#c50f1f;margin:8px 0;font-size:12px;">Iframe load failed</p>
-			<button class="go-btn" id="viewerRetry-${tabId}" style="margin-top:12px;width:auto;padding:5px 15px;">Retry</button>
-			<a href="${url}" target="_blank" style="display:inline-block;margin-top:10px;padding:5px 12px;background:#007acc;color:#fff;text-decoration:none;border-radius:3px;font-size:12px;">Open in new tab ↗</a>
-			</div>
+
+			<!-- Hidden iframe for sandboxed execution -->
+			<iframe id="jsFrame-${tabId}" style="width:0;height:0;border:none;position:absolute;pointer-events:none;" sandbox="allow-scripts allow-modals"></iframe>
+
+			<!-- Full-page console -->
+			<div style="flex-grow:1;background:#1e1e1e;display:flex;flex-direction:column;min-height:0;">
+			<div id="jsConsoleOutput-${tabId}" class="console-output" style="flex-grow:1;overflow-y:auto;padding:12px;font-size:12px;line-height:1.5;"></div>
 			</div>
 			</div>`;
 			contentArea.appendChild(page);
 
-			viewerElement = {
-				frameEl: document.getElementById(`viewerFrame-${tabId}`),
-				fallback: document.getElementById(`viewerFallback-${tabId}`),
-				errorEl: document.getElementById(`viewerError-${tabId}`),
-				retryBtn: document.getElementById(`viewerRetry-${tabId}`),
-				refreshBtn: document.getElementById(`refreshBtn-${tabId}`)
-			};
+			viewerElement = { type: 'js' };
 
-			let loadTimeout;
-			const resetTimeout = () => {
-				clearTimeout(loadTimeout);
-				loadTimeout = setTimeout(() => {
-						if (viewerElement.fallback && viewerElement.fallback.offsetParent !== null) {
-							showError('Preview timeout. Check file type and permissions.');
-						}
-					}, 8000);
-			};
-			const showError = (msg) => {
-				if (viewerElement.errorEl) viewerElement.errorEl.textContent = msg;
-				updateStatus(`Preview error: ${msg}`);
-			};
+			const executeJS = async () => {
+				const code = await getLatestJSContent(filePath);
+				const consoleOut = document.getElementById(`jsConsoleOutput-${tabId}`);
+				consoleOut.innerHTML = '';
+				addJSConsoleLog(tabId, 'info', `▶ Running: ${fileName}\n${'─'.repeat(50)}`);
 
-			if (viewerElement.frameEl) {
-				viewerElement.frameEl.addEventListener('load', () => {
-						clearTimeout(loadTimeout);
-						if (viewerElement.fallback) viewerElement.fallback.style.display = 'none';
-						updateStatus(`Preview loaded: ${fileName}`);
-					});
-				viewerElement.frameEl.addEventListener('error', () => {
-						clearTimeout(loadTimeout);
-						if (viewerElement.fallback) {
-							viewerElement.fallback.style.display = 'flex';
-							showError('Failed to load content');
+				// 🛡️ PRE-FLIGHT SYNTAX CHECK
+				try {
+					new Function(code);
+				} catch (syntaxError) {
+					// Force a log to the real browser console so you know this block executed
+					console.warn("⚠️ JS Viewer caught a Syntax Error in parent:", syntaxError);
+
+					let lineNum = syntaxError.lineNumber;
+					let colNum = syntaxError.columnNumber;
+
+					// Fallback: Extract from message (e.g., "Unexpected identifier 'blas' (8:2)")
+					if (!lineNum) {
+						const match = syntaxError.message.match(/[:\(](\d+)[:\,](\d+)/) || syntaxError.message.match(/line (\d+)/i);
+							if (match) {
+								lineNum = parseInt(match[1], 10);
+								colNum = parseInt(match[2] || match[3] || 1, 10);
+							}
 						}
-					});
-			}
-			if (viewerElement.retryBtn) {
-				viewerElement.retryBtn.addEventListener('click', (e) => {
-						e.stopPropagation();
-						if (viewerElement.frameEl) {
-							const currentSrc = viewerElement.frameEl.src;
-							viewerElement.frameEl.src = '';
-							setTimeout(() => { viewerElement.frameEl.src = currentSrc; }, 50);
+
+						if (lineNum) {
+							const lines = code.split('\n');
+							const errorLine = lines[lineNum - 1] || '';
+							const pointer = ' '.repeat(Math.max(0, (colNum || 1) - 1)) + '^';
+
+							addJSConsoleLog(tabId, 'error',
+								`❌ SYNTAX ERROR at Line ${lineNum}, Column ${colNum || 1}:\n\n` +
+								`  ${lineNum} | ${errorLine}\n` +
+								`     | ${pointer}\n\n` +
+								`💡 Details: ${syntaxError.message}`
+							);
+							return; // HALT: Do not load the iframe
+						} else {
+							addJSConsoleLog(tabId, 'error', `❌ SYNTAX ERROR: ${syntaxError.message}`);
+							return;
 						}
-						resetTimeout();
+					}
+
+					// ✅ Syntax is valid, run in sandboxed iframe
+					const iframe = document.getElementById(`jsFrame-${tabId}`);
+					iframe.srcdoc = generateJSSrcdoc(tabId, code);
+				};;
+
+				document.getElementById(`jsRunBtn-${tabId}`).addEventListener('click', executeJS);
+
+				document.getElementById(`jsCopyConsoleBtn-${tabId}`).addEventListener('click', () => {
+						const consoleOut = document.getElementById(`jsConsoleOutput-${tabId}`);
+						navigator.clipboard.writeText(consoleOut.innerText).then(() => {
+								showToast('✅ Console copied to clipboard', 'success');
+							}).catch(() => showToast('❌ Failed to copy', 'error'));
 					});
-			}
-			if (viewerElement.refreshBtn) {
-				viewerElement.refreshBtn.addEventListener('click', () => {
-						if (viewerElement.frameEl) {
-							const currentSrc = viewerElement.frameEl.src;
-							viewerElement.frameEl.src = '';
-							setTimeout(() => { viewerElement.frameEl.src = currentSrc; }, 50);
-						}
-						resetTimeout();
-						showToast('🔄 Refreshing...', 'info');
+
+				document.getElementById(`jsClearConsoleBtn-${tabId}`).addEventListener('click', () => {
+						document.getElementById(`jsConsoleOutput-${tabId}`).innerHTML = '';
 					});
+
+				// Auto-run on open
+				executeJS();
 			}
-			resetTimeout();
+			else if (isPDF) {
+				// === PDF VIEWER LOGIC ===
+				const pdfViewer = await createPDFViewer(tabId, url, fileName);
+				page = pdfViewer.page;
+				viewerElement = pdfViewer.pdfState;
+				if (options.restoreState) {
+					setTimeout(() => {
+							try {
+								if (options.restoreState.pageNum && viewerElement.pageNum !== options.restoreState.pageNum) {
+									viewerElement.pageNum = options.restoreState.pageNum;
+									if (pdfViewer.renderPage) pdfViewer.renderPage(options.restoreState.pageNum);
+								}
+								if (options.restoreState.scale) {
+									viewerElement.scale = options.restoreState.scale;
+									const zoomSelect = document.getElementById(`pdfZoomSelect-${tabId}`);
+									if (zoomSelect) {
+										const scaleStr = options.restoreState.scale.toString();
+										const matchingOption = Array.from(zoomSelect.options).find(opt => opt.value === scaleStr);
+										if (matchingOption) zoomSelect.value = scaleStr;
+										else {
+											const customOption = document.createElement('option');
+											customOption.value = scaleStr;
+											customOption.textContent = formatScale(options.restoreState.scale);
+											customOption.selected = true;
+											zoomSelect.add(customOption);
+										}
+									}
+								}
+							} catch (e) { console.warn('Could not restore PDF state:', e); }
+						}, 200);
+				}
+			} else {
+				// === GENERIC IFRAME FALLBACK LOGIC ===
+				page = document.createElement('div');
+				page.className = 'page';
+				page.innerHTML = `
+				<div style="display:flex;flex-direction:column;height:100%;">
+				<div class="app-toolbar" style="display:flex;height:28px;background:#252526;border-bottom:1px solid #3e3e42;padding:2px 6px;align-items:center;">
+				<button class="go-btn" id="refreshBtn-${tabId}" title="Refresh preview" style="width:28px;height:24px;font-size:16px;padding:0;display:flex;align-items:center;justify-content:center;">🔄</button>
+				<div style="color:#888;font-size:11px;margin-left:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${url}</div>
+				</div>
+				<div class="iframe-container" style="flex-grow:1;position:relative;">
+				<iframe id="viewerFrame-${tabId}" src="${url}" style="width:100%;height:100%;border:none;display:block;" allowfullscreen loading="lazy" sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-modals"></iframe>
+				<div class="iframe-fallback" id="viewerFallback-${tabId}" style="display:none;">
+				<h3>⚠️ Preview Unavailable</h3>
+				<p>Could not load preview for:</p>
+				<p style="color:#007acc;margin:8px 0;font-size:13px;">${fileName}</p>
+				<p id="viewerError-${tabId}" style="color:#c50f1f;margin:8px 0;font-size:12px;">Iframe load failed</p>
+				<button class="go-btn" id="viewerRetry-${tabId}" style="margin-top:12px;width:auto;padding:5px 15px;">Retry</button>
+				<a href="${url}" target="_blank" style="display:inline-block;margin-top:10px;padding:5px 12px;background:#007acc;color:#fff;text-decoration:none;border-radius:3px;font-size:12px;">Open in new tab ↗</a>
+				</div>
+				</div>
+				</div>`;
+				contentArea.appendChild(page);
+
+				viewerElement = {
+					frameEl: document.getElementById(`viewerFrame-${tabId}`),
+					fallback: document.getElementById(`viewerFallback-${tabId}`),
+					errorEl: document.getElementById(`viewerError-${tabId}`),
+					retryBtn: document.getElementById(`viewerRetry-${tabId}`),
+					refreshBtn: document.getElementById(`refreshBtn-${tabId}`)
+				};
+
+				let loadTimeout;
+				const resetTimeout = () => {
+					clearTimeout(loadTimeout);
+					loadTimeout = setTimeout(() => {
+							if (viewerElement.fallback && viewerElement.fallback.offsetParent !== null) {
+								showError('Preview timeout. Check file type and permissions.');
+							}
+						}, 8000);
+				};
+				const showError = (msg) => {
+					if (viewerElement.errorEl) viewerElement.errorEl.textContent = msg;
+					updateStatus(`Preview error: ${msg}`);
+				};
+
+				if (viewerElement.frameEl) {
+					viewerElement.frameEl.addEventListener('load', () => {
+							clearTimeout(loadTimeout);
+							if (viewerElement.fallback) viewerElement.fallback.style.display = 'none';
+							updateStatus(`Preview loaded: ${fileName}`);
+						});
+					viewerElement.frameEl.addEventListener('error', () => {
+							clearTimeout(loadTimeout);
+							if (viewerElement.fallback) {
+								viewerElement.fallback.style.display = 'flex';
+								showError('Failed to load content');
+							}
+						});
+				}
+				if (viewerElement.retryBtn) {
+					viewerElement.retryBtn.addEventListener('click', (e) => {
+							e.stopPropagation();
+							if (viewerElement.frameEl) {
+								const currentSrc = viewerElement.frameEl.src;
+								viewerElement.frameEl.src = '';
+								setTimeout(() => { viewerElement.frameEl.src = currentSrc; }, 50);
+							}
+							resetTimeout();
+						});
+				}
+				if (viewerElement.refreshBtn) {
+					viewerElement.refreshBtn.addEventListener('click', () => {
+							if (viewerElement.frameEl) {
+								const currentSrc = viewerElement.frameEl.src;
+								viewerElement.frameEl.src = '';
+								setTimeout(() => { viewerElement.frameEl.src = currentSrc; }, 50);
+							}
+							resetTimeout();
+							showToast('🔄 Refreshing...', 'info');
+						});
+				}
+				resetTimeout();
+			}
+
+			addTab(tabId, `👁️ ${fileName}`, page, null, filePath, null);
+			state.tabs[tabId].type = 'viewer';
+			state.tabs[tabId].previewUrl = url;
+			state.tabs[tabId].isPDF = isPDF;
+			state.tabs[tabId].viewerElement = viewerElement;
+			switchPage(tabId);
+			showToast(`👁️ Opened in Viewer: ${fileName}`, 'success');
+		} catch (e) {
+			showToast(`Preview failed: ${e.message}`, 'error');
+			console.error('Viewer error:', e);
+		}
+	}
+
+	function closeCurrent() {
+		const id = state.currentPage;
+		if (id === 'filepicker' || id === 'settings') return;
+		const tab = state.tabs[id];
+		if (!tab) return;
+
+		if (tab.type === 'viewer') {
+			switchPage('filepicker');
+			removeTab(id);
+			showToast(`Closed preview: ${tab.name.replace('👁️ ', '')}`, 'info');
+			return;
 		}
 
-		addTab(tabId, `👁️ ${fileName}`, page, null, filePath, null);
-		state.tabs[tabId].type = 'viewer';
-		state.tabs[tabId].previewUrl = url;
-		state.tabs[tabId].isPDF = isPDF;
-		state.tabs[tabId].viewerElement = viewerElement;
-		switchPage(tabId);
-		showToast(`👁️ Opened in Viewer: ${fileName}`, 'success');
-	} catch (e) {
-		showToast(`Preview failed: ${e.message}`, 'error');
-		console.error('Viewer error:', e);
-	}
-}
-
-function closeCurrent() {
-	const id = state.currentPage;
-	if (id === 'filepicker' || id === 'settings') return;
-	const tab = state.tabs[id];
-	if (!tab) return;
-
-	if (tab.type === 'viewer') {
+		if (tab.editor?.value !== tab.content) {
+			if (!confirm(`Unsaved changes in "${tab.name.replace('📝 ', '')}". Close anyway?`)) return;
+		}
 		switchPage('filepicker');
 		removeTab(id);
-		showToast(`Closed preview: ${tab.name.replace('👁️ ', '')}`, 'info');
-		return;
+		showToast(`Closed: ${tab.name.replace('📝 ', '')}`, 'info');
 	}
 
-	if (tab.editor?.value !== tab.content) {
-		if (!confirm(`Unsaved changes in "${tab.name.replace('📝 ', '')}". Close anyway?`)) return;
-	}
-	switchPage('filepicker');
-	removeTab(id);
-	showToast(`Closed: ${tab.name.replace('📝 ', '')}`, 'info');
-}
+	function initFilePicker() {
+		if (state.systemPages.filepicker.init) return;
+		try {
+			fpContainer.innerHTML = '<div class="fp-placeholder"><div class="spinner"></div><div>Initializing...</div></div>';
+			const wrapper = mods.fp();
+			const picker = wrapper.querySelector('.file-picker-container-wrapper');
+			if (!picker) throw new Error('Picker container not found');
 
-function initFilePicker() {
-	if (state.systemPages.filepicker.init) return;
-	try {
-		fpContainer.innerHTML = '<div class="fp-placeholder"><div class="spinner"></div><div>Initializing...</div></div>';
-		const wrapper = mods.fp();
-		const picker = wrapper.querySelector('.file-picker-container-wrapper');
-		if (!picker) throw new Error('Picker container not found');
+			picker.addEventListener('filepick', (e) => {
+					pendingFilePath = e.detail.filePath;
+					modalFileName.textContent = pendingFilePath.split('/').pop() || pendingFilePath;
+					viewerUrlPreview.textContent = convertFilePathToUrl(pendingFilePath);
+					modal.style.display = 'flex';
+				});
 
-		picker.addEventListener('filepick', (e) => {
-				const filePath = e.detail.filePath;
-				pendingFilePath = filePath;
-				modalFileName.textContent = filePath.split('/').pop() || filePath;
-				viewerUrlPreview.textContent = convertFilePathToUrl(filePath);
-				modal.style.display = 'flex';
-			});
-
-		fpContainer.innerHTML = '';
-		fpContainer.appendChild(picker);
-		state.systemPages.filepicker.init = true;
-		showToast('File picker ready', 'info');
-	} catch (e) {
-		fpContainer.innerHTML = `<div class="fp-placeholder" style="color:#c50f1f">Error: ${e.message}</div>`;
-		showToast(`Picker error: ${e.message}`, 'error');
-		console.error('Picker init failed:', e);
-	}
-}
-
-let pendingFilePath = null;
-function hideOpenModal() {
-	modal.style.display = 'none';
-	pendingFilePath = null;
-	viewerUrlPreview.textContent = '';
-}
-
-closeModalBtn?.addEventListener('click', hideOpenModal);
-modal?.addEventListener('click', (e) => { if (e.target === modal) hideOpenModal(); });
-openEditorBtn?.addEventListener('click', () => { if (pendingFilePath) openFile(pendingFilePath); hideOpenModal(); });
-openViewerBtn?.addEventListener('click', () => { if (pendingFilePath) openFileInViewer(pendingFilePath); hideOpenModal(); });
-pageSel.addEventListener('change', e => switchPage(e.target.value));
-closeBtn.addEventListener('click', closeCurrent);
-
-setProjectBtn.addEventListener('click', setAsCurrentProject);
-compileProjectBtn.addEventListener('click', compileProject);
-runProjectBtn.addEventListener('click', runProject);
-
-document.addEventListener('keydown', e => {
-		const isEditorTab = state.currentPage in state.tabs && (state.tabs[state.currentPage].type === 'editor' || state.tabs[state.currentPage].type === undefined);
-		const isSettings = state.currentPage === 'settings';
-		const isModalOpen = modal.style.display === 'flex';
-
-		if (e.key === 'Escape' && isModalOpen) { e.preventDefault(); hideOpenModal(); return; }
-		if ((e.ctrlKey || e.metaKey) && e.key === 'w') { e.preventDefault(); !closeBtn.disabled && closeCurrent(); }
-		if ((e.ctrlKey || e.metaKey) && e.key === 'o') { e.preventDefault(); switchPage('filepicker'); }
-		if ((e.ctrlKey || e.metaKey) && e.key === '`') { e.preventDefault(); toggleConsole(); }
-		if (e.key === 'Escape') {
-			if (isEditorTab) switchPage('filepicker');
-			else if (isSettings) document.activeElement?.blur();
+			fpContainer.innerHTML = '';
+			fpContainer.appendChild(picker);
+			state.systemPages.filepicker.init = true;
+			showToast('File picker ready', 'info');
+		} catch (e) {
+			fpContainer.innerHTML = `<div class="fp-placeholder" style="color:#c50f1f">Error: ${e.message}</div>`;
+			showToast(`Picker error: ${e.message}`, 'error');
+			console.error('Picker init failed:', e);
 		}
-		if ((e.ctrlKey || e.metaKey) && e.key === ',') { e.preventDefault(); switchPage('settings'); }
-	});
+	}
 
-setTimeout(async () => {
-		initFilePicker();
-		showToast('Ready', 'info');
-		updateStatus('File browser');
-		setTimeout(() => { restoreTabsState(); }, 500);
-	}, 300);
+	function hideOpenModal() {
+		modal.style.display = 'none';
+		pendingFilePath = null;
+		viewerUrlPreview.textContent = '';
+	}
 
-window.addEventListener('beforeunload', () => { saveTabsState(); });
+	closeModalBtn?.addEventListener('click', hideOpenModal);
+	modal?.addEventListener('click', (e) => { if (e.target === modal) hideOpenModal(); });
+	openEditorBtn?.addEventListener('click', () => { if (pendingFilePath) openFile(pendingFilePath); hideOpenModal(); });
+	openViewerBtn?.addEventListener('click', () => { if (pendingFilePath) openFileInViewer(pendingFilePath); hideOpenModal(); });
+	pageSel.addEventListener('change', e => switchPage(e.target.value));
+	closeBtn.addEventListener('click', closeCurrent);
 
-window.dev = {
-	state, openFile, openFileInViewer, closeCurrent, switchPage,
-	convertFilePathToUrl, isPDFFile, saveTabsState, restoreTabsState,
-	compileAndRunCurrentFile, compileProject, runProject, setAsCurrentProject
-};
-</script>
-</body>
-</html>
+	setProjectBtn.addEventListener('click', setAsCurrentProject);
+	compileProjectBtn.addEventListener('click', compileProject);
+	runProjectBtn.addEventListener('click', runProject);
+
+	document.addEventListener('keydown', e => {
+			const isEditorTab = state.currentPage in state.tabs && (state.tabs[state.currentPage].type === 'editor' || state.tabs[state.currentPage].type === undefined);
+			const isSettings = state.currentPage === 'settings';
+			const isModalOpen = modal.style.display === 'flex';
+
+			if (e.key === 'Escape' && isModalOpen) { e.preventDefault(); hideOpenModal(); return; }
+			if ((e.ctrlKey || e.metaKey) && e.key === 'w') { e.preventDefault(); !closeBtn.disabled && closeCurrent(); }
+			if ((e.ctrlKey || e.metaKey) && e.key === 'o') { e.preventDefault(); switchPage('filepicker'); }
+			if ((e.ctrlKey || e.metaKey) && e.key === '`') { e.preventDefault(); toggleConsole(); }
+			if (e.key === 'Escape') {
+				if (isEditorTab) switchPage('filepicker');
+				else if (isSettings) document.activeElement?.blur();
+			}
+			if ((e.ctrlKey || e.metaKey) && e.key === ',') { e.preventDefault(); switchPage('settings'); }
+		});
+
+	// Listen for console messages from JS viewer iframes
+	window.addEventListener('message', (e) => {
+			if (e.data && e.data.type === 'js-console') {
+				const { tabId, level, msg } = e.data;
+				const consoleOut = document.getElementById(`jsConsoleOutput-${tabId}`);
+				if (consoleOut) {
+					const div = document.createElement('div');
+					div.className = level === 'error' ? 'log-error' : level === 'warn' ? 'log-warn' : 'log-info';
+					div.textContent = msg;
+					consoleOut.appendChild(div);
+					consoleOut.scrollTop = consoleOut.scrollHeight;
+				}
+			}
+		});
+
+	setTimeout(async () => {
+			initFilePicker();
+			showToast('Ready', 'info');
+			updateStatus('File browser');
+			setTimeout(() => { restoreTabsState(); }, 500);
+		}, 300);
+
+	window.addEventListener('beforeunload', () => { saveTabsState(); });
+
+	window.dev = {
+		state, openFile, openFileInViewer, closeCurrent, switchPage,
+		convertFilePathToUrl, isPDFFile, saveTabsState, restoreTabsState,
+		compileAndRunCurrentFile, compileProject, runProject, setAsCurrentProject
+	};
+	</script>
+	</body>
+	</html>
