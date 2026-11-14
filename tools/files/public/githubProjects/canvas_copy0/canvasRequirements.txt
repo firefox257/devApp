@@ -1,0 +1,209 @@
+================================================================================
+SVG 2.0 FEATURE REQUIREMENTS FOR C++ CANVAS2D LIBRARY (COMPLETE)
+================================================================================
+This document outlines the comprehensive feature requirements to elevate the 
+pure C++ `Canvas2D` software rasterizer to fully align with the SVG 2.0 
+specification, including Image and Text/Font rendering. 
+
+These requirements are designed to be strictly compatible with the Autogen 
+WebAssembly runtime (shared memory, multi-worker concurrency, no standard 
+C++ threading, explicit memory management).
+
+================================================================================
+1. CORE PATH & GEOMETRY ENGINE
+================================================================================
+1.1 Standardized Path Commands
+- Support all SVG path commands: M/m (Move), L/l (Line), H/h (Horizontal), 
+  V/v (Vertical), C/c (Cubic Bezier), S/s (Smooth Cubic), Q/q (Quadratic), 
+  T/t (Smooth Quadratic), A/a (Elliptical Arc), Z/z (ClosePath).
+1.2 Robust Elliptical Arc Implementation
+- Full compliance with SVG arc parameterization: rx, ry, x-axis-rotation, 
+  large-arc-flag, sweep-flag, x, y.
+- Must handle degenerate cases (e.g., rx=0, ry=0, or points coinciding) by 
+  falling back to straight lines without crashing.
+1.3 Path Normalization
+- Internal conversion of all relative commands to absolute coordinates.
+- Conversion of smooth curves (S, T) into standard cubic/quadratic curves 
+  by calculating missing control points based on the previous command's 
+  reflection.
+
+================================================================================
+2. ADVANCED STROKE RENDERING ENGINE
+================================================================================
+2.1 Stroke Properties
+- stroke-width: Variable width support.
+- stroke-linecap: Explicit support for 'butt' (default), 'round', and 'square'.
+- stroke-linejoin: Explicit support for 'miter' (default), 'round', and 'bevel'.
+- stroke-miterlimit: Threshold (default 4.0) to automatically convert miter 
+  joins to bevel joins when the miter length exceeds the limit.
+2.2 Dashed Stroke Support
+- stroke-dasharray: Array of lengths specifying alternating dashes and gaps.
+- stroke-dashoffset: Starting offset into the dash array.
+- Implementation Requirement: A pre-rasterization "dash generator" that takes 
+  a solid Path2D and outputs a new Path2D containing only the visible dash 
+  segments, which are then rendered as solid strokes.
+
+================================================================================
+3. FILL & PAINT SERVERS
+================================================================================
+3.1 Fill Rules
+- fill-rule: Support for both 'evenodd' and 'nonzero' (SVG default). 
+- Implementation Requirement: The 'nonzero' rule requires the edge-building 
+  phase in `fill_path` to track the direction (sign of dy) of each segment 
+  to calculate the winding number correctly.
+3.2 Paint Servers (Gradients)
+- LinearGradient: Defined by (x1, y1) to (x2, y2), with a list of color stops 
+  (offset 0.0 to 1.0, color, opacity). Must support gradientTransform.
+- RadialGradient: Defined by (cx, cy, r) and optional (fx, fy, fr), with color 
+  stops. Must support gradientTransform.
+- Implementation Requirement: Gradients must be evaluated per-pixel (or per-scanline) 
+  during the rasterization loop, mapping screen coordinates back to gradient 
+  space using the inverse transformation matrix.
+3.3 Patterns
+- pattern: Tiling of a predefined Path2D, gradient, or image across the fill 
+  area, supporting patternTransform and bounding box modes (userSpaceOnUse 
+  vs objectBoundingBox).
+
+================================================================================
+4. TRANSFORMATION & STATE MANAGEMENT
+================================================================================
+4.1 Affine Transformation Matrix
+- A 2x3 matrix (or 3x3 homogeneous) representing: translate, scale, rotate, 
+  skewX, skewY, and arbitrary matrix(a, b, c, d, e, f).
+- All path coordinates, gradient coordinates, and image/text bounds must be 
+  multiplied by the current transformation matrix (CTM) before rasterization.
+4.2 State Stack
+- save(): Pushes the current CTM, fill style, stroke style, line properties, 
+  clip path, and global alpha onto a stack.
+- restore(): Pops the state stack, restoring all previous properties.
+- Essential for hierarchical SVG rendering (<g> elements).
+
+================================================================================
+5. CLIPPING & MASKING
+================================================================================
+5.1 Path Clipping (clip-path)
+- Ability to set an arbitrary Path2D as the active clipping region.
+- Implementation Requirement: During rasterization, pixels or scanline segments 
+  must be intersected with the active clip path. Optimization: Use the clip 
+  path's bounding box to cull rasterization work early.
+5.2 Alpha & Luminance Masking (mask)
+- Ability to use a grayscale or alpha raster buffer (or another rendered element) 
+  to modulate the opacity of the target shape on a per-pixel basis.
+
+================================================================================
+6. COMPOSITING & BLEND MODES
+================================================================================
+6.1 Global Composite Operation
+- Support for standard Porter-Duff compositing operators:
+  * source-over (default), source-in, source-out, source-atop
+  * destination-over, destination-in, destination-out, destination-atop
+  * clear, copy
+6.2 Blend Modes
+- Support for standard SVG/CSS blend modes applied to the stroke/fill before 
+  compositing: normal, multiply, screen, overlay, darken, lighten, color-dodge, 
+  color-burn, hard-light, soft-light, difference, exclusion, hue, saturation, 
+  color, luminosity.
+
+================================================================================
+7. MARKERS
+================================================================================
+7.1 Marker Attachment
+- marker-start, marker-mid, marker-end: Ability to attach a predefined Path2D 
+  (the "marker") to the vertices of a rendered path.
+7.2 Marker Orientation & Scaling
+- orient="auto": The marker must automatically rotate to match the tangent 
+  angle of the path at the attachment vertex.
+- Markers are rendered as separate, filled/stroked paths, transformed 
+  (translated, rotated, and scaled) to the target vertex *after* the main 
+  path is rendered to ensure they draw on top.
+
+================================================================================
+8. FILTERS & EFFECTS (SVG 2.0)
+================================================================================
+8.1 Basic Raster Filters
+- feDropShadow: Offset, blur radius, and color.
+- feGaussianBlur: Standard deviation-based blurring.
+- feColorMatrix: 5x4 matrix for color space transformations (saturate, hue-rotate).
+- Implementation Requirement: Filters operate on the rasterized bounding box 
+  of the element. Requires a temporary off-screen buffer (allocated via 
+  Autogen shared memory `malloc`) to hold the pre-filter raster data, apply 
+  the convolution/matrix, and composite the result back to the main canvas.
+
+================================================================================
+9. IMAGE RENDERING (`<image>`)
+================================================================================
+9.1 Image Embedding & Placement
+- Support for raster image embedding (PNG, JPEG, WebP).
+- Attributes: `x`, `y`, `width`, `height`, and `href`/`xlink:href`.
+9.2 Aspect Ratio Preservation
+- preserveAspectRatio: Full support for SVG alignment parameters (e.g., 
+  xMinYMin, xMidYMid, xMaxYMax) and meeting/slicing behavior (meet, slice, none).
+- Implementation Requirement: Calculate the source-to-destination mapping 
+  rectangle based on the aspect ratio rules before sampling.
+9.3 Decoding Pipeline (Autogen Integration)note: not part of requirements spec keep note.
+- Images cannot be decoded synchronously in C++ without heavy WASM bloat.
+- Workflow: C++ triggers `ag_ext_async` to request image load -> JS Main Thread 
+  fetches and decodes the image (via `createImageBitmap` or OffscreenCanvas) -> 
+  JS extracts raw RGBA pixel data into a SharedArrayBuffer -> JS returns the 
+  shared memory pointer, width, and height to C++ -> C++ `Canvas2D` performs 
+  high-quality bilinear or nearest-neighbor sampling to draw the image into 
+  the target buffer, respecting the CTM and clip paths.
+
+================================================================================
+10. TEXT & TYPOGRAPHY (`<text>`, `<tspan>`)
+================================================================================
+10.1 Text Layout & Positioning
+- Attributes: `x`, `y`, `dx`, `dy`, `rotate` (per-character rotation).
+- text-anchor: Support for 'start' (default), 'middle', and 'end' alignment 
+  relative to the given (x, y) coordinates.
+- dominant-baseline: Support for 'auto', 'middle', 'central', 'hanging', and 
+  'alphabetic' to correctly position text vertically.
+10.2 Font Styling
+- Properties: `font-family`, `font-size`, `font-weight` (normal, bold, numeric), 
+  `font-style` (normal, italic), `letter-spacing`, `word-spacing`.
+10.3 Vector Glyph Rendering (True SVG Compliance)
+- Implementation Requirement: To support arbitrary scaling, stroking, and 
+  transformation of text, text must be rendered as vector paths, not pre-baked 
+  bitmaps.
+- Workflow: 
+  1. JS Main Thread loads font files (TTF/OTF/WOFF) and parses them using a 
+     library like `opentype.js`.
+  2. JS extracts the glyph path commands (M, L, C, Z) for the requested string.
+  3. JS transfers these path commands (as compact shared memory arrays) to C++.
+  4. C++ `Canvas2D` constructs `Path2D` objects for each glyph, applies 
+     `text-anchor` and `dominant-baseline` translations, applies the current 
+     CTM, and renders them using the existing `fill_path` and `stroke_path` 
+     engines. This ensures text perfectly inherits gradients, strokes, and filters.
+10.4 Fallback Mechanism
+- If a specific font fails to load, gracefully fall back to a built-in basic 
+  font (e.g., a simple Hershey font or default sans-serif glyph set compiled 
+  into the WASM binary) to prevent rendering failures.
+
+================================================================================
+11. AUTOGEN-SPECIFIC ARCHITECTURAL CONSTRAINTS
+================================================================================
+11.1 Shared Memory Compliance
+- All state objects (Gradients, Transforms, large Path2D arrays, decoded image 
+  buffers, glyph path data) must be allocated via `malloc`/`new` to reside in 
+  the shared `AtomicMalloc` heap.
+- No thread-local storage or stack pointers may be passed between workers.
+11.2 (this is no longer a requirment keep for notes) Tile-Based Multi-Worker Rasterization
+- To leverage Autogen's multi-threading, `Canvas2D` fill/stroke/image operations 
+  should be divisible into horizontal scanline bands or grid tiles.
+- Worker 0 (Main) partitions the bounding box of the shape into N tiles.
+- Workers 1 to D+U are dispatched via `ag_async` to rasterize their assigned 
+  tiles directly into the shared `uint32_t* buffer`. Tile boundaries must 
+  include a 1-2 pixel overlap margin to ensure anti-aliasing continuity 
+  without requiring inter-worker `ag_spinlock` contention.
+11.3 Memory Lifecycle & Cleanup
+- The `Canvas2D` destructor must explicitly `free` the primary buffer.
+- Any dynamically allocated gradient stops, dash arrays, image pixel buffers, 
+  or glyph path arrays must be explicitly managed (e.g., via a shared 
+  `ResourceRegistry` or explicit `free` calls) to prevent shared heap leaks.
+- JS-side extensions must rigorously follow the Autogen Phase 2 memory rules: 
+  JS allocates return buffers, C++ reads and frees them, or vice versa, 
+  without double-freeing or leaking SharedArrayBuffer memory.
+
+================================================================================
+END OF REQUIREMENTS
+================================================================================

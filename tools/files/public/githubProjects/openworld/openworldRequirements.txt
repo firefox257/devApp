@@ -1,0 +1,530 @@
+================================================================
+PROJECT AETHER — OPEN WORLD GAME ENGINE
+TECHNICAL REQUIREMENTS SPECIFICATION (TRD)
+Version 0.1 — DRAFT
+================================================================
+
+PURPOSE
+  A single cross-platform engine for seamless open-world games,
+  first-person POV, supporting both fantasy and sci-fi content,
+  shipping on iPhone / mobile and native XR (VR + mixed reality).
+
+LEGEND
+  [M] MUST    = release-blocking
+  [S] SHOULD  = target for v1, deferrable with sign-off
+  [C] COULD   = future / stretch goal
+  SHALL       = mandatory behavior
+  TARGET      = measurable budget to validate on hardware
+
+SCOPE ASSUMPTIONS
+  - Desktop editor; mobile + standalone XR are the shipping targets.
+  - One codebase, one gameplay simulation, platform-specific presentation.
+  - Fantasy and sci-fi are content packs, not separate engine forks.
+  - Single-player / co-op first; large-scale multiplayer is deferred.
+
+================================================================
+1. TARGET PLATFORMS
+================================================================
+
+  TIER  TARGET                      API         BASELINE
+  ----  --------------------------  ----------  ---------------------------
+  A1    iPhone (reference)          Metal       iPhone 12 / A14, iOS 16+
+  A2    iPhone (target)             Metal       iPhone 15 / A16 and newer
+  B     Android mid/high            Vulkan      6 GB RAM, Android 12+
+  C1    Standalone XR               OpenXR      Meta Quest 3 / PICO 4 Ultra
+  C2    Standalone XR (lower)       OpenXR      Quest 3S / Quest 2 class
+  D     Native MR / spatial         Metal+OS    visionOS, Quest passthrough
+  E     PC / tethered XR (scale-up) D3D/Vulkan  Future, not launch-blocking
+
+PLAT-001 [M] The engine SHALL build and run the same project on tiers
+             A1, A2, B, C1, C2 and D without source changes to gameplay.
+PLAT-002 [M] All platform-specific code SHALL live behind a Hardware
+             Abstraction Layer (HAL). No platform ifdefs in gameplay.
+PLAT-003 [M] Native XR SHALL be a first-class runtime mode, not a
+             ported mobile build with a stereo camera hack.
+PLAT-004 [S] OpenXR SHALL be the primary XR integration path, with
+             native fallbacks for vendor-only features (hand tracking,
+             passthrough, foveation, guardian).
+PLAT-005 [M] The engine SHALL query capabilities at runtime and select
+             a quality tier; it SHALL NOT assume a device model.
+
+================================================================
+2. PERFORMANCE BUDGETS (INITIAL — VALIDATE IN MILESTONE 0)
+================================================================
+
+  METRIC                  A1      A2      C1      C2
+  ----------------------  ------  ------  ------  ------
+  Target frame rate       60      60      90      72
+  Frame time              16.6ms  16.6ms  11.1ms  13.9ms
+  Main thread CPU         <=6ms   <=5ms   <=5ms   <=6ms
+  GPU, both eyes combined n/a     n/a     <=8.5ms <=11ms
+  Visible triangles       150k    250k    200k    150k
+  Draw calls (total)      120     180     180     140
+  Resident memory         1.2 GB  1.6 GB  1.4 GB  1.1 GB
+  Texture memory          350 MB  512 MB  450 MB  350 MB
+  Active world radius     250 m   400 m   200 m   160 m
+
+  NOTES
+  - XR budgets are TOTAL per frame across both eyes.
+  - Eco mode drops to 30 fps on all tiers.
+  - Budgets are hard CI limits once validated, not aspirations.
+
+PERF-001 [M] The engine SHALL expose every budget above as a
+             configurable, profileable value per quality tier.
+PERF-002 [M] 99th-percentile frame time SHALL stay within the target
+             frame budget during sustained world traversal.
+PERF-003 [M] Frame pacing SHALL be consistent; no periodic spikes
+             from GC, streaming, or asset compilation.
+
+================================================================
+3. CORE ARCHITECTURE
+================================================================
+
+ARCH-001 [M] Use a multithreaded, data-oriented Entity Component
+             System (ECS) with structure-of-arrays storage.
+ARCH-002 [M] Simulation SHALL run at a fixed timestep (60 Hz),
+             independent of render rate, with render interpolation.
+ARCH-003 [M] Head pose SHALL NEVER be interpolated or fixed-step
+             delayed in XR. Tracking-to-photon path stays direct.
+ARCH-004 [M] Provide a work-stealing job system with bounded job
+             counts; platform APIs callable only from the main thread.
+ARCH-005 [M] Use pooled allocators and preallocated containers in
+             hot paths. No per-frame garbage generation.
+ARCH-006 [M] Enforce a hard, configurable resident-memory ceiling
+             per tier. Exceeding it SHALL trigger eviction, not OOM.
+ARCH-007 [M] Asset loading SHALL be async, addressable, prioritized,
+             cancellable, and reference-counted.
+ARCH-008 [M] All gameplay content (weapons, spells, items, biomes,
+             factions, quests) SHALL be data-driven.
+ARCH-009 [M] Support app suspend/resume, focus loss, XR session
+             interruption, and thermal notifications without loss
+             of player state.
+ARCH-010 [S] Provide a deterministic simulation subset for replays,
+             automated tests, and future networking.
+ARCH-011 [S] Subsystems SHALL be modular so fantasy and sci-fi packs
+             register their own components, shaders and VFX.
+
+================================================================
+4. OPEN WORLD & STREAMING
+================================================================
+
+WORLD-001 [M] Hierarchical streaming: micro-cells (64-128 m) inside
+              macro-sectors (512 m-1 km), loaded asynchronously by
+              view direction, velocity and importance.
+WORLD-002 [M] Normal traversal SHALL have zero loading screens and
+              zero visible pop-in. Fast travel may load.
+WORLD-003 [M] Provide HLOD, impostors, dither/crossfade and prefetch
+              to hide streaming transitions.
+WORLD-004 [M] Seamless interior/exterior transitions with independent
+              interior streaming and occlusion portals.
+WORLD-005 [M] Chunked terrain with progressive LOD (CDLOD/clipmap),
+              GPU-driven where supported, CPU fallback otherwise.
+WORLD-006 [M] Runtime virtual texturing with tiled mip streaming;
+              standard material fallback on low-tier devices.
+WORLD-007 [M] Culling stack: frustum + distance + Hi-Z occlusion +
+              importance. CPU occlusion fallback where GPU queries
+              are unavailable.
+WORLD-008 [M] 4-6 automatic LOD levels per asset. XR SHALL use
+              geometry swap + fade, not alpha-dither crossfade.
+WORLD-009 [M] Target a continuous authored/streamed world of at
+              least 16 km², with hybrid authored + procedural content.
+WORLD-010 [M] Data-driven biome blending (noise + splat maps) so a
+              sci-fi city can transition into a fantasy forest.
+WORLD-011 [M] GPU instancing / batching for vegetation, rocks,
+              debris and repeated architecture.
+WORLD-012 [M] Streaming navigation mesh with off-mesh links;
+              agent simulation LOD by distance (full -> abstract
+              -> dormant).
+WORLD-013 [M] Unified deterministic world time, day/night cycle,
+              weather and fog that affect both rendering and gameplay.
+WORLD-014 [M] Persist world state by stable entity GUID, never by
+              cell index or spawn order.
+WORLD-015 [S] Fast travel, waypoints and streaming-anchor prefetch
+              for player-directed jumps across the map.
+
+================================================================
+5. RENDERING & VISUAL FIDELITY
+================================================================
+
+RND-001 [M] Forward+ primary pipeline for mobile and XR.
+            Deferred optional on scale-up tier only.
+RND-002 [M] Scalable PBR material system: metalness/roughness,
+            emissive, occlusion, with per-tier feature stripping.
+RND-003 [M] Fantasy shading pack: subsurface approximation,
+            magical emission, volumetric mist, optional stylized /
+            toon rendering path.
+RND-004 [M] Sci-fi shading pack: holograms (fresnel + scanline),
+            energy shields, hard-surface reflections, neon emission.
+RND-005 [M] Baseline lighting = baked lightmaps + reflection/light
+            probes. Real-time directional light with 1-2 cascaded
+            shadow maps on mobile, 2-3 on high XR.
+RND-006 [M] No full dynamic global illumination or path tracing on
+            mobile/XR. Provide baked + probe approximations.
+RND-007 [M] XR SHALL use single-pass instanced stereo rendering.
+            MSAA 2-4x. No screen-space effects that break per-eye
+            correctness. Avoid temporal AA in XR.
+RND-008 [S] Hardware foveated rendering where eye tracking exists;
+            graceful disabled path elsewhere.
+RND-009 [M] Node-based GPU VFX system with CPU fallback, pooling,
+            and per-tier particle/count/overdraw budgets.
+RND-010 [M] Explicit overdraw budget. Cap stacked transparent
+            fullscreen effects (fog + rain + bloom + DOF).
+RND-011 [M] Post stack: bloom, color grade, vignette, optional DOF.
+            DOF and motion blur OFF by default in XR.
+RND-012 [M] Per-system quality overrides plus automatic global
+            quality scaling driven by thermal and frame timing.
+RND-013 [S] HDR output on supported devices with SDR fallback and
+            consistent grading across both.
+
+================================================================
+6. FIRST-PERSON POV & CHARACTER
+================================================================
+
+POV-001 [M] Separate the camera rig into BODY (locomotion/collision)
+            and HEAD (tracked pose). Neck/shoulder offset, seated
+            and standing profiles, IPD handling.
+POV-002 [M] First-person body with procedural IK for arms and hands;
+            self-culling and wall-clipping prevention.
+POV-003 [M] Held-object system: socket attachment AND physical
+            attachment, one/two-handed weapons, tools and props.
+POV-004 [M] Dedicated viewmodel render layer with its own near
+            plane and stereo-correct depth; no world clipping.
+POV-005 [M] Interaction reach configurable per platform
+            (XR default 0.7-1.2 m; mobile aim-assisted reach).
+POV-006 [M] Foot/hand IK, slope adaptation, step offset, crouch,
+            and lean (real body lean in XR, comfort-lean option).
+POV-007 [M] No involuntary camera roll or head bob in XR.
+            Mobile head bob optional and off by default.
+POV-008 [M] Aim origin defined explicitly: head-center for mobile
+            reticle, controller/hand ray for XR. Document it.
+
+================================================================
+7. GAMEPLAY SYSTEMS (FANTASY + SCI-FI)
+================================================================
+
+GAME-001 [M] Unified interaction verb system: grab, push, pull,
+            use, equip, cast, fire, hack, talk, operate.
+            One verb set, many genre-specific implementations.
+GAME-002 [M] Fantasy: melee arcs + physics weapons, spell casting
+            (gesture and button), mana/stamina, summons, crafting.
+GAME-003 [M] Sci-fi: hitscan and projectile ballistics, shields,
+            terminals/hacking, gravitation variants, vehicles.
+GAME-004 [M] Shared damage / resistance / energy / status-effect
+            pipeline so fireballs and plasma bolts use the same
+            simulation and feedback path.
+GAME-005 [M] Data-driven inventory with weight/slots, equip slots,
+            and diegetic presentation hooks.
+GAME-006 [M] Data-driven quest/objective system that is aware of
+            streaming (defer offscreen triggers, never lose state).
+GAME-007 [M] Modular genre packs: content + materials + VFX +
+            audio + input presets, loadable independently.
+GAME-008 [S] Vehicles and flight with dedicated comfort modes
+            (locked horizon, reduced FOV effects, no forced roll).
+GAME-009 [S] Climbing, swimming and traversal abilities with
+            XR-safe transitions (no forced camera translation).
+
+================================================================
+8. PHYSICS & OBJECT INTERACTION
+================================================================
+
+PHY-001 [M] Fixed-step physics with spatial-hash broadphase,
+            sleeping bodies, and a hard active-body budget
+            (64 mobile / 128 XR).
+PHY-002 [M] Physics-driven interaction: weight, momentum, friction,
+            grab constraints, velocity-based throwing, two-handed
+            lifting. Essential for XR hand interaction.
+PHY-003 [M] Swept/continuous collision for fast projectiles and
+            thrown objects. No tunneling through thin geometry.
+PHY-004 [M] Pooled ragdolls with a max simultaneous count and
+            distance-based fade-out.
+PHY-005 [M] Character controller: capsule, step offset, slope
+            limit, head-vs-body collision separation in XR.
+PHY-006 [S] Authored fracture presets for destruction; full
+            real-time destructible terrain is out of scope.
+PHY-007 [S] Buoyancy and fluid volume interactions for swimming
+            and sci-fi zero-g sections.
+
+================================================================
+9. LOCOMOTION & XR COMFORT
+================================================================
+
+LOC-001 [M] Mobile: virtual stick + touch look, optional gyro
+            aim, toggle/hold sprint, configurable sensitivity.
+LOC-002 [M] XR smooth locomotion: head-relative or hand-relative,
+            configurable accel/decel curves.
+LOC-003 [M] XR teleport: arc preview, valid-surface marker,
+            snap-to-floor, optional fade transition.
+LOC-004 [M] Snap turn at 15 / 30 / 45 degrees; continuous turn
+            optional with peripheral attenuation.
+LOC-005 [M] Comfort vignette / peripheral masking tied to velocity
+            and turn rate, with intensity slider.
+LOC-006 [M] NEVER move or rotate the camera without explicit user
+            intent in XR. No cutscene camera pushes in VR.
+LOC-007 [M] Seated / standing profiles, play-area bounds,
+            recenter, and platform guardian/space-system integration.
+LOC-008 [M] A persistent comfort settings profile: locomotion
+            mode, turn mode, snap angle, vignette, bob, smoothing.
+LOC-009 [M] Fall, damage, and out-of-bounds recovery via teleport
+            rather than forced camera animation.
+LOC-010 [S] Onboarding comfort calibration session before first
+            open-world play.
+
+================================================================
+10. INPUT & DEVICE ABSTRACTION
+================================================================
+
+IN-001 [M] One action-mapping layer translating touch, gamepad,
+           keyboard/mouse, XR controllers, hands, and gaze+pinch
+           into the same semantic actions.
+IN-002 [M] Concurrent inputs and hot-swap between them without
+           restarting or losing context.
+IN-003 [M] Native hand tracking: pinch, grab, palm, poke, with
+           controller fallback and hand-world occlusion.
+IN-004 [M] Unified haptics API mapped to Core Haptics, Android
+           Vibration, and XR controller impulse (amplitude +
+           frequency + envelope).
+IN-005 [M] Context-aware touch UI; safe-area aware (notch,
+           Dynamic Island, rounded corners); landscape-primary.
+IN-006 [M] Full remapping, left/right hand swap, one-handed mode,
+           hold-vs-toggle, deadzones and response curves.
+IN-007 [M] Tracking-to-photon target <= 20 ms on XR;
+           touch-to-photon target <= 50 ms on mobile.
+IN-008 [S] Gaze + pinch and dwell selection as an accessibility
+           and fallback input path.
+
+================================================================
+11. UI / DIEGETIC HUD
+================================================================
+
+UI-001 [M] Diegetic UI first in XR: wrist projector (sci-fi),
+           magical compass / tome (fantasy), physical ammo and
+           health indicators.
+UI-002 [M] World-space UI rendered with correct stereo depth and
+           convergence; no eye-strain-inducing near-plane panels.
+UI-003 [M] Minimize head-locked UI. Any head-locked element SHALL
+           be configurable and comfort-safe.
+UI-004 [M] Mobile HUD: scalable, context-sensitive, reachable
+           with one thumb, safe-area compliant.
+UI-005 [M] VR menus: world-space panels selectable by ray, hand,
+           or gaze; usable without controllers.
+UI-006 [M] Localization framework: RTL, CJK, dynamic text sizing,
+           glyph atlases, no hardcoded string lengths.
+UI-007 [M] Accessibility: subtitles with speaker direction,
+           colorblind palettes, reduced motion, text scaling,
+           high-contrast HUD mode.
+UI-008 [S] UI scaling and layout preview per target device in-editor.
+
+================================================================
+12. AUDIO & SPATIAL SOUND
+================================================================
+
+AUD-001 [M] 3D spatial audio with HRTF binaural rendering,
+            using head + body pose correctly in XR.
+AUD-002 [M] Audio occlusion and obstruction via scene queries
+            and portal/graph propagation (caves, ships, rooms).
+AUD-003 [M] Material-based footsteps and surface interaction
+            sounds; reverb zones with smooth blending.
+AUD-004 [M] Adaptive stem-based music with horizontal and
+            vertical remixing (explore / combat / stealth).
+AUD-005 [M] Voice budget: 32 concurrent on mobile, 48 on XR;
+            streaming for music, compressed for SFX.
+AUD-006 [M] Audio latency target <= 40 ms; spatial updates
+            locked to the render pose, not the physics pose.
+AUD-007 [S] Platform spatial-audio integration where available
+            (Apple Spatial Audio, vendor XR audio SDKs).
+
+================================================================
+13. PERSISTENCE & CROSS-PLATFORM PROGRESSION
+================================================================
+
+SAVE-001 [M] Versioned save schema with migrations, atomic writes,
+            checksums, and crash-recovery checkpoints.
+SAVE-002 [M] Persist entities by stable GUID; persist procedural
+            worlds by seed + exception delta, not full enumeration.
+SAVE-003 [M] Save/load SHALL reconstruct world state identically
+            across tiers (same progression, different quality).
+SAVE-004 [S] Cloud sync with conflict resolution and a local
+            fallback when offline.
+SAVE-005 [M] Separate per-device settings (quality, comfort,
+            controls) from shared player progression.
+SAVE-006 [M] Auto-save on suspend, session end, and major events.
+SAVE-007 [S] Account / entitlement abstraction over Game Center,
+            Play Games, and XR platform accounts.
+
+================================================================
+14. NETWORKING (DEFERRED / PHASE 2)
+================================================================
+
+NET-001 [S] Architecture SHALL permit a client-server authoritative
+            model; do not bake in lockstep-only assumptions.
+NET-002 [S] Spatial interest management and LOD-based replication
+            tied to the streaming system.
+NET-003 [S] Offline-first single player; networking is an optional
+            subsystem, not a boot dependency.
+NET-004 [C] Server-side rewind / lag compensation for hitscan.
+NET-005 [C] Cross-platform progression and cross-play abstraction.
+
+================================================================
+15. THERMAL, BATTERY & POWER
+================================================================
+
+PWR-001 [M] Monitor OS thermal state (iOS thermalState, Android
+            thermal API, XR thermal signals) every second.
+PWR-002 [M] Automatic quality ladder, in order:
+            resolution -> shadow quality -> particle count ->
+            draw distance -> frame rate cap.
+PWR-003 [M] Quality changes SHALL use hysteresis and minimum
+            step duration. No visible quality oscillation.
+PWR-004 [M] Explicit Eco Mode: 30 fps, no dynamic shadows,
+            reduced draw distance, reduced VFX.
+PWR-005 [M] Suspend simulation and streaming when backgrounded;
+            release non-essential GPU resources.
+PWR-006 [M] Target >= 30 minutes of sustained play on the
+            reference device without OS-level throttling or
+            screen dimming.
+PWR-007 [S] Target >= 60 minutes of active play per charge on
+            the reference iPhone at default quality.
+PWR-008 [M] Expose a live power/thermal telemetry overlay for
+            profiling and QA.
+
+================================================================
+16. ASSET PIPELINE & CONTENT AUTHORING
+================================================================
+
+ASSET-001 [M] On import, auto-generate 4-6 LODs, collision proxies,
+              bounds, and navigation contributions.
+ASSET-002 [M] Texture pipeline to ASTC (mobile/XR), ETC2 fallback,
+              BC7 (desktop); mipchains; KTX2/Basis container.
+ASSET-003 [M] Mesh quantization and compression; GPU-ready runtime
+              format; no runtime JSON parsing of mesh data.
+ASSET-004 [M] Automated budget validator in CI: triangles, draw
+              calls, texture memory, material variants, overdraw.
+              Fail the build on violation.
+ASSET-005 [M] One source asset -> automatic mobile / XR / high
+              material and LOD variants. Artists author once.
+ASSET-006 [M] Documented unit and coordinate convention
+              (1 unit = 1 meter), enforced by the importer.
+ASSET-007 [M] Addressable content bundles with on-demand download,
+              patching, and versioned manifest.
+ASSET-008 [S] Deterministic builds and content hashes for
+              reproducible testing and cloud sync.
+
+================================================================
+17. EDITOR & DEVELOPER TOOLING
+================================================================
+
+TOOL-001 [M] Desktop editor on Windows and macOS; runtime on all
+             shipping tiers.
+TOOL-002 [M] Visual scripting with compiled output, debugger,
+             breakpoints and variable inspection.
+TOOL-003 [M] On-device play/stream with < 50 ms added latency
+             for real-time iPhone and XR iteration.
+TOOL-004 [M] On-device profiler: CPU, GPU, memory, draw calls,
+             streaming, thermal, frame-time graph, frame capture.
+TOOL-005 [M] World editor: terrain painting, scattering, splines,
+             zones, streaming preview, LOD and overdraw heatmaps.
+TOOL-006 [M] In-editor XR preview: stereo view, IPD, seated/
+             standing, simulated controllers and hand poses.
+TOOL-007 [M] Debug toolkit: teleport, entity inspector, god mode,
+             streaming visualizer, comfort simulator, time scale.
+TOOL-008 [S] Automated device-farm regression and golden-frame
+             rendering comparisons.
+TOOL-009 [M] Shipping sample project demonstrating BOTH a fantasy
+             region and a sci-fi region in one continuous world.
+
+================================================================
+18. TESTING & ACCEPTANCE CRITERIA
+================================================================
+
+QA-001 [M] Cold start to playable: <= 5 s mobile, <= 8 s XR
+           on reference hardware.
+QA-002 [M] 60-minute soak traversal: flat memory curve, no leaks,
+           no pop-in, no loading screens, within frame budget.
+QA-003 [M] 99th-percentile frame time within target during
+           maximum-density streaming and combat VFX.
+QA-004 [M] Save/load round-trip fidelity test across all tiers.
+QA-005 [M] XR comfort panel: >= 10 participants, target <= 20%
+           reporting discomfort in a standard 20-minute session.
+QA-006 [M] Input latency measured and within IN-007 budgets.
+QA-007 [M] Nightly device-matrix builds and automated gameplay
+           smoke tests on every tier.
+QA-008 [M] Accessibility audit: remapping, one-handed, subtitles,
+           text scaling, reduced motion, colorblind modes.
+QA-009 [S] Localization overflow and glyph coverage tests for
+           all supported languages.
+QA-010 [M] Thermal and battery acceptance per PWR-006 / PWR-007.
+
+================================================================
+19. PRINCIPAL RISKS & REQUIRED MITIGATIONS
+================================================================
+
+RISK-01  Mobile open world = thermal death.
+         -> Hard budgets, tiered quality, thermal ladder, 60-min soak.
+
+RISK-02  XR motion sickness.
+         -> 72/90 fps, single-pass stereo, foveation where available,
+            comfort suite, no forced camera motion, teleport fallback.
+
+RISK-03  Fantasy / sci-fi visual incoherence.
+         -> Shared PBR + damage + VFX core, modular genre packs,
+            art-direction budget guards in CI.
+
+RISK-04  Memory ceiling on shared-RAM mobile devices.
+         -> Virtual texturing, strict streaming eviction, pooled
+            allocators, hard resident-memory cap.
+
+RISK-05  XR API fragmentation.
+         -> OpenXR first, capability queries, vendor fallback layer,
+            per-device conformance tests.
+
+RISK-06  Stereo rendering doubles cost.
+         -> Instanced single-pass stereo, per-eye LOD, foveation,
+            no full-resolution post on both eyes unnecessarily.
+
+RISK-07  Hand tracking unreliability.
+         -> Every action reachable by controller AND touch AND
+            gaze+pinch. Never hand-tracking-only.
+
+RISK-08  Scope explosion.
+         -> Vertical slice first: one 200 m region containing both
+            genres, running on all three target classes.
+
+================================================================
+20. NON-GOALS FOR v1
+================================================================
+
+  - MMO-scale concurrent worlds (thousands of players).
+  - Fully real-time destructible terrain.
+  - Path-traced / photorealistic dynamic global illumination.
+  - Seamless spherical planet-scale streaming.
+  - Native web-browser runtime.
+  - Console certification (architecture permits it; not in scope).
+  - Third-person as a primary camera mode.
+
+================================================================
+21. MILESTONES
+================================================================
+
+  M0 — VERTICAL SLICE
+       200 m x 200 m region, one fantasy biome + one sci-fi biome,
+       first-person POV, all input modes, runs on A1 / C1 / D.
+       Exit: performance budgets met on physical hardware.
+
+  M1 — STREAMING PROOF
+       1 km² continuous world, HLOD, virtual texturing, thermal
+       ladder, save/load, comfort suite.
+       Exit: 60-minute soak passes on A1 and C1.
+
+  M2 — CONTENT SCALE
+       16 km² world, full authoring tools, genre packs, automated
+       asset validation, cloud progression.
+       Exit: QA-001 through QA-008 pass.
+
+  M3 — RELEASE HARDENING
+       Device matrix certification, accessibility audit, battery
+       targets, localization, content lock.
+       Exit: all [M] requirements verified and signed off.
+
+================================================================
+END OF REQUIREMENTS — v0.1
+================================================================

@@ -1,0 +1,111 @@
+
+
+so at least the live dem didn't crash bitnit isnalso not working. the points are all clustered together not to the requirments at all, lit looks like the points are all random and didn't even have a definable floor or anything. could be maybe it isnout of alignment? also didn't handel real world at all. also when start live it sisn't drop the count down to the live max count eather
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+VERDICT
+Structure follows the classical ORB-SLAM-style pipeline, but several parts are
+simplified in ways that will hurt real-world tracking. The 54 tests use
+synthetic dot grids and mostly check counts, so they won't catch the problems
+below.
+
+LIKELY BUGS (fix first)
+- Map culling breaks keyframe links: cull_map_points compacts g_map, but
+  keyframes store indices (map_point_ids). After the first cull, IDs point at
+  the wrong points. Use stable IDs or a free-list.
+- Duplicate landmarks: every new keyframe re-triangulates all matches instead
+  of associating with existing map points. The map fills with duplicates and
+  the O(n^2) dedup in match_against_local_map has to compensate.
+- IMU frame mismatch: slam_process_frame uses raw gravity, while
+  slam_get_floor_plane flips y/z. Overwriting R's up-axis also changes the
+  camera center (C = -R^T t) because t isn't corrected. Raw
+  accelerationIncludingGravity is noisy, and iOS sign conventions differ
+  from Android.
+- Hull buffer overflow risk: out_hull has no size parameter, so a large hull
+  overruns the caller's buffer.
+- Unscaled thresholds: translation is normalized to 1.0, so the 0.10/0.25
+  distance thresholds and the 0.05 plane tolerance are in arbitrary units,
+  not cm, and are not rescaled after calibration.
+- Shared globals, no locking: Vision and BA workers would race on g_map.
+
+GAPS VS. INDUSTRY STANDARD
+ORB
+- No image pyramid, so no scale invariance.
+- Pattern comes from an LCG instead of OpenCV's learned pairs; no
+  pre-smoothing.
+- Rotated offsets are truncated, not rounded.
+- +/-15 pattern rotates out to ~21 px, past the 16 px margin.
+- FAST score is a contiguous count, not a corner score.
+
+Initialization
+- Mostly planar floor makes the 8-point essential matrix degenerate.
+  Standard: homography vs. fundamental model selection plus a parallax check.
+- The computed F is never used.
+
+RANSAC
+- Sampson threshold 0.001 and PnP threshold 0.001 are ~15-17 px at 60 deg
+  FOV. Typical values are 1-4 px.
+- Fixed iteration counts, not adaptive.
+
+PnP
+- 6-point DLT inside RANSAC; standard is P3P/EPnP.
+- Gauss-Newton refinement runs on all points, outliers included, no LM
+  damping.
+
+Tracking
+- Descriptor matching only: no motion model, no projection-based guided
+  search.
+- No keyframe gating while tracking is lost, so a bad pose can insert
+  keyframes.
+
+"BA"
+- Actually single-keyframe motion-only GN plus a heuristic depth nudge.
+- Real local BA jointly optimizes a keyframe window and points using LM, a
+  Huber kernel, and the Schur complement.
+- Runs synchronously, not in the worker REQ 3.3 requires.
+
+Triangulation
+- Normal equations with no reprojection or parallax checks.
+
+Concave hull
+- Heuristic edge-digging, not a real alpha shape. Use Delaunay with
+  circumradius filtering.
+- Cost is roughly O(h*n^2) per iteration.
+
+SVD
+- Eigendecomposition of A^T A squares the condition number, despite the
+  comment. Use one-sided Jacobi or Golub-Kahan.
+
+Build
+- --export-all leaks internals.
+- <iostream> and always-on DEBUG are risky under -fno-exceptions and in Wasm.
+- No -msimd128, though Safari 16.4+ supports it.
+
+WHAT'S SOLID
+- Strict FAST-9 contiguity check and intensity-centroid orientation.
+- Ratio test, cheirality check, Hartley normalization.
+- Double-precision accumulation in eigensolvers; NaN and degenerate-input
+  guards.
+- Gravity-gated plane RANSAC that rejects before counting inliers.
+
+TEST QUALITY
+- Several asserts are tautologies (assert(true), size() >= 0).
+- Asserts vanish under NDEBUG.
+- No test uses real data (TUM RGB-D, EuRoC) with ATE/RPE metrics.
+
+NEXT STEP
+Start with the culling/ID bug and the IMU frame fix?

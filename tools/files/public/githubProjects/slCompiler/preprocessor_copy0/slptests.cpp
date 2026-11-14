@@ -339,7 +339,7 @@ int main() {
     run_test_str("switch break prevents fallthrough", "A", slp.get("switchBreakTest", 1));
 
     // =========================================================================
-    // Tests 34-40: #token inline definitions and variable updates
+    // Tests 34-41: #token inline definitions and variable updates
     // =========================================================================
     std::vector<std::string> def34 = slp.define(R"({
         #token var inlineVar = 42;
@@ -384,15 +384,62 @@ int main() {
     run_test("define 40", {"missingTest"}, def40);
     run_test_str("missing token error", "Error: Token not found: nonexistent", slp.get("nonexistent"));
 
-
-    // =========================================================================
-    // Test 41: Inline #token var function with backtick interpolation
-    // =========================================================================
     std::vector<std::string> def41 = slp.define(R"({
         #token var inlineInterpFunc = (a, b) -> { return `${a}:${b}`; };
     })");
     run_test("define 41", {"inlineInterpFunc"}, def41);
     run_test_str("inline token func with backtick interpolation", "1:2", slp.get("inlineInterpFunc", 1, 2));
+
+    // =========================================================================
+    // Tests 42-45: String Methods, Edge Cases, Exponentiation, Array Assignment
+    // =========================================================================
+    std::vector<std::string> def42 = slp.define(R"({
+        var strMethodsTest = () -> {
+            var s = "hello";
+            var r1 = s.charAt(1);
+            var r2 = s.charCodeAt(1);
+            var r3 = s.substring(1, 4);
+            var r4 = s.startsWith("he");
+            var r5 = s.endsWith("lo");
+            var r6 = s.indexOf("l");
+            var r7 = s.indexOf("z");
+            return r1 + "," + r2 + "," + r3 + "," + r4 + "," + r5 + "," + r6 + "," + r7;
+        }
+        #token strMethodsTest;
+    })");
+    run_test("define 42", {"strMethodsTest"}, def42);
+    run_test_str("string methods", "e,101,ell,true,true,2,-1", slp.get("strMethodsTest"));
+
+    std::vector<std::string> def43 = slp.define(R"({
+        var strEdgeTest = () -> {
+            var s = "abc";
+            var r1 = s.charAt(10); 
+            var r2 = s.charCodeAt(10); 
+            var r3 = s.substring(2, 0); 
+            var r4 = s.substring(1); 
+            var r5 = s.startsWith("b", 1); 
+            var r6 = s.endsWith("b", 2); 
+            var r7 = s.indexOf("c", 5); 
+            return r1 + "|" + (typeof r2 == "undefined" ? "undef" : r2) + "|" + r3 + "|" + r4 + "|" + r5 + "|" + r6 + "|" + r7;
+        }
+        #token strEdgeTest;
+    })");
+    run_test("define 43", {"strEdgeTest"}, def43);
+    run_test_str("string methods edge cases", "|undef|ab|bc|true|true|-1", slp.get("strEdgeTest"));
+
+    std::vector<std::string> def44 = slp.define(R"({
+        var expTest = () -> { return 2 ** 10; }
+        #token expTest;
+    })");
+    run_test("define 44", {"expTest"}, def44);
+    run_test_str("exponentiation", "1024", slp.get("expTest"));
+
+    std::vector<std::string> def45 = slp.define(R"({
+        var arrAssignTest = () -> { var a = [10]; a[0] += 5; return a[0]; }
+        #token arrAssignTest;
+    })");
+    run_test("define 45", {"arrAssignTest"}, def45);
+    run_test_str("compound assignment on array", "15", slp.get("arrAssignTest"));
 
     // =========================================================================
     // Summary Calculation

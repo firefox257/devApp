@@ -1,0 +1,50 @@
+Software Requirements Specification (SRS) – UPDATED
+Module Name: vrCom — Virtual Reality Mobile Canvas Controller Module
+
+1. Overview & Objectives
+vrCom is a lightweight, pure JavaScript module designed to emulate full VR (Meta Quest style) controller inputs and spatial movement on mobile web browsers. It uses an HTML5 Canvas overlay and device hardware sensors to compute 3D spatial orientations and normalized control vectors, emitting standardized event payloads compatible with Three.js and WebGL rendering engines.
+
+2. Hardware & Sensor Integration
+2.1 Device Orientation & Heading
+- Tilt Tracking (Gyroscope): Utilizes the HTML5 DeviceOrientationEvent (beta, gamma) to measure phone pitch and roll, translating physical tilt into targeted view/camera pitch adjustments.
+- Yaw Tracking (Digital Compass): Utilizes webkitCompassHeading (iOS) or alpha (Android) to calculate absolute digital compass direction for accurate rotational heading.
+- Manual Swipe Override: Implements a touch-swipe gesture anywhere on the non-UI canvas area to manually adjust yaw, adding a `manualYawOffset` to the sensor data (useful for desktop fallback or sensor drift correction).
+
+3. On-Screen Touch UI & Controls (Canvas Overlay)
+3.1 Dual Virtual Thumbsticks (Left & Right)
+- Dynamic Center Anchoring: The initial touch-down point (touchstart/pointerdown) inside designated left or right screen regions dynamically sets the stick's center coordinate (cx, cy).
+- Vector Drag Calculation: Dragging calculates a relative displacement vector, clamped to `stickMaxRadius` and normalized to [-1.0, 1.0].
+- Stick Assignments: Left Joystick for translational movement; Right Joystick for directional camera look (though right stick logic is present, primary look is often handled by device tilt + swipe in this implementation).
+
+3.2 Action Buttons & Triggers
+- Trigger & Grab Mapping: Dedicated touch zones emulating Meta Quest Index Trigger (LT/RT) and Grip (LG/RG). Emits discrete boolean states mapped to 0.0 or 1.0 analog values.
+- Standard Face Buttons: 
+  - Left side: X, Y, and Menu buttons.
+  - Right side: A, B, and MenuR buttons.
+- Hit Testing: Supports pill-shaped (vertical/horizontal), circular, and small circular button hit zones with generous touch margins.
+
+3.3 Height / Squat Slider (Right Side UI)
+- Dedicated Vertical Slider: Located along the right edge of the canvas overlay.
+- Scalar Output: Outputs a continuous vertical displacement scalar value ranging strictly from 0.0 (fully squatted) to 1.0 (fully standing).
+- WebGL Integration: Maps directly to the eye-level Y-position of the WebGL camera container.
+
+4. Coordinate System & WebGL / Three.js Compatibility
+4.1 Frame of Reference
+- Handedness & Axes: Right-Handed Coordinate System matching Three.js standards (+X: Right, +Y: Up, -Z: Forward).
+- Normalization & Deadzones: All analog values are normalized to floating-point values. Configurable deadzone thresholding (default: 0.08 for sticks, 0.05 general) prevents sensor/touch drift.
+
+5. Software Architecture & API Interface
+5.1 Initialization API
+Accepts a target HTMLCanvasElement and an options object (deadzone, stickMaxRadius, overlayOpacity, sensor flags, etc.).
+5.2 Event Emitter Schema
+Extends `EventTarget`. Dispatches high-frequency 'input' custom events during the render loop containing:
+- timestamp: Unix timestamp (ms).
+- headset: { orientation: { pitch, yaw, roll }, quaternion: [x, y, z, w], squatScalar: 0.0–1.0 }
+- controllers.left: { joystick: {x, y}, trigger: 0|1, grip: 0|1, buttons: {x, y, menu} }
+- controllers.right: { joystick: {x, y}, trigger: 0|1, grip: 0|1, buttons: {a, b, menuR} }
+
+6. Mobile & Cross-Browser Requirements
+- Sensor Permissions: Automatically handles DeviceOrientationEvent permission prompts required by iOS Safari (13+) via the `start()` method (must be triggered by a user gesture).
+- Multi-Touch Support: Robust `touchId` tracking allows simultaneous dual-joystick + button + slider interactions.
+- Responsiveness: Auto-resizes overlay canvas on window resize or orientation change, scaling via `devicePixelRatio` for crisp rendering.
+- Desktop Fallback: Mouse events (mousedown, mousemove, mouseup) are mapped to the touch logic, allowing testing and play on desktop browsers.

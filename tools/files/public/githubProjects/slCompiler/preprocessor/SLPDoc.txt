@@ -1,23 +1,26 @@
 ================================================================================
                     SMALL LANGUAGE PREPROCESSOR (SLP)
-                          DOCUMENTATION v1.3
+                       DOCUMENTATION v2.0 (Runtime Library)
 ================================================================================
 
 1. INTRODUCTION
 --------------------------------------------------------------------------------
 The Small Language Preprocessor (SLP) is a lightweight, JavaScript-like scripting 
-interpreter designed to be embedded in C++ applications. It processes script 
-definitions, maintains state across multiple evaluations, and exposes specific 
-variables or functions as preprocessor tokens that return string values.
+interpreter library written in pure JavaScript. It is designed to be embedded 
+directly in web applications or Node.js environments. It parses and executes 
+script definitions at runtime, maintains state across multiple evaluations, and 
+exposes specific variables or functions as preprocessor tokens that return string 
+values via a simple JavaScript API.
 
 2. SYSTEM OVERVIEW
 --------------------------------------------------------------------------------
 The SLP system consists of two main components:
-  1. SLP Interpreter Engine: Parses and executes SLP script code, managing 
-     memory, lexical scope, and execution flow without C++ exceptions or RTTI.
-  2. C++ Host API: Provides an interface for the host application to load 
-     scripts, persist global state, and invoke marked preprocessor tokens with 
-     a variadic number of arguments.
+  1. SLP Interpreter Engine: Parses and executes SLP script code at runtime, 
+     managing memory, lexical scope, and execution flow. It is optimized for 
+     fast interpretation using pure JavaScript best practices.
+  2. JavaScript Host API: Provides a simple interface for the host application 
+     to load scripts, persist global state, and invoke marked preprocessor 
+     tokens with a variable number of arguments.
 
 3. LANGUAGE SYNTAX & FEATURES
 --------------------------------------------------------------------------------
@@ -28,12 +31,11 @@ The SLP system consists of two main components:
 3.2 Data Types
   The `typeof` operator returns lowercase string identifiers for these types:
   - undefined : Uninitialized variables. (typeof returns "undefined")
-  - integer   : Whole numbers, internally implemented as uint64_t (BigInt) to 
-                guarantee full 64-bit unsigned integer support without precision 
-                loss or overflow. Negative numbers are supported via standard 
-                two's complement representation within the uint64_t and int64_t space. 
-                (typeof returns "integer")
-  - float     : Floating-point numbers (double/float64). (typeof returns "float")
+  - integer   : Whole numbers. Internally implemented using JavaScript BigInt 
+                to guarantee full 64-bit unsigned integer support without precision 
+                loss. (typeof returns "integer")
+  - float     : Floating-point numbers (standard JS Number / double). 
+                (typeof returns "float")
   - boolean   : true or false. (typeof returns "boolean")
   - string    : 8-bit character sequences. Supports single ('...'), double ("..."), 
                 and backtick (`...`) quotes. 
@@ -101,111 +103,95 @@ The SLP system consists of two main components:
       #token var name = 123;                 // Inline variable token
       #token var namefunc = (x) -> { ... };  // Inline function token
       var name = 123; #token name;           // Post-declaration marking
-  - Behavior: When accessed via the C++ API, variables return their stringified 
+  - Behavior: When accessed via the JS API, variables return their stringified 
               value. Functions are invoked with provided arguments and return 
               their stringified result.
 
-4. C++ API REFERENCE
+4. JAVASCRIPT API REFERENCE
 --------------------------------------------------------------------------------
-#include "slp.cpp"
-
-struct DefineResult {
-    bool success;
-    std::vector<std::string> tokens;
-    std::string error_message;
-};
-
 class SLP {
-public:
   // 1. Initialization
-  SLP(); 
+  constructor(); 
   // Instantiates a new, isolated interpreter state.
 
-  // 2. Script Definition
-  DefineResult define(const std::string& script);
-  // Parses and executes the provided script. Maintains global state across 
+  // 2. Script Definition & Execution
+  define(script: string): DefineResult;
+  // Parses and executes the provided script at runtime. Maintains global state across 
   // multiple calls. 
+  // DefineResult is an object: { success: boolean, tokens: string[], error_message: string }
   // - On success: success is true, tokens contains the names of newly defined 
-  //   tokens in this call, error_message is empty.
-  // - On failure: success is false, tokens is empty, error_message contains a 
+  //   tokens in this call, error_message is an empty string.
+  // - On failure: success is false, tokens is an empty array, error_message contains a 
   //   single descriptive error message (e.g., "Parse Error: ..." or 
   //   "Runtime Error: ...").
 
   // 3. Token Execution (Variadic)
-  template <typename... Args>
-  std::string get(const std::string& token_name, Args&&... args);
+  get(token_name: string, ...args: any[]): string;
   // Evaluates a variable or invokes a function marked with #token.
-  // Accepts a variable amount of arguments (integers, floats, strings, booleans).
+  // Accepts a variable amount of arguments (numbers, strings, booleans).
   // Arguments are ignored if the token is a variable.
-  // Returns the result as a std::string, or an error string (e.g., 
+  // Returns the result as a string, or an error string (e.g., 
   // "Error: Token not found: ...") on failure.
   // Stringification Rules: Booleans are stringified as 'true' or 'false'. 
   // Floats are stringified with up to 6 decimal places. Objects and Arrays 
   // are stringified as JSON-like representations.
-};
+}
 
 5. USAGE EXAMPLE
 --------------------------------------------------------------------------------
-#include "slp.cpp"
-#include <iostream>
-#include <vector>
+const slp = new SLP();
 
-int main() {
-    SLP slp;
+// Define global state and tokens
+const res1 = slp.define(`
+    #token var globalmsg = 123;
+    var func1 = (x, y) -> { return x + " " + y; }
+    #token func1;
+`);
 
-    // Define global state and tokens
-    DefineResult res1 = slp.define(R"(
-        #token var globalmsg = 123;
-        var func1 = (x, y) -> { return x + " " + y; }
-        #token func1;
-    )");
-    
-    if (res1.success) {
-        // res1.tokens will contain {"globalmsg", "func1"}
-    } else {
-        std::cerr << res1.error_message << "\n";
-    }
-
-    // Invoke variable token (args ignored)
-    std::cout << slp.get("globalmsg") << "\n"; // Output: 123
-
-    // Invoke function token with variadic arguments
-    std::cout << slp.get("func1", 123, 124) << "\n"; // Output: 123 124
-
-    // State persists across define calls
-    slp.define(R"( globalmsg += "hi"; )");
-    std::cout << slp.get("globalmsg") << "\n"; // Output: 123hi
-
-    return 0;
+if (res1.success) {
+    // res1.tokens will contain ["globalmsg", "func1"]
+    console.log("Defined tokens:", res1.tokens);
+} else {
+    console.error(res1.error_message);
 }
 
-6. IMPLEMENTATION & COMPILER RESTRICTIONS
+// Invoke variable token (args ignored)
+console.log(slp.get("globalmsg")); // Output: "123"
+
+// Invoke function token with variadic arguments
+console.log(slp.get("func1", 123, 124)); // Output: "123 124"
+
+// State persists across define calls
+slp.define(`globalmsg += "hi";`);
+console.log(slp.get("globalmsg")); // Output: "123hi"
+
+6. IMPLEMENTATION & LIBRARY RESTRICTIONS
 --------------------------------------------------------------------------------
-To ensure maximum portability and minimal overhead, the SLP implementation 
-adheres to strict compiler constraints:
-  -fno-exceptions : No C++ exceptions (throw, try, catch) are used. Errors are 
-                    handled via return types (e.g., "Parse Error: ..." or 
-                    "Runtime Error: ..." strings from define(), and "Error: ..." 
-                    strings from get()).
-  -fno-rtti       : No Run-Time Type Information (dynamic_cast, typeid) is used. 
-                    Type checking relies on explicit type tags (enums).
-  - Memory Management: Uses reference-counted std::shared_ptr<Value> objects to 
-                       prevent memory leaks during repeated define/get calls.
+To ensure maximum performance and reliability as a pure JavaScript library, the 
+SLP implementation adheres to strict best practices:
+  - Vanilla JS Only: No external dependencies, build steps, or heavy framework 
+    features are used. The interpreter is written in pure, optimized JavaScript.
+  - No Exceptions in Hot Paths: To maintain interpretation performance and 
+    predictability, errors are handled via result objects (e.g., `DefineResult`) 
+    rather than throwing JavaScript `Error` objects during normal execution flow.
+  - Memory Management: Relies on JavaScript's garbage collector. Performance-critical 
+    data structures may utilize native TypedArrays (e.g., `Int32Array`, `Float64Array`) 
+    where beneficial, but standard JS objects and arrays are fully supported.
 
 7. TESTING BEST PRACTICES
 --------------------------------------------------------------------------------
 Because global state persists across define() calls, tests should be scoped 
-using curly braces `{ }` to prevent global namespace pollution.
+using block statements `{ }` to prevent global namespace pollution.
 
 BAD:
   slp.define("var x = 123;");
   slp.define("var x = 456;"); // May cause unexpected behavior or redefinition issues
 
 GOOD:
-  slp.define(R"({
+  slp.define(`{
       var x = 123;
       var testFunc = () -> { return x; }
       #token testFunc;
-  })"); // 'x' is evaluated but test logic remains isolated to the block scope.
+  }`); // 'x' is evaluated but test logic remains isolated to the block scope.
 
 ================================================================================

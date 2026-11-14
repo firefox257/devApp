@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+	<html lang="en">
+		<head>
+			<meta charset="UTF-8">
+			<meta name="viewport" content="width=device-width, initial-scale=1.0">
+			<title>Autogen Phase 2 Boilerplate Example</title>
+				<style>
+					body {
+						font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace;
+						background: #1e1e1e; color: #d4d4d4; margin: 0; padding: 20px;
+						display: flex; flex-direction: column; align-items: center; min-height: 100vh;
+					}
+					.container {
+						background: #252526; border: 1px solid #3e3e42; border-radius: 8px;
+						padding: 20px; width: 100%; max-width: 700px; box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+					}
+					h1 { margin-top: 0; color: #569cd6; font-size: 1.5rem; }
+					h2 { color: #4ec9b0; font-size: 1.1rem; margin-top: 20px; border-bottom: 1px solid #3e3e42; padding-bottom: 6px; }
+					.status { padding: 10px; border-radius: 4px; margin-bottom: 15px; font-weight: bold; text-align: center; }
+					.status.ready { background: #1e5c2e; color: #4ec9b0; }
+					.status.error { background: #5c1e1e; color: #f48771; }
+					.status.waiting { background: #3c3c3c; color: #cccccc; }
+					.control-group { margin-bottom: 12px; }
+					label { display: block; margin-bottom: 4px; color: #9cdcfe; font-size: 0.85rem; }
+					input[type="number"] {
+						width: 80px; padding: 6px; background: #3c3c3c; border: 1px solid #555;
+						color: #fff; border-radius: 4px; box-sizing: border-box;
+					}
+					button {
+						padding: 8px 14px; background: #0e639c; color: #fff; border: none;
+						border-radius: 4px; cursor: pointer; font-weight: bold; transition: background 0.2s;
+						margin-right: 6px; margin-bottom: 4px; font-size: 0.85rem;
+					}
+					button:hover:not(:disabled) { background: #1177bb; }
+					button:disabled { background: #3c3c3c; color: #888; cursor: not-allowed; }
+					.result-text { margin-top: 4px; color: #4ec9b0; font-weight: bold; font-size: 0.9rem; min-height: 1.2em; }
+					#console {
+						margin-top: 10px; background: #1e1e1e; border: 1px solid #3e3e42; border-radius: 4px;
+						padding: 10px; height: 200px; overflow-y: auto; font-size: 12px; white-space: pre-wrap;
+					}
+					.log-info { color: #4ec9b0; }
+					.log-warn { color: #dcdcaa; }
+					.log-err { color: #f48771; font-weight: bold; }
+				</style>
+			</head>
+			<body>
+				<div class="container">
+					<h1>Autogen Boilerplate Example</h1>
+						<div id="status" class="status waiting">Status: Waiting for initialization...</div>
+							<div class="control-group">
+								<button id="btnInit" onclick="initRuntime()">Initialize Runtime</button>
+								</div>
+								<!-- DIRECT CALL -->
+									<h2>Direct Export Call</h2>
+										<div class="control-group">
+											<label>add_numbers(a, b)</label>
+												<input type="number" id="valA" value="15"> +
+												<input type="number" id="valB" value="25">
+												<button id="btnDirect" onclick="runDirectCall()" disabled>Run</button>
+													<div id="directResult" class="result-text"></div>
+													</div>
+													<!-- ag_async EXAMPLES -->
+														<h2>ag_async (Undedicated Pool)</h2>
+															<div class="control-group">
+																<label>ag_async → ag_future → JS wrapFuture (non-blocking C++, JS polls)</label>
+																	<input type="number" id="asyncIter" value="100000"> iterations
+																	<button id="btnAsyncFuture" onclick="runAsyncFuture()" disabled>Run</button>
+																		<div id="asyncFutureResult" class="result-text"></div>
+																		</div>
+																		<div class="control-group">
+																			<label>ag_async → ag_future → ag_await (non-blocking C++ wait)</label>
+																				<input type="number" id="asyncBlockIter" value="100000"> iterations
+																				<button id="btnAsyncBlock" onclick="runAsyncBlocking()" disabled>Run</button>
+																					<div id="asyncBlockResult" class="result-text"></div>
+																					</div>
+																					<div class="control-group">
+																						<label>ag_async with captureless lambda: a * b + 1</label>
+																							<input type="number" id="lamA" value="6"> *
+																							<input type="number" id="lamB" value="7"> + 1
+																							<button id="btnAsyncLambda" onclick="runAsyncLambda()" disabled>Run</button>
+																								<div id="asyncLambdaResult" class="result-text"></div>
+																								</div>
+																								<div class="control-group">
+																									<label>ag_async with capturing lambda: base * 3</label>
+																										<input type="number" id="capBase" value="14"> * 3
+																										<button id="btnAsyncCapture" onclick="runAsyncCapture()" disabled>Run</button>
+																											<div id="asyncCaptureResult" class="result-text"></div>
+																											</div>
+																											<!-- ag_async_on EXAMPLES -->
+																												<h2>ag_async_on (Dedicated Worker Targeting)</h2>
+																													<div class="control-group">
+																														<label>ag_async_on(1, ...) → ag_future → JS wrapFuture</label>
+																															<input type="number" id="dedVal" value="5"> → value * 100 + 7
+																															<button id="btnDedFuture" onclick="runDedicatedFuture()" disabled>Run</button>
+																																<div id="dedFutureResult" class="result-text"></div>
+																																</div>
+																																<div class="control-group">
+																																	<label>ag_async_on(1, ...) → ag_future → ag_await (non-blocking)</label>
+																																		<input type="number" id="dedBlockVal" value="9"> → value * 100 + 7
+																																		<button id="btnDedBlock" onclick="runDedicatedBlocking()" disabled>Run</button>
+																																			<div id="dedBlockResult" class="result-text"></div>
+																																			</div>
+																																			<div class="control-group">
+																																				<label>ag_async_on(1, lambda) → ag_await: a + b + 1000</label>
+																																					<input type="number" id="dedLamA" value="3"> +
+																																					<input type="number" id="dedLamB" value="4"> + 1000
+																																					<button id="btnDedLambda" onclick="runDedicatedLambda()" disabled>Run</button>
+																																						<div id="dedLambdaResult" class="result-text"></div>
+																																						</div>
+																																						<!-- ag_sync EXAMPLE -->
+																																							<h2>ag_sync (Blocking Worker-to-Worker)</h2>
+																																								<div class="control-group">
+																																									<label>ag_sync(target_id, func, multiplier) → multiplier * 10</label>
+																																										<input type="number" id="syncTarget" value="1"> target,
+																																										<input type="number" id="syncMult" value="12"> multiplier
+																																										<button id="btnSync" onclick="runSyncCall()" disabled>Run</button>
+																																											<div id="syncResult" class="result-text"></div>
+																																											</div>
+																																											<!-- GLOBAL STATE -->
+																																												<h2>Global Shared State</h2>
+																																													<div class="control-group">
+																																														<button id="btnGlobal" onclick="runGlobalCall()" disabled>Increment Global Count</button>
+																																															<div id="globalResult" class="result-text"></div>
+																																															</div>
+																																															<!-- EXTENSIONS -->
+																																																<h2>Extensions Pipeline</h2>
+																																																	<div class="control-group">
+																																																		<button id="btnExt" onclick="runExtCall()" disabled>Run Extensions Pipeline</button>
+																																																			<div id="extResult" class="result-text"></div>
+																																																			</div>
+																																																			<div id="console"></div>
+																																																			</div>
+																																																			<script src="/system/autogen/autogen.js"></script>
+																																																				<script>
+																																																					const consoleDiv = document.getElementById('console');
+																																																					const statusDiv  = document.getElementById('status');
+																																																					let runtime = null;
+																																																					function log(type, msg) {
+																																																						const div = document.createElement('div');
+																																																						div.className = `log-${type}`;
+																																																						div.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+																																																						consoleDiv.appendChild(div);
+																																																						consoleDiv.scrollTop = consoleDiv.scrollHeight;
+																																																						const ct = type === 'err' ? 'error' : type === 'warn' ? 'warn' : 'log';
+																																																						console[ct](msg);
+																																																					}
+																																																					function enableButtons() {
+																																																						document.querySelectorAll('button[id^="btn"]:not(#btnInit)').forEach(b => b.disabled = false);
+																																																					}
+																																																					// ============================================================
+																																																					// INIT
+																																																					// ============================================================
+																																																					async function initRuntime() {
+																																																						const btn = document.getElementById('btnInit');
+																																																						btn.disabled = true;
+																																																						statusDiv.textContent = "Status: Checking environment...";
+																																																						if (!crossOriginIsolated) {
+																																																							statusDiv.className = "status error";
+																																																							statusDiv.textContent = "Status: FAILED (Missing COOP/COEP headers)";
+																																																							log('err', "FATAL: crossOriginIsolated is false.");
+																																																							btn.disabled = false;
+																																																							return;
+																																																						}
+																																																						try {
+																																																							log('info', "Initializing AutogenRuntime...");
+																																																							runtime = new AutogenRuntime();
+																																																							await runtime.initialize('example1.wasm');
+																																																							// --- REGISTER EXTENSIONS ---
+																																																							runtime.registerMainExtension("ui_add_log", (workerId, level, value) => {
+																																																									const logType  = level === 0 ? 'info' : level === 1 ? 'warn' : 'err';
+																																																									const levelStr = level === 0 ? 'INFO' : level === 1 ? 'WARN' : 'ERR';
+																																																									log(logType, `[Worker ${workerId} → Main UI] ${levelStr}: ${value}`);
+																																																								});
+																																																							runtime.registerMainExtension("get_main_thread_seed", (workerId) => {
+																																																									return Math.floor(Math.random() * 1000);
+																																																								});
+																																																							const workerMockFetchFunc = function(request_id) {
+																																																								return request_id * 10 + workerId;
+																																																							};
+																																																							runtime.registerWorkerExtension("worker_mock_fetch", workerMockFetchFunc);
+																																																							// --- END EXTENSIONS ---
+																																																							statusDiv.className = "status ready";
+																																																							statusDiv.textContent = "Status: READY";
+																																																							log('info', "Runtime initialized. All workers ready.");
+																																																							enableButtons();
+																																																						} catch (err) {
+																																																							statusDiv.className = "status error";
+																																																							statusDiv.textContent = "Status: FAILED";
+																																																							log('err', `Init failed: ${err.message}`);
+																																																							btn.disabled = false;
+																																																						}
+																																																					}
+																																																					// ============================================================
+																																																					// DIRECT CALL
+																																																					// ============================================================
+																																																					async function runDirectCall() {
+																																																						const a = parseInt(document.getElementById('valA').value) || 0;
+																																																						const b = parseInt(document.getElementById('valB').value) || 0;
+																																																						try {
+																																																							const result = await runtime.callExport(0, 'add_numbers', a, b);
+																																																							document.getElementById('directResult').textContent = `Result: ${result}`;
+																																																						} catch (err) { log('err', `Direct call failed: ${err.message}`); }
+																																																					}
+																																																					// ============================================================
+																																																					// ag_async EXAMPLES
+																																																					// ============================================================
+																																																					// Example A: ag_async → future ptr → JS wrapFuture → awaitResult
+																																																					async function runAsyncFuture() {
+																																																						const iterations = parseInt(document.getElementById('asyncIter').value) || 1000;
+																																																						try {
+																																																							log('info', `ag_async: dispatching heavy_computation(${iterations}) to undedicated pool...`);
+																																																							const futurePtr = await runtime.callExport(0, 'run_async_computation', iterations);
+																																																							if (!futurePtr || (futurePtr >>> 0) === 0xDEADBEEF) throw new Error("Failed to create future");
+																																																							const fut    = runtime.wrapFuture(futurePtr);
+																																																							const result = await fut.awaitResult('uint32');
+																																																							document.getElementById('asyncFutureResult').textContent = `Result: ${result}`;
+																																																							log('info', `ag_async future resolved: ${result}`);
+																																																						} catch (err) { log('err', `ag_async future failed: ${err.message}`); }
+																																																					}
+																																																					// Example B: ag_async → ag_future → ag_await (non-blocking C++ wait)
+																																																					async function runAsyncBlocking() {
+																																																						const iterations = parseInt(document.getElementById('asyncBlockIter').value) || 1000;
+																																																						try {
+																																																							log('info', `ag_async + ag_await: non-blocking C++ until heavy_computation(${iterations}) finishes...`);
+																																																							const futurePtr = await runtime.callExport(0, 'run_async_computation_blocking', iterations);
+																																																							const fut = runtime.wrapFuture(futurePtr);
+																																																							const result = await fut.awaitResult('uint32');
+																																																							document.getElementById('asyncBlockResult').textContent = `Result: ${result}`;
+																																																							log('info', `ag_async + ag_await returned: ${result}`);
+																																																						} catch (err) { log('err', `ag_async blocking failed: ${err.message}`); }
+																																																					}
+																																																					// Example C: ag_async with captureless lambda
+																																																					async function runAsyncLambda() {
+																																																						const a = parseInt(document.getElementById('lamA').value) || 0;
+																																																						const b = parseInt(document.getElementById('lamB').value) || 0;
+																																																						try {
+																																																							const futurePtr = await runtime.callExport(0, 'run_async_lambda', a, b);
+																																																							const fut = runtime.wrapFuture(futurePtr);
+																																																							const result = await fut.awaitResult('uint32');
+																																																							document.getElementById('asyncLambdaResult').textContent = `Result: ${result}`;
+																																																						} catch (err) { log('err', `Lambda async failed: ${err.message}`); }
+																																																					}
+																																																					// Example D: ag_async with capturing lambda
+																																																					async function runAsyncCapture() {
+																																																						const base = parseInt(document.getElementById('capBase').value) || 0;
+																																																						try {
+																																																							const futurePtr = await runtime.callExport(0, 'run_async_capturing_lambda', base);
+																																																							const fut = runtime.wrapFuture(futurePtr);
+																																																							const result = await fut.awaitResult('uint32');
+																																																							document.getElementById('asyncCaptureResult').textContent = `Result: ${result}`;
+																																																						} catch (err) { log('err', `Capturing lambda failed: ${err.message}`); }
+																																																					}
+																																																					// ============================================================
+																																																					// ag_async_on EXAMPLES  (target_id is FIRST argument)
+																																																					// ============================================================
+																																																					// Example E: ag_async_on(1, ...) → future ptr → JS wrapFuture
+																																																					async function runDedicatedFuture() {
+																																																						const value = parseInt(document.getElementById('dedVal').value) || 0;
+																																																						try {
+																																																							log('info', `ag_async_on(1, dedicated_task, ${value}) → dispatching to dedicated worker 1...`);
+																																																							const futurePtr = await runtime.callExport(0, 'run_dedicated_async', value);
+																																																							if (!futurePtr || (futurePtr >>> 0) === 0xDEADBEEF) throw new Error("Failed to create future");
+																																																							const fut    = runtime.wrapFuture(futurePtr);
+																																																							const result = await fut.awaitResult('uint32');
+																																																							document.getElementById('dedFutureResult').textContent = `Result: ${result}`;
+																																																							log('info', `ag_async_on future resolved: ${result}`);
+																																																						} catch (err) { log('err', `ag_async_on future failed: ${err.message}`); }
+																																																					}
+																																																					// Example F: ag_async_on(1, ...) → ag_future → ag_await (non-blocking)
+																																																					async function runDedicatedBlocking() {
+																																																						const value = parseInt(document.getElementById('dedBlockVal').value) || 0;
+																																																						try {
+																																																							log('info', `ag_async_on(1, ...) + ag_await: non-blocking until dedicated worker 1 finishes...`);
+																																																							const futurePtr = await runtime.callExport(0, 'run_dedicated_async_blocking', value);
+																																																							const fut = runtime.wrapFuture(futurePtr);
+																																																							const result = await fut.awaitResult('uint32');
+																																																							document.getElementById('dedBlockResult').textContent = `Result: ${result}`;
+																																																							log('info', `ag_async_on + ag_await returned: ${result}`);
+																																																						} catch (err) { log('err', `ag_async_on blocking failed: ${err.message}`); }
+																																																					}
+																																																					// Example G: ag_async_on with lambda on dedicated worker
+																																																					async function runDedicatedLambda() {
+																																																						const a = parseInt(document.getElementById('dedLamA').value) || 0;
+																																																						const b = parseInt(document.getElementById('dedLamB').value) || 0;
+																																																						try {
+																																																							const futurePtr = await runtime.callExport(0, 'run_dedicated_lambda', a, b);
+																																																							const fut = runtime.wrapFuture(futurePtr);
+																																																							const result = await fut.awaitResult('uint32');
+																																																							document.getElementById('dedLambdaResult').textContent = `Result: ${result}`;
+																																																						} catch (err) { log('err', `Dedicated lambda failed: ${err.message}`); }
+																																																					}
+																																																					// ============================================================
+																																																					// ag_sync EXAMPLE
+																																																					// ============================================================
+																																																					async function runSyncCall() {
+																																																						const target = parseInt(document.getElementById('syncTarget').value) || 1;
+																																																						const mult   = parseInt(document.getElementById('syncMult').value) || 1;
+																																																						try {
+																																																							log('info', `ag_sync(${target}, sync_target_function, ${mult}) → blocking...`);
+																																																							const result = await runtime.callExport(0, 'test_sync_call', target, mult);
+																																																							document.getElementById('syncResult').textContent = `Result: ${result}`;
+																																																							log('info', `ag_sync returned: ${result}`);
+																																																						} catch (err) { log('err', `ag_sync failed: ${err.message}`); }
+																																																					}
+																																																					// ============================================================
+																																																					// GLOBAL STATE
+																																																					// ============================================================
+																																																					async function runGlobalCall() {
+																																																						try {
+																																																							const result = await runtime.callExport(0, 'increment_startup_count');
+																																																							document.getElementById('globalResult').textContent = `Global Count: ${result}`;
+																																																						} catch (err) { log('err', `Global call failed: ${err.message}`); }
+																																																					}
+																																																					// ============================================================
+																																																					// EXTENSIONS
+																																																					// ============================================================
+																																																					async function runExtCall() {
+																																																						try {
+																																																							log('info', "Triggering Extensions pipeline...");
+																																																							const futurePtr = await runtime.callExport(0, 'test_extensions');
+																																																							const fut = runtime.wrapFuture(futurePtr);
+																																																							const result = await fut.awaitResult('uint32');
+																																																							document.getElementById('extResult').textContent = `Pipeline Result: ${result}`;
+																																																						} catch (err) { log('err', `Extensions failed: ${err.message}`); }
+																																																					}
+																																																				</script>
+																																																			</body>
+																																																		</html>

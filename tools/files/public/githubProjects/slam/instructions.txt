@@ -1,0 +1,6 @@
+phase1 requirments completed.
+
+phase2 
+requirements updated with denoising and 20 frame key marker pass. 
+lets implement more of the slam.
+show the full code only the files with the changes

@@ -1,0 +1,105 @@
+================================================================================
+vrCom Developer Documentation
+Virtual Reality Mobile Canvas Controller Module
+================================================================================
+
+1. OVERVIEW
+vrCom is a pure JavaScript class that extends EventTarget. It renders an interactive, semi-transparent VR controller overlay on an HTML5 Canvas and maps touch/mouse inputs, device orientation, and swipe gestures into a unified, Three.js-ready state object.
+
+2. INSTALLATION & IMPORT
+No build step required. Import directly as an ES module:
+
+    import { VRCom } from './vrCom.js';
+    // or
+    import VRCom from './vrCom.js';
+
+3. INITIALIZATION
+Create an instance by passing a target <canvas> element and an optional configuration object.
+
+    const canvas = document.getElementById('vr-canvas');
+    const vr = new VRCom(canvas, {
+      deadzone: 0.05,          // General deadzone (default: 0.05)
+      stickMaxRadius: 45,      // Max drag distance for virtual joysticks in pixels
+      stickDeadzone: 0.08,     // Joystick-specific deadzone (default: 0.08)
+      emitRate: 1 / 60,        // Seconds between 'input' events (default: ~60fps)
+      useSensors: true,        // Enable device orientation tracking
+      useCompass: true,        // Use digital compass for absolute yaw
+      showOverlay: true,       // Draw the visual controller overlay
+      overlayOpacity: 0.6,     // Opacity of the overlay (0.0 to 1.0)
+      leftRegion: 0.50,        // Left half of screen is left-stick territory
+      rightRegion: 0.50        // Right half of screen is right-stick territory
+    });
+
+4. STARTING & STOPPING
+IMPORTANT: On iOS 13+, sensor permissions require a direct user gesture (e.g., a button click). Always call start() inside a click/touch event handler.
+
+    // Inside a user-initiated event handler:
+    async function startVR() {
+      await vr.start(); // Requests permissions and begins the render/input loop
+    }
+
+    // To clean up (e.g., when navigating away):
+    vr.stop(); // Cancels RAF and removes event listeners
+
+5. READING INPUT STATE
+You can read the state synchronously or listen to the high-frequency event emitter.
+
+Method A: Event Listener (Recommended for Render Loops)
+    vr.addEventListener('input', (event) => {
+      const state = event.detail;
+      // Apply state.headset.orientation.yaw to camera
+      // Apply state.controllers.left.joystick.x to movement
+    });
+
+Method B: Synchronous Polling
+    function gameLoop() {
+      const state = vr.getState(); // Returns a deep-cloned snapshot of the current state
+      // ... update game logic ...
+      requestAnimationFrame(gameLoop);
+    }
+
+6. EVENT PAYLOAD SCHEMA
+The state object structure:
+
+    {
+      timestamp: 1690000000000, // DOMHighResTimeStamp
+      headset: {
+        orientation: { pitch: 0.1, yaw: 1.5, roll: 0.0 }, // In radians
+        quaternion: [0.0, 0.0, 0.0, 1.0],                 // [x, y, z, w]
+        squatScalar: 0.75                                 // 0.0 (crouched) to 1.0 (standing)
+      },
+      controllers: {
+        left: {
+          joystick: { x: 0.0, y: 0.0 },                   // Normalized -1.0 to 1.0
+          trigger: 0,                                     // 0 or 1
+          grip: 0,                                        // 0 or 1
+          buttons: { x: false, y: false, menu: false }
+        },
+        right: {
+          joystick: { x: 0.0, y: 0.0 },
+          trigger: 0,
+          grip: 0,
+          buttons: { a: false, b: false, menuR: false }
+        }
+      }
+    }
+
+7. UI LAYOUT & CUSTOMIZATION
+The visual layout is defined by internal constants. If you need to adjust button positions, you can modify the vrCom.js file directly:
+- BUTTON_LAYOUT: Defines x (0.0 to 1.0 screen width), y (0.0 to 1.0 screen height), shape ('circle', 'pill-v', 'pill-h', 'small'), and key mapping.
+- STICK_HOME: Default resting visual positions for the left and right joysticks (as screen ratios).
+- SLIDER_RANGE: { yTop: 0.38, yBottom: 0.58 } defines the vertical bounds of the height slider.
+
+8. DESKTOP FALLBACK & SWIPE GESTURES
+- Desktop: Mouse clicks and drags are automatically mapped to the touch logic, allowing full testing on desktop browsers without a touchscreen.
+- Swipe to Rotate: Touching and dragging anywhere on the canvas outside of the defined UI elements (sticks, buttons, slider) will apply a manual yaw offset. This is added to the sensor yaw, allowing users to recenter or look around manually if the compass drifts.
+
+9. BEST PRACTICES
+1. Canvas Styling: Ensure the canvas has "position: fixed; inset: 0; z-index: 10; pointer-events: none;" in CSS. Add a class (e.g., ".active { pointer-events: auto; }") via JS only after the user has clicked "Start" to prevent blocking underlying UI prematurely.
+2. Camera Integration: Map headset.squatScalar to your camera's Y position using linear interpolation (lerp) for smooth height transitions, as demonstrated in village.html.
+3. Memory Management: Always call vr.stop() when the component unmounts or the game ends to prevent memory leaks from lingering requestAnimationFrame loops and event listeners.
+
+10. TROUBLESHOOTING
+- "Orientation permission denied": Ensure vr.start() is called directly inside a click or touchstart event listener. Browsers block sensor access on page load.
+- Joystick feels jittery: Increase stickDeadzone in the options object (e.g., to 0.15).
+- Overlay looks blurry on high-DPI phones: The module automatically handles devicePixelRatio scaling up to 2x. Ensure your CSS sets the canvas width and height to 100vw/100vh.

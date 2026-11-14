@@ -1,0 +1,3 @@
+autogen has changed to be able to ag_async with asunc funtions and handel promises.
+clean up all code refator to minimize the code and get the fetch to work.
+show the full code only with the files thst have changes.

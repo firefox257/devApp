@@ -1,7 +1,6 @@
-./SLPDoc.txt
 ================================================================================
                     SMALL LANGUAGE PREPROCESSOR (SLP)
-                          DOCUMENTATION v1.1
+                          DOCUMENTATION v1.3
 ================================================================================
 
 1. INTRODUCTION
@@ -32,7 +31,7 @@ The SLP system consists of two main components:
   - integer   : Whole numbers, internally implemented as uint64_t (BigInt) to 
                 guarantee full 64-bit unsigned integer support without precision 
                 loss or overflow. Negative numbers are supported via standard 
-                two's complement representation within the uint64_t space. 
+                two's complement representation within the uint64_t and int64_t space. 
                 (typeof returns "integer")
   - float     : Floating-point numbers (double/float64). (typeof returns "float")
   - boolean   : true or false. (typeof returns "boolean")
@@ -79,7 +78,24 @@ The SLP system consists of two main components:
       * arr.shift()        : Removes and returns the first element.
   - Array Properties: arr.length returns the number of elements.
 
-3.7 Preprocessor Directives
+3.7 String Methods
+  The interpreter provides built-in methods for string manipulation:
+      * str.charAt(index)      : Returns a new string of length 1 at the given index. 
+                                 Returns an empty string ("") if the index is out of bounds.
+      * str.charCodeAt(index)  : Returns the 8-bit integer character code at the given index. 
+                                 Returns `undefined` if the index is out of bounds.
+      * str.substring(start, end) : Returns a substring from `start` to `end` (exclusive). 
+                                    If `end` is omitted, it extracts to the end of the string. 
+                                    If `start` > `end`, the arguments are automatically swapped. 
+                                    Indices are safely clamped to the string length.
+      * str.startsWith(searchString, position) : Returns true if the string starts with the given search string. 
+                                                 The optional position (default 0) specifies the index to start searching from.
+      * str.endsWith(searchString, length)     : Returns true if the string ends with the given search string. 
+                                                 The optional length (default string length) specifies the length of the string to check.
+      * str.indexOf(searchString, fromIndex)   : Returns the first index of the search string, or -1 if not found. 
+                                                 The optional fromIndex (default 0) specifies the index to start searching from.
+
+3.8 Preprocessor Directives
   - #token Directive: Registers a variable or function as a preprocessor entry point.
   - Syntax Patterns:
       #token var name = 123;                 // Inline variable token

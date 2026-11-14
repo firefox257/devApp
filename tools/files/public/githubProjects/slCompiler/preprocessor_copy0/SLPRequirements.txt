@@ -70,6 +70,13 @@ The interpreter shall support the following operator categories:
   - a.pop(): Removes and returns the last element.
   - a.shift(): Removes and returns the first element.
 * FR-6.4 Array Properties: a.length shall return the number of elements in the array.
+* FR-6.5 String Methods: The interpreter shall provide built-in string methods:
+  - str.charAt(index): Returns a string of length 1 at the index, or "" if out of bounds.
+  - str.charCodeAt(index): Returns the integer character code at the index, or undefined if out of bounds.
+  - str.substring(start, end): Returns the substring from start to end (exclusive). Supports automatic argument swapping if start > end, and clamps to string length.
+  - str.startsWith(searchString, position): Returns true if the string starts with the search string, starting at the optional position (default 0).
+  - str.endsWith(searchString, length): Returns true if the string ends with the search string, checking up to the optional length (default string length).
+  - str.indexOf(searchString, fromIndex): Returns the first index of the search string, or -1 if not found, starting at the optional fromIndex (default 0).
 
 #### 3.7 Preprocessor Directives
 * FR-7.1 #token Directive: The script shall support a #token directive to register a variable or function as a preprocessor entry point.

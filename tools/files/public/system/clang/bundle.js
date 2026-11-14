@@ -133,89 +133,87 @@ var nextFilesystemId = /* @__PURE__ */ (function() {
 		let id = 0;
 		return () => id++;
 	})();
+
+var AuthData = {
+	prjPath: undefined,
+	cache: new Map()
+};
+
 var File = class {
-	static _xhrCache = new Map();
-	static BASE_DIR = '/public/wasmfs'; // <--- YOUR SPECIFIC DIRECTORY
-	constructor(data = "") {
-		
-		
+	// REMOVED: static _xhrCache = new Map();
+	static BASE_DIR = '/public/wasmfs';
+
+	constructor(data, lazyPath) {
 		this.id = nextFilesystemId();
 		this._data = null;
-		this._lazyPath = null;
+		this._lazyPath = lazyPath;
 		if (data instanceof Uint8Array) {
 			this._data = data;
-		} else if (typeof data === "string") {
-			
-			if (data.startsWith("lazy://")) {
-				this._lazyPath = data.substring(7);
-			} else {
-				this._data = new TextEncoder().encode(data);
-			}
+		} else if(typeof data === "string") {
+			this._data = new TextEncoder().encode(data);
+		} else if (typeof lazyPath === "string") {
+			this._lazyPath = lazyPath;
 		} else {
 			throw new Error(`Cannot construct a file from ${typeof data}`);
 		}
 	}
+
 	get data() {
-	
 		if (this._data === null && this._lazyPath) {
-			//console.log("\r\n@|"+this._lazyPath+"\r\n");
-			if (File._xhrCache.has(this._lazyPath) && !this._lazyPath.startsWith('@')) {
-				
-				this._data = File._xhrCache.get(this._lazyPath);
+			var fetchPath;
+			var useCache=false;
+			if(this._lazyPath.startsWith('usr/')) {
+				fetchPath = '/public/wasmfs/' + this._lazyPath;
+				useCache=true;
 			} else {
-				console.log("here1");
-				var fetchPath;
-				if(this._lazyPath.startsWith('@'))
-				{
-					fetchPath = this._lazyPath.substring(1,this._lazyPath.length);
+				fetchPath = '/public/' + this._lazyPath;
+			}
 
-				} else {
-
-					fetchPath = '/public/wasmfs/' + this._lazyPath;
-				}
-
-				//const fetchPath = this._lazyPath;
-
-
-				console.log('[WASM FS] Fetching ' + fetchPath);
+			// FIX: Check the global AuthData.cache for cross-compilation persistence
+			if (useCache && AuthData.cache.has(fetchPath)) {
+				this._data = AuthData.cache.get(fetchPath);
+			} else {
+				console.log('[WASM FS] Fetching ' + fetchPath+"\r\n");
 				const xhr = new XMLHttpRequest();
 				xhr.open('GET', '/', false);
 				xhr.setRequestHeader('X-CMD', 'freadb');
 				xhr.setRequestHeader('X-SRC', fetchPath);
 				xhr.responseType = 'arraybuffer';
 				xhr.send();
+
 				if (xhr.status === 200) {
 					this._data = new Uint8Array(xhr.response);
-					File._xhrCache.set(this._lazyPath, this._data);
+					// FIX: Store in global cache so it survives the next compilation
+					AuthData.cache.set(fetchPath, this._data);
 				} else {
-					// CRITICAL: Throw the exact WASI error string for "File Not Found".
-					// The WASM trampoline will catch this and gracefully tell Clang the file is missing.
 					throw "no-entry";
 				}
 			}
 		}
 		return this._data;
 	}
+
 	set data(val) { this._data = val; }
+
 	get size() {
 		if (this._data === null && this._lazyPath) {
 			return this.data.length;
 		}
 		return this._data ? this._data.length : 0;
 	}
+
 	static resetCache(paths) {
 		if (!paths) {
-			// If no paths are provided, clear the entire cache (backward compatible)
-			File._xhrCache.clear();
+			AuthData.cache.clear();
 		} else {
-			// Normalize to an array if a single string is passed
 			const pathsArray = Array.isArray(paths) ? paths : [paths];
 			for (const path of pathsArray) {
-				File._xhrCache.delete(path);
+				let fetchPath = path.startsWith('usr/') ? '/public/wasmfs/' + path : '/public/' + path;
+				AuthData.cache.delete(fetchPath);
 			}
 		}
 	}
-};
+};;
 var Directory = class _Directory {
 	constructor(files = {}) {
 		this.id = nextFilesystemId();
@@ -286,57 +284,80 @@ var Descriptor = class _Descriptor {
 		this.entry = entry;
 	}
 	// NEW: Smart lazy-loading proxy that distinguishes between files and directories
+	// UPDATED: Smart lazy-loading proxy that uses traverse() as the primary cache
 	_createLazyProxy(path) {
-
-		//console.log("\r\n@@|"+path+"\r\n");
+		// 1. INTRA-RUN CACHE: Check if it's already in the current directory tree
+		try {
+			const existingEntry = this.entry.traverse(path);
+			if (existingEntry instanceof File) {
+				return existingEntry;
+			}
+		} catch (e) {
+			if (e !== "no-entry") throw e;
+		}
 
 		const lastSlash = path.lastIndexOf("/");
 		const dirPath = lastSlash === -1 ? "" : path.substring(0, lastSlash);
 		const fileName = lastSlash === -1 ? path : path.substring(lastSlash + 1);
+
 		let parentDir = this.entry;
 		if (dirPath) {
 			parentDir = this.entry.traverse(dirPath, { create: "directory" });
 		}
-		// Note: Ensure this matches the BASE_DIR logic in your File class
-		var serverPath;
-		if(path.startsWith('@')) {
-			serverPath = path.substring(1,path.length);
-		} else {
-			serverPath = '/public/wasmfs/' + path;
+
+		if (Object.hasOwn(parentDir.files, fileName)) {
+			return parentDir.files[fileName];
 		}
 
-		//const serverPath = '/' + path;
+		var serverPath;
+		var useCache=false;
+		if (path.startsWith('usr/')) {
+			serverPath = '/public/wasmfs/' + path;
+			useCache = true;
+		} else {
+			serverPath = '/public/' + path;
+		}
 
-		// 1. Attempt to read the path as a file via Sync XHR
+		// 2. CROSS-RUN CACHE: Check AuthData.cache before hitting the network
+		if (useCache && AuthData.cache.has(serverPath)) {
+			const file = new File(AuthData.cache.get(serverPath), path);
+			parentDir.files[fileName] = file;
+			return file;
+		}
+
+		// 3. CACHE MISS: Fetch from server
 		const xhr = new XMLHttpRequest();
-		xhr.open('GET', '/', false); // 'false' = Synchronous
+		xhr.open('GET', '/', false);
 		xhr.setRequestHeader('X-CMD', 'freadb');
 		xhr.setRequestHeader('X-SRC', serverPath);
 		xhr.responseType = 'arraybuffer';
 		xhr.send();
+
 		if (xhr.status === 200) {
-			// SUCCESS: It's a file! Pre-load the binary data into memory.
-			const file = new File(new Uint8Array(xhr.response));
+			const fileData = new Uint8Array(xhr.response);
+			// FIX: Store in global cache
+			AuthData.cache.set(serverPath, fileData);
+
+			const file = new File(fileData, path);
 			parentDir.files[fileName] = file;
 			return file;
+
 		} else if (xhr.status === 400) {
-			// SUCCESS: Server returned "Cannot read a directory", so it IS a directory!
-			// Fetch the directory contents using the 'ls' command.
 			const lsXhr = new XMLHttpRequest();
 			lsXhr.open('GET', '/', false);
 			lsXhr.setRequestHeader('X-CMD', 'ls');
 			lsXhr.setRequestHeader('X-SRC', serverPath);
 			lsXhr.send();
+
 			const dir = new Directory({});
 			if (lsXhr.status === 200) {
 				try {
 					const entries = JSON.parse(lsXhr.responseText);
 					for (const entry of entries) {
+						const childPath = path === '/' ? entry.name : `${path}/${entry.name}`;
 						if (entry.type === 'file') {
-							// Create a lazy proxy for every file inside this directory
-							dir.files[entry.name] = new File(`lazy://${path}/${entry.name}`);
+							dir.files[entry.name] = new File(undefined, childPath);
 						} else if (entry.type === 'directory') {
-							// Create an empty sub-directory (it will be lazily populated if Clang enters it)
 							dir.files[entry.name] = new Directory({});
 						}
 					}
@@ -347,7 +368,6 @@ var Descriptor = class _Descriptor {
 			parentDir.files[fileName] = dir;
 			return dir;
 		} else {
-			// FAILURE: 404 Not Found or other error. The path does not exist.
 			throw "no-entry";
 		}
 	}
@@ -512,10 +532,17 @@ function directoryFromTree(tree, basePath = '') {
 	const files = {};
 	for (const [filename, data] of Object.entries(tree)) {
 		const fullPath = basePath ? basePath + '/' + filename : filename;
-		if (typeof data === "string" || data instanceof Uint8Array)
-		files[filename] = new File(data, fullPath); // Pass the path to the File
-		else
-		files[filename] = directoryFromTree(data, fullPath);
+
+		// FIX: Reconstruct lazy proxies from the serialized marker
+		if (data && typeof data === 'object' && data._lazyPath) {
+			files[filename] = new File(undefined, data._lazyPath);
+		}
+		else if (typeof data === "string" || data instanceof Uint8Array) {
+			files[filename] = new File(data, fullPath);
+		}
+		else {
+			files[filename] = directoryFromTree(data, fullPath);
+		}
 	}
 	return new Directory(files);
 }
@@ -529,28 +556,26 @@ function directoryIntoTree(directory, { decodeASCII = true } = {}) {
 	const tree = {};
 	for (const [filename, entry] of Object.entries(directory.files)) {
 		if (entry instanceof File) {
-			// FIX: Skip unloaded lazy proxies.
-			// This prevents crashing when serializing the tree after a compilation error,
-			// and avoids fetching files that were only probed but never actually used.
+			// FIX: Serialize lazy proxies so they survive round-trips!
 			if (entry._lazyPath && entry._data === null) {
-				continue;
-			}
-			// FIX: Safely access data. If it somehow throws "no-entry" during serialization,
-			// fallback to an empty buffer instead of crashing the entire process.
-			let fileData;
-			try {
-				fileData = entry.data;
-			} catch (e) {
-				if (e === "no-entry") {
-					fileData = new Uint8Array();
-				} else {
-					throw e;
+				tree[filename] = { _lazyPath: entry._lazyPath };
+			} else {
+				let fileData;
+				try {
+					fileData = entry.data;
+				} catch (e) {
+					if (e === "no-entry") {
+						fileData = new Uint8Array();
+					} else {
+						throw e;
+					}
 				}
+				tree[filename] = decodeASCII && isASCII(fileData) ? new TextDecoder().decode(fileData) : fileData;
 			}
-			tree[filename] = decodeASCII && isASCII(fileData) ? new TextDecoder().decode(fileData) : fileData;
 		}
-		if (entry instanceof Directory)
-		tree[filename] = directoryIntoTree(entry, { decodeASCII });
+		if (entry instanceof Directory) {
+			tree[filename] = directoryIntoTree(entry, { decodeASCII });
+		}
 	}
 	return tree;
 }
@@ -8133,5 +8158,6 @@ export {
 	runClang,
 	runLLVM,
 	version,
-	resetFileCache
+	resetFileCache,
+	AuthData
 };

@@ -1,0 +1,49 @@
+FILE I/O & FILE MANAGER EXTENSION REQUIREMENTS
+=============================================
+
+1. ARCHITECTURAL INTEGRATION
+---------------------------
+- Implemented as an extension header (e.g., extensions/file_io.hpp) bridging WebAssembly and browser capabilities.
+- Utilizes Autogen's three extension communication patterns:
+  1. Asynchronous Operations (returning an ag_future* pointer for non-blocking file tasks).
+  2. Synchronous Blocking Operations (suspending via Atomics.wait for immediate operations).
+  3. Fire-and-Forget (one-way notification tasks).
+- Avoids heavy stream formatting wrappers in favor of explicit pointer-and-size memory buffers allocated via AtomicMalloc (ag_alloc) and null-terminated C-style character streams.
+
+2. FILE I/O MODES & CONFIGURATION
+---------------------------------
+- Strongly typed C++ enumerators replace legacy character-based mode flags:
+  * FileAccessMode: ReadOnly, WriteOnly, ReadWrite
+  * FileFormat: Text, Binary
+  * FileOpenBehavior: OpenExisting, CreateOrTruncate, Append
+
+3. FILE CLASS SPECIFICATION
+---------------------------
+- open(path, access, format, behavior): Opens a file handle via extension bridging.
+- read(buffer, size): Reads up to size bytes into the shared-memory buffer pointer.
+- write(buffer, size): Writes size bytes from the shared-memory buffer pointer to the file.
+- writeString(str): Specialized stream writer for null-terminated C-style character strings.
+- seek(offset, origin): Repositions file read/write pointer (Origins: Begin, Current, End).
+- getPosition(): Returns current byte offset relative to the beginning of the file.
+- getPositionFromEnd(): Returns current byte offset relative to the end of the file.
+- flush(): Forces unwritten buffered data to commit to the storage/transport layer.
+- close(): Closes the file handle and releases resources.
+
+4. FILE MANAGER CLASS SPECIFICATION
+-----------------------------------
+- Metadata & Inspection (FileMetadata struct tracking size, timestamps, directory status, and read/write accessibility).
+- getMetadata(path): Retrieves file or directory metadata.
+- listDirectory(path): Returns a list of filenames/entries contained within a directory.
+- createFile(path): Creates a new, empty file.
+- createDirectory(path): Creates a new directory (including nested paths).
+- deleteFile(path): Deletes a target file.
+- deleteDirectory(path, recursive): Deletes a directory, with an option to recursively delete contents.
+- rename(oldPath, newPath): Renames or moves a file or directory.
+- copyFile(sourcePath, destPath): Copies an individual file.
+- copyDirectory(sourcePath, destPath): Recursively copies an entire directory and its contents.
+
+5. ERROR PROPAGATION & MEMORY MANAGEMENT
+------------------------------------------
+- Browser-layer failures populate an error state within the communication block or future structure.
+- C++ wrappers check status codes upon resume to safely handle or report errors.
+- All payloads, buffers, and string paths are allocated inside the shared WASM heap via AtomicMalloc, with callers and handlers responsible for cleaning up temporary memory.

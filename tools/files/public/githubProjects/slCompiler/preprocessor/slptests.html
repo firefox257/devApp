@@ -1,0 +1,1737 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SLP Test Runner</title>
+    <style>
+        :root {
+            --bg: #f5f5f7;
+            --card: #ffffff;
+            --text: #1d1d1f;
+            --pass: #34c759;
+            --fail: #ff3b30;
+            --code-bg: #1e1e1e;
+            --code-text: #f8f8f2;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 16px;
+            font-size: 15px;
+            line-height: 1.5;
+        }
+        h1 { font-size: 22px; margin: 0 0 16px 0; font-weight: 600; }
+        .summary {
+            background: var(--card);
+            padding: 16px;
+            border-radius: 12px;
+            margin-bottom: 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        .summary-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        .summary-stats { font-size: 18px; font-weight: 600; }
+        .pass-text { color: var(--pass); }
+        .fail-text { color: var(--fail); }
+        
+        .btn-group {
+            display: flex;
+            gap: 8px;
+        }
+        .btn {
+            border: none;
+            padding: 10px 16px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .btn-primary {
+            background: #007aff;
+            color: white;
+        }
+        .btn-primary:active { background: #0056b3; }
+        .btn-secondary {
+            background: #e5e5ea;
+            color: #1d1d1f;
+        }
+        .btn-secondary:active { background: #d1d1d6; }
+        
+        .section-title {
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #86868b;
+            margin: 24px 0 8px 0;
+            font-weight: 600;
+        }
+
+        .console-box {
+            background: var(--code-bg);
+            color: var(--code-text);
+            padding: 12px;
+            border-radius: 10px;
+            font-family: "SF Mono", Monaco, monospace;
+            font-size: 12px;
+            max-height: 250px;
+            overflow-y: auto;
+            margin-bottom: 16px;
+            white-space: pre-wrap;
+            word-break: break-all;
+            -webkit-overflow-scrolling: touch;
+        }
+        .log-line { margin: 2px 0; border-bottom: 1px solid #333; padding-bottom: 2px; }
+        .log-log { color: #f8f8f2; }
+        .log-warn { color: #f1fa8c; }
+        .log-error { color: #ff5555; }
+
+        .test-list { display: flex; flex-direction: column; gap: 8px; }
+        .test-item {
+            background: var(--card);
+            padding: 12px;
+            border-radius: 10px;
+            border-left: 4px solid #ccc;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+        .test-item.pass { border-left-color: var(--pass); }
+        .test-item.fail { border-left-color: var(--fail); }
+        
+        .test-name { font-weight: 600; font-size: 14px; margin-bottom: 4px; }
+        .test-detail { font-family: "SF Mono", Monaco, monospace; font-size: 12px; color: #666; word-break: break-all; }
+        .test-detail span { color: #1d1d1f; font-weight: 500; }
+    </style>
+</head>
+<body>
+
+    <h1>SLP Test Runner</h1>
+    
+    <div class="summary">
+        <div class="summary-header">
+            <div class="summary-stats" id="summaryText">Running...</div>
+            <div class="btn-group">
+                <button class="btn btn-secondary" id="copyBtn" onclick="copyResults()">📋 Copy</button>
+                <button class="btn btn-primary" onclick="runTests()">🔄 Re-run</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="section-title">Console Output</div>
+    <div class="console-box" id="consoleOutput"></div>
+
+    <div class="section-title">Test Results</div>
+    <div class="test-list" id="testList"></div>
+
+<script>
+// ============================================================================
+// INLINED SLP.JS (For single-file portability on mobile)
+// ============================================================================
+class Environment {
+  constructor(parent = null) {
+    this.vars = new Map();
+    this.parent = parent;
+  }
+  set(name, value) {
+    if (this.vars.has(name)) {
+      this.vars.set(name, value);
+    } else if (this.parent) {
+      this.parent.set(name, value);
+    } else {
+      this.vars.set(name, value);
+    }
+  }
+  get(name) {
+    if (this.vars.has(name)) return this.vars.get(name);
+    if (this.parent) return this.parent.get(name);
+    return undefined;
+  }
+}
+
+function toBoolean(val) {
+  if (val === undefined) return false;
+  if (typeof val === 'boolean') return val;
+  if (typeof val === 'number') return val !== 0 && !isNaN(val);
+  if (typeof val === 'bigint') return val !== 0n;
+  if (typeof val === 'string') return val.length > 0;
+  if (Array.isArray(val)) return val.length > 0;
+  if (val !== null && typeof val === 'object') return true;
+  return false;
+}
+
+class Lexer {
+  constructor(input) {
+    this.input = input;
+    this.pos = 0;
+    this.line = 1;
+    this.col = 1;
+    this.buffer = [];
+  }
+  peek() { return this.input[this.pos]; }
+  advance() {
+    const ch = this.input[this.pos];
+    this.pos++;
+    if (ch === '\n') { this.line++; this.col = 1; }
+    else { this.col++; }
+    return ch;
+  }
+  skipWhitespaceAndComments() {
+    while (this.pos < this.input.length) {
+      if (/\s/.test(this.input[this.pos])) {
+        this.advance();
+      } else if (this.input[this.pos] === '/' && this.input[this.pos + 1] === '/') {
+        while (this.pos < this.input.length && this.input[this.pos] !== '\n') this.advance();
+      } else if (this.input[this.pos] === '/' && this.input[this.pos + 1] === '*') {
+        this.advance(); this.advance();
+        while (this.pos < this.input.length) {
+          if (this.input[this.pos] === '*' && this.input[this.pos + 1] === '/') {
+            this.advance(); this.advance();
+            break;
+          }
+          this.advance();
+        }
+      } else {
+        break;
+      }
+    }
+  }
+  _generateToken() {
+    this.skipWhitespaceAndComments();
+    if (this.pos >= this.input.length) return { type: 'EOF', value: 'EOF' };
+    const ch = this.input[this.pos];
+    if (/[a-zA-Z_$]/.test(ch)) {
+      let id = '';
+      while (this.pos < this.input.length && /[a-zA-Z0-9_$]/.test(this.input[this.pos])) {
+        id += this.advance();
+      }
+      if (['var', 'if', 'else', 'switch', 'case', 'default', 'break', 'continue', 'while', 'do', 'for', 'in', 'return', 'typeof', 'true', 'false', 'undefined'].includes(id)) {
+        return { type: 'KEYWORD', value: id };
+      }
+      return { type: 'IDENTIFIER', value: id };
+    }
+    if (/[0-9]/.test(ch)) {
+      let numStr = '';
+      let isFloat = false;
+      while (this.pos < this.input.length && (/[0-9]/.test(this.input[this.pos]) || this.input[this.pos] === '.' || this.input[this.pos] === 'n')) {
+        const c = this.input[this.pos];
+        if (c === '.') {
+          if (isFloat) break;
+          isFloat = true;
+        } else if (c === 'n') {
+          numStr += this.advance();
+          break;
+        }
+        numStr += this.advance();
+      }
+      if (isFloat) return { type: 'FLOAT', value: parseFloat(numStr) };
+      return { type: 'INTEGER', value: BigInt(numStr) };
+    }
+    if (ch === '"' || ch === "'" || ch === '`') {
+      const quote = this.advance();
+      let str = '';
+      while (this.pos < this.input.length) {
+        const c = this.advance();
+        if (c === quote) break;
+        if (c === '\\') {
+          const next = this.advance();
+          if (next === 'n') str += '\n';
+          else if (next === 't') str += '\t';
+          else if (next === 'r') str += '\r';
+          else if (next === quote) str += quote;
+          else if (next === '\\') str += '\\';
+          else if (next === '$') str += '$';
+          else str += next;
+        } else {
+          str += c;
+        }
+      }
+      return { type: 'STRING', value: str, quote: quote };
+    }
+    const twoChar = this.input.substr(this.pos, 2);
+    const operators = ['++', '--', '**', '==', '!=', '>=', '<=', '&&', '||', '<<', '>>', '+=', '-=', '*=', '/=', '%=', '<<=', '>>=', '&=', '^=', '|=', '->'];
+    if (operators.includes(twoChar)) {
+      this.advance(); this.advance();
+      return { type: 'OPERATOR', value: twoChar };
+    }
+    const singleCharOps = ['+', '-', '*', '/', '%', '=', '!', '>', '<', '&', '|', '^', '~', '?', ':', '.', ',', ';', '(', ')', '{', '}', '[', ']', '#'];
+    if (singleCharOps.includes(ch)) {
+      this.advance();
+      return { type: ch === '#' ? 'HASH' : (['(', ')', '{', '}', '[', ']', '.', ',', ';'].includes(ch) ? 'PUNCTUATION' : 'OPERATOR'), value: ch };
+    }
+    throw new Error(`Unexpected character: ${ch} at line ${this.line}, col ${this.col}`);
+  }
+  getNextToken() {
+    if (this.buffer.length > 0) return this.buffer.shift();
+    return this._generateToken();
+  }
+  peekToken() {
+    if (this.buffer.length === 0) {
+      this.buffer.push(this._generateToken());
+    }
+    return this.buffer[0];
+  }
+}
+
+class Parser {
+  constructor(lexer) {
+    this.lexer = lexer;
+    this.current = this.lexer.getNextToken();
+    this.previous = null;
+  }
+  advance() {
+    this.previous = this.current;
+    this.current = this.lexer.getNextToken();
+    return this.previous;
+  }
+  check(...expected) {
+    for (const exp of expected) {
+      if (this.current.type === exp || this.current.value === exp) return true;
+    }
+    return false;
+  }
+  match(...expected) {
+    for (const exp of expected) {
+      if (this.current.type === exp || this.current.value === exp) {
+        this.advance();
+        return true;
+      }
+    }
+    return false;
+  }
+  consume(expected, errorMsg) {
+    if (this.check(expected)) return this.advance();
+    throw new Error(`${errorMsg} Got ${this.current.type} (${this.current.value})`);
+  }
+  parseProgram() {
+    const body = [];
+    while (this.current.type !== 'EOF') {
+      body.push(this.parseStatement());
+    }
+    return { type: 'Program', body };
+  }
+  parseStatement() {
+    if (this.match('HASH')) {
+      this.consume('token', "Expected 'token' after '#'");
+      if (this.match('var')) {
+        const decl = this.parseVariableDeclaration();
+        return { type: 'TokenDirective', target: 'var', declaration: decl };
+      } else {
+        const id = this.consume('IDENTIFIER', "Expected identifier after #token");
+        this.consume(';', "Expected ';' after #token name");
+        return { type: 'TokenDirective', target: 'identifier', name: id.value };
+      }
+    }
+    if (this.match('var')) {
+      return this.parseVariableDeclaration();
+    }
+    if (this.match('return')) {
+      let arg = null;
+      if (!this.check(';', '}', 'EOF')) {
+        arg = this.parseExpression();
+      }
+      this.consume(';', "Expected ';' after return");
+      return { type: 'ReturnStatement', argument: arg };
+    }
+    if (this.match('break')) {
+      this.consume(';', "Expected ';' after break");
+      return { type: 'BreakStatement' };
+    }
+    if (this.match('continue')) {
+      this.consume(';', "Expected ';' after continue");
+      return { type: 'ContinueStatement' };
+    }
+    if (this.match('if')) {
+      this.consume('(', "Expected '(' after if");
+      const test = this.parseExpression();
+      this.consume(')', "Expected ')' after if condition");
+      const consequent = this.parseBlock();
+      let alternate = null;
+      if (this.match('else')) {
+        alternate = this.parseBlock();
+      }
+      return { type: 'IfStatement', test, consequent, alternate };
+    }
+    if (this.match('while')) {
+      this.consume('(', "Expected '(' after while");
+      const test = this.parseExpression();
+      this.consume(')', "Expected ')' after while condition");
+      const body = this.parseBlock();
+      return { type: 'WhileStatement', test, body };
+    }
+    if (this.match('do')) {
+      const body = this.parseBlock();
+      this.consume('while', "Expected 'while' after do block");
+      this.consume('(', "Expected '(' after do while");
+      const test = this.parseExpression();
+      this.consume(')', "Expected ')' after do while condition");
+      this.consume(';', "Expected ';' after do while");
+      return { type: 'DoWhileStatement', body, test };
+    }
+    if (this.check('for')) {
+      this.advance();
+      this.consume('(', "Expected '(' after for");
+      let left = null;
+      if (this.match('var')) {
+        const id = this.consume('IDENTIFIER', "Expected variable name");
+        let initVal = null;
+        if (this.match('=')) {
+          initVal = this.parseExpression();
+        }
+        left = { type: 'VariableDeclaration', id: id.value, init: initVal };
+      } else {
+        left = this.parseExpression();
+      }
+      if (this.match('in')) {
+        const right = this.parseExpression();
+        this.consume(')', "Expected ')' after for...in");
+        const body = this.parseBlock();
+        return { type: 'ForInStatement', left, right, body };
+      } else {
+        this.consume(';', "Expected ';' after for init");
+        let test = null;
+        if (!this.check(';')) test = this.parseExpression();
+        this.consume(';', "Expected ';' after for test");
+        let update = null;
+        if (!this.check(')')) update = this.parseExpression();
+        this.consume(')', "Expected ')' after for update");
+        const body = this.parseBlock();
+        return { type: 'ForStatement', init: left, test, update, body };
+      }
+    }
+    if (this.match('switch')) {
+      this.consume('(', "Expected '(' after switch");
+      const discriminant = this.parseExpression();
+      this.consume(')', "Expected ')' after switch discriminant");
+      this.consume('{', "Expected '{' after switch");
+      const cases = [];
+      while (!this.check('}', 'EOF')) {
+        if (this.match('case')) {
+          const test = this.parseExpression();
+          this.consume(':', "Expected ':' after case");
+          const consequent = [];
+          while (!this.check('case', 'default', '}', 'EOF')) {
+            consequent.push(this.parseStatement());
+          }
+          cases.push({ test, consequent });
+        } else if (this.match('default')) {
+          this.consume(':', "Expected ':' after default");
+          const consequent = [];
+          while (!this.check('case', 'default', '}', 'EOF')) {
+            consequent.push(this.parseStatement());
+          }
+          cases.push({ test: null, consequent });
+        } else {
+          break;
+        }
+      }
+      this.consume('}', "Expected '}' after switch cases");
+      return { type: 'SwitchStatement', discriminant, cases };
+    }
+    const expr = this.parseExpression();
+    this.consume(';', "Expected ';' after expression");
+    return { type: 'ExpressionStatement', expression: expr };
+  }
+  parseVariableDeclaration() {
+    const id = this.consume('IDENTIFIER', "Expected variable name");
+    let init = null;
+    if (this.match('=')) {
+      init = this.parseExpression();
+    }
+    this.consume(';', "Expected ';' after variable declaration");
+    return { type: 'VariableDeclaration', id: id.value, init: init };
+  }
+  parseBlock() {
+    this.consume('{', "Expected '{' for block");
+    const body = [];
+    while (!this.check('}', 'EOF')) {
+      body.push(this.parseStatement());
+    }
+    this.consume('}', "Expected '}' after block");
+    return { type: 'BlockStatement', body };
+  }
+  parseExpression() { return this.parseAssignment(); }
+  parseAssignment() {
+    let expr = this.parseConditional();
+    if (this.match('=', '+=', '-=', '*=', '/=', '%=', '<<=', '>>=', '&=', '^=', '|=')) {
+      const operator = this.previous.value;
+      const right = this.parseAssignment();
+      return { type: 'AssignmentExpression', left: expr, operator, right };
+    }
+    return expr;
+  }
+  parseConditional() {
+    let expr = this.parseLogicalOr();
+    if (this.match('?')) {
+      const consequent = this.parseExpression();
+      this.consume(':', "Expected ':' in conditional expression");
+      const alternate = this.parseAssignment();
+      return { type: 'ConditionalExpression', test: expr, consequent, alternate };
+    }
+    return expr;
+  }
+  parseLogicalOr() {
+    let expr = this.parseLogicalAnd();
+    while (this.match('||')) {
+      expr = { type: 'BinaryExpression', left: expr, operator: '||', right: this.parseLogicalAnd() };
+    }
+    return expr;
+  }
+  parseLogicalAnd() {
+    let expr = this.parseBitwiseOr();
+    while (this.match('&&')) {
+      expr = { type: 'BinaryExpression', left: expr, operator: '&&', right: this.parseBitwiseOr() };
+    }
+    return expr;
+  }
+  parseBitwiseOr() {
+    let expr = this.parseBitwiseXor();
+    while (this.match('|')) {
+      expr = { type: 'BinaryExpression', left: expr, operator: '|', right: this.parseBitwiseXor() };
+    }
+    return expr;
+  }
+  parseBitwiseXor() {
+    let expr = this.parseBitwiseAnd();
+    while (this.match('^')) {
+      expr = { type: 'BinaryExpression', left: expr, operator: '^', right: this.parseBitwiseAnd() };
+    }
+    return expr;
+  }
+  parseBitwiseAnd() {
+    let expr = this.parseEquality();
+    while (this.match('&')) {
+      expr = { type: 'BinaryExpression', left: expr, operator: '&', right: this.parseEquality() };
+    }
+    return expr;
+  }
+  parseEquality() {
+    let expr = this.parseRelational();
+    while (this.match('==', '!=')) {
+      expr = { type: 'BinaryExpression', left: expr, operator: this.previous.value, right: this.parseRelational() };
+    }
+    return expr;
+  }
+  parseRelational() {
+    let expr = this.parseShift();
+    while (this.match('<', '<=', '>', '>=')) {
+      expr = { type: 'BinaryExpression', left: expr, operator: this.previous.value, right: this.parseShift() };
+    }
+    return expr;
+  }
+  parseShift() {
+    let expr = this.parseAdditive();
+    while (this.match('<<', '>>')) {
+      expr = { type: 'BinaryExpression', left: expr, operator: this.previous.value, right: this.parseAdditive() };
+    }
+    return expr;
+  }
+  parseAdditive() {
+    let expr = this.parseMultiplicative();
+    while (this.match('+', '-')) {
+      expr = { type: 'BinaryExpression', left: expr, operator: this.previous.value, right: this.parseMultiplicative() };
+    }
+    return expr;
+  }
+  parseMultiplicative() {
+    let expr = this.parseExponentiation();
+    while (this.match('*', '/', '%')) {
+      expr = { type: 'BinaryExpression', left: expr, operator: this.previous.value, right: this.parseExponentiation() };
+    }
+    return expr;
+  }
+  parseExponentiation() {
+    let expr = this.parseUnary();
+    if (this.match('**')) {
+      const right = this.parseExponentiation();
+      return { type: 'BinaryExpression', left: expr, operator: '**', right };
+    }
+    return expr;
+  }
+  parseUnary() {
+    if (this.match('!', '-', '+', '~', 'typeof')) {
+      const operator = this.previous.value;
+      const argument = this.parseUnary();
+      return { type: 'UnaryExpression', operator, argument };
+    }
+    return this.parsePrimaryAndPostfix();
+  }
+  parsePrimaryAndPostfix() {
+    let expr = this.parsePrimary();
+    while (true) {
+      if (this.match('.')) {
+        const prop = this.consume('IDENTIFIER', "Expected property name after '.'");
+        expr = { type: 'MemberExpression', object: expr, property: { type: 'Literal', value: prop.value }, computed: false };
+      } else if (this.match('[')) {
+        const prop = this.parseExpression();
+        this.consume(']', "Expected ']' after computed property");
+        expr = { type: 'MemberExpression', object: expr, property: prop, computed: true };
+      } else if (this.match('(')) {
+        expr = this.parseCallExpression(expr);
+      } else if (this.match('++', '--')) {
+        expr = { type: 'UpdateExpression', operator: this.previous.value, argument: expr, prefix: false };
+      } else {
+        break;
+      }
+    }
+    return expr;
+  }
+  parsePrimary() {
+    if (this.match('true')) return { type: 'Literal', value: true };
+    if (this.match('false')) return { type: 'Literal', value: false };
+    if (this.match('undefined')) return { type: 'Literal', value: undefined };
+    if (this.match('INTEGER')) return { type: 'Literal', value: this.previous.value };
+    if (this.match('FLOAT')) return { type: 'Literal', value: this.previous.value };
+    if (this.match('STRING')) {
+      const token = this.previous;
+      if ((token.quote === '`' || token.quote === '"') && token.value.includes('${')) {
+        return this.parseTemplateLiteral(token.value, token.quote);
+      }
+      return { type: 'Literal', value: token.value };
+    }
+    if (this.match('IDENTIFIER')) {
+      return { type: 'Identifier', name: this.previous.value };
+    }
+    if (this.check('(')) {
+      this.advance();
+      let isArrow = true;
+      const params = [];
+      const consumed = [];
+      const savedPrevious = this.previous;
+      if (!this.check(')')) {
+        while (true) {
+          if (this.check('IDENTIFIER')) {
+            consumed.push(this.advance());
+            params.push(this.previous.value);
+          } else {
+            isArrow = false;
+            break;
+          }
+          if (this.check(',')) {
+            consumed.push(this.advance());
+          } else {
+            break;
+          }
+        }
+      }
+      if (isArrow && this.check(')')) {
+        consumed.push(this.advance());
+        if (this.check('->')) {
+          consumed.push(this.advance());
+          const body = this.parseBlock();
+          return { type: 'FunctionExpression', params, body };
+        } else {
+          isArrow = false;
+        }
+      } else {
+        isArrow = false;
+      }
+      if (!isArrow) {
+        this.lexer.buffer = [...consumed, ...this.lexer.buffer];
+        this.current = consumed.length > 0 ? consumed[0] : { type: 'PUNCTUATION', value: '(' };
+        this.previous = savedPrevious;
+        this.advance();
+        const expr = this.parseExpression();
+        this.consume(')', "Expected ')' after expression");
+        return expr;
+      }
+    }
+    if (this.match('[')) return this.parseArrayLiteral();
+    if (this.match('{')) return this.parseObjectLiteral();
+    throw new Error(`Unexpected token: ${this.current.type} (${this.current.value})`);
+  }
+  parseTemplateLiteral(raw, quote) {
+    const parts = [];
+    let i = 0;
+    while (i < raw.length) {
+      const start = raw.indexOf('${', i);
+      if (start === -1) {
+        parts.push({ type: 'Literal', value: raw.slice(i) });
+        break;
+      }
+      if (start > i) {
+        parts.push({ type: 'Literal', value: raw.slice(i, start) });
+      }
+      let depth = 1;
+      let j = start + 2;
+      while (j < raw.length && depth > 0) {
+        if (raw[j] === '{') depth++;
+        else if (raw[j] === '}') depth--;
+        j++;
+      }
+      const exprStr = raw.slice(start + 2, j - 1);
+      const subLexer = new Lexer(exprStr);
+      const subParser = new Parser(subLexer);
+      const expr = subParser.parseExpression();
+      parts.push({ type: 'TemplateExpression', expression: expr });
+      i = j;
+    }
+    return { type: 'TemplateLiteral', parts };
+  }
+  parseCallExpression(callee) {
+    const args = [];
+    if (!this.check(')')) {
+      do {
+        args.push(this.parseExpression());
+      } while (this.match(','));
+    }
+    this.consume(')', "Expected ')' after arguments");
+    return { type: 'CallExpression', callee, arguments: args };
+  }
+  parseArrayLiteral() {
+    const elements = [];
+    while (!this.check(']', 'EOF')) {
+      elements.push(this.parseExpression());
+      if (this.match(',')) {
+        if (this.check(']')) break;
+      } else {
+        break;
+      }
+    }
+    this.consume(']', "Expected ']' after array elements");
+    return { type: 'ArrayLiteral', elements };
+  }
+  parseObjectLiteral() {
+    const properties = [];
+    while (!this.check('}', 'EOF')) {
+      const key = this.consume('IDENTIFIER', "Expected property name").value;
+      this.consume(':', "Expected ':' after property name");
+      const value = this.parseExpression();
+      properties.push({ key, value });
+      if (this.match(',')) {
+        if (this.check('}')) break;
+      } else {
+        break;
+      }
+    }
+    this.consume('}', "Expected '}' after object properties");
+    return { type: 'ObjectLiteral', properties };
+  }
+}
+
+class Interpreter {
+  constructor() {
+    this.globalEnv = new Environment();
+    this.tokens = new Set();
+  }
+  interpret(program) {
+    try {
+      const newTokens = [];
+      for (const stmt of program.body) {
+        const res = this.execute(stmt, this.globalEnv);
+        if (res.control) {
+          return { success: false, tokens: [], error_message: `Runtime Error: Unexpected control flow '${res.control}'` };
+        }
+        if (stmt.type === 'TokenDirective') {
+          if (stmt.target === 'var') {
+            newTokens.push(stmt.declaration.id);
+            this.tokens.add(stmt.declaration.id);
+          } else if (stmt.target === 'identifier') {
+            newTokens.push(stmt.name);
+            this.tokens.add(stmt.name);
+          }
+        }
+      }
+      return { success: true, tokens: newTokens, error_message: "" };
+    } catch (e) {
+      return { success: false, tokens: [], error_message: `Runtime Error: ${e.message}` };
+    }
+  }
+  resolveReference(node, env) {
+    if (node.type === 'Identifier') {
+      return {
+        get: () => env.get(node.name),
+        set: (val) => env.set(node.name, val)
+      };
+    } else if (node.type === 'MemberExpression') {
+      const objRes = this.evaluate(node.object, env);
+      if (objRes.control) throw new Error("Control flow in assignment");
+      const obj = objRes.value;
+      const prop = node.computed ? this.evaluate(node.property, env).value : node.property.value;
+      return {
+        get: () => obj[prop],
+        set: (val) => { obj[prop] = val; }
+      };
+    }
+    throw new Error("Invalid assignment target");
+  }
+  execute(node, env) {
+    switch (node.type) {
+      case 'Program':
+      case 'BlockStatement': {
+        const blockEnv = node.type === 'BlockStatement' ? new Environment(env) : env;
+        for (const stmt of node.body) {
+          const res = this.execute(stmt, blockEnv);
+          if (res.control) return res;
+        }
+        return { value: undefined, control: null };
+      }
+      case 'VariableDeclaration': {
+        let val = undefined;
+        if (node.init) {
+          const res = this.evaluate(node.init, env);
+          if (res.control) return res;
+          val = res.value;
+        }
+        env.set(node.id, val);
+        return { value: undefined, control: null };
+      }
+      case 'TokenDirective':
+        if (node.declaration) {
+          return this.execute(node.declaration, env);
+        }
+        return { value: undefined, control: null };
+      case 'ReturnStatement': {
+        if (node.argument) {
+          const res = this.evaluate(node.argument, env);
+          if (res.control) return res;
+          return { value: res.value, control: 'return' };
+        }
+        return { value: undefined, control: 'return' };
+      }
+      case 'BreakStatement': return { value: undefined, control: 'break' };
+      case 'ContinueStatement': return { value: undefined, control: 'continue' };
+      case 'IfStatement': {
+        const testRes = this.evaluate(node.test, env);
+        if (testRes.control) return testRes;
+        if (toBoolean(testRes.value)) {
+          return this.execute(node.consequent, env);
+        } else if (node.alternate) {
+          return this.execute(node.alternate, env);
+        }
+        return { value: undefined, control: null };
+      }
+      case 'WhileStatement': {
+        while (true) {
+          const tRes = this.evaluate(node.test, env);
+          if (tRes.control) return tRes;
+          if (!toBoolean(tRes.value)) break;
+          const bRes = this.execute(node.body, env);
+          if (bRes.control === 'break') break;
+          if (bRes.control === 'return') return bRes;
+        }
+        return { value: undefined, control: null };
+      }
+      case 'DoWhileStatement': {
+        while (true) {
+          const bRes = this.execute(node.body, env);
+          if (bRes.control === 'break') break;
+          if (bRes.control === 'return') return bRes;
+          const tRes = this.evaluate(node.test, env);
+          if (tRes.control) return tRes;
+          if (!toBoolean(tRes.value)) break;
+        }
+        return { value: undefined, control: null };
+      }
+      case 'ForStatement': {
+        if (node.init) {
+          const iRes = this.execute(node.init, env);
+          if (iRes.control) return iRes;
+        }
+        while (true) {
+          if (node.test) {
+            const tRes = this.evaluate(node.test, env);
+            if (tRes.control) return tRes;
+            if (!toBoolean(tRes.value)) break;
+          }
+          const bRes = this.execute(node.body, env);
+          if (bRes.control === 'break') break;
+          if (bRes.control === 'return') return bRes;
+          if (node.update) {
+            const uRes = this.evaluate(node.update, env);
+            if (uRes.control) return uRes;
+          }
+        }
+        return { value: undefined, control: null };
+      }
+      case 'ForInStatement': {
+        const rightRes = this.evaluate(node.right, env);
+        if (rightRes.control) return rightRes;
+        const obj = rightRes.value;
+        if (obj !== null && obj !== undefined) {
+          const keys = Object.keys(obj);
+          for (const key of keys) {
+            this.assign(node.left, key, env);
+            const bRes = this.execute(node.body, env);
+            if (bRes.control === 'break') break;
+            if (bRes.control === 'return') return bRes;
+          }
+        }
+        return { value: undefined, control: null };
+      }
+      case 'SwitchStatement': {
+        const discRes = this.evaluate(node.discriminant, env);
+        if (discRes.control) return discRes;
+        const discVal = discRes.value;
+        let matched = false;
+        let skip = false;
+        for (const c of node.cases) {
+          if (!skip) {
+            if (c.test) {
+              const tRes = this.evaluate(c.test, env);
+              if (tRes.control) return tRes;
+              if (tRes.value == discVal) {
+                matched = true;
+              } else {
+                continue;
+              }
+            } else {
+              matched = true;
+            }
+          }
+          if (matched) {
+            for (const stmt of c.consequent) {
+              const res = this.execute(stmt, env);
+              if (res.control === 'break') {
+                skip = true;
+                break;
+              }
+              if (res.control === 'return') return res;
+              if (res.control === 'continue') return res;
+            }
+            if (skip) break;
+          }
+        }
+        return { value: undefined, control: null };
+      }
+      case 'ExpressionStatement':
+        return this.evaluate(node.expression, env);
+      default:
+        return { value: undefined, control: null };
+    }
+  }
+  assign(node, value, env) {
+    if (node.type === 'Identifier') {
+      env.set(node.name, value);
+    } else if (node.type === 'MemberExpression') {
+      const objRes = this.evaluate(node.object, env);
+      if (objRes.control) throw new Error("Control flow in assignment");
+      const obj = objRes.value;
+      const propRes = this.evaluate(node.property, env);
+      const prop = propRes.value;
+      obj[prop] = value;
+    } else {
+      throw new Error("Invalid assignment target");
+    }
+  }
+  evaluate(node, env) {
+    switch (node.type) {
+      case 'Literal': return { value: node.value, control: null };
+      case 'TemplateLiteral': {
+        let str = "";
+        for (const part of node.parts) {
+          if (part.type === 'Literal') {
+            str += part.value;
+          } else if (part.type === 'TemplateExpression') {
+            const res = this.evaluate(part.expression, env);
+            if (res.control) return res;
+            str += this.stringify(res.value);
+          }
+        }
+        return { value: str, control: null };
+      }
+      case 'Identifier': return { value: env.get(node.name), control: null };
+      case 'ArrayLiteral': {
+        const arr = [];
+        for (const el of node.elements) {
+          const res = this.evaluate(el, env);
+          if (res.control) return res;
+          arr.push(res.value);
+        }
+        return { value: arr, control: null };
+      }
+      case 'ObjectLiteral': {
+        const obj = {};
+        for (const prop of node.properties) {
+          const res = this.evaluate(prop.value, env);
+          if (res.control) return res;
+          obj[prop.key] = res.value;
+        }
+        return { value: obj, control: null };
+      }
+      case 'FunctionExpression':
+        return { value: { type: 'function', params: node.params, body: node.body, env: env }, control: null };
+      case 'UnaryExpression': {
+        const argRes = this.evaluate(node.argument, env);
+        if (argRes.control) return argRes;
+        const arg = argRes.value;
+        let uVal;
+        switch (node.operator) {
+          case '!': uVal = !toBoolean(arg); break;
+          case '-': uVal = typeof arg === 'bigint' ? -arg : -Number(arg); break;
+          case '+': uVal = Number(arg); break;
+          case '~': uVal = typeof arg === 'bigint' ? ~arg : ~Number(arg); break;
+          case 'typeof':
+            if (arg === undefined) uVal = "undefined";
+            else if (typeof arg === 'bigint') uVal = "integer";
+            else if (typeof arg === 'number') uVal = "float";
+            else if (typeof arg === 'boolean') uVal = "boolean";
+            else if (typeof arg === 'string') uVal = "string";
+            else if (Array.isArray(arg)) uVal = "array";
+            else if (arg !== null && typeof arg === 'object') uVal = "object";
+            else if (arg && arg.type === 'function') uVal = "function";
+            else uVal = typeof arg;
+            break;
+        }
+        return { value: uVal, control: null };
+      }
+      case 'UpdateExpression': {
+        const ref = this.resolveReference(node.argument, env);
+        let current = ref.get();
+        let newVal;
+        if (node.operator === '++') {
+          newVal = typeof current === 'bigint' ? current + 1n : Number(current) + 1;
+        } else {
+          newVal = typeof current === 'bigint' ? current - 1n : Number(current) - 1;
+        }
+        ref.set(newVal);
+        return { value: node.prefix ? newVal : current, control: null };
+      }
+      case 'AssignmentExpression': {
+        const assignRef = this.resolveReference(node.left, env);
+        const rightRes = this.evaluate(node.right, env);
+        if (rightRes.control) return rightRes;
+        let rightVal = rightRes.value;
+        let finalVal = rightVal;
+        if (node.operator !== '=') {
+          const leftVal = assignRef.get();
+          switch (node.operator) {
+            case '+=': finalVal = (typeof leftVal === 'bigint' || typeof rightVal === 'bigint') ? BigInt(leftVal) + BigInt(rightVal) : Number(leftVal) + Number(rightVal); break;
+            case '-=': finalVal = (typeof leftVal === 'bigint' || typeof rightVal === 'bigint') ? BigInt(leftVal) - BigInt(rightVal) : Number(leftVal) - Number(rightVal); break;
+            case '*=': finalVal = (typeof leftVal === 'bigint' || typeof rightVal === 'bigint') ? BigInt(leftVal) * BigInt(rightVal) : Number(leftVal) * Number(rightVal); break;
+            case '/=': finalVal = (typeof leftVal === 'bigint' || typeof rightVal === 'bigint') ? BigInt(leftVal) / BigInt(rightVal) : Number(leftVal) / Number(rightVal); break;
+            case '%=': finalVal = (typeof leftVal === 'bigint' || typeof rightVal === 'bigint') ? BigInt(leftVal) % BigInt(rightVal) : Number(leftVal) % Number(rightVal); break;
+            case '<<=': finalVal = BigInt(leftVal) << BigInt(rightVal); break;
+            case '>>=': finalVal = BigInt(leftVal) >> BigInt(rightVal); break;
+            case '&=': finalVal = BigInt(leftVal) & BigInt(rightVal); break;
+            case '^=': finalVal = BigInt(leftVal) ^ BigInt(rightVal); break;
+            case '|=': finalVal = BigInt(leftVal) | BigInt(rightVal); break;
+          }
+        }
+        assignRef.set(finalVal);
+        return { value: finalVal, control: null };
+      }
+      case 'BinaryExpression': {
+        const lRes = this.evaluate(node.left, env);
+        if (lRes.control) return lRes;
+        const rRes = this.evaluate(node.right, env);
+        if (rRes.control) return rRes;
+        const l = lRes.value;
+        const r = rRes.value;
+        let bVal;
+        switch (node.operator) {
+          case '+': 
+            if (typeof l === 'string' || typeof r === 'string') bVal = String(l) + String(r);
+            else if (typeof l === 'bigint' || typeof r === 'bigint') bVal = BigInt(l) + BigInt(r);
+            else bVal = Number(l) + Number(r);
+            break;
+          case '-': bVal = (typeof l === 'bigint' || typeof r === 'bigint') ? BigInt(l) - BigInt(r) : Number(l) - Number(r); break;
+          case '*': bVal = (typeof l === 'bigint' || typeof r === 'bigint') ? BigInt(l) * BigInt(r) : Number(l) * Number(r); break;
+          case '/': bVal = (typeof l === 'bigint' || typeof r === 'bigint') ? BigInt(l) / BigInt(r) : Number(l) / Number(r); break;
+          case '%': bVal = (typeof l === 'bigint' || typeof r === 'bigint') ? BigInt(l) % BigInt(r) : Number(l) % Number(r); break;
+          case '**': bVal = (typeof l === 'bigint' || typeof r === 'bigint') ? BigInt(l) ** BigInt(r) : Number(l) ** Number(r); break;
+          case '==': bVal = l == r; break;
+          case '!=': bVal = l != r; break;
+          case '>': bVal = l > r; break;
+          case '>=': bVal = l >= r; break;
+          case '<': bVal = l < r; break;
+          case '<=': bVal = l <= r; break;
+          case '&&': bVal = toBoolean(l) && toBoolean(r); break;
+          case '||': bVal = toBoolean(l) || toBoolean(r); break;
+          case '&': bVal = BigInt(l) & BigInt(r); break;
+          case '|': bVal = BigInt(l) | BigInt(r); break;
+          case '^': bVal = BigInt(l) ^ BigInt(r); break;
+          case '<<': bVal = BigInt(l) << BigInt(r); break;
+          case '>>': bVal = BigInt(l) >> BigInt(r); break;
+        }
+        return { value: bVal, control: null };
+      }
+      case 'ConditionalExpression': {
+        const cTest = this.evaluate(node.test, env);
+        if (cTest.control) return cTest;
+        return toBoolean(cTest.value) ? this.evaluate(node.consequent, env) : this.evaluate(node.alternate, env);
+      }
+      case 'CallExpression': {
+        let targetObj = null;
+        let func = null;
+        if (node.callee.type === 'MemberExpression') {
+          const objRes = this.evaluate(node.callee.object, env);
+          if (objRes.control) return objRes;
+          targetObj = objRes.value;
+          const methodName = node.callee.computed ? this.evaluate(node.callee.property, env).value : node.callee.property.value;
+          if (typeof targetObj === 'string') {
+            func = this.getStringMethod(methodName, targetObj);
+          } else if (Array.isArray(targetObj)) {
+            func = this.getArrayMethod(methodName, targetObj);
+          } else {
+            func = targetObj[methodName];
+          }
+        } else {
+          const calleeRes = this.evaluate(node.callee, env);
+          if (calleeRes.control) return calleeRes;
+          func = calleeRes.value;
+        }
+        const callArgs = [];
+        for (const argNode of node.arguments) {
+          const aRes = this.evaluate(argNode, env);
+          if (aRes.control) return aRes;
+          callArgs.push(aRes.value);
+        }
+        if (typeof func === 'function') {
+          return { value: func.apply(targetObj, callArgs), control: null };
+        } else if (func && func.type === 'function') {
+          const funcEnv = new Environment(func.env);
+          for (let i = 0; i < func.params.length; i++) {
+            funcEnv.set(func.params[i], callArgs[i] !== undefined ? callArgs[i] : undefined);
+          }
+          funcEnv.set('args', callArgs);
+          const res = this.execute(func.body, funcEnv);
+          if (res.control === 'return') return { value: res.value, control: null };
+          if (res.control) return res;
+          return { value: undefined, control: null };
+        }
+        return { value: undefined, control: null };
+      }
+      default:
+        return { value: undefined, control: null };
+    }
+  }
+  getStringMethod(name, str) {
+    switch (name) {
+      case 'charAt': return (index) => str.charAt(index) || "";
+      case 'charCodeAt': return (index) => {
+        const code = str.charCodeAt(index);
+        return isNaN(code) ? undefined : code;
+      };
+      case 'substring': return (start, end) => {
+        if (end === undefined) return str.substring(start);
+        if (start > end) return str.substring(end, start);
+        return str.substring(start, end);
+      };
+      case 'startsWith': return (search, pos) => str.startsWith(search, pos || 0);
+      case 'endsWith': return (search, len) => str.endsWith(search, len !== undefined ? len : str.length);
+      case 'indexOf': return (search, from) => str.indexOf(search, from !== undefined ? from : 0);
+      default: return undefined;
+    }
+  }
+  getArrayMethod(name, arr) {
+    switch (name) {
+      case 'push': return (...vals) => { arr.push(...vals); return BigInt(arr.length); };
+      case 'unshift': return (...vals) => { arr.unshift(...vals); return BigInt(arr.length); };
+      case 'pop': return () => arr.pop();
+      case 'shift': return () => arr.shift();
+      default: return undefined;
+    }
+  }
+  stringify(val) {
+    if (val === undefined) return "undefined";
+    if (val === null) return "null";
+    if (typeof val === 'boolean') return val ? "true" : "false";
+    if (typeof val === 'bigint') return val.toString();
+    if (typeof val === 'number') {
+      return parseFloat(val.toFixed(6)).toString();
+    }
+    if (typeof val === 'string') return val;
+    if (Array.isArray(val)) {
+      return "[" + val.map(v => this.stringify(v)).join(", ") + "]";
+    }
+    if (val !== null && typeof val === 'object') {
+      if (val.type === 'function') return "[function]";
+      const keys = Object.keys(val);
+      const pairs = keys.map(k => `"${k}": ${this.stringify(val[k])}`);
+      return "{" + pairs.join(", ") + "}";
+    }
+    return String(val);
+  }
+  get(tokenName, ...args) {
+    if (!this.tokens.has(tokenName)) {
+      return `Error: Token not found: ${tokenName}`;
+    }
+    const val = this.globalEnv.get(tokenName);
+    if (val && val.type === 'function') {
+      const funcEnv = new Environment(val.env);
+      for (let i = 0; i < val.params.length; i++) {
+        funcEnv.set(val.params[i], args[i] !== undefined ? args[i] : undefined);
+      }
+      funcEnv.set('args', args);
+      const res = this.execute(val.body, funcEnv);
+      if (res.control === 'return') {
+        return this.stringify(res.value);
+      }
+      return this.stringify(res.value);
+    } else {
+      return this.stringify(val);
+    }
+  }
+}
+
+class SLP {
+  constructor() {
+    this.interpreter = new Interpreter();
+  }
+  define(script) {
+    try {
+      const lexer = new Lexer(script);
+      const parser = new Parser(lexer);
+      const program = parser.parseProgram();
+      return this.interpreter.interpret(program);
+    } catch (e) {
+      const msg = e.message || "Unknown error";
+      if (msg.includes("Unexpected") || msg.includes("Expected")) {
+        return { success: false, tokens: [], error_message: `Parse Error: ${msg}` };
+      }
+      return { success: false, tokens: [], error_message: `Runtime Error: ${msg}` };
+    }
+  }
+  get(tokenName, ...args) {
+    return this.interpreter.get(tokenName, ...args);
+  }
+}
+// ============================================================================
+// END OF INLINED SLP.JS
+// ============================================================================
+
+// Console Capture Setup
+const consoleOutput = [];
+const originalLog = console.log;
+const originalWarn = console.warn;
+const originalError = console.error;
+
+function hookConsole(method) {
+    console[method] = function(...args) {
+        const msg = args.map(a => typeof a === 'object' ? JSON.stringify(a, null, 2) : String(a)).join(' ');
+        consoleOutput.push({ method, msg });
+        original[method].apply(console, args);
+    };
+}
+hookConsole('log');
+hookConsole('warn');
+hookConsole('error');
+
+// Test Runner Setup
+const results = [];
+
+function test(name, expected, actual) {
+    const expectedStr = JSON.stringify(expected);
+    const actualStr = JSON.stringify(actual);
+    const passed = expectedStr === actualStr;
+    results.push({ name, expected: expectedStr, actual: actualStr, passed });
+}
+
+function testStr(name, expected, actual) {
+    const passed = expected === actual;
+    results.push({ name, expected: `"${expected}"`, actual: `"${actual}"`, passed });
+}
+
+function runTests() {
+    results.length = 0;
+    consoleOutput.length = 0;
+    document.getElementById('testList').innerHTML = '';
+    document.getElementById('consoleOutput').innerHTML = '';
+    document.getElementById('summaryText').textContent = 'Running...';
+    
+    // Reset copy button text
+    const copyBtn = document.getElementById('copyBtn');
+    copyBtn.textContent = '📋 Copy';
+    copyBtn.disabled = false;
+
+    const slp = new SLP();
+
+    try {
+        // Tests 1-3: Global state persistence
+        let def1 = slp.define(`
+            var globalmsg = 123;
+            var func1 = (x, y) -> { return x + " " + y; }
+            #token func1;
+        `);
+        test("define 1", ["func1"], def1.tokens);
+        testStr("func1 basic", "123 124", slp.get("func1", 123, 124));
+
+        let def2 = slp.define(`
+            globalmsg += "hi";
+            var func2 = (a, b, c) -> { return "msg: " + globalmsg + ", args: " + a + "," + b + "," + c; }
+            #token func2;
+        `);
+        test("define 2", ["func2"], def2.tokens);
+        testStr("func2 state persistence", "msg: 123hi, args: 10,20,30", slp.get("func2", 10, 20, 30));
+
+        let def3 = slp.define(`
+            var func3 = () -> { return "no args"; }
+            #token func3;
+        `);
+        test("define 3", ["func3"], def3.tokens);
+        testStr("func3 no args", "no args", slp.get("func3"));
+
+        // Tests 4-25: Scoped with { }
+        let def4 = slp.define(`{
+            var arr = [1, 2, 3];
+            arr.push(4); arr.unshift(0);
+            var popped = arr.pop(); var shifted = arr.shift();
+            var arrTest = () -> { return "len:" + arr.length + ", pop:" + popped + ", shift:" + shifted; }
+            #token arrTest;
+        }`);
+        test("define 4", ["arrTest"], def4.tokens);
+        testStr("arrTest operations", "len:3, pop:4, shift:0", slp.get("arrTest"));
+
+        let def5 = slp.define(`{
+            var typeTest = (x) -> { return typeof x; }
+            #token typeTest;
+        }`);
+        test("define 5", ["typeTest"], def5.tokens);
+        testStr("typeTest integer", "integer", slp.get("typeTest", 42));
+        testStr("typeTest string", "string", slp.get("typeTest", "test"));
+        testStr("typeTest float", "float", slp.get("typeTest", 3.14));
+        testStr("typeTest boolean", "boolean", slp.get("typeTest", true));
+        testStr("typeTest undefined", "undefined", slp.get("typeTest"));
+
+        let def7 = slp.define(`{
+            var templateTest = (name) -> { return \`Hello \${name}!\`; }
+            #token templateTest;
+        }`);
+        test("define 7", ["templateTest"], def7.tokens);
+        testStr("templateTest literal", "Hello SLP!", slp.get("templateTest", "SLP"));
+
+        let def8 = slp.define(`{
+            var sum = 0;
+            for (var i = 1; i <= 5; i++) { sum += i; }
+            var forTest = () -> { return sum; }
+            #token forTest;
+        }`);
+        test("define 8", ["forTest"], def8.tokens);
+        testStr("for loop", "15", slp.get("forTest"));
+
+        let def9 = slp.define(`{
+            var count = 0; var x = 10;
+            while (x > 0) { count++; x -= 2; }
+            var whileTest = () -> { return count; }
+            #token whileTest;
+        }`);
+        test("define 9", ["whileTest"], def9.tokens);
+        testStr("while loop", "5", slp.get("whileTest"));
+
+        let def10 = slp.define(`{
+            var switchTest = (val) -> {
+                switch (val) {
+                    case 1: return "one";
+                    case 2: return "two";
+                    default: return "other";
+                }
+            }
+            #token switchTest;
+        }`);
+        test("define 10", ["switchTest"], def10.tokens);
+        testStr("switch statement 1", "one", slp.get("switchTest", 1));
+        testStr("switch statement 2", "two", slp.get("switchTest", 2));
+        testStr("switch statement default", "other", slp.get("switchTest", 99));
+
+        let def11 = slp.define(`{
+            var factorial = (n) -> {
+                if (n <= 1) return 1;
+                return n * factorial(n - 1);
+            }
+            #token factorial;
+        }`);
+        test("define 11", ["factorial"], def11.tokens);
+        testStr("factorial 5", "120", slp.get("factorial", 5));
+
+        let def12 = slp.define(`{
+            var makeCounter = () -> {
+                var count = 0;
+                var counter = () -> { count += 1; return count; }
+                return counter;
+            }
+            var myCounter = makeCounter();
+            var closureTest = () -> { return myCounter() + "," + myCounter(); }
+            #token closureTest;
+        }`);
+        test("define 12", ["closureTest"], def12.tokens);
+        testStr("closure test", "1,2", slp.get("closureTest"));
+
+        let def13 = slp.define(`{
+            var argsTest = () -> { return "len:" + args.length + ",0:" + args[0] + ",1:" + args[1]; }
+            #token argsTest;
+        }`);
+        test("define 13", ["argsTest"], def13.tokens);
+        testStr("args array", "len:2,0:hello,1:world", slp.get("argsTest", "hello", "world"));
+
+        let def14 = slp.define(`{
+            var ternaryTest = (x) -> { return x > 5 ? "big" : "small"; }
+            #token ternaryTest;
+        }`);
+        test("define 14", ["ternaryTest"], def14.tokens);
+        testStr("ternary big", "big", slp.get("ternaryTest", 10));
+        testStr("ternary small", "small", slp.get("ternaryTest", 3));
+
+        let def15 = slp.define(`{
+            var bitwiseTest = () -> {
+                var a = 5; var b = 3;
+                var and = a & b; var or = a | b; var xor = a ^ b;
+                var lshift = a << 1; var rshift = 10 >> 1;
+                return and + "," + or + "," + xor + "," + lshift + "," + rshift;
+            }
+            #token bitwiseTest;
+        }`);
+        test("define 15", ["bitwiseTest"], def15.tokens);
+        testStr("bitwise operations", "1,7,6,10,5", slp.get("bitwiseTest"));
+
+        let def16 = slp.define(`{
+            var objTest = () -> {
+                var obj = { name: "SLP", version: 1 };
+                obj.version = 2; obj["newProp"] = "added";
+                return obj.name + "," + obj.version + "," + obj.newProp;
+            }
+            #token objTest;
+        }`);
+        test("define 16", ["objTest"], def16.tokens);
+        testStr("object operations", "SLP,2,added", slp.get("objTest"));
+
+        let def18 = slp.define(`{
+            var compTest = () -> {
+                var x = 10; x += 5; x -= 3; x *= 2; x /= 4; return x;
+            }
+            #token compTest;
+        }`);
+        test("define 18", ["compTest"], def18.tokens);
+        testStr("compound assignment", "6", slp.get("compTest"));
+
+        let def19 = slp.define(`{
+            var doWhileTest = () -> {
+                var i = 0; do { i++; } while (i < 3); return i;
+            }
+            #token doWhileTest;
+        }`);
+        test("define 19", ["doWhileTest"], def19.tokens);
+        testStr("do-while loop", "3", slp.get("doWhileTest"));
+
+        let def20 = slp.define(`{
+            var forInObjTest = () -> {
+                var obj = { a: 10, b: 20 }; var sum = 0;
+                for (var k in obj) { sum += obj[k]; }
+                return sum;
+            }
+            #token forInObjTest;
+        }`);
+        test("define 20", ["forInObjTest"], def20.tokens);
+        testStr("for-in object loop", "30", slp.get("forInObjTest"));
+
+        let def21 = slp.define(`{
+            var forInArrayTest = () -> {
+                var arr = ["x", "y", "z"]; var res = "";
+                for (var i in arr) { res += arr[i]; }
+                return res;
+            }
+            #token forInArrayTest;
+        }`);
+        test("define 21", ["forInArrayTest"], def21.tokens);
+        testStr("for-in array loop", "xyz", slp.get("forInArrayTest"));
+
+        let def22 = slp.define(`{
+            var divTest = () -> { return 10 / 0; }
+            #token divTest;
+        }`);
+        test("define 22", ["divTest"], def22.tokens);
+        testStr("division by zero error", "Error: Division by zero", slp.get("divTest"));
+
+        let def23 = slp.define(`{
+            var nestedTest = () -> {
+                var data = { users: [{ name: "Alice" }, { name: "Bob" }] };
+                return data.users[1].name;
+            }
+            #token nestedTest;
+        }`);
+        test("define 23", ["nestedTest"], def23.tokens);
+        testStr("nested object/array access", "Bob", slp.get("nestedTest"));
+
+        let def24 = slp.define(`{
+            var complexTemplate = (a, b) -> { return "Sum of \${a} and \${b} is \${a + b}"; }
+            #token complexTemplate;
+        }`);
+        test("define 24", ["complexTemplate"], def24.tokens);
+        testStr("complex template literal", "Sum of 5 and 7 is 12", slp.get("complexTemplate", 5, 7));
+
+        let def25 = slp.define(`{
+            var typeofFunc = () -> { return typeof typeofFunc; }
+            #token typeofFunc;
+        }`);
+        test("define 25", ["typeofFunc"], def25.tokens);
+        testStr("typeof function", "function", slp.get("typeofFunc"));
+
+        // Tests 26-33: Edge Cases, BigInt, and Control Flow Enhancements
+        let def26 = slp.define(`{
+            var x = 99;
+            var sqTest = () -> { return '\${x}'; }
+            #token sqTest;
+        }`);
+        test("define 26", ["sqTest"], def26.tokens);
+        testStr("single-quote no interpolation", "${x}", slp.get("sqTest"));
+
+        let def27 = slp.define(`{
+            var oobTest = () -> { var a = [1, 2]; return a[5]; }
+            #token oobTest;
+        }`);
+        test("define 27", ["oobTest"], def27.tokens);
+        testStr("out-of-bounds array access", "Error: Out-of-bounds array access at index 5", slp.get("oobTest"));
+
+        let def28 = slp.define(`{
+            var bigIntTest = () -> { var max = 18446744073709551615; return max - 1; }
+            #token bigIntTest;
+        }`);
+        test("define 28", ["bigIntTest"], def28.tokens);
+        testStr("BigInt precision", "18446744073709551614", slp.get("bigIntTest"));
+
+        let def29 = slp.define(`{
+            var argsZeroTest = () -> { return "len:" + args.length; }
+            #token argsZeroTest;
+        }`);
+        test("define 29", ["argsZeroTest"], def29.tokens);
+        testStr("args length zero", "len:0", slp.get("argsZeroTest"));
+
+        let def30 = slp.define(`{
+            var objAssignTest = () -> { var o = { val: 10 }; o.val += 5; return o.val; }
+            #token objAssignTest;
+        }`);
+        test("define 30", ["objAssignTest"], def30.tokens);
+        testStr("compound assignment on object", "15", slp.get("objAssignTest"));
+
+        let def31 = slp.define(`{
+            var breakTest = () -> { 
+                var res = ""; 
+                for (var i = 1; i <= 5; i++) { 
+                    if (i == 3) break; 
+                    res += i; 
+                } 
+                return res; 
+            }
+            #token breakTest;
+        }`);
+        test("define 31", ["breakTest"], def31.tokens);
+        testStr("break in loop", "12", slp.get("breakTest"));
+
+        let def32 = slp.define(`{
+            var continueTest = () -> { 
+                var res = ""; 
+                for (var i = 1; i <= 4; i++) { 
+                    if (i == 2) continue; 
+                    res += i; 
+                } 
+                return res; 
+            }
+            #token continueTest;
+        }`);
+        test("define 32", ["continueTest"], def32.tokens);
+        testStr("continue in loop", "134", slp.get("continueTest"));
+
+        let def33 = slp.define(`{
+            var switchBreakTest = (val) -> {
+                var res = "";
+                switch (val) {
+                    case 1: res += "A"; break;
+                    case 2: res += "B"; break;
+                    default: res += "C";
+                }
+                return res;
+            }
+            #token switchBreakTest;
+        }`);
+        test("define 33", ["switchBreakTest"], def33.tokens);
+        testStr("switch break prevents fallthrough", "A", slp.get("switchBreakTest", 1));
+
+        // Tests 34-41: #token inline definitions and variable updates
+        let def34 = slp.define(`{
+            #token var inlineVar = 42;
+        }`);
+        test("define 34", ["inlineVar"], def34.tokens);
+        testStr("inline var token", "42", slp.get("inlineVar"));
+
+        let def35 = slp.define(`{
+            #token var inlineFunc = (x) -> { return x * 2; };
+        }`);
+        test("define 35", ["inlineFunc"], def35.tokens);
+        testStr("inline func token", "84", slp.get("inlineFunc", 42));
+
+        let def36 = slp.define(`{
+            inlineVar = 99;
+        }`);
+        test("define 36", [], def36.tokens);
+        testStr("updated var token", "99", slp.get("inlineVar"));
+
+        let def37 = slp.define(`{
+            var dynamicToken = 100;
+            #token dynamicToken;
+        }`);
+        test("define 37", ["dynamicToken"], def37.tokens);
+        testStr("post-declared var token", "100", slp.get("dynamicToken"));
+
+        let def38 = slp.define(`{
+            dynamicToken = 200;
+        }`);
+        test("define 38", [], def38.tokens);
+        testStr("updated post-declared var token", "200", slp.get("dynamicToken"));
+
+        let def39 = slp.define(`{
+            #token var multiArgFunc = (a, b, c, d) -> { return a + b + c + d; };
+        }`);
+        test("define 39", ["multiArgFunc"], def39.tokens);
+        testStr("inline multi-arg func token", "10", slp.get("multiArgFunc", 1, 2, 3, 4));
+
+        let def40 = slp.define(`{
+            #token var missingTest = 1;
+        }`);
+        test("define 40", ["missingTest"], def40.tokens);
+        testStr("missing token error", "Error: Token not found: nonexistent", slp.get("nonexistent"));
+
+        let def41 = slp.define(`{
+            #token var inlineInterpFunc = (a, b) -> { return \`\${a}:\${b}\`; };
+        }`);
+        test("define 41", ["inlineInterpFunc"], def41.tokens);
+        testStr("inline token func with backtick interpolation", "1:2", slp.get("inlineInterpFunc", 1, 2));
+
+        // Tests 42-45: String Methods, Edge Cases, Exponentiation, Array Assignment
+        let def42 = slp.define(`{
+            var strMethodsTest = () -> {
+                var s = "hello";
+                var r1 = s.charAt(1);
+                var r2 = s.charCodeAt(1);
+                var r3 = s.substring(1, 4);
+                var r4 = s.startsWith("he");
+                var r5 = s.endsWith("lo");
+                var r6 = s.indexOf("l");
+                var r7 = s.indexOf("z");
+                return r1 + "," + r2 + "," + r3 + "," + r4 + "," + r5 + "," + r6 + "," + r7;
+            }
+            #token strMethodsTest;
+        }`);
+        test("define 42", ["strMethodsTest"], def42.tokens);
+        testStr("string methods", "e,101,ell,true,true,2,-1", slp.get("strMethodsTest"));
+
+        let def43 = slp.define(`{
+            var strEdgeTest = () -> {
+                var s = "abc";
+                var r1 = s.charAt(10); 
+                var r2 = s.charCodeAt(10); 
+                var r3 = s.substring(2, 0); 
+                var r4 = s.substring(1); 
+                var r5 = s.startsWith("b", 1); 
+                var r6 = s.endsWith("b", 2); 
+                var r7 = s.indexOf("c", 5); 
+                return r1 + "|" + (typeof r2 == "undefined" ? "undef" : r2) + "|" + r3 + "|" + r4 + "|" + r5 + "|" + r6 + "|" + r7;
+            }
+            #token strEdgeTest;
+        }`);
+        test("define 43", ["strEdgeTest"], def43.tokens);
+        testStr("string methods edge cases", "|undef|ab|bc|true|true|-1", slp.get("strEdgeTest"));
+
+        let def44 = slp.define(`{
+            var expTest = () -> { return 2 ** 10; }
+            #token expTest;
+        }`);
+        test("define 44", ["expTest"], def44.tokens);
+        testStr("exponentiation", "1024", slp.get("expTest"));
+
+        let def45 = slp.define(`{
+            var arrAssignTest = () -> { var a = [10]; a[0] += 5; return a[0]; }
+            #token arrAssignTest;
+        }`);
+        test("define 45", ["arrAssignTest"], def45.tokens);
+        testStr("compound assignment on array", "15", slp.get("arrAssignTest"));
+
+    } catch (e) {
+        console.error("Test runner crashed:", e);
+    }
+
+    renderResults();
+}
+
+function copyResults() {
+    const passedCount = results.filter(r => r.passed).length;
+    const totalCount = results.length;
+    const failedTests = results.filter(r => !r.passed);
+    
+    let text = `SLP Test Results\n`;
+    text += `================\n`;
+    text += `Summary: ${passedCount}/${totalCount} Tests Passed`;
+    if (failedTests.length > 0) {
+        text += ` (${failedTests.length} Failed)\n\n`;
+        text += `Failed Tests:\n`;
+        failedTests.forEach(r => {
+            text += `- ${r.name}\n`;
+            text += `  Expected: ${r.expected}\n`;
+            text += `  Actual:   ${r.actual}\n`;
+        });
+    } else {
+        text += `\n\n`;
+    }
+    
+    text += `Console Output:\n`;
+    text += `---------------\n`;
+    if (consoleOutput.length === 0) {
+        text += `[No console output captured]\n`;
+    } else {
+        consoleOutput.forEach(entry => {
+            text += `[${entry.method.toUpperCase()}] ${entry.msg}\n`;
+        });
+    }
+
+    navigator.clipboard.writeText(text).then(() => {
+        const btn = document.getElementById('copyBtn');
+        const originalText = btn.textContent;
+        btn.textContent = '✅ Copied!';
+        btn.disabled = true;
+        setTimeout(() => {
+            btn.textContent = originalText;
+            btn.disabled = false;
+        }, 2000);
+    }).catch(err => {
+        console.error('Failed to copy: ', err);
+        alert('Failed to copy to clipboard. Please select and copy manually.');
+    });
+}
+
+function renderResults() {
+    const passedCount = results.filter(r => r.passed).length;
+    const totalCount = results.length;
+    const summaryEl = document.getElementById('summaryText');
+    
+    if (passedCount === totalCount) {
+        summaryEl.innerHTML = `<span class="pass-text">✅ ${passedCount} / ${totalCount} Tests Passed</span>`;
+    } else {
+        summaryEl.innerHTML = `<span class="fail-text">❌ ${totalCount - passedCount} Failed</span> <span style="color:#666">(${passedCount}/${totalCount} Passed)</span>`;
+    }
+
+    const testListEl = document.getElementById('testList');
+    results.forEach(r => {
+        const div = document.createElement('div');
+        div.className = `test-item ${r.passed ? 'pass' : 'fail'}`;
+        div.innerHTML = `
+            <div class="test-name">${r.name}</div>
+            ${!r.passed ? `
+                <div class="test-detail">Expected: <span>${r.expected}</span></div>
+                <div class="test-detail">Actual: <span>${r.actual}</span></div>
+            ` : ''}
+        `;
+        testListEl.appendChild(div);
+    });
+
+    const consoleEl = document.getElementById('consoleOutput');
+    if (consoleOutput.length === 0) {
+        consoleEl.innerHTML = '<div class="log-line log-log">No console output captured.</div>';
+    } else {
+        consoleOutput.forEach(entry => {
+            const div = document.createElement('div');
+            div.className = `log-line log-${entry.method}`;
+            div.textContent = `[${entry.method.toUpperCase()}] ${entry.msg}`;
+            consoleEl.appendChild(div);
+        });
+    }
+}
+
+// Auto-run on load
+window.addEventListener('DOMContentLoaded', runTests);
+</script>
+</body>
+</html>

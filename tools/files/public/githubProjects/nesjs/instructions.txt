@@ -1,0 +1,6 @@
+phase 1 completed
+
+pase 2
+
+the rom loaded showing blank. all everyting is bing drawn on the very top line.
+fix and show the full code with the changes.

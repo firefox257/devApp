@@ -1,0 +1,466 @@
+./slamRequirements.txt
+================================================================================
+PROJECT REQUIREMENTS DOCUMENT: BROWSER-BASED MONOCULAR SLAM FOR iOS
+================================================================================
+1. PROJECT OVERVIEW & CORE CONSTRAINTS
+--------------------------------------------------------------------------------
+- Objective: Detect and map the physical floor plane in a browser environment
+to support Augmented Reality (AR) object placement.
+- Map Separation Architecture: The system maintains a comprehensive internal
+3D tracking map (including walls, ceilings, and objects) to ensure robust
+pose estimation. However, the system must explicitly identify the floor
+plane, and the final AR output/rendering must be strictly constrained to
+this extracted floor geometry.
+- Target Platform: iOS Safari (Mobile Web). Minimum supported version: iOS 16.4+
+(Required for OffscreenCanvas, SharedArrayBuffer, and WebAssembly SIMD support).
+- Primary Constraint: Apple's iOS Safari does not support the WebXR AR Module
+(no native hit-testing, plane detection, or anchors).
+- Technical Constraint: Must be written entirely in JavaScript and custom C++,
+utilizing WebAssembly (Wasm) and Web Workers for heavy computation.
+- Spatial Constraint: The system is strictly limited to a 20ft x 20ft
+operational area with a 20-foot max distance limit for point validation.
+- Operational Architecture: Two Primary Tracking Modes with an explicit split
+between the "Scanning/Initialization Mode" (dense map creation and feature
+capturing) and the "Tracking/Live Mode" (runtime tracking and AR interaction).
+- Drift Detection Constraint: The system must include an industry-standard
+drift detection / integrity monitoring layer that continuously evaluates
+tracking quality, visual-inertial consistency, map scale stability, gravity /
+floor alignment, and path-crossing inconsistency. The drift detector must
+produce explicit states and user-facing actions, including warnings and
+reset prompts.
+2. HARDWARE & ENVIRONMENT REQUIREMENTS
+--------------------------------------------------------------------------------
+- Camera: Rear-facing camera accessed via `navigator.mediaDevices.getUserMedia`.
+- Sensors: Device IMU accessed via `DeviceMotionEvent` (specifically utilizing
+both `accelerationIncludingGravity` and `rotationRate` properties) to extract
+the raw Earth's gravity vector and angular velocity in the device's coordinate
+space.
+- Permissions: Explicit user gestures required for both Camera and IMU access
+on iOS.
+- Environment: Requires a textured floor (flat colors/patternless floors will
+fail feature extraction). Requires adequate lighting.
+3. FUNCTIONAL REQUIREMENTS: THE SLAM PIPELINE
+--------------------------------------------------------------------------------
+[PHASE 0.5: IMAGE PRE-PROCESSING DENOISING]
+- REQ 0.5.1: The system MAY apply a bilateral filter to the grayscale frame
+before feature extraction when the scene brightness (measured via mean
+luminance) falls below a configured threshold (recommended default: 40/255).
+This targets iOS low-light sensor noise without destroying ORB edges.
+- REQ 0.5.2: The bilateral filter parameters must be:
+sigma_space  = 3.0
+sigma_color  = 30.0
+kernel_size  = 5
+These are tuned to suppress ISO noise while preserving FAST corner edges.
+- REQ 0.5.3: The system must NOT apply Gaussian blur or median filter as a
+general-purpose denoiser. Gaussian blur destroys FAST keypoints; median
+filter is too slow in Wasm for full-frame application and also degrades
+corners.
+- REQ 0.5.4: Pre-processing must be bypassed entirely when scene brightness
+is adequate (≥ 40/255 mean luminance) to preserve feature density.
+- REQ 0.5.5: The system must expose a developer toggle to disable pre-
+processing entirely for debugging.
+[PHASE 1: INITIALIZATION & SCANNING MODE]
+- REQ 1.1: The system must prompt the user to physically move the device
+(e.g., "Move phone left and right") to generate parallax.
+- REQ 1.2: The system must capture a Reference Frame, convert it to grayscale,
+and extract ORB/FAST keypoints and descriptors using the custom Wasm module.
+- REQ 1.3: As the user moves, the system must capture subsequent frames,
+extract features, and match them against the *previous frame* or a *local
+sliding window of recent keyframes* to compute relative motion.
+- REQ 1.4: Once >50 valid matches are found, the system must compute the
+Fundamental Matrix (via 8-point RANSAC) and the Essential Matrix.
+- REQ 1.5: The system must decompose the Essential Matrix to extract initial
+Rotation (R) and Translation (t), and triangulate matched 2D points into an
+initial 3D point cloud.
+- REQ 1.6: The system must normalize the initial translation vector to a
+length of 1.0 to establish a baseline scale.
+- REQ 1.7: Distance rejection thresholds must be set to 5–10 baseline units
+(where 1 baseline unit = ‖t‖ from REQ 1.6) during this scanning phase.
+After scale calibration (Phase 5), these thresholds must be converted to
+metric units (5–10 cm).
+- REQ 1.8: Feature-Level Denoising: After brute-force matching, the system
+must apply Lowe's ratio test with a threshold of 0.75. Matches with ratio
+> 0.75 must be discarded.
+- REQ 1.9: Spatial Bucketing: The system must enforce spatial bucketing of
+keypoints: divide the frame into an 8×8 grid, and retain at most 5 keypoints
+per cell (40 total max per frame). Selection within each cell is by FAST
+response score. This must occur BEFORE descriptor extraction to save compute.
+- REQ 1.10: Epipolar Gating: During Essential/Fundamental matrix estimation,
+the system must apply the Sampson distance as an additional inlier filter
+after RANSAC, rejecting matches with Sampson distance > 3.0 pixels.
+- REQ 1.11: Hartley Normalization for Essential Matrix: Before computing the
+Essential Matrix via 8-point RANSAC, the system must apply Hartley
+normalization to the normalized camera coordinates. This involves:
+1. Computing the mean (mx, my) of all point coordinates.
+2. Computing the mean distance from the mean.
+3. Scaling points so the mean distance equals sqrt(2).
+4. Building the transformation matrix T.
+5. Applying T to all points before building the DLT matrix A.
+6. Denormalizing the resulting Essential matrix: E_final = T2^T * E_temp * T1.
+This prevents numerical instability when points are clustered or offset from
+the origin, which is common in real-world camera feeds.
+[PHASE 2: TRACKING & LIVE OPERATION MODE]
+- REQ 2.1: For every new frame, the system must extract features and match
+them against the *local 3D map* (projected 3D points, including walls and
+environmental features) to calculate pose.
+- REQ 2.2: The system must use the PnP (Perspective-n-Point) algorithm with
+RANSAC to calculate the camera's 6-DoF pose (Rotation and Translation).
+- REQ 2.3: The system must fuse IMU data (gravity vector) to constrain the
+camera's Roll and Pitch, preventing vertical drift.
+- REQ 2.4: Distance rejection thresholds must be set to 15–30 baseline units
+during this active live tracking phase. After scale calibration (Phase 5),
+these thresholds must be converted to metric units (15–30 cm).
+- REQ 2.5: Tracking Loss & Re-localization: If active live marker point counts
+drop below a minimum threshold, the system must first attempt to
+re-localize against previously stored keyframes. Only if re-localization
+fails after a brief timeout must it trigger the Auto-Rescan prompt.
+- REQ 2.6: Configurable Frame Processing Strategy: The system must expose a
+developer configuration flag to toggle between a Frame-Skipping stride mode
+(processing every N-th frame) and a Sliding Window sequential mode, allowing
+seamless adaptation to 30 FPS, 29.97 FPS, or 60 FPS camera streams.
+- REQ 2.7: The tracking output must expose the metrics required by the drift
+detection system, including inlier count, match count, reprojection error,
+parallax estimate, tracking state, camera pose, and IMU readings.
+- REQ 2.8: PnP Refinement Gating: During PnP, the system must reject 3D→2D
+correspondences with reprojection error > 4.0 pixels (configurable) after
+the initial RANSAC pass.
+- REQ 2.9: Pose Temporal Denoising: The system must fuse visual pose estimates
+with IMU data using a complementary filter to produce the rendered camera
+pose. The filter must operate at the display refresh rate (60 Hz) and
+interpolate between asynchronous SLAM updates.
+- REQ 2.10: The complementary filter must use the following structure:
+* High-pass filter on gyro (rotationRate) for orientation updates.
+* Low-pass filter on visual pose for orientation correction.
+* Low-pass filter on visual pose for position updates.
+* Gravity vector from IMU (complementary-filtered) constrains roll/pitch.
+* Yaw is integrated purely from gyro (unobservable from gravity).
+- REQ 2.11: The filter must apply an innovation gate: if the visual pose
+update differs from the gyro-predicted pose by more than a configured
+threshold (recommended: 5° for orientation, 0.1 × baseline for position),
+the visual update must be down-weighted by 50% for that frame. This
+prevents single-frame visual outliers from jittering the rendered pose.
+- REQ 2.12: The filter must expose a "confidence" scalar (0.0–1.0) based on
+recent innovation magnitudes. The AR rendering layer must use this to
+fade out placed objects when confidence drops below 0.3.
+- REQ 2.13: The filter must NOT be a full EKF. A complementary filter is
+sufficient for this use case, runs in < 0.1 ms on the main thread, and
+avoids the covariance-tuning complexity that a full EKF would require.
+- REQ 2.14: The complementary filter must run on the Main Thread because it
+needs to interpolate at display refresh rate.
+[PHASE 3: MAPPING & OPTIMIZATION (BACK-END)]
+- REQ 3.1: Upon the addition of a new Keyframe, the system must trigger a
+Local Bundle Adjustment (BA) process.
+- REQ 3.2: The BA solver must minimize the reprojection error by adjusting
+the 3D map points and camera poses.
+- REQ 3.3: The BA process must run in a dedicated background Web Worker to
+prevent blocking the main rendering thread.
+- REQ 3.4: The system must expose a configurable parameter to set the maximum
+number of 3D points of interest (POIs) allowed in the active map. The
+system must enforce this limit by culling points based on a Quality Metric
+(e.g., high reprojection error or low observation count), strictly avoiding
+the deletion of the oldest/most stable points, to prevent Wasm memory
+exhaustion.
+[PHASE 3.5: KEYFRAME INSERTION POLICY]
+- REQ 3.5.1: The system must enforce a MINIMUM frame interval of 20 frames
+between consecutive keyframe insertions. No keyframe shall be created with
+fewer than 20 frames elapsed since the last keyframe, regardless of other
+criteria. This prevents map bloat and Wasm memory exhaustion from over-
+sampling.
+- REQ 3.5.2: The system must ALSO insert a keyframe when ANY of the following
+conditions are met (even if the 20-frame minimum has not elapsed, in which
+case the 20-frame floor is waived only for the current insertion):
+* Translation baseline since last keyframe exceeds a configured threshold
+(recommended default: 0.15 × current map scale, i.e. ~15% of the
+previous keyframe's median depth).
+* Rotation delta since last keyframe exceeds a configured threshold
+(recommended default: 10°).
+* The number of tracked 3D→2D inliers in the current frame drops below
+60% of the inlier count at the last keyframe.
+* The current frame's keypoints fall outside the spatial convex hull of
+the last keyframe's keypoints by more than 20% of the frame width on
+any axis (indicating significant scene coverage change).
+- REQ 3.5.3: The system must cap the total number of active keyframes in the
+map. Recommended default: 60 keyframes. When the cap is reached, the system
+must evict the keyframe with the lowest "utility score," defined as:
+utility = (observation_count × 0.5) + (spatial_isolation × 0.3)
++ (age_penalty × 0.2)
+where spatial_isolation measures distance to nearest surviving keyframe.
+The oldest keyframes must NOT be evicted solely by age.
+- REQ 3.5.4: Keyframe insertion must be evaluated on the Main Thread but the
+actual keyframe construction (feature extraction, descriptor storage, map
+point registration) must be dispatched to the Vision Worker to avoid
+blocking rendering.
+- REQ 3.5.5: The system must expose a developer-configurable override to
+force keyframe insertion on demand (e.g., for debugging or user-initiated
+"capture this view" actions).
+[PHASE 4: FLOOR PLANE EXTRACTION & MAP SEPARATION]
+- REQ 4.1: The system must execute a dedicated floor surface estimation step
+using the 3D point cloud and RANSAC plane fitting immediately following the
+initial scanning phase.
+- REQ 4.2: The system must continuously read the IMU gravity vector to
+establish the absolute "Down" direction in 3D space.
+- REQ 4.3: The RANSAC plane-fitting algorithm must be strictly constrained: it
+must REJECT any plane whose normal vector does not align with the IMU
+gravity vector within a 5-degree tolerance.
+- REQ 4.4: The largest contiguous horizontal plane passing the gravity
+constraint must be identified as the floor.
+- REQ 4.5: MAP SEPARATION PROTOCOL: The internal tracking map MUST retain all
+environmental geometry (walls, ceilings, objects) to ensure robust tracking.
+The "floor-only" constraint applies strictly to the AR Output Map. The
+system must extract the floor inliers into a separate data structure used
+exclusively for rendering and AR object placement logic.
+- REQ 4.6: The system must calculate the Alpha Shape (Concave Hull) of the
+extracted floor inlier points to generate an accurate 2D boundary mesh for
+rendering, avoiding the over-extension issues of a standard Convex Hull.
+- REQ 4.7: The floor plane estimate must be monitored for stability. If the
+extracted floor plane normal diverges from the IMU gravity vector beyond the
+allowed tolerance during live operation, the system must flag a floor-plane
+drift condition.
+- REQ 4.8: Map-Level Denoising: The extracted floor plane normal must be
+smoothed using an exponential moving average (EMA) with a time constant of
+2.0 seconds. The smoothed normal is used for rendering and AR placement; the
+raw normal is used for drift detection (REQ 4.7 / 7.6).
+- REQ 4.9: The floor plane height (distance from camera origin) must also
+be EMA-smoothed with a time constant of 3.0 seconds. This prevents
+placed objects from "bobbing" as the plane estimate fluctuates.
+- REQ 4.10: The system must apply statistical outlier removal to the 3D
+point cloud every 5 seconds (configurable). For each point, compute the
+mean distance to its 10 nearest neighbors; reject points whose mean
+distance exceeds the global mean + 2.0 × global standard deviation.
+This must run in the Optimization Worker to avoid blocking the main
+thread.
+- REQ 4.11: The system must NOT apply temporal smoothing to the full 3D
+point cloud positions — only to the floor plane parameters. Smoothing
+individual map points introduces lag that breaks PnP consistency.
+[PHASE 5: SCALE CALIBRATION & RENDERING]
+- REQ 5.1: Camera Intrinsics & Scale: Because iOS Safari does not expose the
+camera matrix (K) and User-Agent strings are frozen, the system must use a
+generic fallback FOV (e.g., 65 degrees) for initial tracking.
+- REQ 5.2: The system must prompt the user to tap two points on the floor
+exactly 3 feet apart.
+- REQ 5.3: UX Stability Check: Before registering the taps, the system must
+pause tracking, prompt the user to hold the device steady, and only accept
+the input after a 1-second stability check (low IMU variance and low visual
+reprojection error).
+- REQ 5.4: The system must calculate the distance between these two 3D points
+in the SLAM map and apply a global scalar multiplier to the entire map
+(and dynamically refine the focal length estimate) to match real-world
+dimensions.
+- REQ 5.5: The system must render the camera feed and the generated floor
+mesh using WebGL (via Three.js), updating the virtual camera's pose
+frame-by-frame using the SLAM tracking data.
+- REQ 5.6: The final rendered AR scene must contain ONLY the camera feed and
+the extracted floor mesh. Internal tracking points (walls/ceilings) must
+remain invisible to the user.
+- REQ 5.7: After scale calibration, the system must mark the session as
+scale-calibrated and enable absolute-scale drift checks that rely on
+real-world distance thresholds.
+[PHASE 6: SESSION CONTROL & RESET]
+- REQ 6.1: The system must provide a UI control to allow the user to manually
+reset the current SLAM session.
+- REQ 6.2: Upon reset, the system must clear the 3D point cloud, all
+keyframes, camera poses, and the extracted floor mesh from both the internal
+and output maps.
+- REQ 6.3: The system must explicitly invoke the custom C++ `free` functions
+to deallocate all Wasm memory associated with the cleared data to prevent
+memory leaks.
+- REQ 6.4: After the reset is complete, the system must revert to
+[PHASE 1: INITIALIZATION & SCANNING MODE] and prompt the user to physically
+move the device to scan the floor again.
+- REQ 6.5: Upon reset, the drift detection system must also be fully reset,
+including all sliding windows, counters, path-crossing history, covariance
+estimates, debounce timers, and warning states.
+[PHASE 7: DRIFT DETECTION & INTEGRITY MONITORING]
+- REQ 7.1: The system must implement an industry-standard drift detection /
+integrity monitoring layer that runs continuously during Tracking/Live Mode
+and after scale calibration.
+- REQ 7.2: The drift detector must use a sliding-window state monitor with
+adaptive covariance and Mahalanobis-distance / Normalized Innovation
+Squared (NIS) gating to detect inconsistent visual odometry updates.
+- REQ 7.3: The drift detector must monitor tracking quality using at least:
+* PnP inlier count.
+* Match/inlier ratio.
+* Reprojection error.
+* Parallax or motion baseline quality.
+* Tracking-lost state.
+- REQ 7.4: The drift detector must monitor visual-inertial consistency using
+IMU acceleration and rotation-rate data. If the device is detected as
+stationary by IMU variance, but visual pose estimates continue to move
+beyond a configured tolerance for a configured duration, the system must
+flag stationary visual drift.
+- REQ 7.5: The drift detector must monitor gravity alignment. If the estimated
+gravity direction or camera roll/pitch constraint diverges beyond the
+configured tolerance, the system must flag a gravity-alignment drift
+condition.
+- REQ 7.6: The drift detector must monitor floor-plane stability. If the
+extracted floor plane normal deviates from the IMU gravity vector by more
+than the configured tolerance, the system must flag floor-plane drift.
+- REQ 7.7: The drift detector must monitor scale stability. If the global map
+scale, scale estimate, or median scene scale changes too rapidly outside of
+an explicit user calibration event, the system must flag scale drift.
+- REQ 7.8: The drift detector must implement path-crossing / revisit
+inconsistency detection. Because loop closure is omitted, the system must
+maintain a top-down trajectory representation over the floor plane and
+detect when the user returns to a previously visited area with an
+inconsistent pose.
+- REQ 7.9: Path-crossing detection must use configurable parameters for:
+* Grid cell size.
+* Minimum revisit time.
+* Position tolerance.
+* Heading/yaw tolerance.
+* Maximum conflict count before reset is required.
+- REQ 7.10: Drift detection must use debouncing / hysteresis to avoid false
+positives. The system must not trigger a user-facing drift or reset event
+from a single-frame outlier unless the outlier is classified as a hard
+failure.
+- REQ 7.11: The drift detector must expose explicit states:
+* OK: Tracking appears stable.
+* WARNING: Early drift indicators detected; user may be warned.
+* DRIFT: Strong drift indicators detected; AR placement should be
+discouraged or temporarily disabled.
+* RESET_REQUIRED: Drift is severe or path-crossing inconsistency indicates
+the map is unreliable; the user must be prompted to reset/rescan.
+- REQ 7.12: When the drift state is WARNING, the system must display a
+non-blocking UI warning such as: "Tracking may be drifting. Move slowly and
+keep the floor visible."
+- REQ 7.13: When the drift state is DRIFT, the system must display a stronger
+warning and should temporarily disable new AR object placement until
+tracking quality recovers.
+- REQ 7.14: When the drift state is RESET_REQUIRED, the system must prompt the
+user to reset/rescan the session and must disable AR object placement until
+the reset is complete.
+- REQ 7.15: The drift detector must expose diagnostic metrics to the
+application layer, including active drift reasons, debounce timers,
+tracking quality metrics, innovation/NIS score, stationary drift state,
+scale drift state, and path-crossing conflict state.
+- REQ 7.16: The drift detector must not depend on WebXR, native plane
+detection, native anchors, or any iOS-native AR capability. It must operate
+entirely from the custom SLAM output, camera data, and IMU data available
+in the browser.
+- REQ 7.17: The drift detector must be reset whenever the SLAM session is
+manually reset or automatically reset after tracking failure.
+[PHASE 8: TESTING & VALIDATION]
+- REQ 8.1: The system must include comprehensive unit tests covering all
+pipeline stages, including edge cases that expose numerical instabilities.
+- REQ 8.2: Tests must include scenarios with clustered/offset normalized
+coordinates to validate Hartley normalization in Essential matrix computation.
+- REQ 8.3: Tests must include real-world degraded image scenarios (low
+contrast, noise, blur) to validate feature extraction robustness.
+- REQ 8.4: Tests must include dynamic resolution and portrait aspect ratio
+scenarios to validate camera intrinsics handling.
+- REQ 8.5: Tests must include low-parallax and pure rotation scenarios to
+validate initialization behavior under degenerate motion.
+- REQ 8.6: Tests must include noisy/offset IMU gravity vectors to validate
+gravity fusion robustness.
+- REQ 8.7: Tests must validate spatial bucketing ensures uniform keypoint
+distribution across the frame.
+- REQ 8.8: Tests must validate the Sampson distance threshold correctly
+rejects outliers while preserving inliers under realistic noise conditions
+(1–3 pixel noise).
+4. TECHNICAL & ARCHITECTURE REQUIREMENTS
+--------------------------------------------------------------------------------
+- Core Algorithm Pipeline: Classical, zero-dependency C++ stack utilizing ORB
+feature extraction, Lowe's ratio test, RANSAC, and PnP solvers (loop
+closure omitted to optimize mobile performance).
+- Custom C++ WASM Implementation (`slamOpencv`):
+* Source File: The system must use a purpose-built, stripped-down C++
+implementation (`slamOpencv.cpp`) derived from OpenCV's core algorithms
+rather than the full OpenCV.js library.
+* Scope of C++ Code: The `slamOpencv.cpp` must ONLY implement the specific
+algorithms required for this SLAM pipeline. Required implementations:
+- FAST/ORB keypoint extraction and descriptor computation.
+- Brute-Force Hamming distance matcher with Lowe's ratio test.
+- 8-point RANSAC algorithm for Fundamental and Essential Matrix computation
+  with Hartley normalization for the Essential matrix.
+- Essential Matrix decomposition (Rotation and Translation).
+- Perspective-n-Point (PnP) solver with RANSAC.
+- RANSAC-based 3D plane fitting algorithm.
+- Bilateral filter (conditional application based on brightness).
+- Statistical outlier removal (k-nearest-neighbor distance filtering).
+- Spatial bucketing for keypoint distribution (8×8 grid, 5 keypoints per cell).
+* Compilation Toolchain: The `slamOpencv.cpp` must be compiled to WebAssembly
+using the Clang compiler with the EXACT following configuration:
+{
+"main": "slamOpencv.cpp",
+"output": "slamOpencv.wasm",
+"args": [
+"clang++",
+"-std=c++20",
+"-O2",
+"-msimd128",
+"-flto",
+"-I", "./include",
+"-pthread",
+"-fno-exceptions",
+"-fno-rtti",
+"-matomics",
+"-mbulk-memory",
+"-Wl,--no-entry",
+"-Wl,--shared-memory",
+"-Wl,--import-memory",
+"-Wl,--max-memory=268435456",
+"-Wl,--export-all"
+]
+}
+* Memory & Error Handling Constraints:
+- The `-fno-exceptions` and `-fno-rtti` flags mandate that all error
+handling must be done via return codes, not C++ exceptions.
+- All dynamically allocated matrices, point arrays, and descriptors must
+be explicitly freed using the corresponding C++ free functions
+immediately after use.
+- Threading Model:
+* Main Thread: UI, Video Feed, IMU handling, Three.js rendering, drift
+detection state handling, and complementary filter for pose smoothing.
+* Vision Worker (Web Worker + Wasm): Custom `slamOpencv.wasm` feature
+extraction, matching, PnP pose estimation, and keyframe construction.
+* Optimization Worker (Web Worker + Wasm): Bundle Adjustment solver and
+statistical outlier removal on point cloud.
+- Drift Detection Module:
+* The drift detection module may run on the Main Thread or inside a
+dedicated Web Worker, but it must not block rendering or camera capture.
+* The drift detector must consume pose updates, tracking metrics, IMU data,
+scale calibration state, and floor-plane stability metrics.
+* The drift detector must output a state machine result and a list of
+active drift reasons.
+* The drift detector must be stateful and resettable.
+* The drift detector must support configurable thresholds for all drift
+checks, including tracking quality, innovation gating, stationary drift,
+scale drift, gravity alignment, floor-plane alignment, and path crossing.
+- Communication & Callbacks:
+* Control Interface: JS-to-C++ interaction managed via exported C++ setter
+functions for parameter configuration and state control.
+* State & Frame Callbacks: C++ returns camera position (XYZ), rotation
+matrices, and phase-transition completion events back to JavaScript.
+* Drift Callbacks: The drift detection module must notify the application
+layer when the drift state changes between OK, WARNING, DRIFT, and
+RESET_REQUIRED.
+- Data Passing: Must use `Transferable` objects and `OffscreenCanvas` to pass
+image data between threads without memory copying.
+- Server Environment Requirements: Because the system uses `-pthread` and
+SharedArrayBuffer for Web Workers, the hosting server MUST be configured to
+send the following HTTP headers:
+* `Cross-Origin-Opener-Policy: same-origin`
+* `Cross-Origin-Embedder-Policy: require-corp`
+- Libraries: Custom WASM module (`slamOpencv.wasm`), Three.js, gl-matrix.
+5. NON-FUNCTIONAL REQUIREMENTS (PERFORMANCE & iOS SPECIFICS)
+--------------------------------------------------------------------------------
+- Frame Rate: Main thread rendering must maintain 60 FPS (or target device
+native refresh). SLAM processing runs at configurable target rates via the
+selected frame-skipping stride or sliding window mode.
+- Memory Management: The system must explicitly free every custom C++
+allocated matrix or array created. Failure to do so will cause iOS Safari
+to crash the tab due to Wasm memory limits.
+- Drift Limit & Loop Closure Omission: The 20x20 ft constraint is mandatory.
+Because loop closure is omitted, the system must display a persistent UI
+warning: "Avoid walking in circles to prevent map drift." If the system
+detects a path-crossing intersection via odometry, it should prompt a
+session reset.
+- Drift Detection Responsiveness: Drift detection must evaluate quickly enough
+to prevent prolonged placement of AR content on an unstable map, but must
+use debounce/hysteresis to avoid excessive false positives.
+- Drift Detection UI: Drift warnings must be clearly visible but must not
+fully obscure the camera feed. Reset-required prompts must be modal or
+otherwise unmissable.
+- Latency: IMU and Visual pose data must be interpolated to ensure smooth
+rendering between asynchronous SLAM updates and the display refresh rate.
+================================================================================

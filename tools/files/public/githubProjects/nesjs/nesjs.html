@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>NESJS — Mobile NES Emulator (Debug Build)</title>
+<style>
+:root{color-scheme:dark;--bg:#0d0f14;--panel:#171b24;--accent:#ff4757;--txt:#e8ecf3;}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none;}
+html,body{margin:0;height:100%;overflow:hidden;overscroll-behavior:none;background:var(--bg);color:var(--txt);
+font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;touch-action:none;}
+#app{height:100dvh;display:flex;flex-direction:column;
+padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);
+padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right);max-width:720px;margin:0 auto;}
+header{display:flex;align-items:center;gap:8px;padding:8px 12px;font-size:12px;background:var(--panel);flex:0 0 auto;flex-wrap:wrap;}
+header b{color:var(--accent);letter-spacing:1px;}
+header .spacer{flex:1;}
+header button{background:#262c3a;color:var(--txt);border:0;border-radius:6px;padding:6px 10px;font-size:12px;font-weight:600;}
+header button:active{filter:brightness(1.3);}
+header button.active{background:var(--accent);}
+#screenWrap{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;background:#000;position:relative;}
+canvas{image-rendering:pixelated;image-rendering:crisp-edges;display:block;width:100%;height:100%;object-fit:contain;}
+#drop{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+gap:12px;text-align:center;padding:20px;font-size:14px;color:#9aa4b8;}
+#drop strong{color:var(--txt);font-size:18px;}
+#drop.hidden{display:none;}
+#controls{flex:0 0 auto;background:var(--panel);padding:10px;display:flex;align-items:center;justify-content:space-between;gap:10px;}
+.dpad{position:relative;width:120px;height:120px;flex:0 0 auto;}
+.dpad .arm{position:absolute;background:#2b3242;border-radius:8px;}
+.dpad .h{left:0;top:40px;width:120px;height:40px;}
+.dpad .v{left:40px;top:0;width:40px;height:120px;}
+.dpad .btn{position:absolute;width:40px;height:40px;border:0;background:transparent;color:#98a2b8;font-size:16px;z-index:2;}
+.dpad .btn:active,.dpad .btn.on{color:#fff;}
+#up{left:40px;top:0;} #down{left:40px;bottom:0;} #left{left:0;top:40px;} #right{right:0;top:40px;}
+.center{display:flex;flex-direction:column;align-items:center;gap:8px;}
+.system{display:flex;gap:12px;}
+.system button{background:#2b3242;color:#c6cede;border:0;border-radius:20px;padding:6px 10px;font-size:10px;letter-spacing:1px;font-weight:700;}
+.ab{display:flex;gap:16px;align-items:flex-end;transform:rotate(-12deg);}
+.ab button{width:56px;height:56px;border-radius:50%;border:3px solid #7a2530;background:var(--accent);
+color:#fff;font-weight:700;font-size:18px;box-shadow:0 4px 0 #7a2530;}
+.ab button:last-child{margin-bottom:18px;}
+button:active{transform:translateY(2px);filter:brightness(1.2);}
+#fileInput{display:none;}
+#status{font-size:10px;color:#8b95a8;padding:4px 12px;background:var(--panel);flex:0 0 auto;text-align:center;}
+
+/* Debug overlay */
+#debugOverlay{display:none;position:absolute;top:4px;left:4px;background:rgba(0,0,0,0.85);color:#0f0;
+font-family:monospace;font-size:10px;padding:6px 8px;border-radius:4px;border:1px solid #0f0;z-index:100;
+pointer-events:none;min-width:180px;}
+#debugOverlay.visible{display:block;}
+#debugOverlay div{margin:1px 0;}
+#debugOverlay .label{color:#888;}
+#debugOverlay .val{color:#0f0;font-weight:bold;}
+#debugOverlay .warn{color:#f80;}
+
+@media (orientation:landscape){
+#app{flex-direction:row;flex-wrap:wrap;}
+header{width:100%;}
+#screenWrap{width:55%;height:calc(100dvh - 40px);}
+#controls{width:45%;height:calc(100dvh - 40px);flex-direction:column;justify-content:center;}
+#status{width:100%;}
+}
+</style>
+</head>
+<body>
+<div id="app">
+<header>
+<b>NESJS</b>
+<span id="romName">no ROM loaded</span>
+<span class="spacer"></span>
+<button id="loadBtn">Load ROM</button>
+<button id="hexBtn">ROM Hex</button>
+<button id="consoleBtn">Console</button>
+<button id="debugBtn">Debug: Off</button>
+<button id="stepBtn">Step Frame</button>
+<button id="resetBtn">Reset</button>
+<button id="muteBtn">Audio: On</button>
+<button id="pauseBtn">Pause</button>
+</header>
+<div id="screenWrap">
+<canvas id="screen" width="256" height="240"></canvas>
+<!-- DEBUG OVERLAY -->
+<div id="debugOverlay">
+<div><span class="label">Frame:</span> <span class="val" id="dbgFrame">0</span></div>
+<div><span class="label">Scanline:</span> <span class="val" id="dbgSL">0</span> <span class="label">Cycle:</span> <span class="val" id="dbgCyc">0</span></div>
+<div><span class="label">PC:</span> <span class="val" id="dbgPC">$0000</span></div>
+<div><span class="label">PPUCTRL:</span> <span class="val" id="dbgCtrl">$00</span></div>
+<div><span class="label">PPUMASK:</span> <span class="val" id="dbgMask">$00</span></div>
+<div><span class="label">v:</span> <span class="val" id="dbgV">$0000</span> <span class="label">t:</span> <span class="val" id="dbgT">$0000</span></div>
+<div><span class="label">fineX:</span> <span class="val" id="dbgX">0</span></div>
+<div><span class="label">BG:</span> <span class="val" id="dbgBG">OFF</span> <span class="label">SPR:</span> <span class="val" id="dbgSPR">OFF</span></div>
+<div><span class="label">NT writes:</span> <span class="val" id="dbgNT">0</span></div>
+<div><span class="label">Pal writes:</span> <span class="val" id="dbgPal">0</span></div>
+<div><span class="label">Scroll writes:</span> <span class="val" id="dbgScroll">0</span></div>
+<div><span class="label">Unique tiles:</span> <span class="val" id="dbgTiles">0</span></div>
+<div id="dbgWarn" class="warn"></div>
+</div>
+<div id="drop">
+<strong>Drop a .nes ROM here</strong>
+<span>or tap "Load ROM"</span>
+<span style="font-size:11px">NROM · MMC1 · UxROM · CNROM · MMC3</span>
+</div>
+</div>
+<div id="status">60 Hz · NTSC · pure JavaScript · DEBUG BUILD</div>
+<div id="controls">
+<div class="dpad">
+<div class="arm h"></div><div class="arm v"></div>
+<button class="btn" id="up" data-btn="4">▲</button>
+<button class="btn" id="down" data-btn="5">▼</button>
+<button class="btn" id="left" data-btn="6">◀</button>
+<button class="btn" id="right" data-btn="7">▶</button>
+</div>
+<div class="center">
+<div class="system">
+<button data-btn="2">SELECT</button>
+<button data-btn="3">START</button>
+</div>
+</div>
+<div class="ab">
+<button data-btn="1">B</button>
+<button data-btn="0">A</button>
+</div>
+</div>
+<input type="file" id="fileInput" accept=".nes,application/octet-stream">
+</div>
+
+<!-- Debug Console Overlay -->
+<div id="consoleOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.95);z-index:9999;padding:10px;flex-direction:column;">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+<span style="color:#fff;font-weight:bold;font-size:14px;">Debug Console</span>
+<div style="display:flex;gap:8px;">
+<button id="clearConsoleBtn" style="background:#888;color:#fff;border:0;padding:6px 12px;border-radius:4px;font-weight:bold;">Clear</button>
+<button id="copyConsoleBtn" style="background:#4a4;color:#fff;border:0;padding:6px 12px;border-radius:4px;font-weight:bold;">Copy</button>
+<button id="closeConsoleBtn" style="background:#f44;color:#fff;border:0;padding:6px 12px;border-radius:4px;font-weight:bold;">Close</button>
+</div>
+</div>
+<div id="consoleOutput" style="flex:1;overflow-y:auto;background:#111;color:#0f0;font-family:monospace;font-size:11px;padding:8px;border-radius:4px;white-space:pre-wrap;border:1px solid #333;"></div>
+</div>
+
+<!-- ROM Hex Overlay -->
+<div id="hexOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.95);z-index:9999;padding:10px;flex-direction:column;">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+<span style="color:#fff;font-weight:bold;font-size:14px;">ROM Header & Hex</span>
+<div style="display:flex;gap:8px;align-items:center;">
+<label style="color:#ccc;font-size:12px;">Bytes:</label>
+<input type="number" id="hexRangeInput" value="64" min="16" max="65536" step="16" style="width:80px;background:#222;color:#0f0;border:1px solid #444;padding:4px;border-radius:4px;font-family:monospace;">
+<button id="refreshHexBtn" style="background:#48c;color:#fff;border:0;padding:6px 12px;border-radius:4px;font-weight:bold;">Refresh</button>
+<button id="copyHexBtn" style="background:#4a4;color:#fff;border:0;padding:6px 12px;border-radius:4px;font-weight:bold;">Copy</button>
+<button id="closeHexBtn" style="background:#f44;color:#fff;border:0;padding:6px 12px;border-radius:4px;font-weight:bold;">Close</button>
+</div>
+</div>
+<pre id="hexOutput" style="flex:1;overflow-y:auto;background:#111;color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;white-space:pre;border:1px solid #333;"></pre>
+</div>
+
+<script type="module">
+import { NES } from './nesjs.js';
+const nes = new NES();
+window.nes = nes;
+const canvas = document.getElementById('screen');
+const ctx = canvas.getContext('2d', { alpha:false });
+ctx.imageSmoothingEnabled = false;
+const image = ctx.createImageData(256,240);
+
+/* ---------- On-Screen Console Interception ---------- */
+const consoleOutput = document.getElementById('consoleOutput');
+const origLog = console.log, origWarn = console.warn, origError = console.error;
+function addConsole(type, args) {
+  const line = document.createElement('div');
+  line.style.color = type === 'error' ? '#f44' : type === 'warn' ? '#fa0' : '#0f0';
+  line.style.borderBottom = '1px solid #222';
+  line.style.padding = '2px 0';
+  line.textContent = `[${type}] ` + Array.from(args).map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ');
+  consoleOutput.appendChild(line);
+  consoleOutput.scrollTop = consoleOutput.scrollHeight;
+}
+console.log = (...args) => { origLog(...args); addConsole('log', args); };
+console.warn = (...args) => { origWarn(...args); addConsole('warn', args); };
+console.error = (...args) => { origError(...args); addConsole('error', args); };
+
+document.getElementById('consoleBtn').onclick = () => { document.getElementById('consoleOverlay').style.display = 'flex'; };
+document.getElementById('closeConsoleBtn').onclick = () => { document.getElementById('consoleOverlay').style.display = 'none'; };
+document.getElementById('clearConsoleBtn').onclick = () => { consoleOutput.innerHTML = ''; };
+document.getElementById('copyConsoleBtn').onclick = () => {
+  navigator.clipboard.writeText(consoleOutput.innerText).then(() => {
+    const btn = document.getElementById('copyConsoleBtn');
+    const orig = btn.textContent;
+    btn.textContent = 'Copied!';
+    setTimeout(() => btn.textContent = orig, 1500);
+  }).catch(err => console.error('Copy failed', err));
+};
+
+/* ---------- ROM Hex Viewer ---------- */
+let romData = null;
+let romHex = '';
+function generateHexDump(length) {
+  if (!romData) return 'No ROM loaded.';
+  const len = Math.min(length, romData.length);
+  let hex = '';
+  for (let i = 0; i < len; i += 16) {
+    let hexLine = '';
+    let ascii = '';
+    for (let j = 0; j < 16; j++) {
+      if (i + j < len) {
+        const b = romData[i + j];
+        hexLine += b.toString(16).padStart(2, '0') + ' ';
+        ascii += (b >= 32 && b <= 126) ? String.fromCharCode(b) : '.';
+      } else {
+        hexLine += '   ';
+        ascii += ' ';
+      }
+    }
+    hex += `0x${i.toString(16).padStart(4, '0')}  ${hexLine} |${ascii}|
+`;
+  }
+  return hex;
+}
+document.getElementById('hexBtn').onclick = () => {
+  if (!romData) {
+    document.getElementById('hexOutput').textContent = 'No ROM loaded.';
+  } else {
+    const range = parseInt(document.getElementById('hexRangeInput').value) || 64;
+    romHex = generateHexDump(range);
+    document.getElementById('hexOutput').textContent = romHex;
+  }
+  document.getElementById('hexOverlay').style.display = 'flex';
+};
+document.getElementById('refreshHexBtn').onclick = () => {
+  if (romData) {
+    const range = parseInt(document.getElementById('hexRangeInput').value) || 64;
+    romHex = generateHexDump(range);
+    document.getElementById('hexOutput').textContent = romHex;
+  }
+};
+document.getElementById('closeHexBtn').onclick = () => { document.getElementById('hexOverlay').style.display = 'none'; };
+document.getElementById('copyHexBtn').onclick = () => {
+  navigator.clipboard.writeText(romHex || 'No ROM loaded').then(() => {
+    const btn = document.getElementById('copyHexBtn');
+    const orig = btn.textContent;
+    btn.textContent = 'Copied!';
+    setTimeout(() => btn.textContent = orig, 1500);
+  }).catch(err => console.error('Copy failed', err));
+};
+
+/* ---------- Audio ---------- */
+let audioCtx=null, muted=false, nextTime=0;
+function initAudio(){
+  if(audioCtx) { audioCtx.resume(); return; }
+  audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+  nextTime=audioCtx.currentTime;
+}
+const audioBuf=new Float32Array(2048);
+function pumpAudio(){
+  if(!audioCtx||muted) return;
+  const n=nes.apu.readAudio(audioBuf);
+  if(!n) return;
+  const b=audioCtx.createBuffer(1,n,audioCtx.sampleRate===44100?44100:44100);
+  const data=b.getChannelData(0);
+  const ratio=44100/audioCtx.sampleRate;
+  for(let i=0;i<data.length;i++){const src=i*ratio;const j=Math.floor(src);data[i]=audioBuf[Math.min(j,n-1)]||0;}
+  const src=audioCtx.createBufferSource();src.buffer=b;src.connect(audioCtx.destination);
+  if(nextTime<audioCtx.currentTime) nextTime=audioCtx.currentTime;
+  src.start(nextTime);nextTime+=b.duration;
+  if(nextTime-audioCtx.currentTime>0.25) nextTime=audioCtx.currentTime+0.05;
+}
+
+/* ---------- ROM loading ---------- */
+const fileInput=document.getElementById('fileInput');
+const drop=document.getElementById('drop');
+async function loadFile(file){
+  if(!file) return;
+  try{
+    const buf=await file.arrayBuffer();
+    romData = new Uint8Array(buf);
+    romHex = generateHexDump(64);
+    document.getElementById('hexOutput').textContent = romHex;
+    nes.loadROM(buf);
+    nes.title=file.name.replace(/\.nes$/i,'');
+    document.getElementById('romName').textContent=nes.title;
+    drop.classList.add('hidden');
+    initAudio();
+    paused=false;document.getElementById('pauseBtn').textContent='Pause';
+    console.log(`[UI] Successfully loaded: ${nes.title}`);
+  }catch(e){
+    console.error("[UI] Failed to load ROM:", e);
+    alert(e.message);
+  }
+}
+document.getElementById('loadBtn').onclick=()=>fileInput.click();
+fileInput.onchange=e=>loadFile(e.target.files[0]);
+drop.ondragover=e=>{e.preventDefault();};
+drop.ondrop=e=>{e.preventDefault();loadFile(e.dataTransfer.files[0]);};
+document.addEventListener('dragover',e=>e.preventDefault());
+document.addEventListener('drop',e=>e.preventDefault());
+
+/* ---------- Touch controller ---------- */
+const B=NES.BUTTONS;
+function bindHold(el,btn){
+  const down=e=>{e.preventDefault();initAudio();nes.setButton(btn,true);el.classList.add('on');el.setPointerCapture?.(e.pointerId);};
+  const up=e=>{e.preventDefault();nes.setButton(btn,false);el.classList.remove('on');};
+  el.addEventListener('pointerdown',down);
+  el.addEventListener('pointerup',up);
+  el.addEventListener('pointercancel',up);
+  el.addEventListener('lostpointercapture',up);
+  el.addEventListener('contextmenu',e=>e.preventDefault());
+}
+document.querySelectorAll('[data-btn]').forEach(el=>bindHold(el,+el.dataset.btn));
+
+/* ---------- Keyboard fallback ---------- */
+const keymap={ArrowUp:4,ArrowDown:5,ArrowLeft:6,ArrowRight:7,KeyZ:1,KeyX:0,ShiftLeft:2,Enter:3};
+addEventListener('keydown',e=>{if(keymap[e.code]!==undefined){e.preventDefault();initAudio();nes.setButton(keymap[e.code],true);}});
+addEventListener('keyup',e=>{if(keymap[e.code]!==undefined)nes.setButton(keymap[e.code],false);});
+
+/* ---------- UI toggles ---------- */
+document.getElementById('muteBtn').onclick=e=>{muted=!muted;e.target.textContent='Audio: '+(muted?'Off':'On');if(!muted)initAudio();};
+let paused=false;
+document.getElementById('pauseBtn').onclick=e=>{paused=!paused;e.target.textContent=paused?'Resume':'Pause';};
+
+/* ---------- DEBUG CONTROLS ---------- */
+document.getElementById('debugBtn').onclick = (e) => {
+  nes.debug = !nes.debug;
+  e.target.textContent = 'Debug: ' + (nes.debug ? 'ON' : 'Off');
+  e.target.classList.toggle('active', nes.debug);
+  document.getElementById('debugOverlay').classList.toggle('visible', nes.debug);
+  console.log(`[UI] Debug mode: ${nes.debug ? 'ON' : 'OFF'}`);
+};
+
+document.getElementById('stepBtn').onclick = () => {
+  if(nes.loaded){
+    nes.stepFrame();
+    console.log(`[UI] Stepped 1 frame. Frame=${nes.ppu.frame} PC=$${nes.cpu.pc.toString(16).padStart(4,'0')}`);
+    updateDebugOverlay();
+  }
+};
+
+document.getElementById('resetBtn').onclick = () => {
+  if(nes.loaded){
+    nes.resetEmulator();
+    console.log(`[UI] Emulator reset. PC=$${nes.cpu.pc.toString(16).padStart(4,'0')}`);
+  }
+};
+
+/* ---------- Debug overlay update ---------- */
+function updateDebugOverlay(){
+  if(!nes.debug || !nes.loaded) return;
+  const info = nes.ppu.getDebugInfo();
+  document.getElementById('dbgFrame').textContent = info.frame;
+  document.getElementById('dbgSL').textContent = info.scanline;
+  document.getElementById('dbgCyc').textContent = info.cycle;
+  document.getElementById('dbgPC').textContent = '$' + nes.cpu.pc.toString(16).padStart(4,'0');
+  document.getElementById('dbgCtrl').textContent = '$' + info.ctrl.toString(16).padStart(2,'0');
+  document.getElementById('dbgMask').textContent = '$' + info.mask.toString(16).padStart(2,'0');
+  document.getElementById('dbgV').textContent = '$' + info.v.toString(16).padStart(4,'0');
+  document.getElementById('dbgT').textContent = '$' + info.t.toString(16).padStart(4,'0');
+  document.getElementById('dbgX').textContent = info.x;
+  document.getElementById('dbgBG').textContent = info.bgOn ? 'ON' : 'OFF';
+  document.getElementById('dbgSPR').textContent = info.sprOn ? 'ON' : 'OFF';
+  document.getElementById('dbgNT').textContent = info.ntWrites;
+  document.getElementById('dbgPal').textContent = info.palWrites;
+  document.getElementById('dbgScroll').textContent = info.scrollWrites;
+  document.getElementById('dbgTiles').textContent = info.uniqueTiles;
+
+  // Warnings
+  const warn = document.getElementById('dbgWarn');
+  const warnings = [];
+  if(info.ntWrites === 0 && info.frame > 5) warnings.push(' No NT writes!');
+  if(info.scrollWrites === 0 && info.frame > 5) warnings.push('⚠ No scroll writes!');
+  if(!info.bgOn && info.frame > 5) warnings.push('⚠ BG disabled!');
+  if(info.uniqueTiles <= 2 && info.frame > 10) warnings.push('⚠ Only ' + info.uniqueTiles + ' unique tiles');
+  warn.textContent = warnings.join(' ');
+}
+
+/* ---------- Main thread render / clock loop ---------- */
+let last=performance.now(),acc=0,lastFrame=-1,fpsTime=last,fpsCount=0,dbgUpdateCounter=0;
+function loop(now){
+  requestAnimationFrame(loop);
+  let dt=(now-last)/1000;last=now;if(dt>0.1)dt=0.1;
+  if(nes.loaded&&!paused){
+    acc+=dt;
+    let steps=0;
+    while(acc>=1/60&&steps<3){nes.stepFrame();acc-=1/60;steps++;}
+    if(steps===3)acc=0;
+    if(nes.ppu.frame!==lastFrame){
+      lastFrame=nes.ppu.frame;
+      image.data.set(nes.ppu.output);
+      ctx.putImageData(image,0,0);
+      fpsCount++;
+    }
+    pumpAudio();
+
+    // Update debug overlay every 10 frames to avoid perf hit
+    if(nes.debug){
+      dbgUpdateCounter++;
+      if(dbgUpdateCounter >= 10){
+        dbgUpdateCounter = 0;
+        updateDebugOverlay();
+      }
+    }
+  }
+  if(now-fpsTime>1000){
+    document.getElementById('status').textContent=
+      `${Math.round(fpsCount*1000/(now-fpsTime))} FPS · ${nes.loaded?nes.title:'idle'} · NTSC 60 Hz${nes.debug?' · DEBUG':''}`;
+    fpsTime=now;fpsCount=0;
+  }
+}
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

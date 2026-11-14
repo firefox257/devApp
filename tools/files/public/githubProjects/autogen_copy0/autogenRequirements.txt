@@ -1,0 +1,686 @@
+AUTOGEN REQUIREMENTS
+====================
+1. WASM ARCHITECTURE
+--------------------
+The WASM architecture consists of:
+ONE compiled WASM module.
+ONE shared WebAssembly.Memory backed by SharedArrayBuffer.
+ONE WASM instance per Autogen WASM Worker.
+Multiple Autogen WASM workers may instantiate the same compiled module.
+All Autogen WASM workers use the same shared WebAssembly.Memory.
+There must not be separate WASM modules, separate heaps, or separate shared-memory
+instances for individual workers.
+The browser main/UI thread is not an Autogen execution worker.
+The main Autogen execution worker is a Web Worker executing WASM and is
+separate from the configured dedicated/undedicated worker pool.
+All worker-to-worker communication must use the established MessagePort mesh
+and must not require routing through the browser main/UI thread.
+2. SHARED MEMORY
+----------------
+The shared WebAssembly.Memory is the common memory space between all Autogen
+WASM worker instances.
+All ordinary cross-worker data must reside in the shared WASM heap.
+A pointer is valid across workers only when it refers to an object located in
+the shared WASM heap.
+The following are NOT valid cross-worker shared pointers:
+Worker stacks.
+Thread-local storage.
+Normal WASM globals.
+Normal C/C++ static storage.
+.data.
+.bss.
+.rodata.
+Any other worker-instance-local storage.
+Because normal C/C++ static storage and normal WASM globals are instance-local,
+they will not work for cross-worker sharing. Applications must use a mechanism
+to allocate and manage shared state within the shared WASM heap (e.g., using
+the shared allocator) and pass valid shared pointers to access it.
+3. MEMORY ALLOCATION AND GROWTH
+-------------------------------
+Autogen uses the existing:
+./include/wasisys/AtomicMalloc.cpp
+as the shared WASM allocator.
+AtomicMalloc.cpp must not be overwritten, regenerated, replaced, deleted, or
+silently substituted.
+It provides the common thread-safe allocation mechanisms, including:
+malloc
+free
+realloc
+new
+delete
+new[]
+delete[]
+NOTE: The functions `cppmalloc`, `cppfree`, and `cpprealloc` are reserved
+EXCLUSIVELY for JavaScript usage to manage shared memory from the JS side.
+In C++ code, developers MUST use standard `malloc`, `free`, `realloc`, `new`,
+`delete`, `new[]`, and `delete[]` as normal. These standard C++ allocation
+mechanisms are automatically intercepted and routed to the shared `AtomicMalloc`
+allocator.
+All workers use the same shared allocator and therefore the same shared heap.
+WASM memory must be capable of growing when the allocator requires additional
+memory.
+Memory growth applies to the shared memory rather than creating a new memory
+for an individual worker.
+Memory growth must be strictly coordinated across all WASM modules and workers.
+Because memory growth detaches the underlying ArrayBuffer, the runtime must
+ensure that all workers safely refresh their JavaScript TypedArray/DataView
+views and update any cached pointers. Workers waking from synchronization
+primitives (like Atomics.wait) must refresh their views immediately upon
+resuming execution to prevent access to detached memory.
+JavaScript typed-array/DataView views into WASM memory must be refreshed when
+memory growth invalidates the previous views.
+Logical object addresses and shared pointers must continue to follow the
+defined WASM linear-memory semantics after growth.
+4. PORTABLE SOURCE ABSTRACTIONS
+-------------------------------
+Where WASM and native implementations require different mechanisms, Autogen
+must provide a common source-level abstraction.
+The abstraction must hide target-specific implementation details without
+changing the application-facing API.
+Portable concepts include:
+Thread IDs.
+Function Identities.
+Thread-to-thread calls.
+Futures.
+Async work.
+Shared-memory access.
+Synchronization mechanisms.
+Error/status handling.
+Allocation.
+5. WASM TOOLCHAIN
+-----------------
+The WASM implementation targets C++20 and the existing YoWASM/YoWasm +
+Clang/LLVM toolchain.
+The WASM build must support the features required for:
+SharedArrayBuffer-backed WebAssembly.Memory.
+WASM atomics.
+Multiple WASM instances using the same memory.
+Worker execution.
+Shared-memory synchronization.
+C++20 code.
+The expected compiler/linker configuration includes the equivalent of:
+-O2
+-std=c++20
+-pthread
+-fno-exceptions
+-fno-rtti
+-matomics
+-mbulk-memory
+-mshared-memory
+The exact command line may vary as implementation details are established.
+Additional Toolchain Requirements:
+- WASI Stubbing: The build environment must provide basic WASI stubs
+(e.g., proc_exit, fd_write, environ_get) to satisfy linker requirements
+for standard C++ library components, even if the application does not
+perform direct file or environment I/O.
+- Native Cross-Compilation Target: While primarily a WASM patch, the
+Autogen source abstractions must compile cleanly for native targets
+(x86-64, ARM) using a standard Clang cross-compiler toolchain, mapping
+the WASM-specific primitives to their native OS equivalents (e.g.,
+pthreads, native mutexes) without altering the application-facing API.
+6. THREADING MODEL
+------------------
+Autogen WASM workers are Web Workers executing WASM.
+The browser main/UI thread is not counted as an Autogen application thread.
+The main Autogen worker is a Web Worker executing WASM and may block when
+required by synchronous runtime operations.
+The configured worker pool consists of:
+Dedicated WASM workers.
+Undedicated WASM workers.
+The main Autogen worker is not included in the dedicated/undedicated counts.
+The thread configuration is defined by the C++/Autogen application.
+The browser runtime obtains the configured worker counts from the C++ runtime
+configuration during initialization.
+The configured worker count is:
+dedicated_count + undedicated_count
+The main Autogen worker is separate and is not included in this count.
+The browser runtime then creates and initializes all configured Autogen WASM workers.
+JavaScript/browser code must not independently choose, increase, or decrease
+the configured Autogen worker counts.
+Worker creation is not dynamic.
+If all available worker capacity is already committed, Autogen must not create
+another worker.
+No hidden worker may be created to service an operation.
+No private async worker may be created.
+No replacement worker may be created after initialization because a worker
+fails.
+Capacity exhaustion must be reported through the Autogen error mechanism.
+7. THREAD CONFIGURATION
+-----------------------
+The worker configuration is defined by the C++/Autogen application.
+The C++ configuration specifies:
+dedicated_count
+undedicated_count
+During initialization, after the shared WebAssembly.Memory and WASM module
+infrastructure are established, the browser runtime obtains these values from
+the C++ runtime configuration.
+The configured worker count is:
+dedicated_count + undedicated_count
+The main Autogen worker is separate and is not included in this count.
+The browser runtime then creates and initializes all configured Autogen WASM workers.
+JavaScript/browser code must not independently choose, increase, or decrease
+the configured Autogen worker counts.
+Worker creation is not dynamic.
+If all available worker capacity is already committed, Autogen must not create
+another worker.
+No hidden worker may be created to service an operation.
+No private async worker may be created.
+No replacement worker may be created after initialization because a worker
+fails.
+Capacity exhaustion must be reported through the Autogen error mechanism.
+8. DEDICATED WORKERS
+--------------------
+Dedicated workers have stable worker IDs and may be directly targeted.
+A dedicated worker remains associated with its assigned worker ID for its
+lifetime.
+Dedicated workers are not dynamically reassigned.
+Work explicitly targeting a dedicated worker must execute on that worker.
+9. UNDEDICATED WORKER POOL
+---------------------------
+Undedicated workers form one fixed shared worker pool.
+The pool is used for work that does not require a specific worker, including:
+Balanced work.
+Round-robin work.
+Small tasks.
+Future/async work.
+Async/future work uses this same pool.
+There is no separate async worker pool.
+If all undedicated workers are busy, work may queue, but Autogen must not
+create another worker.
+10. WORKER INITIALIZATION
+-------------------------
+Worker IDs are assigned during initialization and remain stable for the
+lifetime of the runtime.
+Configured pool worker IDs must use a deterministic numbering scheme.
+The dedicated and undedicated ranges must be deterministic.
+The main Autogen worker has a separately defined identity and is not included
+in the configured pool count.
+Initialization must proceed in an order that establishes the shared runtime
+before application work is accepted.
+The initialization sequence must establish:
+Shared WebAssembly.Memory.
+Compiled WASM module.
+C++ thread configuration.
+The main Autogen WASM worker.
+WASM worker instances for the configured pool.
+Worker IDs.
+MessagePort connections.
+Worker configuration.
+Function registration.
+Shared runtime state.
+The browser runtime must obtain the dedicated and undedicated worker counts
+from C++ before creating the configured worker pool.
+Workers must not accept normal application work until initialization is
+complete.
+11. MESSAGEPORT MESH
+--------------------
+All Autogen workers (including the main Autogen WASM worker and all pool
+workers) must participate in a fixed, full-connect MessagePort mesh (every
+worker holds a direct MessagePort to every other worker).
+Worker-to-worker communication must be direct through these established
+MessagePort connections.
+The browser main/UI thread must not be used as a routing intermediary for
+normal worker-to-worker calls.
+The mesh must be established during initialization.
+The runtime must know the available target worker IDs and their associated
+MessagePorts.
+The mesh must remain fixed for the lifetime of the runtime.
+12. THREAD-TO-THREAD CALLS
+--------------------------
+A threaded call must identify at minimum:
+Target thread ID.
+Compile-Time Function Hash ID.
+Call/request identity.
+Arguments or argument transport information.
+Result or result transport information.
+Completion state.
+Error/status information.
+Arguments and results that cross worker boundaries must use shared-memory
+references or an explicitly defined transport representation.
+Pointers crossing workers must refer only to valid shared heap memory.
+A worker must be able to directly invoke a registered function on another
+worker through the MessagePort mesh using the Function Hash ID.
+- The `ag_async_on` and `ag_sync` macros must take the target worker ID as
+the first argument, followed by the function name and its arguments
+(e.g., `ag_async_on(target_id, func, args...)`).
+13. FUNCTION IDENTITIES
+-----------------------
+Every thread-callable function must have a unique, deterministic Compile-Time
+Hash ID (e.g., generated via WyHash).
+The Hash ID is the runtime function identity.
+Hash IDs are used directly as the runtime threaded dispatch identity.
+The same hashing convention must be used for:
+C++ -> C++ worker calls.
+JavaScript -> worker calls.
+Registered callable functions.
+JavaScript calls a WASM function by its string name, which the runtime
+translates to the deterministic Hash ID before or during dispatch.
+14. SYNCHRONOUS CALLS
+---------------------
+Autogen must support synchronous worker-to-worker function calls.
+A synchronous call must not require routing through the browser main/UI thread.
+The caller must be able to wait for completion using the Autogen synchronization
+mechanisms. This wait must be implemented using primitives like Atomics.wait
+and Atomics.notify to suspend the thread without blocking the worker's event
+loop, preventing deadlocks when waiting for responses.
+Because Atomics.wait freezes the worker's event loop, the worker cannot process
+incoming MessagePort messages while waiting. Therefore, synchronous call
+responses must bypass the MessagePort: the responding worker must write the
+result directly into the SharedArrayBuffer and trigger Atomics.notify.
+The result or error must be associated with the original call/request identity.
+Synchronous calls must support returned values and application/runtime errors.
+Pre-allocated Sync State:
+To prevent dynamic memory allocation during thread suspension (which could
+cause deadlocks or invalidate pointers during SharedArrayBuffer growth),
+synchronous call request structures (ag_sync_req) must be drawn from a
+pre-allocated, context-bound pool. Dynamic allocation while a worker is
+suspended via Atomics.wait is strictly prohibited.
+15. ASYNC AND FUTURES
+---------------------
+Autogen must support asynchronous operations and futures without creating
+additional workers.
+Async work must execute on the existing undedicated worker pool unless a
+specific dedicated worker is explicitly targeted.
+A future must provide a way to determine completion and retrieve:
+Result.
+Application error/status.
+System/runtime error.
+If a target worker fails or terminates while an asynchronous operation is
+pending, the associated future must be actively rejected with a system error.
+Async operations may queue when worker capacity is unavailable.
+No private async worker is permitted.
+Non-Blocking Await:
+Autogen's `ag_await` mechanism is strictly non-blocking. It utilizes C++20
+coroutines (`co_await`) to yield execution back to the JavaScript event loop
+while waiting for a future to resolve. Consequently, any C++ function that
+uses `ag_await` or `ag_yield` must be a coroutine (returning `ag_future*`
+and using `ag_return`). The redundant `ag_ext_await` has been removed;
+developers must use `ag_await` for both internal async tasks and external
+extension calls.
+16. SYNCHRONIZATION
+-------------------
+Autogen must provide the mechanisms required for developers to build
+thread-safe synchronization.
+Supported mechanisms may include:
+Atomics.
+Atomic operations.
+Wait.
+Notify.
+Locks.
+Spinlocks.
+Other low-level synchronization primitives required by the runtime.
+Autogen does not own application locking policy.
+Developers are responsible for:
+Deadlock prevention.
+Lock ordering.
+Starvation prevention.
+Synchronization correctness.
+Object lifetime.
+Safe concurrent access.
+Autogen must not silently impose application-level locks.
+17. SHARED POINTER AND LIFETIME RULES
+-------------------------------------
+Only pointers to shared heap objects may be passed between workers.
+Pointers to worker stacks must never be shared.
+Pointers to instance-local globals/statics must never be shared.
+Pointers into .data, .bss, or .rodata must never be treated as shared-memory
+pointers.
+Objects shared between workers must remain alive for as long as any worker
+may access them.
+Autogen must not automatically free a shared object while another worker may
+still reference it.
+Applications may use reference counting, ownership, locks, atomics, or other
+lifetime mechanisms as appropriate.
+Dispatched Closure Ownership:
+When using generic async/sync dispatch (e.g., ag_async, ag_sync), the
+callable object (e.g., lambda) and its packed arguments are heap-allocated
+in the shared memory by the caller. Upon invocation, ownership transfers
+to the target worker, which is strictly responsible for invoking the
+function, extracting the result, and freeing both the callable object and
+the arguments payload, regardless of success or failure.
+18. ERROR AND LOGGING SYSTEM
+----------------------------
+Autogen must distinguish application errors from system/runtime errors.
+System/runtime errors include:
+Missing Function Hash ID.
+Invalid target thread.
+Invalid call state.
+Failed worker.
+Unavailable resource.
+Exceeded worker capacity.
+Invalid shared-memory reference.
+Initialization failure.
+Shutdown-related failure.
+Errors must propagate through synchronous calls, asynchronous operations, and
+futures as appropriate.
+Runtime logging must support informational, warning, and error messages.
+The implementation must provide mechanisms corresponding to:
+msginfo
+msgwarn
+msgerr
+Browser integration must capture relevant console output, including:
+console.log
+console.info
+console.warn
+console.error
+console.debug
+Relevant worker errors, uncaught errors, and unhandled promise rejections
+must also be captured by the browser runtime.
+19. BROWSER / IPHONE REQUIREMENTS
+---------------------------------
+The WASM runtime must operate in a browser environment including iPhone/iOS.
+The implementation must use the browser configuration required for:
+SharedArrayBuffer.
+Shared WebAssembly.Memory.
+WASM atomics.
+The hosting environment must serve the application with the required HTTP
+security headers to enable SharedArrayBuffer (especially on iOS Safari):
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Embedder-Policy: require-corp
+The application must not depend on a desktop developer console for runtime
+diagnostics.
+Runtime status, logging, warnings, errors, and application results must be
+available through the application UI.
+20. C++ THREADING RESTRICTIONS
+------------------------------
+The standard C++ threading library must not be a fundamental Autogen runtime
+mechanism.
+Autogen must not depend on:
+std::thread
+std::async
+std::future
+std::promise
+std::mutex
+std::condition_variable
+std::atomic
+Autogen provides its own worker, messaging, synchronization, async, and future
+mechanisms.
+C++ exceptions are disabled.
+Runtime/application error handling must use the defined Autogen status/error
+mechanism.
+21. BROWSER MAIN THREAD
+-----------------------
+The browser main/UI thread is responsible for browser-facing orchestration.
+It may:
+Create Web Workers.
+Create MessageChannels/MessagePorts.
+Load the compiled WASM module.
+Create shared WebAssembly.Memory.
+Initialize worker instances.
+Provide browser APIs.
+Display runtime output.
+It is not an Autogen application execution worker.
+Normal worker-to-worker application calls must not be routed through the
+browser main/UI thread.
+22. RUNTIME LIFECYCLE
+--------------------
+The runtime must have defined lifecycle states:
+UNINITIALIZED
+CONFIGURING
+CREATING_WORKERS
+INITIALIZING_WASM
+ESTABLISHING_MESSAGEPORT_MESH
+INITIALIZING_RUNTIME
+READY
+RUNNING
+SHUTDOWN
+FAILED
+Normal application work is permitted only after READY.
+Initialization must establish all required shared resources, workers, worker
+IDs, MessagePorts, and function registrations.
+Initialization failure must transition the runtime to FAILED and output a
+system error.
+If any configured Autogen worker fails or terminates unexpectedly, the runtime
+must output a system error.
+23. SHUTDOWN
+------------
+Shutdown must stop acceptance of new work.
+Pending operations must be completed, cancelled, or reported according to
+their defined state.
+All Autogen workers must be terminated.
+No replacement workers may be created during shutdown.
+Shared runtime resources must be released according to their ownership rules.
+After shutdown, new application work must not be accepted until a new runtime
+instance is explicitly initialized.
+24. FUNCTION-CALL ERROR HANDLING
+--------------------------------
+Every callable operation must provide enough state to distinguish:
+Successful completion.
+Returned application value.
+Application status/error.
+System/runtime error.
+A missing or invalid Function Hash ID must produce a defined system error.
+An invalid target worker ID must produce a defined system error.
+A call to a failed or unavailable worker must produce a defined system error.
+A capacity-exhaustion condition must produce a defined system error rather
+than silently creating another worker.
+Errors must preserve their association with the originating call/request.
+25. SOURCE / BUILD GENERATION
+-----------------------------
+Autogen-generated source and runtime code must preserve the single-module,
+shared-memory architecture.
+Generated code must not introduce worker-local storage where shared storage is
+required.
+Generated threaded-call code must use:
+Target worker ID.
+Function Hash ID.
+Call/request identity.
+Defined argument/result transport.
+The generated runtime must use the existing AtomicMalloc implementation for
+shared allocation.
+26. DEVELOPER-FRIENDLY SOURCE API
+---------------------------------
+All Autogen source-level APIs, macros, declarations, and abstractions must be
+developer-friendly.
+Macros must use normal readable naming and must not use all-uppercase names
+unless there is a strong technical reason to do so.
+Macro and API names should be concise and easy to read in normal application
+code.
+Avoid unnecessarily long or verbose names.
+For example, prefer:
+asyncCall(target, func, args)
+over:
+AUTOGEN_ASYNC_INVOKE(target, func, args)
+Source-level abstractions should look natural to developers using the language
+and should not expose unnecessary implementation details.
+Developer-facing APIs must prioritize:
+Readability.
+Conciseness.
+Consistent naming.
+Easy discoverability.
+Minimal boilerplate.
+Clear semantics.
+Implementation-specific prefixes, internal naming conventions, and verbose
+identifiers should be kept out of application-facing source unless required
+to prevent a genuine naming conflict.
+The same developer-friendly naming principles apply to:
+Macros.
+Functions.
+Types.
+Threading APIs.
+Synchronization APIs.
+Shared-memory APIs.
+Error/status APIs.
+JavaScript integration APIs.
+27. PORTABILITY REQUIREMENTS
+----------------------------
+The Autogen architecture is fundamentally a WASM compatibility patch designed
+to provide native-like threading, async, and shared-memory semantics within
+the restrictive browser environment.
+However, the source-level abstractions must be designed for seamless native
+portability. The native implementation (targeting x86-64 or ARM via Clang
+cross-compilation) will replace WASM-specific mechanisms (MessagePorts,
+SharedArrayBuffer, Atomics.wait) with platform-native equivalents (e.g.,
+POSIX threads, native mutexes, condition variables).
+Despite the underlying implementation differences, the following conceptual
+model must remain strictly consistent across both WASM and native targets:
+Worker/thread identity and configuration.
+Function Identities (Hash IDs).
+Callable function registration and generic dispatch trampolines.
+Thread-to-thread calls (sync and async).
+Shared-state abstractions and lifetime rules.
+Error/status handling mechanisms.
+The application code must not require #ifdef blocks to switch between WASM
+and native execution; the Autogen headers must abstract this entirely.
+28. FUNCTION SIGNATURES AND PARAMETERS
+--------------------------------------
+Exported functions using `ag_export` must define actual typed parameters rather
+than relying on a generic `args_ptr` or untyped pointer casting for argument
+passing.
+The `ag_export` macro must act as a clean attribute wrapper, allowing developers
+to write plain, standard C++ function signatures immediately after it.
+Relying on manual `args_ptr` unpacking inside the exported function body or
+using complex C++ template trampolines for synchronous exports is deprecated.
+The runtime must pass arguments directly to the exported C++ function, mimicking
+plain old WebAssembly-to-C++ function calls with actual arguments.
+Distinction in Dispatch Mechanisms:
+- Direct Exports: Functions explicitly exported for direct JavaScript-to-WASM
+invocation using `ag_export` must define actual, standard typed parameters.
+They must not rely on generic `args_ptr` unpacking or complex C++ template
+trampolines in the exported signature.
+- Generic Worker-to-Worker Dispatch: Internal asynchronous/synchronous routing
+of arbitrary callables (e.g., lambdas via `ag_async`/`ag_sync`) utilizes a
+type-erased trampoline pattern (`dispatcher_ptr` + `args_ptr`). The
+trampoline is strictly responsible for safely unpacking the `args_ptr` into
+the correct typed parameters before invoking the target callable, and
+subsequently freeing the allocated payload.
+29. GLOBAL SHARED POINTER REGISTRATION
+--------------------------------------
+Autogen must provide a mechanism to establish a globally shared pointer that resolves to the exact same shared heap memory address across all Autogen WASM worker instances, while mapping cleanly to native environments.
+This mechanism overcomes the limitation where normal C/C++ static storage or globals are instance-local and cannot be used for cross-worker sharing in WASM.
+The mechanism must support a developer-friendly API (e.g., registerGlobal) to associate a named global property with a shared heap pointer.
+Conceptual usage:
+class try1 { /* stuff */ };
+registerGlobal(try1*, globalTry1);
+WASM Initialization and Propagation Flow:
+1. The target object must be allocated in the shared WASM heap using the shared allocator (AtomicMalloc).
+2. An exported initialization function is called exactly once, typically by the main Autogen worker, after all threads are fully initialized.
+3. This function initializes the new pointer and exposes/returns it to the JavaScript layer.
+4. JavaScript then propagates this exact pointer value to all threading WebWorker modules.
+5. Each worker instance resolves the global property (e.g., via a registered hash or name) and sets its local reference to this propagated shared memory address.
+Native Environment Behavior:
+In a native implementation, registerGlobal cleanly initializes and assigns the pointer object using platform-native global/static mechanisms or a native registry. It bypasses the need for JavaScript propagation while maintaining the exact same application-facing API and conceptual model (aligning with Portability Requirements).
+Constraints:
+- The propagated pointer (in WASM) must strictly refer to valid shared heap memory.
+- This mechanism must not allocate or initialize a new instance per worker; it strictly synchronizes the reference to a single, shared instance across all workers.
+- The global pointer registry must remain consistent and survive memory growth events (logical addresses remain valid).
+- This feature must align with the shared pointer and lifetime rules (Requirement 17), ensuring the shared object remains alive as long as any worker may access it.
+30. COROUTINE YIELD FACILITATION
+--------------------------------
+Autogen recognizes that developers may choose to use C++20 coroutines
+(`co_await`, `co_return`) in their application code. While Autogen does not
+own, enforce, or deeply integrate a specific coroutine implementation, it
+must provide the underlying primitives to make coroutines safe and functional
+in a WASM environment.
+- Yield Primitives: Autogen must provide an `ag_yield()` mechanism
+(backed by `js_yield_coroutine` and `ag_resume_coroutine`) that allows
+a WASM coroutine to safely yield execution back to the JavaScript event
+loop without blocking the Web Worker's main execution thread.
+- Non-Blocking Await: The `ag_await` macro is now a non-blocking,
+coroutine-based primitive. It yields to the JS event loop instead of
+blocking the worker thread with `Atomics.wait`. The redundant `ag_ext_await`
+has been removed; developers must use `ag_await` for both internal async
+tasks and external extension calls.
+- Event Loop Integration: Yielding must be implemented via a non-blocking
+JS-side mechanism (e.g., `setTimeout` or `queueMicrotask`) that
+eventually triggers the WASM resume export, passing the coroutine handle
+address.
+- Agnostic Design: Autogen provides the plumbing for yielding and resuming.
+The actual coroutine promise types, `co_await` logic, and state machines
+remain the responsibility of the developer's application code or
+third-party libraries, which build on top of Autogen's `ag_future` and
+yield primitives.
+31. EXTENSIBILITY AND EXTERNAL CALLS
+------------------------------------
+Autogen must support extensibility for operations requiring browser or server
+environment access (e.g., File I/O, network requests, WebGL, DOM, Audio)
+without violating the rule that worker-to-worker application calls must not
+route through the browser main/UI thread.
+Execution Context Routing:
+Because certain browser APIs (like standard WebGL contexts, DOM
+manipulation, or AudioContext) strictly require the browser main/UI thread,
+while others (like fetch, WebSockets, or OffscreenCanvas WebGL) can execute
+directly inside Web Workers, the extension system must support explicit
+routing targets:
+- ag_ext_main: The JavaScript handler executes on the browser main/UI thread.
+When a main extension is registered, it is registered once on the main
+thread, and all function calls from any worker are routed via their
+mainThreadPort to the main thread for execution. Ideal for standard WebGL,
+DOM, and Audio APIs.
+- ag_ext_worker: The JavaScript handler executes locally within the calling
+Web Worker. Because worker-local extensions run strictly in the local
+worker's context, a worker-local extension must be registered individually
+on all threads. Consequently, an extension called on thread 0 runs on
+thread 0, an extension called on thread 1 runs on thread 1, and so on.
+Ideal for network requests, background processing, and OffscreenCanvas
+operations.
+Communication Modes for External Calls:
+The extension and bridging system supports three distinct execution patterns based on task requirements:
+1. Asynchronous Operations: Handled via non-blocking requests returning an `ag_future*` pointer, allowing the worker to continue execution or await completion asynchronously using the non-blocking `ag_await`.
+2. Synchronous Blocking Operations: Handled via blocking requests (e.g., synchronous XHR or file I/O) where the calling thread suspends safely using `Atomics.wait` until the result is written directly to shared memory and notified.
+3. Fire-and-Forget (One-Way): Used for tasks like DOM property updates where a response or thread blocking is unnecessary, executing as a simple one-way message pass without synchronization overhead.
+Core Primitive Responsibility:
+- The core Autogen framework must provide generic primitives to bridge WASM and the JavaScript environment.
+- This includes support for asynchronous futures, synchronous request structures with atomics, and one-way messaging.
+- The core `autogen.hpp` must NOT contain specific APIs for File I/O,
+networking, WebGL, or other domain-specific features to prevent core
+bloat and maintain a clean separation of concerns.
+Extension Arguments (PHASE 2 UPDATE):
+- Extension calls from C++ must accept normal, variadic arguments of any type
+and any number (e.g., `ext::add_async(10, 25)`), rather than requiring the
+developer to manually pack them into a single generic struct pointer.
+- Arguments are serialized by the C++ side into a JSON array string stored in
+shared memory, transmitted to the JS side, deserialized, and passed to the
+handler as individual normal JavaScript arguments.
+- The JS extension handler receives the exact same arguments as the C++ call
+(e.g., `handler(workerId, a, b)` for main extensions, or `handler(a, b)`
+for worker extensions). No `args_ptr` is exposed in the handler signature.
+Extension Handler Logic (PHASE 2 UPDATE):
+- JavaScript extension handlers must simply return the result value.
+- Developer-written extension handlers must NOT contain any atomic notification
+code, memory allocation for the result, or DataView writes to the future or
+sync request structures.
+- The core Autogen library (JS runtime) is strictly responsible for:
+1. Taking the returned value from the handler.
+2. Allocating shared memory for the result (if it is a primitive number).
+3. Writing the result pointer to the `ag_future` or `ag_sync_req` structure.
+4. Setting the status to resolved.
+5. Calling `Atomics.notify` to wake the waiting C++ thread.
+6. Freeing the JSON arguments buffer after the handler completes.
+Extension Developer Responsibility:
+- Extension developers must provide their own `.hpp` files (e.g.,
+`extensions/file_io.hpp` or `extensions/webgl.hpp`).
+- These headers must wrap the core generic primitives in type-safe,
+developer-friendly C++ APIs (e.g., `read_file_sync`, `gl_create_context`).
+- The extension header is strictly responsible for invoking the core primitive
+with the correct context flag, and unpacking/cleaning up the response.
+Memory Management and Lifecycle:
+- The C++ extension wrapper is strictly responsible for reading the result,
+extracting the data, and freeing both the result payload and the future
+struct to prevent memory leaks.
+Main Thread Integration:
+- When `ag_ctx_main` is used, the browser main thread maintains the registry
+of main extension handlers.
+- Upon receiving the routed request, the main thread executes the handler,
+writes the result to the SharedArrayBuffer via the library bridge, and notifies the waiting
+Web Worker (if synchronous/asynchronous).
+- This routing is strictly for browser-API-bound operations and does not
+violate the prohibition against routing normal worker-to-worker application
+logic through the main thread.
+Worker-Local Registration:
+- When `ag_ctx_worker` is used, the extension must be initialized/registered
+inside every worker thread's JavaScript environment. The runtime ensures
+that extension registrations are propagated to all workers during
+initialization, guaranteeing that local execution maps directly to the
+calling thread's ID (e.g., thread 0 calls run in thread 0's local handler).
+32. MULTIPLE FUTURE AWAIT (AG_AWAIT_ALL)
+----------------------------------------
+Autogen must support waiting on multiple asynchronous operations concurrently
+without blocking the worker's event loop.
+- The `ag_await_all` mechanism must accept a `std::vector<ag_future*>`.
+- It must yield to the JS event loop until all provided futures have resolved
+or rejected.
+- It must support heterogeneous result types. The returned result object must
+allow the developer to extract each future's result using a `.get<T>(index)`
+method, where `T` can be different for each index (e.g., `int` for index 0,
+`float` for index 1).

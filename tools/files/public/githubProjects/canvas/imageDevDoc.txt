@@ -1,0 +1,164 @@
+Developer Documentation: image.cpp (Optimized Image Loader)
+
+## Overview
+image.cpp is a highly optimized, single-file image decoding library designed for speed and minimal footprint. It is a streamlined, custom implementation (inspired by stb_image) tailored for decoding baseline JPEG, 8-bit PNG (including interlaced), and GIF (first frame only). 
+
+It is specifically engineered for performance-critical environments, including native C++ applications and WebAssembly (Emscripten) targets, with zero dependencies on the C++ standard library beyond basic C headers (stdio.h, stdlib.h, string.h, stdint.h).
+
+---
+
+## Features & Limitations
+
+Supported:
+- JPEG: Baseline (non-progressive) 8-bit JPEGs.
+- PNG: 8-bit color depth, including indexed (palette) and interlaced PNGs. Alpha channel transparency is fully supported.
+- GIF: 8-bit color, first frame only (animations are not decoded).
+- Format Conversion: Automatic on-the-fly conversion to a requested channel count (1=Grayscale, 2=Grayscale+Alpha, 3=RGB, 4=RGBA).
+
+Not Supported (by design, for size/speed):
+- Progressive JPEGs.
+- 16-bit or 32-bit PNGs (float/high-dynamic-range).
+- Animated GIFs (subsequent frames are ignored).
+- EXIF metadata or orientation tags.
+
+---
+
+## Build & Compilation
+
+To achieve maximum performance, compile with aggressive optimization flags and disable unnecessary C++ features.
+
+Native (GCC / Clang):
+g++ -O3 -march=native -fno-exceptions -fno-rtti -flto -c your_file.cpp
+
+WebAssembly (Emscripten):
+emcc -O3 -msimd128 -flto -fno-exceptions -fno-rtti your_file.cpp -o output.js
+
+Optional: Detailed Error Messages
+By default, error reporting is minimized to save binary size. To enable human-readable error strings from Image::getFailureReason(), define the following macro before including the file:
+
+#define IMG_ERROR_STRINGS
+#include "image.cpp"
+
+---
+
+## Public API Reference
+
+The entire public interface is encapsulated within the Image class. Copy construction and assignment are explicitly deleted to prevent accidental memory duplication.
+
+Constructor & Destructor:
+Image();
+~Image();
+- Automatically initializes internal pointers to nullptr.
+- Destructor automatically calls free() to prevent memory leaks.
+
+Loading Methods:
+bool loadFromMemory(const unsigned char *buffer, int len, int req_comp = 0);
+bool loadFromFile(const char *filename, int req_comp = 0);
+
+- buffer / filename: The source data.
+- len: Size of the memory buffer in bytes.
+- req_comp: Desired number of output channels. 
+  0: Use the image's native channel count.
+  1: Grayscale.
+  2: Grayscale + Alpha.
+  3: RGB.
+  4: RGBA (Recommended for WebGL/HTML5 Canvas compatibility).
+- Returns: true on success, false on failure.
+
+Memory Management:
+void free();
+- Manually deallocates the internal pixel buffer and resets dimensions to 0. Automatically called by the destructor.
+
+Getters:
+int getWidth() const;
+int getHeight() const;
+int getChannels() const;
+unsigned char *getData();
+const unsigned char *getData() const;
+
+- getData(): Returns a pointer to the raw, contiguous pixel array. The data is laid out in row-major order (top-to-bottom, left-to-right). Each pixel consists of getChannels() bytes.
+
+Error Handling:
+static const char *getFailureReason();
+- Returns a static string describing the last failure (e.g., "outofmem", "bad huffman code", "unknown image type"). Requires IMG_ERROR_STRINGS to be defined for specific messages; otherwise, returns "image load failed".
+
+---
+
+## Usage Examples
+
+Example 1: Loading from a Local File (Native C++)
+
+#define IMG_ERROR_STRINGS
+#include <image.cpp>
+
+int main() {
+    Image img;
+    // Force 4 channels (RGBA) for consistent processing
+    if (img.loadFromFile("texture.png", 4)) {
+        printf("Loaded: %dx%d, %d channels\n", img.getWidth(), img.getHeight(), img.getChannels());
+        
+        unsigned char* pixels = img.getData();
+        // ... process pixels ...
+
+        // img.free() is called automatically when it goes out of scope
+    } else {
+        printf("Failed to load: %s\n", Image::getFailureReason());
+    }
+    return 0;
+}
+
+Example 2: Loading from Memory (WebAssembly / Network Fetch)
+This mirrors the pattern used in image_test.cpp, where data is fetched asynchronously and passed to C++ via a pointer.
+
+#include <image.cpp>
+
+// Assume fetched_data and fetched_size come from a JS fetch or network layer
+bool decode_network_image(const unsigned char* fetched_data, int fetched_size) {
+    Image img;
+    
+    // Request 4 channels (RGBA) to ensure compatibility with HTML5 Canvas ImageData
+    bool success = img.loadFromMemory(fetched_data, fetched_size, 4);
+    
+    if (success) {
+        // Pass img.getData(), img.getWidth(), img.getHeight() to rendering engine
+        return true;
+    } else {
+        // Log Image::getFailureReason() for debugging
+        return false;
+    }
+}
+
+---
+
+## Integration Notes for WebAssembly / Autogen
+
+If you are using this in a WebAssembly environment (like the provided image_test.cpp and imageTest.html):
+
+1. Channel Forcing: Always use req_comp = 4 when targeting the HTML5 Canvas API. The Canvas ImageData constructor expects a contiguous Uint8ClampedArray of RGBA values.
+2. Memory Ownership: loadFromMemory copies or re-allocates the decoded pixel data internally. You are responsible for freeing the original source buffer (e.g., the FetchResult->data_ptr in image_test.cpp) after loadFromMemory returns.
+3. SharedArrayBuffer: When passing the decoded data_ptr back to JavaScript, ensure the memory is copied out of the SharedArrayBuffer or properly synchronized, as the Canvas API cannot directly consume SharedArrayBuffer views in all contexts (as demonstrated by the Uint8ClampedArray copy in imageTest.html).
+4. Thread Safety: The Image class is not thread-safe for concurrent mutation. However, separate Image instances can be safely decoded on separate threads (e.g., using Web Workers or Autogen's dedicated threads) as long as they do not share the same input buffer simultaneously without synchronization.
+
+---
+
+## Troubleshooting
+
+Symptom: Returns false, reason: "unknown image type"
+Likely Cause: Buffer does not start with valid JPEG (FF D8), PNG (89 50 4E 47), or GIF (47 49 46 38) magic bytes.
+Solution: Verify the network fetch succeeded and the buffer is not truncated or an HTML error page.
+
+Symptom: Returns false, reason: "progressive jpeg"
+Likely Cause: The source JPEG is saved in progressive format.
+Solution: Re-save the source image as baseline/standard JPEG.
+
+Symptom: Returns false, reason: "8bit only"
+Likely Cause: The PNG is 16-bit or 32-bit depth.
+Solution: Convert the source PNG to 8-bit depth using an image editor.
+
+Symptom: Canvas renders upside down or garbled
+Likely Cause: Misalignment in channel expectations.
+Solution: Ensure req_comp = 4 is used, and verify the JS side reads exactly width * height * 4 bytes.
+
+---
+
+For further reference, see image_test.cpp for a complete, production-ready example integrating this loader with asynchronous network fetching and WebAssembly memory management.

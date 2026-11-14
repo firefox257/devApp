@@ -1,0 +1,1076 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Autogen Developer Documentation</title>
+<style>
+:root {
+--bg-color: #ffffff;
+--text-color: #1f2937;
+--sidebar-bg: #f9fafb;
+--accent-color: #2563eb;
+--accent-hover: #1d4ed8;
+--code-bg: #1e1e1e;
+--code-text: #d4d4d4;
+--border-color: #e5e7eb;
+}
+@media (prefers-color-scheme: dark) {
+:root {
+--bg-color: #111827;
+--text-color: #f3f4f6;
+--sidebar-bg: #1f2937;
+--accent-color: #60a5fa;
+--accent-hover: #93c5fd;
+--code-bg: #0d1117;
+--code-text: #c9d1d9;
+--border-color: #374151;
+}
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+line-height: 1.6;
+color: var(--text-color);
+background-color: var(--bg-color);
+margin: 0;
+padding: 0;
+}
+.container {
+display: grid;
+grid-template-columns: 300px 1fr;
+gap: 40px;
+max-width: 1200px;
+margin: 0 auto;
+padding: 40px 20px;
+}
+.sidebar {
+position: sticky;
+top: 40px;
+height: fit-content;
+background-color: var(--sidebar-bg);
+padding: 20px;
+border-radius: 8px;
+border: 1px solid var(--border-color);
+max-height: calc(100vh - 80px);
+overflow-y: auto;
+}
+.sidebar h3 {
+margin-top: 0;
+font-size: 1.1rem;
+border-bottom: 2px solid var(--accent-color);
+padding-bottom: 8px;
+margin-bottom: 16px;
+}
+.toc-list { list-style: none; padding: 0; margin: 0; }
+.toc-list li { margin-bottom: 8px; }
+.toc-list a {
+text-decoration: none;
+color: var(--text-color);
+font-size: 0.9rem;
+display: block;
+padding: 4px 8px;
+border-radius: 4px;
+transition: background-color 0.2s, color 0.2s;
+}
+.toc-list a:hover { background-color: var(--accent-color); color: #ffffff; }
+.content { min-width: 0; }
+h1 { font-size: 2.5rem; margin-top: 0; color: var(--accent-color); }
+h2 {
+font-size: 1.8rem;
+margin-top: 40px;
+padding-bottom: 8px;
+border-bottom: 1px solid var(--border-color);
+scroll-margin-top: 20px;
+}
+h3 { font-size: 1.3rem; margin-top: 24px; scroll-margin-top: 20px; }
+h4 { font-size: 1.1rem; margin-top: 20px; color: var(--accent-color); }
+p, ul, ol { margin-bottom: 16px; }
+ul, ol { padding-left: 24px; }
+li { margin-bottom: 8px; }
+code {
+font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
+background-color: var(--sidebar-bg);
+padding: 2px 6px;
+border-radius: 4px;
+font-size: 0.9em;
+border: 1px solid var(--border-color);
+}
+pre {
+background-color: var(--code-bg);
+color: var(--code-text);
+padding: 16px;
+border-radius: 8px;
+overflow-x: auto;
+font-size: 0.9rem;
+line-height: 1.5;
+border: 1px solid var(--border-color);
+}
+pre code { background-color: transparent; padding: 0; border: none; color: inherit; font-size: inherit; }
+.note {
+background-color: rgba(37, 99, 235, 0.1);
+border-left: 4px solid var(--accent-color);
+padding: 16px;
+border-radius: 4px;
+margin: 20px 0;
+}
+.warning {
+background-color: rgba(220, 38, 38, 0.1);
+border-left: 4px solid #dc2626;
+padding: 16px;
+border-radius: 4px;
+margin: 20px 0;
+}
+table {
+width: 100%;
+border-collapse: collapse;
+margin: 20px 0;
+font-size: 0.95rem;
+}
+th, td {
+border: 1px solid var(--border-color);
+padding: 10px;
+text-align: left;
+}
+th {
+background-color: var(--sidebar-bg);
+font-weight: 600;
+}
+@media (max-width: 768px) {
+.container { grid-template-columns: 1fr; gap: 20px; padding: 20px; }
+.sidebar { position: relative; top: 0; max-height: none; }
+h1 { font-size: 2rem; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+<nav class="sidebar">
+<h3>Table of Contents</h3>
+<ul class="toc-list">
+<li><a href="#overview">Overview</a></li>
+<li><a href="#environment">1. Environment & Build Requirements</a></li>
+<li><a href="#architecture">2. Architecture & Worker Model</a>
+<ul class="toc-list" style="padding-left: 16px; margin-top: 4px;">
+<li><a href="#topology">2.1 Configuring Worker Topology</a></li>
+<li><a href="#addressing">2.2 Worker ID Addressing Scheme</a></li>
+</ul>
+</li>
+<li><a href="#js-api">3. JavaScript API Reference</a></li>
+<li><a href="#cpp-api">4. C++ API Reference</a></li>
+<li><a href="#extensions">5. Extensibility & External Calls (Deep Dive)</a>
+<ul class="toc-list" style="padding-left: 16px; margin-top: 4px;">
+<li><a href="#ext-contexts">5.1 Execution Contexts</a></li>
+<li><a href="#ext-modes">5.2 The Three Extension Modes</a></li>
+<li><a href="#ext-contract">5.3 JavaScript Handler Contract</a></li>
+<li><a href="#ext-examples">5.4 Comprehensive Examples</a></li>
+<li><a href="#ext-memory">5.5 Critical Memory Rules</a></li>
+</ul>
+</li>
+<li><a href="#lifecycle">6. Runtime Lifecycle</a></li>
+<li><a href="#best-practices">7. Best Practices & Safety Rules</a></li>
+<li><a href="#browser-guide">8. Browser-Side JavaScript Guide</a>
+<ul class="toc-list" style="padding-left: 16px; margin-top: 4px;">
+<li><a href="#html-setup">8.1 HTML Setup & Headers</a></li>
+<li><a href="#init-lifecycle">8.2 Initialization Lifecycle</a></li>
+<li><a href="#calling-cpp">8.3 Calling C++ Functions</a></li>
+<li><a href="#working-futures">8.4 Working with Futures</a></li>
+<li><a href="#memory-management">8.5 Memory Management</a></li>
+<li><a href="#registering-extensions">8.6 Registering Extensions</a></li>
+<li><a href="#error-handling">8.7 Error Handling</a></li>
+</ul>
+</li>
+<li><a href="#complete-example">9. Complete End-to-End Example</a></li>
+</ul>
+</nav>
+<main class="content">
+<h1 id="overview">Autogen Developer Documentation</h1>
+<p>Autogen is a high-performance, multi-threaded WebAssembly (WASM) runtime designed for browser environments. It enables true shared-memory concurrency across Web Workers without routing application logic through the browser main/UI thread.</p>
+<div class="note">
+<strong>Key Features:</strong>
+<ul style="margin-bottom: 0;">
+<li>Single compiled WASM module with a shared <code>WebAssembly.Memory</code> (SharedArrayBuffer).</li>
+<li>Full MessagePort mesh for direct, zero-copy worker-to-worker communication.</li>
+<li>Zero-overhead direct function pointer dispatch (enabling native captureless and capturing lambda support).</li>
+<li>True synchronous blocking calls using <code>Atomics.wait</code>/<code>notify</code> without deadlocks.</li>
+<li>Fully functional Global Shared Pointer Registration (<code>registerGlobal</code>).</li>
+<li>C++20 <code>co_await</code> semantics integrated via non-blocking <code>ag_await</code> and <code>ag_yield()</code>.</li>
+<li>Heterogeneous multiple future awaiting via <code>ag_await_all</code>.</li>
+<li>Stream-like logging (<code>msginfo</code>, <code>msgwarn</code>, <code>msgerr</code>) with <code>&lt;&lt;</code> operator support.</li>
+<li>Robust Extensibility System for Main Thread and Worker-Local external calls.</li>
+</ul>
+</div>
+<section id="environment">
+<h2>1. Environment & Build Requirements</h2>
+<h3>1.1 HTTP Security Headers (Mandatory)</h3>
+<p>To enable <code>SharedArrayBuffer</code> and WASM atomics (especially on iOS Safari), your server <strong>MUST</strong> serve the application with these exact headers:</p>
+<pre><code>Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Embedder-Policy: require-corp</code></pre>
+<h3>1.2 Toolchain & Compiler Flags</h3>
+<p>Target C++17/C++20 with the YoWASM/Clang-LLVM toolchain. Required flags:</p>
+<pre><code>-O2 -std=c++20 -pthread -fno-exceptions -fno-rtti -matomics -mbulk-memory -mshared-memory</code></pre>
+<h3>1.3 C++ Threading Restrictions</h3>
+<div class="warning">
+Autogen provides its own concurrency model. <strong>DO NOT</strong> use standard C++ threading libraries.
+</div>
+<ul>
+<li><strong>Forbidden:</strong> <code>std::thread</code>, <code>std::async</code>, <code>std::future</code>, <code>std::promise</code>, <code>std::mutex</code>, <code>std::condition_variable</code>, <code>std::atomic</code>.</li>
+<li><strong>Required:</strong> Use Autogen's <code>ag_async</code>, <code>ag_sync</code>, <code>ag_spinlock</code>, and <code>ag_await</code>.</li>
+</ul>
+</section>
+<section id="architecture">
+<h2>2. Architecture & Worker Model</h2>
+<h3 id="topology">2.1 Configuring Worker Topology (Thread Counts)</h3>
+<p>The number of workers is strictly defined at compile time using two macros. These macros generate exported WASM functions that the JavaScript <code>AutogenRuntime</code> reads during initialization to know exactly how many workers to spawn.</p>
+<div class="note">
+<strong>RULES FOR THREAD COUNT MACROS:</strong>
+<ol style="margin-bottom: 0;">
+<li>They <strong>MUST</strong> be placed at the global scope in your main C++ entry file (e.g., <code>main.cpp</code> or <code>test.cpp</code>).</li>
+<li>They <strong>MUST</strong> be placed BEFORE any other function definitions or logic.</li>
+<li>The counts are absolute. If you specify <code>0</code>, no workers of that type are created.</li>
+</ol>
+</div>
+<pre><code>// ./main.cpp
+#include <autogen.hpp>
+// MUST be at global scope, before any other code
+ag_dedicated_thread_count(1);
+ag_undedicated_thread_count(2);
+ag_export(my_function)
+uint32_t my_function(int a, int b) {
+return a + b;
+}</code></pre>
+<h3 id="addressing">2.2 Worker ID Addressing Scheme</h3>
+<p>Understanding worker IDs is critical for routing. IDs are assigned sequentially based on the counts defined above.</p>
+<p><em>Given: <code>ag_dedicated_thread_count(1)</code> and <code>ag_undedicated_thread_count(2)</code></em></p>
+<table>
+<thead>
+<tr>
+<th>Worker Type</th>
+<th>ID Range</th>
+<th>Concrete IDs (Example)</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Main Autogen</td>
+<td>Always <code>0</code></td>
+<td><code>0</code></td>
+<td>Primary execution, handles JS <code>callExport</code> by default.</td>
+</tr>
+<tr>
+<td>Dedicated</td>
+<td><code>1</code> to <code>D</code></td>
+<td><code>1</code></td>
+<td>Stable, pinned workloads (e.g., physics, audio, dedicated state).</td>
+</tr>
+<tr>
+<td>Undedicated</td>
+<td><code>D+1</code> to <code>D+U</code></td>
+<td><code>2</code>, <code>3</code></td>
+<td>Round-robin pool for balanced async task dispatch.</td>
+</tr>
+</tbody>
+</table>
+<p><em>*Note: <code>D</code> = dedicated count, <code>U</code> = undedicated count.</em></p>
+<h3>2.3 Shared Memory Rules</h3>
+<p><strong>ALL</strong> cross-worker data <strong>MUST</strong> reside in the shared WASM heap (via <code>AtomicMalloc</code>).</p>
+<ul>
+<li><strong>VALID shared pointers:</strong> Pointers returned by <code>malloc</code>, <code>new</code>, or <code>cppmalloc</code>.</li>
+<li><strong>INVALID shared pointers:</strong> Worker stacks, thread-local storage, normal WASM globals, <code>.data</code>, <code>.bss</code>, <code>.rodata</code>, or instance-local static storage.</li>
+</ul>
+<div class="note">
+<strong>NOTE:</strong> The functions <code>cppmalloc</code>, <code>cppfree</code>, and <code>cpprealloc</code> are reserved EXCLUSIVELY for JavaScript usage. In C++ code, developers MUST use standard <code>malloc</code>, <code>free</code>, <code>realloc</code>, <code>new</code>, <code>delete</code>, <code>new[]</code>, and <code>delete[]</code> as normal. These standard C++ allocation mechanisms are automatically intercepted and routed to the shared <code>AtomicMalloc</code> allocator.
+</div>
+<h3>2.4 MessagePort Mesh</h3>
+<p>During initialization, a full-connect MessagePort mesh is established. Every worker holds a direct port to every other worker. Worker-to-worker calls bypass the browser main thread entirely, ensuring minimal latency.</p>
+</section>
+<section id="js-api">
+<h2>3. JavaScript API Reference</h2>
+<h3>3.1 AutogenRuntime Class</h3>
+<p>The central orchestrator for the WASM environment.</p>
+<pre><code>const runtime = new AutogenRuntime();
+// 1. Initialize the runtime, load WASM, create workers, and establish mesh.
+await runtime.initialize('path/to/module.wasm');
+// 2. Call an exported WASM function on a specific worker.
+// workerId: 0 (Main), 1+ (Dedicated/Undedicated)
+const result = await runtime.callExport(0, 'my_function', 10, 20);
+// 3. Wrap a C++ ag_future* pointer into a JS-awaitable object.
+const future = runtime.wrapFuture(futurePtr);
+const value = await future.awaitResult('int32'); // Types: 'void', 'int32', 'uint32', 'float', 'double', or raw pointer
+// 4. Gracefully shut down the runtime, terminating all workers.
+runtime.shutdown();</code></pre>
+<h3>3.2 AgFuture Class</h3>
+<p>Wraps a C++ <code>ag_future*</code> for JavaScript consumption.</p>
+<ul>
+<li><code>status</code>: 0 (pending), 1 (resolved), 2 (rejected).</li>
+<li><code>resultPtr</code>: Pointer to the result in shared memory.</li>
+<li><code>errorCode</code>: System or application error code (<code>0xDEADBEEF</code> for system errors).</li>
+<li><code>awaitResult(type)</code>: Async method to wait for completion and return the typed value. Automatically frees the future and result payload.</li>
+</ul>
+</section>
+<section id="cpp-api">
+<h2>4. C++ API Reference</h2>
+<h3>4.1 Function Export</h3>
+<p>Mark functions to be callable from JS or other workers. Acts as a clean attribute wrapper.</p>
+<pre><code>ag_export(my_function)
+uint32_t my_function(int a, int b) {
+return a + b;
+}</code></pre>
+<h3>4.2 Asynchronous Execution (<code>ag_async</code>)</h3>
+<p>Dispatches work to the <strong>UNDEDICATED</strong> worker pool by default using a thread-safe round-robin algorithm. It automatically skips the current worker to prevent self-deadlock.</p>
+<pre><code>ag_export(dispatch_to_pool)
+uint32_t dispatch_to_pool() {
+// Automatically routed to worker 2 or 3 (in our 1D/2U example)
+ag_future* fut = ag_async(my_function, 10, 20);
+int result = ag_await&lt;int&gt;(fut);
+return result; // Returns 30
+}</code></pre>
+<h3>4.3 Targeted Asynchronous Execution (<code>ag_async_on</code>)</h3>
+<p>Dispatches work to a <strong>SPECIFIC</strong> dedicated worker by ID.</p>
+<pre><code>ag_export(dispatch_to_dedicated)
+uint32_t dispatch_to_dedicated() {
+// Explicitly target Dedicated Worker ID 1
+ag_future* fut = ag_async_on(1, my_function, 10, 20);
+return ag_await&lt;int&gt;(fut); // Returns 30
+}</code></pre>
+<h3>4.4 Synchronous Execution (<code>ag_sync</code>)</h3>
+<p>Direct, blocking worker-to-worker function call. The caller suspends via <code>Atomics.wait</code>. The callee writes directly to the shared <code>ag_sync_req</code> struct and calls <code>Atomics.notify</code>. No MessagePort routing is used for the response, preventing deadlocks.</p>
+<pre><code>ag_export(sync_call_example)
+uint32_t sync_call_example() {
+// Blocks this worker until Worker 1 completes the function
+uint32_t result = ag_sync(1, my_function, 10, 20);
+return result; // Returns 30 immediately upon completion
+}</code></pre>
+<h3>4.5 Global Shared State (<code>registerGlobal</code>)</h3>
+<p>Registers a globally shared pointer that resolves to the exact same shared heap address across ALL workers. This overcomes WASM instance-local global limitations.</p>
+<pre><code>class MyConfig { public: int value = 42; };
+registerGlobal(MyConfig, globalConfig);
+ag_export(use_config)
+uint32_t use_config() {
+if (globalConfig) {
+globalConfig-&gt;value = 100; // Mutates state visible to ALL workers
+}
+return globalConfig ? globalConfig-&gt;value : 0;
+}</code></pre>
+<h3>4.6 Coroutines & Yielding (<code>ag_yield</code> & <code>ag_await</code>)</h3>
+<p>Yields control back to the JS event loop, allowing the worker to process MessagePort messages while logically paused. Requires compiler coroutine support.</p>
+<div class="warning">
+<strong>CRITICAL: COROUTINE INFECTION</strong><br>
+Because <code>ag_await</code> and <code>ag_yield</code> are now strictly non-blocking and rely on C++20 coroutines (<code>co_await</code>) to yield to the JS event loop, any C++ function that uses them MUST be a coroutine.
+<ul style="margin-bottom: 0;">
+<li>The function MUST return <code>ag_future*</code>.</li>
+<li>The function MUST use <code>ag_return</code> (or <code>co_return</code>) instead of <code>return</code>.</li>
+</ul>
+</div>
+<pre><code>// Example A: Basic yielding with progress tracking
+ag_export(long_task_with_yield)
+ag_future* long_task_with_yield(uint32_t* progress_ptr) {
+if (progress_ptr) {
+*progress_ptr = 25;
+ag_yield(); // Yields to JS event loop, resumes on next tick
+*progress_ptr = 50;
+ag_yield();
+*progress_ptr = 100;
+}
+ag_return 1;
+}
+
+// Example B: Chaining async operations inside a coroutine
+ag_export(chain_async_tasks)
+ag_future* chain_async_tasks() {
+// First async task
+ag_future* f1 = ag_async(compute_step_1, 10);
+int step1_result = ag_await&lt;int&gt;(f1); // Yields to JS event loop
+
+// Second async task using result of first
+ag_future* f2 = ag_async(compute_step_2, step1_result);
+int step2_result = ag_await&lt;int&gt;(f2); // Yields again
+
+ag_return step2_result;
+}</code></pre>
+<h3>4.7 Stream-like Logging (<code>msginfo</code>, <code>msgwarn</code>, <code>msgerr</code>)</h3>
+<p>Autogen provides a lightweight, stream-based logging API similar to <code>std::cout</code>. It automatically handles memory allocation, formatting, and routing to the main thread console. The log is flushed automatically to the JS environment when the statement ends.</p>
+<pre><code>msginfo &lt;&lt; "Value: " &lt;&lt; 42 &lt;&lt; ", Hex: " &lt;&lt; 0xDEADBEEF;
+msgwarn &lt;&lt; "Warning: double value is " &lt;&lt; 3.14159;
+msgerr &lt;&lt; "Error code: " &lt;&lt; (int32_t)-1;</code></pre>
+<h3>4.8 Waiting on Multiple Futures (<code>ag_await_all</code>)</h3>
+<p>Autogen provides <code>ag_await_all</code> to wait for multiple <code>ag_future*</code> pointers concurrently without blocking the worker's event loop. It supports heterogeneous return types.</p>
+<pre><code>// Example A: Awaiting multiple homogeneous futures
+ag_export(await_multiple_ints)
+ag_future* await_multiple_ints() {
+std::vector&lt;ag_future*&gt; futures;
+futures.push_back(ag_async(add, 10, 20));
+futures.push_back(ag_async(add, 30, 40));
+
+// Yields to JS event loop until ALL futures complete
+auto results = ag_await_all(futures);
+
+// Extract results (all are int in this case)
+int sum = results.get&lt;int&gt;(0) + results.get&lt;int&gt;(1);
+ag_return sum; // Returns 100
+}
+
+// Example B: Awaiting heterogeneous futures (int, float, custom struct)
+struct Point { int x; int y; };
+Point create_point(int x, int y) { return {x, y}; }
+float calculate_distance(Point p) { return sqrt(p.x*p.x + p.y*p.y); }
+
+ag_export(await_heterogeneous)
+ag_future* await_heterogeneous() {
+std::vector&lt;ag_future*&gt; futures;
+futures.push_back(ag_async(add, 5, 5));             // returns int (10)
+futures.push_back(ag_async(create_point, 3, 4));    // returns Point {3, 4}
+futures.push_back(ag_async(calculate_distance, Point{3, 4})); // returns float (5.0)
+
+auto results = ag_await_all(futures);
+
+// Extract results with their specific types using .get&lt;T&gt;(index)
+int int_val = results.get&lt;int&gt;(0);
+Point pt = results.get&lt;Point&gt;(1);
+float dist = results.get&lt;float&gt;(2);
+
+bool success = (int_val == 10 && pt.x == 3 && dist == 5.0f);
+ag_return success ? 1 : 0;
+}</code></pre>
+</section>
+<section id="extensions">
+<h2>5. Extensibility & External Calls (Deep Dive)</h2>
+<p>Autogen provides a robust extensibility system to bridge the gap between isolated Web Workers and the browser environment (Main Thread), or to perform specialized worker-local tasks (like <code>fetch</code> or OffscreenCanvas), <strong>WITHOUT</strong> violating the core rule that worker-to-worker application logic must not route through the main thread.</p>
+<h3 id="ext-contexts">5.1 Execution Contexts</h3>
+<p>Before making an extension call, you must specify the execution context:</p>
+<ul>
+<li><code>ag_ext::main</code> (value <code>0</code>): The JavaScript handler executes on the <strong>Browser Main/UI Thread</strong>. Ideal for DOM manipulation, standard WebGL, AudioContext, or localStorage.</li>
+<li><code>ag_ext::worker</code> (value <code>1</code>): The JavaScript handler executes <strong>locally within the calling Web Worker</strong>. Ideal for <code>fetch</code> API, IndexedDB, or background processing that doesn't require the main thread.</li>
+</ul>
+<h3 id="ext-modes">5.2 The Three Extension Communication Modes</h3>
+<p>There are three distinct C++ macros for extensions, each with a specific JavaScript handler contract.</p>
+<h4>MODE A: <code>ag_ext_async</code> (Non-Blocking)</h4>
+<ul>
+<li><strong>Macro:</strong> <code>ag_ext_async(ReturnType, Context, "extension_name", arg1, arg2, ...)</code></li>
+<li><strong>Behavior:</strong> Packs arguments into a JSON string in shared memory, creates an <code>ag_future*</code>, and sends a message. The calling C++ thread continues execution immediately. You must <code>ag_await</code> the returned future (which will yield to the JS event loop).</li>
+<li><strong>Use Case:</strong> Network requests, heavy main-thread calculations.</li>
+</ul>
+<h4>MODE B: <code>ag_ext_sync</code> (Blocking)</h4>
+<ul>
+<li><strong>Macro:</strong> <code>ag_ext_sync(ReturnType, Context, "extension_name", arg1, arg2, ...)</code></li>
+<li><strong>Behavior:</strong> Packs arguments, borrows an <code>ag_sync_req</code>, sends the message, and <strong>SUSPENDS</strong> the calling thread using <code>Atomics.wait</code>. It resumes ONLY when the JS handler returns a value and the library triggers <code>Atomics.notify</code>.</li>
+<li><strong>Use Case:</strong> Synchronous DOM reads, or when subsequent C++ logic strictly depends on the external result.</li>
+</ul>
+<h4>MODE C: <code>ag_ext_fire</code> (Fire-and-Forget)</h4>
+<ul>
+<li><strong>Macro:</strong> <code>ag_ext_fire(Context, "extension_name", arg1, arg2, ...)</code></li>
+<li><strong>Behavior:</strong> Packs arguments and sends a one-way message. No future is created, no result is expected, and the calling thread does not block or wait.</li>
+<li><strong>Use Case:</strong> Logging, analytics, triggering visual updates.</li>
+</ul>
+<h3 id="ext-contract">5.3 JavaScript Handler Contract & Responsibilities (PHASE 2 UPDATE)</h3>
+<p>When you register an extension, your JS handler receives <strong>NORMAL arguments</strong> (deserialized from JSON) and simply <strong>RETURNS the result value</strong>. The core Autogen JS library handles all memory allocation, atomic notifications, and cleanup.</p>
+<h4>[ASYNC HANDLER SIGNATURE - MAIN THREAD]</h4>
+<pre><code>runtime.registerMainExtension("my_ext", async (callerWorkerId, arg1, arg2) =&gt; {
+// 1. Arguments are passed directly as normal JS variables.
+// 2. Perform async operation.
+// 3. Simply return the result value.
+// The library handles allocation, Atomics.notify, and args cleanup.
+return resultValue;
+});</code></pre>
+<h4>[SYNC HANDLER SIGNATURE - MAIN THREAD]</h4>
+<pre><code>runtime.registerMainExtension("my_ext", (callerWorkerId, arg1) =&gt; {
+// 1. Perform synchronous operation.
+// 2. Simply return the result value.
+return resultValue;
+});</code></pre>
+<h4>[FIRE-AND-FORGET HANDLER SIGNATURE - MAIN THREAD]</h4>
+<pre><code>runtime.registerMainExtension("my_ext", (callerWorkerId, arg1, arg2) =&gt; {
+// 1. Perform operation (no result expected).
+// 2. Do not return anything (or return undefined).
+console.log(`Worker ${callerWorkerId} says: ${arg1}`);
+});</code></pre>
+<h4>[WORKER-LOCAL HANDLER SIGNATURE]</h4>
+<pre><code>runtime.registerWorkerExtension("my_ext", (arg1, arg2) =&gt; {
+// Same as above, but `callerWorkerId` is omitted.
+// Note: The global `workerId` variable from autogen_worker.js is
+// accessible inside the evaluated function closure.
+return resultValue;
+});</code></pre>
+<h3 id="ext-examples">5.4 Comprehensive Extension Examples</h3>
+<h4>EXAMPLE 1: Main Thread Async Extension (Fetching Data)</h4>
+<pre><code>// C++ Side (extensions/fetch.hpp)
+inline ag_future* fetch_data_async(const char* url) {
+return ag_ext_async(char*, ag_ext::main, "fetch_from_main", url);
+}
+// JS Side (Main Thread)
+autogen.registerMainExtension("fetch_from_main", async (workerId, url) =&gt; {
+try {
+const response = await fetch(url);
+const text = await response.text();
+// Allocate memory for the result string + null terminator
+const resultPtr = autogen.mainWasmInstance.exports.cppmalloc(text.length + 1);
+const resultView = new Uint8Array(autogen.sharedMemory.buffer);
+for (let i = 0; i &lt; text.length; i++) resultView[resultPtr + i] = text.charCodeAt(i);
+resultView[resultPtr + text.length] = 0; // Null terminate
+// Simply return the pointer! The library handles the future resolution.
+return resultPtr;
+} catch (err) {
+// Throwing an error will automatically reject the future with 0xDEADBEEF
+throw new Error("Fetch failed");
+}
+});</code></pre>
+<h4>EXAMPLE 2: Worker-Local Sync Extension (Heavy Computation)</h4>
+<pre><code>// C++ Side (extensions/crypto.hpp)
+inline uint32_t hash_string_sync(const char* data) {
+return ag_ext_sync(uint32_t, ag_ext::worker, "compute_hash_worker", data);
+}
+// JS Side (Worker - registered via autogen.registerWorkerExtension)
+autogen.registerWorkerExtension("compute_hash_worker", (data) =&gt; {
+// `data` is received as a normal JS string!
+let hash = 0;
+for (let i = 0; i &lt; data.length; i++) {
+hash = (hash * 31 + data.charCodeAt(i)) | 0;
+}
+// Simply return the primitive! Library handles allocation and Atomics.notify.
+return hash;
+});</code></pre>
+<h4>EXAMPLE 3: Fire-and-Forget Extension (Analytics/Logging)</h4>
+<pre><code>// C++ Side
+inline void log_event(const char* event_name, uint32_t value) {
+ag_ext_fire(ag_ext::main, "track_analytics", event_name, value);
+}
+// JS Side (Main Thread)
+autogen.registerMainExtension("track_analytics", (workerId, name, value) =&gt; {
+console.log(`[Analytics] Worker ${workerId} triggered: ${name} = ${value}`);
+// No return needed. Library handles args cleanup.
+});</code></pre>
+<h4>EXAMPLE 4: Passing and Returning Complex Shared Memory Pointers</h4>
+<pre><code>// C++ Side (extensions/image.hpp)
+struct ImageData { uint32_t width; uint32_t height; uint32_t* pixels; };
+inline ag_future* process_image_async(ImageData* img) {
+// Pass the pointer as a uint32_t to the JS handler
+return ag_ext_async(ImageData*, ag_ext::worker, "apply_filter", (uint32_t)(uintptr_t)img);
+}
+// JS Side (Worker)
+autogen.registerWorkerExtension("apply_filter", (imgPtr) =&gt; {
+// 1. Read the struct from shared memory
+const view = new DataView(autogen.sharedMemory.buffer);
+const width = view.getUint32(imgPtr, true);
+const height = view.getUint32(imgPtr + 4, true);
+const pixelsPtr = view.getUint32(imgPtr + 8, true);
+
+// 2. Process the pixels (example: invert colors)
+const pixels = new Uint32Array(autogen.sharedMemory.buffer, pixelsPtr, width * height);
+for (let i = 0; i &lt; pixels.length; i++) {
+pixels[i] = pixels[i] ^ 0x00FFFFFF; // Invert RGB
+}
+
+// 3. Allocate a NEW ImageData struct in shared memory to return
+const newImgPtr = autogen.mainWasmInstance.exports.cppmalloc(12);
+view.setUint32(newImgPtr, width, true);
+view.setUint32(newImgPtr + 4, height, true);
+view.setUint32(newImgPtr + 8, pixelsPtr, true); // Assuming pixels modified in place
+
+// 4. Return the pointer to the new struct. Library handles future resolution.
+return newImgPtr;
+});</code></pre>
+<h3 id="ext-memory">5.5 Critical Memory Management Rules for Extensions</h3>
+<ol>
+<li><strong>Caller Allocates Args:</strong> The C++ <code>ag_ext_*</code> macros automatically serialize arguments into a JSON string and allocate it on the shared heap.</li>
+<li><strong>Library Frees Args:</strong> The core Autogen JS library automatically parses the JSON, calls your handler, and frees the JSON <code>args_ptr</code> buffer. You DO NOT need to free it in your handler.</li>
+<li><strong>Handler Returns Results:</strong> Your JS handler simply returns the result value (a primitive number, or a pointer to a complex structure you allocated).</li>
+<li><strong>Library Allocates Primitives:</strong> If your handler returns a primitive number, the JS library automatically allocates 4 bytes in shared memory, writes the number, and passes the pointer to the C++ future/sync request.</li>
+<li><strong>Caller Frees Results:</strong> The C++ <code>ag_await</code> or <code>ag_ext_sync</code> macro will automatically read the result pointer, copy/move the value, and call <code>cppfree</code> on the result pointer.</li>
+<li><strong>String Handling:</strong> C++ strings (<code>const char*</code>) are passed as JSON strings. JS receives them as normal JS strings. Returned strings must be allocated with <code>length + 1</code> and null-terminated by JS, and the pointer returned.</li>
+</ol>
+</section>
+<section id="lifecycle">
+<h2>6. Runtime Lifecycle</h2>
+<p>The runtime transitions through strict states. Work is <strong>ONLY</strong> accepted in <strong>READY/RUNNING</strong> states. Initialization failures transition immediately to <strong>FAILED</strong>.</p>
+<ol>
+<li><strong>UNINITIALIZED</strong></li>
+<li><strong>CONFIGURING</strong> (Fetching WASM)</li>
+<li><strong>INITIALIZING_WASM</strong> (Compiling module)</li>
+<li><strong>CREATING_WORKERS</strong> (Spawning Web Workers based on thread count macros)</li>
+<li><strong>ESTABLISHING_MESH</strong> (Connecting all workers via MessageChannel)</li>
+<li><strong>INITIALIZING_RUNTIME</strong> (Setting up globals, allocators, sync pools)</li>
+<li><strong>READY / RUNNING</strong> (Accepting application work)</li>
+<li><strong>SHUTDOWN / FAILED</strong> (Terminal states)</li>
+</ol>
+</section>
+<section id="best-practices">
+<h2>7. Best Practices & Safety Rules</h2>
+<ol>
+<li><strong>Pointer Validity:</strong> NEVER pass stack addresses or instance-local pointers between workers. Always allocate cross-worker data via <code>malloc</code>/<code>new</code>.</li>
+<li><strong>Lifetime Management:</strong> The caller is responsible for ensuring shared objects outlive their usage. Autogen does not auto-free shared memory. Use explicit ownership or reference counting.</li>
+<li><strong>Memory Growth:</strong> If the shared heap grows, the underlying ArrayBuffer is detached. Workers automatically refresh their <code>DataView</code>/<code>TypedArray</code> views upon waking from <code>Atomics.wait</code>. Logical addresses remain valid.</li>
+<li><strong>Error Handling:</strong> Always check future status. System errors (e.g., invalid worker ID, capacity exhaustion) set <code>errorCode</code> to <code>0xDEADBEEF</code> and status to <code>2</code> (rejected).</li>
+<li><strong>No Dynamic Workers:</strong> Worker counts are FIXED at initialization. If the undedicated pool is busy, tasks queue. Autogen will <strong>NEVER</strong> spawn hidden or replacement workers.</li>
+<li><strong>Coroutine Infection:</strong> If you use <code>ag_await</code> or <code>ag_yield</code> in a function, that function MUST return <code>ag_future*</code> and use <code>ag_return</code>. Plan your architecture to isolate coroutine requirements where possible.</li>
+</ol>
+</section>
+<section id="browser-guide">
+<h2>8. Browser-Side JavaScript Development Guide</h2>
+<p>This section provides comprehensive guidance for developing the browser/JavaScript side of an Autogen application. It covers everything from HTML setup to advanced memory management and extension registration.</p>
+
+<h3 id="html-setup">8.1 HTML Page Setup & Security Headers</h3>
+<p>Your HTML page must be served with the correct COOP/COEP headers to enable SharedArrayBuffer. This is <strong>MANDATORY</strong> for Autogen to function.</p>
+
+<h4>Server Configuration Examples</h4>
+<pre><code># Node.js (Express)
+app.use((req, res, next) =&gt; {
+  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+  res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
+  next();
+});
+
+# Python (Flask)
+@app.after_request
+def add_security_headers(response):
+    response.headers['Cross-Origin-Opener-Policy'] = 'same-origin'
+    response.headers['Cross-Origin-Embedder-Policy'] = 'require-corp'
+    return response
+
+# Nginx
+add_header Cross-Origin-Opener-Policy "same-origin";
+add_header Cross-Origin-Embedder-Policy "require-corp";</code></pre>
+
+<h4>Minimal HTML Skeleton</h4>
+<pre><code>&lt;!DOCTYPE html&gt;
+&lt;html lang="en"&gt;
+&lt;head&gt;
+    &lt;meta charset="UTF-8"&gt;
+    &lt;title&gt;Autogen App&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+    &lt;div id="status"&gt;Loading...&lt;/div&gt;
+    &lt;script src="/system/autogen/autogen.js"&gt;&lt;/script&gt;
+    &lt;script src="app.js"&gt;&lt;/script&gt;
+&lt;/body&gt;
+&lt;/html&gt;</code></pre>
+
+<h3 id="init-lifecycle">8.2 Runtime Initialization Lifecycle</h3>
+<p>The <code>AutogenRuntime</code> class manages the entire lifecycle. Here's a step-by-step guide with error handling:</p>
+<pre><code>// app.js
+async function initializeAutogen() {
+    const statusDiv = document.getElementById('status');
+    
+    // STEP 1: Check if SharedArrayBuffer is available
+    if (!crossOriginIsolated) {
+        statusDiv.textContent = 'ERROR: Missing COOP/COEP headers';
+        console.error('Server must send Cross-Origin-Opener-Policy and Cross-Origin-Embedder-Policy headers');
+        return null;
+    }
+    
+    try {
+        statusDiv.textContent = 'Initializing runtime...';
+        
+        // STEP 2: Create runtime instance
+        const runtime = new AutogenRuntime();
+        
+        // STEP 3: Initialize (loads WASM, creates workers, establishes mesh)
+        await runtime.initialize('./my_module.wasm');
+        
+        statusDiv.textContent = 'Runtime ready!';
+        console.log(`Workers created: ${runtime.workers.size}`);
+        console.log(`Dedicated: ${runtime.dedicatedCount}, Undedicated: ${runtime.undedicatedCount}`);
+        
+        return runtime;
+    } catch (err) {
+        statusDiv.textContent = 'Initialization failed';
+        console.error('Autogen init error:', err);
+        return null;
+    }
+}
+
+// Usage
+const runtime = await initializeAutogen();
+if (runtime) {
+    // Runtime is ready, start your application logic
+    startApp(runtime);
+}</code></pre>
+
+<h3 id="calling-cpp">8.3 Calling C++ Functions from JavaScript</h3>
+<p>Use <code>runtime.callExport(workerId, functionName, ...args)</code> to invoke C++ functions.</p>
+
+<h4>Example 1: Calling a Simple Function</h4>
+<pre><code>// C++ side:
+// ag_export(add_numbers)
+// uint32_t add_numbers(int a, int b) { return a + b; }
+
+// JavaScript side:
+const result = await runtime.callExport(0, 'add_numbers', 10, 20);
+console.log(result); // 30</code></pre>
+
+<h4>Example 2: Calling a Function that Returns a Future</h4>
+<pre><code>// C++ side:
+// ag_export(compute_async)
+// uint32_t compute_async(int iterations) {
+//     return (uint32_t)(uintptr_t)ag_async(heavy_work, iterations);
+// }
+
+// JavaScript side:
+const futurePtr = await runtime.callExport(0, 'compute_async', 100000);
+const future = runtime.wrapFuture(futurePtr);
+const result = await future.awaitResult('uint32');
+console.log('Computation result:', result);</code></pre>
+
+<h4>Example 3: Targeting a Specific Worker</h4>
+<pre><code>// Call a function on dedicated worker 1
+const result = await runtime.callExport(1, 'dedicated_task', 42);</code></pre>
+
+<h4>Example 4: Handling Errors</h4>
+<pre><code>try {
+    const result = await runtime.callExport(0, 'some_function');
+} catch (err) {
+    console.error('C++ function failed:', err.message);
+    // Common errors:
+    // - "Worker X not ready" - Runtime not initialized
+    // - "Invalid function name" - Function not exported
+    // - "Future rejected: 0xDEADBEEF" - System error in C++
+}</code></pre>
+
+<h3 id="working-futures">8.4 Working with Futures (ag_future*)</h3>
+<p>When C++ returns an <code>ag_future*</code>, you must wrap it in JavaScript to await the result.</p>
+
+<h4>Creating and Awaiting a Future</h4>
+<pre><code>const futurePtr = await runtime.callExport(0, 'get_future');
+const future = runtime.wrapFuture(futurePtr);
+
+// Await the result (automatically frees the future and result memory)
+const value = await future.awaitResult('uint32');</code></pre>
+
+<h4>Available Result Types</h4>
+<ul>
+<li><code>'void'</code> - No return value (returns undefined)</li>
+<li><code>'int32'</code> - Signed 32-bit integer</li>
+<li><code>'uint32'</code> - Unsigned 32-bit integer</li>
+<li><code>'float'</code> - 32-bit floating point</li>
+<li><code>'double'</code> - 64-bit floating point</li>
+<li>(omit type) - Returns the raw pointer (for complex structures)</li>
+</ul>
+
+<h4>Polling a Future Manually</h4>
+<pre><code>// If you need to check status without blocking:
+const future = runtime.wrapFuture(futurePtr);
+const view = new DataView(runtime.sharedMemory.buffer);
+
+while (future.status === 0) {
+    console.log('Still pending...');
+    await new Promise(r =&gt; setTimeout(r, 100));
+}
+
+if (future.status === 1) {
+    console.log('Resolved! Result pointer:', future.resultPtr);
+} else if (future.status === 2) {
+    console.error('Rejected! Error code:', future.errorCode);
+}</code></pre>
+
+<h3 id="memory-management">8.5 Shared Memory Management from JavaScript</h3>
+<p>Autogen uses <code>cppmalloc</code>, <code>cppfree</code>, and <code>cpprealloc</code> for JavaScript-side memory allocation in the shared WASM heap.</p>
+
+<h4>Allocating and Freeing Memory</h4>
+<pre><code>// Allocate 100 bytes
+const ptr = await runtime.callExport(0, 'cppmalloc', 100);
+
+// Use the memory (see below for reading/writing)
+const view = new DataView(runtime.sharedMemory.buffer);
+view.setUint32(ptr, 42, true);
+
+// Free the memory when done
+await runtime.callExport(0, 'cppfree', ptr);</code></pre>
+
+<h4>Reading and Writing Shared Memory</h4>
+<pre><code>// Always use DataView or TypedArrays for memory access
+const view = new DataView(runtime.sharedMemory.buffer);
+
+// Write values
+view.setUint32(ptr, 12345, true);           // uint32 at offset 0
+view.setInt32(ptr + 4, -99, true);          // int32 at offset 4
+view.setFloat32(ptr + 8, 3.14, true);       // float at offset 8
+view.setFloat64(ptr + 12, 2.71828, true);   // double at offset 12
+
+// Read values
+const uint_val = view.getUint32(ptr, true);
+const int_val = view.getInt32(ptr + 4, true);
+const float_val = view.getFloat32(ptr + 8, true);
+const double_val = view.getFloat64(ptr + 12, true);</code></pre>
+
+<h4>Working with Arrays</h4>
+<pre><code>// Create a typed array view into shared memory
+const arrayPtr = await runtime.callExport(0, 'cppmalloc', 400); // 100 uint32s
+const uint32Array = new Uint32Array(runtime.sharedMemory.buffer, arrayPtr, 100);
+
+// Fill with data
+for (let i = 0; i &lt; 100; i++) {
+    uint32Array[i] = i * 10;
+}
+
+// Pass pointer to C++
+await runtime.callExport(0, 'process_array', arrayPtr, 100);
+
+// Free when done
+await runtime.callExport(0, 'cppfree', arrayPtr);</code></pre>
+
+<h4>Handling Strings</h4>
+<pre><code>// Write a string to shared memory
+function writeString(ptr, str) {
+    const encoder = new TextEncoder();
+    const bytes = encoder.encode(str);
+    const view = new Uint8Array(runtime.sharedMemory.buffer);
+    view.set(bytes, ptr);
+    view[ptr + bytes.length] = 0; // Null terminator
+}
+
+// Read a string from shared memory
+function readString(ptr) {
+    const view = new Uint8Array(runtime.sharedMemory.buffer);
+    let end = ptr;
+    while (view[end] !== 0) end++;
+    const bytes = view.slice(ptr, end);
+    const decoder = new TextDecoder();
+    return decoder.decode(bytes);
+}
+
+// Usage
+const strPtr = await runtime.callExport(0, 'cppmalloc', 256);
+writeString(strPtr, 'Hello from JavaScript!');
+await runtime.callExport(0, 'process_string', strPtr);
+await runtime.callExport(0, 'cppfree', strPtr);</code></pre>
+
+<h3 id="registering-extensions">8.6 Registering Extensions (Main Thread & Worker-Local)</h3>
+<p>Extensions allow C++ code to call JavaScript functions. There are two contexts:</p>
+
+<h4>Main Thread Extensions</h4>
+<p>These run on the browser's main UI thread. Use for: DOM manipulation, WebGL, AudioContext, localStorage</p>
+<pre><code>// Register a synchronous extension
+runtime.registerMainExtension('get_dom_value', (callerWorkerId, elementId) =&gt; {
+    const elem = document.getElementById(elementId);
+    return elem ? elem.value : '';
+});
+
+// Register an async extension (returns a Promise)
+runtime.registerMainExtension('fetch_data', async (callerWorkerId, url) =&gt; {
+    const response = await fetch(url);
+    const data = await response.json();
+    
+    // Allocate memory for the result
+    const jsonStr = JSON.stringify(data);
+    const ptr = await runtime.callExport(0, 'cppmalloc', jsonStr.length + 1);
+    writeString(ptr, jsonStr);
+    
+    return ptr; // Return the pointer to C++
+});
+
+// Register a fire-and-forget extension (no return value)
+runtime.registerMainExtension('update_ui', (callerWorkerId, message) =&gt; {
+    document.getElementById('status').textContent = message;
+    // No return needed
+});</code></pre>
+
+<h4>Worker-Local Extensions</h4>
+<p>These run inside each Web Worker. Use for: fetch API, IndexedDB, background processing</p>
+<pre><code>// Register the same extension on all workers
+runtime.registerWorkerExtension('compute_hash', (data) =&gt; {
+    let hash = 0;
+    for (let i = 0; i &lt; data.length; i++) {
+        hash = (hash * 31 + data.charCodeAt(i)) | 0;
+    }
+    return hash;
+});
+
+// Worker-local async extension
+runtime.registerWorkerExtension('async_process', async (input) =&gt; {
+    await new Promise(r =&gt; setTimeout(r, 100)); // Simulate work
+    return input * 2;
+});</code></pre>
+
+<h4>Calling Extensions from C++</h4>
+<p>See Section 5 for C++ side examples (<code>ag_ext_async</code>, <code>ag_ext_sync</code>, <code>ag_ext_fire</code>)</p>
+
+<h3 id="error-handling">8.7 Error Handling in JavaScript</h3>
+
+<h4>Handling Initialization Errors</h4>
+<pre><code>try {
+    await runtime.initialize('./module.wasm');
+} catch (err) {
+    if (err.message.includes('HTTP Error')) {
+        console.error('Failed to load WASM file');
+    } else if (err.message.includes('compile')) {
+        console.error('WASM compilation failed');
+    } else {
+        console.error('Unknown init error:', err);
+    }
+}</code></pre>
+
+<h4>Handling Function Call Errors</h4>
+<pre><code>try {
+    const result = await runtime.callExport(0, 'risky_function');
+} catch (err) {
+    if (err.message.includes('not ready')) {
+        console.error('Runtime not initialized');
+    } else if (err.message.includes('Invalid function')) {
+        console.error('Function not exported');
+    } else {
+        console.error('Function execution failed:', err);
+    }
+}</code></pre>
+
+<h4>Handling Future Errors</h4>
+<pre><code>const future = runtime.wrapFuture(futurePtr);
+try {
+    const result = await future.awaitResult('uint32');
+} catch (err) {
+    if (err.message.includes('timed out')) {
+        console.error('Future timed out');
+    } else if (err.message.includes('rejected')) {
+        console.error('Future rejected with error code:', err.message);
+    }
+}</code></pre>
+
+<h4>Handling Extension Errors</h4>
+<pre><code>runtime.registerMainExtension('risky_ext', (workerId, input) =&gt; {
+    try {
+        // Risky operation
+        return JSON.parse(input);
+    } catch (err) {
+        // Throwing an error will reject the future in C++ with 0xDEADBEEF
+        throw new Error('Parse failed: ' + err.message);
+    }
+});</code></pre>
+</section>
+
+<section id="complete-example">
+<h2>9. Complete End-to-End Example Workflow</h2>
+<p>This section provides a complete, runnable example demonstrating all major features of Autogen from both C++ and JavaScript perspectives.</p>
+
+<h3>C++ Side: main.cpp</h3>
+<pre><code>#include &lt;autogen.hpp&gt;
+
+// STEP 1: Define topology (1 Dedicated, 2 Undedicated)
+ag_dedicated_thread_count(1);
+ag_undedicated_thread_count(2);
+
+// STEP 2: Define a shared global
+class AppState { public: int score = 0; };
+registerGlobal(AppState, appState);
+
+// STEP 3: Define worker functions
+ag_export(add_numbers)
+uint32_t add_numbers(int a, int b) { 
+    return a + b; 
+}
+
+ag_export(update_score_async)
+ag_future* update_score_async(int points) {
+    ag_future* fut = ag_async([](int pts) {
+        if (appState) appState-&gt;score += pts;
+    }, points);
+    ag_await&lt;void&gt;(fut); // Yields to JS event loop
+    ag_return appState ? appState-&gt;score : 0;
+}
+
+ag_export(get_score_sync)
+uint32_t get_score_sync() {
+    return ag_sync(1, []() { return appState ? appState-&gt;score : 0; });
+}
+
+ag_export(get_large_data)
+uint32_t get_large_data() {
+    // Allocate and fill an array
+    uint32_t* data = (uint32_t*)malloc(100 * sizeof(uint32_t));
+    for (int i = 0; i &lt; 100; i++) {
+        data[i] = i * 10;
+    }
+    return (uint32_t)(uintptr_t)data;
+}</code></pre>
+
+<h3>JavaScript Side: app.js</h3>
+<pre><code>async function startApp() {
+    // Initialize runtime
+    const runtime = new AutogenRuntime();
+    await runtime.initialize('./main.wasm');
+    
+    console.log('Runtime initialized with', runtime.workers.size, 'workers');
+    
+    // Register extensions
+    runtime.registerMainExtension('log_to_console', (workerId, message) =&gt; {
+        console.log(`[Worker ${workerId}] ${message}`);
+    });
+    
+    runtime.registerWorkerExtension('multiply', (a, b) =&gt; {
+        return a * b;
+    });
+    
+    // EXAMPLE 1: Direct function call
+    const sum = await runtime.callExport(0, 'add_numbers', 10, 20);
+    console.log('10 + 20 =', sum); // 30
+    
+    // EXAMPLE 2: Async function with future
+    const futurePtr = await runtime.callExport(0, 'update_score_async', 50);
+    const future = runtime.wrapFuture(futurePtr);
+    const newScore = await future.awaitResult('uint32');
+    console.log('New score:', newScore); // 50
+    
+    // EXAMPLE 3: Sync call to dedicated worker
+    const currentScore = await runtime.callExport(0, 'get_score_sync');
+    console.log('Current score from worker 1:', currentScore); // 50
+    
+    // EXAMPLE 4: Working with large data
+    const dataPtr = await runtime.callExport(0, 'get_large_data');
+    const dataArray = new Uint32Array(runtime.sharedMemory.buffer, dataPtr, 100);
+    
+    console.log('First 5 elements:', Array.from(dataArray.slice(0, 5)));
+    // [0, 10, 20, 30, 40]
+    
+    // Process data in JavaScript
+    const total = dataArray.reduce((sum, val) =&gt; sum + val, 0);
+    console.log('Total sum:', total); // 4950
+    
+    // Free the memory
+    await runtime.callExport(0, 'cppfree', dataPtr);
+    
+    // EXAMPLE 5: Using extensions
+    await runtime.callExport(0, 'log_to_console', 'Hello from C++!');
+    
+    // Shutdown when done
+    runtime.shutdown();
+    console.log('Runtime shutdown complete');
+}
+
+startApp().catch(err =&gt; {
+    console.error('App failed:', err);
+});</code></pre>
+
+<h3>HTML Side: index.html</h3>
+<pre><code>&lt;!DOCTYPE html&gt;
+&lt;html lang="en"&gt;
+&lt;head&gt;
+    &lt;meta charset="UTF-8"&gt;
+    &lt;title&gt;Autogen Complete Example&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+    &lt;h1&gt;Autogen Demo&lt;/h1&gt;
+    &lt;div id="output"&gt;&lt;/div&gt;
+    &lt;script src="/system/autogen/autogen.js"&gt;&lt;/script&gt;
+    &lt;script src="app.js"&gt;&lt;/script&gt;
+&lt;/body&gt;
+&lt;/html&gt;</code></pre>
+
+<p>This complete example demonstrates:</p>
+<ul>
+<li>Runtime initialization</li>
+<li>Direct function calls</li>
+<li>Async operations with futures</li>
+<li>Synchronous calls to dedicated workers</li>
+<li>Shared memory allocation and manipulation</li>
+<li>Extension registration and usage</li>
+<li>Proper memory cleanup</li>
+<li>Error handling</li>
+</ul>
+</section>
+
+<footer style="margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--border-color); color: #6b7280; font-size: 0.9rem; text-align: center;">
+<p>Autogen Developer Documentation &copy; 2026</p>
+</footer>
+</main>
+</div>
+</body>
+</html>

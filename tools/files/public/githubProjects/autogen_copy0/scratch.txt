@@ -1,0 +1,7 @@
+
+
+so we need recomendations to autogen the webworkers to recice the shared array buffer,
+the module and the commands from then main messageport to initiate the malloc memory amd add and remove messagdports from other modules.
+
+
+

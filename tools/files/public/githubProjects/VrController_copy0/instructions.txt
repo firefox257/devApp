@@ -1,0 +1,2 @@
+llets update the requitements with what is imolemented.
+lets make detsiled devDoc.txt on how to use this.

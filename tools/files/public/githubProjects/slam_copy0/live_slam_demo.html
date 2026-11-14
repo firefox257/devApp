@@ -1,0 +1,1329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Live iPhone SLAM Floor Demo</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body {
+  margin: 0; padding: 0; background: #000; color: #fff;
+  width: 100%; height: 100%; overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  -webkit-text-size-adjust: 100%; -webkit-user-select: none; user-select: none;
+}
+#app { position: fixed; inset: 0; overflow: hidden; background: #000; }
+#video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; background: #000; }
+#threeHost { position: absolute; inset: 0; z-index: 2; touch-action: none; }
+
+/* MINIMAL STATUS BAR */
+#minimalStatus {
+  position: absolute; z-index: 10;
+  top: env(safe-area-inset-top, 0); left: 0; right: 0;
+  padding: 8px 12px;
+  background: rgba(0,0,0,0.7);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 13px; font-weight: 600;
+}
+#minimalStatus .left { display: flex; gap: 8px; align-items: center; min-width: 0; }
+#minimalStatus .right { display: flex; gap: 6px; align-items: center; }
+#statusText { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 34vw; }
+.statusDot { width: 8px; height: 8px; border-radius: 50%; background: #666; flex: 0 0 auto; }
+.statusDot.ready { background: #4ec9b0; }
+.statusDot.scanning { background: #ffa500; animation: pulse 1s infinite; }
+.statusDot.live { background: #4ec9b0; }
+.statusDot.error { background: #f48771; }
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+#floorIndicator {
+  padding: 4px 8px; border-radius: 12px; font-size: 10px; font-weight: 700;
+  background: rgba(255,165,0,0.3); border: 1px solid rgba(255,165,0,0.5);
+  white-space: nowrap;
+}
+#floorIndicator.locked { background: rgba(78,201,176,0.3); border: 1px solid rgba(78,201,176,0.6); }
+.iconBtn {
+  background: rgba(255,255,255,0.2); border: none; border-radius: 50%;
+  width: 30px; height: 30px; color: #fff; font-size: 15px; font-weight: 700;
+  cursor: pointer; flex: 0 0 auto;
+}
+.iconBtn:active { background: rgba(255,255,255,0.35); }
+
+/* INFO PANEL */
+#infoPanel {
+  position: absolute; z-index: 20; top: 50%; left: 50%;
+  transform: translate(-50%,-50%);
+  width: 92%; max-width: 500px; max-height: 82vh;
+  background: rgba(0,0,0,0.95);
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 16px; padding: 18px;
+  display: none; flex-direction: column;
+  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+  overflow-y: auto;
+}
+#infoPanel.show { display: flex; }
+#infoPanel h2 { margin: 0 0 14px 0; font-size: 18px; color: #4ec9b0; }
+.infoSection { margin-bottom: 12px; padding: 10px; background: rgba(255,255,255,0.05); border-radius: 8px; }
+.infoSection h3 { margin: 0 0 6px 0; font-size: 13px; color: #569cd6; }
+.infoSection p { margin: 3px 0; font-size: 12px; line-height: 1.45; color: #d4d4d4; }
+.infoSection .value { color: #4ec9b0; font-weight: 600; }
+.warning { color: #f48771 !important; }
+.success { color: #4ec9b0 !important; }
+#closeInfo { margin-top: 8px; padding: 12px; background: #0e639c; border: none; border-radius: 8px; color: #fff; font-size: 15px; font-weight: 700; cursor: pointer; }
+
+/* CONTROLS */
+#controlsToggle {
+  position: absolute; z-index: 15;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 10px); right: 10px;
+  width: 50px; height: 50px; border-radius: 50%;
+  background: rgba(14,99,156,0.9);
+  border: 2px solid rgba(255,255,255,0.3);
+  color: #fff; font-size: 24px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center; cursor: pointer;
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+}
+#controls {
+  position: absolute; z-index: 14;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 70px); right: 10px;
+  width: 272px; max-height: 74vh; overflow-y: auto;
+  background: rgba(0,0,0,0.92);
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 12px; padding: 14px;
+  display: none; flex-direction: column; gap: 9px;
+  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+}
+#controls.show { display: flex; }
+#controls button {
+  padding: 12px; border: none; border-radius: 8px;
+  font-size: 14px; font-weight: 700; color: #fff; background: #0e639c; cursor: pointer;
+}
+#controls button:disabled { background: #3a3a3a; color: #666; }
+#controls button.secondary { background: #333; }
+#controls button.good { background: #168a3a; }
+#controls button.warn { background: #a86400; }
+#controls select {
+  padding: 8px; border-radius: 6px; background: #111; color: #4ec9b0;
+  border: 1px solid #333; font-size: 12px; width: 100%;
+}
+.toggleRow { display: flex; flex-wrap: wrap; gap: 9px; padding: 4px 0; }
+.toggleRow label { display: flex; align-items: center; gap: 5px; font-size: 11px; color: #d4d4d4; }
+.ctrlLabel { font-size: 11px; color: #888; margin-bottom: -4px; }
+
+/* LOG PANEL */
+#log {
+  position: absolute; z-index: 25; top: 50%; left: 50%;
+  transform: translate(-50%,-50%);
+  width: 94%; max-width: 640px; height: 74vh;
+  background: rgba(0,0,0,0.96);
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 16px; padding: 16px;
+  display: none; flex-direction: column;
+  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+}
+#log.show { display: flex; }
+#logHeader { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; gap: 8px; }
+#logHeader h2 { margin: 0; font-size: 17px; color: #4ec9b0; white-space: nowrap; }
+#logActions { display: flex; gap: 6px; }
+#logActions button { padding: 8px 12px; border: none; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; }
+#copyLogBtn { background: #168a3a; color: #fff; }
+#clearLogBtn { background: #a86400; color: #fff; }
+#closeLogBtn { background: #333; color: #fff; }
+#logContent {
+  flex: 1; overflow-y: auto;
+  background: rgba(0,0,0,0.55); border-radius: 8px; padding: 10px;
+  font-family: Menlo, Consolas, monospace; font-size: 10.5px; line-height: 1.4;
+  color: #d6ffd6; white-space: pre-wrap; word-break: break-word;
+  -webkit-user-select: text; user-select: text;
+}
+.log-info { color: #d6ffd6; }
+.log-warn { color: #ffd700; }
+.log-err  { color: #ff6b6b; font-weight: bold; }
+
+/* CROSSHAIR */
+#crosshair {
+  position: absolute; z-index: 4; left: 50%; top: 50%;
+  width: 34px; height: 34px; margin-left: -17px; margin-top: -17px;
+  pointer-events: none; opacity: 0.9;
+}
+#crosshair::before, #crosshair::after {
+  content: ""; position: absolute;
+  background: rgba(0,255,0,0.9); box-shadow: 0 0 8px rgba(0,255,0,0.9);
+}
+#crosshair::before { left: 16px; top: 0; width: 2px; height: 34px; }
+#crosshair::after { left: 0; top: 16px; width: 34px; height: 2px; }
+
+/* TAP HINT */
+#tapHint {
+  position: absolute; z-index: 5; left: 12px; right: 12px;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 72px);
+  text-align: center; font-size: 13px; color: #baffba;
+  text-shadow: 0 1px 3px #000; pointer-events: none;
+  background: rgba(0,0,0,0.62); padding: 9px; border-radius: 8px;
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <video id="video" autoplay muted playsinline></video>
+  <div id="threeHost"></div>
+
+  <!-- MINIMAL STATUS BAR -->
+  <div id="minimalStatus">
+    <div class="left">
+      <div class="statusDot" id="statusDot"></div>
+      <span id="statusText">Idle</span>
+    </div>
+    <div class="right">
+      <div id="floorIndicator">NO FLOOR</div>
+      <button id="copyStatusBtn" class="iconBtn" title="Copy Console">📋</button>
+      <button id="infoBtn" class="iconBtn" title="Info">ℹ</button>
+    </div>
+  </div>
+
+  <!-- INFO PANEL -->
+  <div id="infoPanel">
+    <h2>SLAM Status</h2>
+
+    <div class="infoSection">
+      <h3>System</h3>
+      <p>Mode: <span class="value" id="infoMode">idle</span></p>
+      <p>Resolution: <span class="value" id="infoRes">-</span></p>
+      <p>Keyframes: <span class="value" id="infoKeyframes">0</span></p>
+      <p>Map Points: <span class="value" id="infoMapPoints">0</span></p>
+      <p>Camera Pose: <span class="value" id="infoPose">no</span></p>
+      <p>Last SLAM result: <span class="value" id="infoResult">-</span></p>
+    </div>
+
+    <div class="infoSection">
+      <h3>Tracking Metrics</h3>
+      <p>Keypoints: <span class="value" id="infoKeypoints">0</span></p>
+      <p>Matches: <span class="value" id="infoMatches">0</span></p>
+      <p>Inliers: <span class="value" id="infoInliers">0</span></p>
+      <p>Frame proc time: <span class="value" id="infoProcTime">0 ms</span></p>
+      <p>Frame brightness: <span class="value" id="infoBright">-</span></p>
+    </div>
+
+    <div class="infoSection">
+      <h3>Floor Validation</h3>
+      <p>Status: <span id="infoFloorStatus" class="warning">Not detected</span></p>
+      <p>Hull vertices: <span class="value" id="infoHullVerts">0</span></p>
+      <p>Plane normal: <span class="value" id="infoPlaneN">-</span></p>
+      <p>Plane d: <span class="value" id="infoPlaneD">-</span></p>
+      <p>Angle error: <span id="infoAngleError">-</span></p>
+      <p>Camera height: <span class="value" id="infoCamHeight">-</span></p>
+    </div>
+
+    <div class="infoSection">
+      <h3>IMU</h3>
+      <p>Source: <span class="value" id="infoIMUSource">fallback</span></p>
+      <p>Gravity (cam, down): <span class="value" id="infoIMU">-</span></p>
+      <p>Screen angle: <span class="value" id="infoScreenAngle">-</span></p>
+    </div>
+
+    <div class="infoSection">
+      <h3>Performance</h3>
+      <p>Render FPS: <span class="value" id="infoFPS">0</span></p>
+      <p>Frames processed: <span class="value" id="infoFrameCount">0</span></p>
+    </div>
+
+    <button id="closeInfo">Close</button>
+  </div>
+
+  <!-- LOG PANEL -->
+  <div id="log">
+    <div id="logHeader">
+      <h2>Debug Log</h2>
+      <div id="logActions">
+        <button id="copyLogBtn">Copy All</button>
+        <button id="clearLogBtn">Clear</button>
+        <button id="closeLogBtn">Close</button>
+      </div>
+    </div>
+    <div id="logContent"></div>
+  </div>
+
+  <div id="crosshair"></div>
+  <div id="tapHint">Tap ⚙ for controls, ℹ for info.</div>
+
+  <button id="controlsToggle">⚙</button>
+
+  <!-- CONTROLS PANEL -->
+  <div id="controls">
+    <button id="btnInit">1. Initialize Runtime</button>
+    <button id="btnCamera" disabled>2. Start Camera + IMU</button>
+    <button id="btnScan" class="warn" disabled>3. Start Scan</button>
+    <button id="btnLive" class="good" disabled>4. Start Live</button>
+    <button id="btnForceInit" class="warn" disabled>Force Init (Debug)</button>
+    <button id="btnPlace" disabled>Place Cube at Center</button>
+    <button id="btnReset" class="secondary" disabled>Reset Session</button>
+    <button id="btnShowLog" class="secondary">Show Debug Log</button>
+
+    <div class="ctrlLabel">Processing resolution</div>
+    <select id="selQuality">
+      <option value="240">Low — 240p (fast)</option>
+      <option value="360">Medium — 360p</option>
+      <option value="480" selected>High — 480p (recommended)</option>
+      <option value="600">Ultra — 600p (slow)</option>
+    </select>
+
+    <div class="toggleRow">
+      <label><input id="chkMarkers" type="checkbox" checked> Points</label>
+      <label><input id="chkFloor" type="checkbox" checked> Floor</label>
+      <label><input id="chkFlip" type="checkbox" checked> CV Flip</label>
+      <label><input id="chkAutoKF" type="checkbox" checked> AutoKF</label>
+      <label><input id="chkVerbose" type="checkbox"> Verbose</label>
+      <label><input id="chkGravFix" type="checkbox" checked> GravFix</label>
+    </div>
+  </div>
+</div>
+
+<script src="/system/autogen/autogen.js"></script>
+<script>
+"use strict";
+
+// ============================================================================
+// CONSOLE CAPTURE — installed first so WASM worker logs are captured too
+// ============================================================================
+const _origLog   = console.log.bind(console);
+const _origWarn  = console.warn.bind(console);
+const _origError = console.error.bind(console);
+
+function _stamp() { return new Date().toLocaleTimeString(); }
+
+function _stringify(a) {
+  if (typeof a === "string") return a;
+  if (a instanceof Error) return a.stack || a.message;
+  try { return JSON.stringify(a); } catch (e) { return String(a); }
+}
+
+function _appendLog(type, msg) {
+  const host = document.getElementById("logContent");
+  if (!host) return;
+  const d = document.createElement("div");
+  d.className = "log-" + type;
+  d.textContent = "[" + _stamp() + "] " + msg;
+  host.appendChild(d);
+  host.scrollTop = host.scrollHeight;
+  while (host.childNodes.length > 1200) host.removeChild(host.firstChild);
+}
+
+console.log = function (...args) {
+  _appendLog("info", args.map(_stringify).join(" "));
+  _origLog(...args);
+};
+console.warn = function (...args) {
+  _appendLog("warn", args.map(_stringify).join(" "));
+  _origWarn(...args);
+};
+console.error = function (...args) {
+  _appendLog("err", args.map(_stringify).join(" "));
+  _origError(...args);
+};
+
+// ============================================================================
+// CONFIG
+// ============================================================================
+const WASM_URL       = "slamOpencvTest.wasm";
+const CAMERA_FOV_DEG = 65.0;
+const MAX_MAP_POINTS = 800;
+const MAX_HULL_VERTS = 512;
+
+let PROCESS_FPS_SCAN = 12;   // 20-frame KF policy at 5 FPS = 4s per KF -> too slow
+let PROCESS_FPS_LIVE = 8;
+
+const MIN_KEYFRAMES_FOR_LIVE  = 2;    // was 3
+const MIN_MAP_POINTS_FOR_LIVE = 12;   // was 50 -> blocked live mode forever
+const MIN_HULL_VERTS_FOR_LIVE = 3;    // was 4
+const MAX_FLOOR_ANGLE_ERR     = 25.0; // quality indicator, NOT a hard gate
+
+const FLOOR_UPDATE_MS  = 700;
+const MARKER_UPDATE_MS = 900;
+const AUTOKF_MS        = 1800;
+const FLOOR_LOG_MS     = 2500;
+
+// ============================================================================
+// DOM
+// ============================================================================
+const $ = id => document.getElementById(id);
+const video = $("video"), threeHost = $("threeHost");
+const statusDot = $("statusDot"), statusText = $("statusText"), floorIndicator = $("floorIndicator");
+const infoPanel = $("infoPanel"), logPanel = $("log"), logContent = $("logContent");
+const controls = $("controls"), controlsToggle = $("controlsToggle");
+const btnInit = $("btnInit"), btnCamera = $("btnCamera"), btnScan = $("btnScan"),
+      btnLive = $("btnLive"), btnForceInit = $("btnForceInit"), btnPlace = $("btnPlace"),
+      btnReset = $("btnReset"), btnShowLog = $("btnShowLog");
+const copyStatusBtn = $("copyStatusBtn"), copyLogBtn = $("copyLogBtn"),
+      clearLogBtn = $("clearLogBtn"), closeLogBtn = $("closeLogBtn");
+const chkMarkers = $("chkMarkers"), chkFloor = $("chkFloor"), chkFlip = $("chkFlip"),
+      chkAutoKF = $("chkAutoKF"), chkVerbose = $("chkVerbose"), chkGravFix = $("chkGravFix");
+const selQuality = $("selQuality");
+const tapHint = $("tapHint");
+
+// ============================================================================
+// STATE
+// ============================================================================
+let runtime = null, stream = null, mode = "idle";
+let procW = 0, procH = 0, procCanvas = null, procCtx = null;
+
+let gravity = [0, 0.7071, -0.7071];  // camera-frame, points DOWN (phone tilted ~45deg)
+let haveIMU = false, screenAngle = 0;
+
+let renderer = null, scene = null, camera = null;
+let floorMesh = null, mapMarkers = null, placedCube = null;
+
+let floorPlane = null;             // THREE.Plane in world/map space
+let floorHullCount = 0, floorAngleError = 0, floorCamHeight = 0;
+let floorNormalRaw = [0, 0, 0], floorDRaw = 0;
+let floorLocked = false, scanReady = false, haveCameraPose = false;
+
+let keyframeCount = 0, mapPointCount = 0;
+let lastKpCount = 0, lastMatchCount = 0, lastInlierCount = 0;
+let lastProcMs = 0, lastBrightness = 0, lastSLAMResult = null;
+
+let frameCounter = 0, fpsActual = 0, fpsFrameCount = 0, lastFpsTime = 0;
+let lastProcessTime = 0, lastFloorTime = 0, lastMarkerTime = 0, lastAutoKF = 0;
+let lastFloorLog = 0, scanStart = 0;
+let rafStarted = false, busy = false, allocated = false;
+
+let currentR = [1,0,0, 0,1,0, 0,0,1];  // raw row-major R from WASM
+
+// WASM pointers
+let ptrFrame = 0, ptrIMU = 0, ptrGravFloor = 0, ptrPose = 0, ptrPoseSize = 0,
+    ptrPose16 = 0, ptrPlane = 0, ptrHullSize = 0, ptrHull = 0, ptrMapPoints = 0;
+
+// ============================================================================
+// APP LOGGING (routed through captured console)
+// ============================================================================
+function log(m)  { console.log(m); }
+function warn(m) { console.warn("WARN: " + m); }
+function fail(m) {
+  console.error("ERROR: " + m);
+  statusText.textContent = "Error";
+  statusDot.className = "statusDot error";
+}
+
+window.onerror = function (message, source, lineno, colno, err) {
+  fail(message + " @ " + source + ":" + lineno + ":" + colno);
+  if (err && err.stack) fail(err.stack);
+};
+window.addEventListener("unhandledrejection", ev => {
+  fail(ev.reason && ev.reason.stack ? ev.reason.stack : String(ev.reason));
+});
+
+// ============================================================================
+// CLIPBOARD
+// ============================================================================
+async function copyConsoleToClipboard() {
+  const text = logContent.textContent || "";
+  if (!text) {
+    copyStatusBtn.textContent = "∅";
+    setTimeout(() => copyStatusBtn.textContent = "📋", 1400);
+    return;
+  }
+  let ok = false;
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+      ok = true;
+    } else {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.setAttribute("readonly", "");
+      ta.style.position = "fixed";
+      ta.style.left = "-999999px";
+      ta.style.top = "0";
+      document.body.appendChild(ta);
+      ta.focus(); ta.select(); ta.setSelectionRange(0, text.length);
+      ok = document.execCommand("copy");
+      document.body.removeChild(ta);
+    }
+  } catch (e) {
+    fail("Copy failed: " + (e.message || e));
+  }
+  copyStatusBtn.textContent = ok ? "✓" : "✗";
+  setTimeout(() => copyStatusBtn.textContent = "📋", 1400);
+  if (ok) log("Console copied to clipboard (" + text.length + " chars).");
+}
+
+// ============================================================================
+// WASM HELPERS — never cache views (WASM memory can grow and detach them)
+// ============================================================================
+function ex(name) { return runtime && runtime.mainWasmInstance.exports[name]; }
+function hasExport(name) { return !!ex(name); }
+function cppMalloc(n) { return Number(ex("cppmalloc")(n)); }
+function cppFree(p) { if (p) ex("cppfree")(p); }
+function u8(p, n)  { return new Uint8Array(runtime.sharedMemory.buffer, p, n); }
+function f32(p, n) { return new Float32Array(runtime.sharedMemory.buffer, p, n); }
+function i32(p, n) { return new Int32Array(runtime.sharedMemory.buffer, p, n); }
+
+async function callWasm(name, ...args) {
+  if (!hasExport(name)) throw new Error("Missing WASM export: " + name);
+  return await runtime.callExport(0, name, ...args);
+}
+async function opt(name, ...args) {
+  if (!hasExport(name)) return undefined;
+  try { return await runtime.callExport(0, name, ...args); }
+  catch (e) { warn(name + " failed: " + (e.message || e)); return undefined; }
+}
+
+function allocateWasmBuffers() {
+  if (allocated) return;
+  ptrFrame     = cppMalloc(procW * procH);
+  ptrIMU       = cppMalloc(3 * 4);
+  ptrGravFloor = cppMalloc(3 * 4);
+  ptrPose      = cppMalloc(16 * 4);
+  ptrPoseSize  = cppMalloc(4);
+  ptrPose16    = cppMalloc(16 * 4);
+  ptrPlane     = cppMalloc(4 * 4);
+  ptrHullSize  = cppMalloc(4);
+  ptrHull      = cppMalloc(MAX_HULL_VERTS * 3 * 4);
+  ptrMapPoints = cppMalloc(MAX_MAP_POINTS * 3 * 4);
+  if (!ptrFrame || !ptrIMU || !ptrGravFloor || !ptrPose || !ptrPoseSize ||
+      !ptrPose16 || !ptrPlane || !ptrHullSize || !ptrHull || !ptrMapPoints) {
+    throw new Error("cppmalloc failed — out of WASM memory");
+  }
+  allocated = true;
+  log("WASM buffers allocated: frame=" + procW + "x" + procH +
+      " (" + ((procW * procH / 1024) | 0) + " KB), hull=" + MAX_HULL_VERTS +
+      ", mapPts=" + MAX_MAP_POINTS);
+}
+
+function writeGravityForProcess() {
+  // slam_process_frame wants gravity pointing DOWN in camera frame
+  f32(ptrIMU, 3).set(gravity);
+}
+function writeGravityForFloor() {
+  // slam_get_floor_plane internally does g_cam = (v.x, -v.y, -v.z).
+  // We want g_cam == up_CV == -gravity, so pre-invert: v = (-gx, gy, gz).
+  if (chkGravFix.checked) f32(ptrGravFloor, 3).set([-gravity[0], gravity[1], gravity[2]]);
+  else                    f32(ptrGravFloor, 3).set(gravity);
+}
+
+// ============================================================================
+// UI WIRING
+// ============================================================================
+$("infoBtn").addEventListener("click", () => { infoPanel.classList.toggle("show"); updateInfoPanel(); });
+$("closeInfo").addEventListener("click", () => infoPanel.classList.remove("show"));
+controlsToggle.addEventListener("click", () => controls.classList.toggle("show"));
+btnShowLog.addEventListener("click", () => logPanel.classList.add("show"));
+closeLogBtn.addEventListener("click", () => logPanel.classList.remove("show"));
+copyLogBtn.addEventListener("click", copyConsoleToClipboard);
+copyStatusBtn.addEventListener("click", copyConsoleToClipboard);
+clearLogBtn.addEventListener("click", () => { logContent.innerHTML = ""; log("Log cleared."); });
+
+btnInit.addEventListener("click", initRuntime);
+btnCamera.addEventListener("click", startCameraAndIMU);
+btnScan.addEventListener("click", startScan);
+btnLive.addEventListener("click", startLive);
+btnForceInit.addEventListener("click", forceInit);
+btnPlace.addEventListener("click", () => placeCubeAtScreen(window.innerWidth / 2, window.innerHeight / 2));
+btnReset.addEventListener("click", resetSLAM);
+
+chkMarkers.addEventListener("change", () => { if (!chkMarkers.checked) clearMapMarkers(); });
+chkFloor.addEventListener("change", () => { if (!chkFloor.checked) clearFloorMesh(); });
+chkGravFix.addEventListener("change", () => log("GravFix " + (chkGravFix.checked ? "ON" : "OFF")));
+selQuality.addEventListener("change", () => {
+  log("Quality changed — takes effect on next Camera start / Reset.");
+});
+
+function updateButtonVisibility() {
+  btnInit.style.display      = (mode === "idle") ? "" : "none";
+  btnCamera.style.display    = (mode === "idle") ? "" : "none";
+  btnScan.style.display      = (mode === "camera") ? "" : "none";
+  btnLive.style.display      = (mode === "scan") ? "" : "none";
+  btnForceInit.style.display = (mode === "scan") ? "" : "none";
+  btnPlace.style.display     = (mode === "live") ? "" : "none";
+  btnReset.style.display     = (mode === "camera" || mode === "scan" || mode === "live") ? "" : "none";
+  selQuality.disabled        = (mode === "scan" || mode === "live");
+}
+updateButtonVisibility();
+
+// ============================================================================
+// INIT RUNTIME
+// ============================================================================
+async function initRuntime() {
+  btnInit.disabled = true;
+  statusText.textContent = "Initializing...";
+  statusDot.className = "statusDot";
+
+  if (!window.crossOriginIsolated) {
+    fail("crossOriginIsolated=false. Server must send COOP: same-origin + COEP: require-corp.");
+    btnInit.disabled = false;
+    return;
+  }
+  if (typeof AutogenRuntime === "undefined") {
+    fail("AutogenRuntime is undefined — /system/autogen/autogen.js not loaded.");
+    btnInit.disabled = false;
+    return;
+  }
+
+  try {
+    log("Initializing AutogenRuntime...");
+    runtime = new AutogenRuntime();
+    await runtime.initialize(WASM_URL);
+
+    const required = ["slam_init", "slam_reset", "slam_process_frame", "slam_get_floor_plane",
+                      "slam_get_keyframe_count", "slam_get_map_point_count", "cppmalloc", "cppfree"];
+    const missing = required.filter(n => !hasExport(n));
+    if (missing.length) throw new Error("Missing required exports: " + missing.join(", "));
+
+    const optional = ["slam_get_camera_pose16", "slam_get_map_points_xyz", "slam_force_keyframe",
+                      "slam_get_keypoint_count", "slam_get_match_count", "slam_get_inlier_count",
+                      "slam_set_frame_stride", "slam_set_use_sliding_window",
+                      "slam_set_tracking_distance_threshold", "slam_set_scanning_distance_threshold",
+                      "slam_set_max_map_points", "slam_set_min_track_points", "slam_set_enable_denoising"];
+    log("Optional exports present: " + (optional.filter(hasExport).join(", ") || "(none)"));
+    const absent = optional.filter(n => !hasExport(n));
+    if (absent.length) warn("Optional exports absent: " + absent.join(", "));
+
+    setupThree();
+    statusText.textContent = "Ready";
+    statusDot.className = "statusDot ready";
+    btnCamera.disabled = false;
+    updateButtonVisibility();
+    log("Runtime initialized successfully.");
+    log("Live thresholds: KF>=" + MIN_KEYFRAMES_FOR_LIVE +
+        ", pts>=" + MIN_MAP_POINTS_FOR_LIVE +
+        ", hull>=" + MIN_HULL_VERTS_FOR_LIVE +
+        " (angle < " + MAX_FLOOR_ANGLE_ERR + "deg is a quality hint only)");
+  } catch (e) {
+    fail(e.stack || e.message || String(e));
+    btnInit.disabled = false;
+  }
+}
+
+// ============================================================================
+// CAMERA + IMU
+// ============================================================================
+async function startCameraAndIMU() {
+  btnCamera.disabled = true;
+  try {
+    statusText.textContent = "Requesting IMU...";
+    if (typeof DeviceMotionEvent !== "undefined" && typeof DeviceMotionEvent.requestPermission === "function") {
+      try {
+        const r = await DeviceMotionEvent.requestPermission();
+        log("DeviceMotion permission: " + r);
+        if (r !== "granted") warn("Motion denied — falling back to fixed gravity vector.");
+      } catch (e) { warn("DeviceMotion permission error: " + (e.message || e)); }
+    }
+    window.addEventListener("devicemotion", onDeviceMotion, true);
+
+    statusText.textContent = "Requesting camera...";
+    stream = await navigator.mediaDevices.getUserMedia({
+      audio: false,
+      video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } }
+    });
+    video.srcObject = stream;
+    await video.play();
+    await new Promise(res => { if (video.videoWidth) return res(); video.onloadedmetadata = () => res(); });
+
+    setupProcessingCanvas();
+    allocateWasmBuffers();
+
+    await callWasm("slam_reset");
+    await callWasm("slam_init", procW, procH, CAMERA_FOV_DEG);
+    await opt("slam_set_max_map_points", MAX_MAP_POINTS);
+    await opt("slam_set_use_sliding_window", true);
+    await opt("slam_set_frame_stride", 1);
+
+    mode = "camera";
+    statusText.textContent = "Camera ready";
+    statusDot.className = "statusDot ready";
+    btnScan.disabled = false;
+    btnReset.disabled = false;
+    tapHint.textContent = "Point at a TEXTURED floor, then Start Scan.";
+    updateButtonVisibility();
+
+    if (!rafStarted) { rafStarted = true; requestAnimationFrame(loop); }
+
+    log("Camera stream: " + video.videoWidth + "x" + video.videoHeight +
+        " -> processing " + procW + "x" + procH + " @ " + CAMERA_FOV_DEG + "deg FOV");
+    if (!haveIMU) warn("No IMU samples yet — using fallback gravity (0, 0.707, -0.707). Tilt phone ~45deg down.");
+  } catch (e) {
+    fail(e.stack || e.message || String(e));
+    btnCamera.disabled = false;
+  }
+}
+
+function onDeviceMotion(ev) {
+  const a = ev.accelerationIncludingGravity;
+  if (!a || a.x == null || a.y == null || a.z == null) return;
+  const gx = a.x, gy = a.y, gz = a.z;
+  if (!isFinite(gx) || !isFinite(gy) || !isFinite(gz)) return;
+
+  // Device frame (x right, y up, z out of screen) -> CV camera (x right, y down, z forward)
+  let cx = gx, cy = -gy, cz = gz;
+
+  screenAngle = (screen.orientation && screen.orientation.angle) || window.orientation || 0;
+  const r = screenAngle * Math.PI / 180, c = Math.cos(r), s = Math.sin(r);
+  const rx = cx * c - cy * s, ry = cx * s + cy * c;
+  cx = rx; cy = ry;
+
+  const len = Math.hypot(cx, cy, cz);
+  if (len < 1e-3) return;
+  const n = [cx / len, cy / len, cz / len];
+
+  const k = 0.85; // complementary smoothing
+  gravity = [gravity[0]*k + n[0]*(1-k), gravity[1]*k + n[1]*(1-k), gravity[2]*k + n[2]*(1-k)];
+  const gl = Math.hypot(gravity[0], gravity[1], gravity[2]);
+  if (gl > 1e-6) gravity = [gravity[0]/gl, gravity[1]/gl, gravity[2]/gl];
+  haveIMU = true;
+}
+
+function setupProcessingCanvas() {
+  const target = parseInt(selQuality.value, 10) || 480;
+  const vw = video.videoWidth || 1280, vh = video.videoHeight || 720;
+  const screenAspect = window.innerWidth / Math.max(1, window.innerHeight);
+
+  if (screenAspect >= 1.0) { procW = target; procH = Math.round(target / screenAspect); }
+  else                     { procH = target; procW = Math.round(target * screenAspect); }
+
+  procW = Math.max(160, procW) & ~1;
+  procH = Math.max(160, procH) & ~1;
+
+  procCanvas = document.createElement("canvas");
+  procCanvas.width = procW; procCanvas.height = procH;
+  procCtx = procCanvas.getContext("2d", { willReadFrequently: true });
+  log("Processing canvas: " + procW + "x" + procH + " (quality target " + target + "p, source " + vw + "x" + vh + ")");
+}
+
+// ============================================================================
+// THREE.JS
+// ============================================================================
+function setupThree() {
+  if (renderer) return;
+  scene = new THREE.Scene();
+  camera = new THREE.PerspectiveCamera(CAMERA_FOV_DEG, window.innerWidth / Math.max(1, window.innerHeight), 0.01, 1000);
+  camera.matrixAutoUpdate = false;
+  camera.position.set(0, 0, 0);
+  camera.updateMatrix();
+  camera.matrixWorldNeedsUpdate = true;
+
+  renderer = new THREE.WebGLRenderer({ alpha: true, antialias: false, preserveDrawingBuffer: true });
+  renderer.setClearColor(0x000000, 0);
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+  threeHost.appendChild(renderer.domElement);
+
+  scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+  const dir = new THREE.DirectionalLight(0xffffff, 0.75);
+  dir.position.set(2, 5, 3);
+  scene.add(dir);
+
+  renderer.domElement.addEventListener("pointerdown", onARTap);
+  window.addEventListener("resize", onResize);
+}
+
+function onResize() {
+  if (!renderer || !camera) return;
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  camera.aspect = window.innerWidth / Math.max(1, window.innerHeight);
+  camera.updateProjectionMatrix();
+}
+
+// ============================================================================
+// SCAN / LIVE / RESET
+// ============================================================================
+async function startScan() {
+  try {
+    btnScan.disabled = true;
+    btnLive.disabled = true;
+    btnPlace.disabled = true;
+    btnForceInit.disabled = false;
+
+    clearFloorMesh(); clearMapMarkers(); clearCube();
+    floorPlane = null; floorLocked = false; scanReady = false; haveCameraPose = false;
+    floorHullCount = 0; floorAngleError = 0; floorCamHeight = 0;
+    keyframeCount = 0; mapPointCount = 0;
+    lastKpCount = 0; lastMatchCount = 0; lastInlierCount = 0;
+    frameCounter = 0; lastAutoKF = 0; lastFloorLog = 0;
+    scanStart = performance.now();
+
+    await callWasm("slam_reset");
+    await callWasm("slam_init", procW, procH, CAMERA_FOV_DEG);
+    await opt("slam_set_max_map_points", MAX_MAP_POINTS);
+    await opt("slam_set_frame_stride", 1);
+    await opt("slam_set_use_sliding_window", true);
+    await opt("slam_set_min_track_points", 10);
+    await opt("slam_set_scanning_distance_threshold", 0.08);
+    await opt("slam_set_tracking_distance_threshold", 0.10);
+
+    mode = "scan";
+    statusText.textContent = "Scanning...";
+    statusDot.className = "statusDot scanning";
+    tapHint.textContent = "Move slowly LEFT ↔ RIGHT. Keep textured floor in view.";
+    updateButtonVisibility();
+
+    log("=== SCAN STARTED ===");
+    log("Target " + PROCESS_FPS_SCAN + " FPS | need KF>=" + MIN_KEYFRAMES_FOR_LIVE +
+        ", pts>=" + MIN_MAP_POINTS_FOR_LIVE + ", hull>=" + MIN_HULL_VERTS_FOR_LIVE);
+    log("Gravity(cam,down)=(" + gravity.map(v => v.toFixed(3)).join(", ") + ") source=" +
+        (haveIMU ? "DeviceMotion" : "FALLBACK"));
+  } catch (e) {
+    fail(e.stack || e.message || String(e));
+    btnScan.disabled = false;
+  }
+}
+
+async function startLive() {
+  try {
+    if (!floorPlane || floorHullCount < MIN_HULL_VERTS_FOR_LIVE) {
+      await updateFloorPlane(true);
+    }
+    if (!floorPlane || floorHullCount < MIN_HULL_VERTS_FOR_LIVE) {
+      warn("Floor not ready: hull=" + floorHullCount + ". Keep scanning.");
+      return;
+    }
+    if (floorAngleError > MAX_FLOOR_ANGLE_ERR) {
+      warn("Going live with UNSTABLE floor (angle " + floorAngleError.toFixed(1) + "deg). Placement may drift.");
+    }
+    mode = "live";
+    statusText.textContent = "Live tracking";
+    statusDot.className = "statusDot live";
+    tapHint.textContent = "Tap the floor to place a cube.";
+    btnPlace.disabled = false;
+    updateButtonVisibility();
+    await opt("slam_set_tracking_distance_threshold", 0.25);
+    log("=== LIVE MODE STARTED === hull=" + floorHullCount +
+        " angle=" + floorAngleError.toFixed(2) + "deg camHeight=" + floorCamHeight.toFixed(4));
+  } catch (e) {
+    fail(e.stack || e.message || String(e));
+  }
+}
+
+async function forceInit() {
+  log("=== FORCE INIT ATTEMPT ===");
+  log("State: KF=" + keyframeCount + " pts=" + mapPointCount +
+      " kps=" + lastKpCount + " matches=" + lastMatchCount + " inliers=" + lastInlierCount);
+  if (!hasExport("slam_force_keyframe")) { warn("slam_force_keyframe not exported — cannot force."); return; }
+  for (let i = 0; i < 6; i++) {
+    await opt("slam_force_keyframe");
+    await processOneFrame(performance.now(), true);
+    log("ForceInit step " + (i + 1) + ": KF=" + keyframeCount + " pts=" + mapPointCount +
+        " matches=" + lastMatchCount + " inliers=" + lastInlierCount);
+    if (keyframeCount > 1 || mapPointCount > 0) { log("ForceInit: map initialized."); break; }
+    await new Promise(r => setTimeout(r, 90));
+  }
+  if (keyframeCount <= 1 && mapPointCount === 0) {
+    warn("ForceInit failed. Pipeline needs more distinct matches / parallax. " +
+         "Try: higher resolution, more texture, larger sideways motion.");
+  }
+}
+
+async function resetSLAM() {
+  try {
+    mode = "camera";
+    await callWasm("slam_reset");
+    await callWasm("slam_init", procW, procH, CAMERA_FOV_DEG);
+    await opt("slam_set_max_map_points", MAX_MAP_POINTS);
+    clearFloorMesh(); clearMapMarkers(); clearCube();
+    floorPlane = null; floorLocked = false; scanReady = false; haveCameraPose = false;
+    keyframeCount = 0; mapPointCount = 0; floorHullCount = 0;
+    floorAngleError = 0; floorCamHeight = 0;
+    lastKpCount = 0; lastMatchCount = 0; lastInlierCount = 0;
+    lastSLAMResult = null; frameCounter = 0;
+    btnScan.disabled = false;
+    btnLive.disabled = true;
+    btnPlace.disabled = true;
+    btnForceInit.disabled = true;
+    statusText.textContent = "Reset complete";
+    statusDot.className = "statusDot ready";
+    tapHint.textContent = "Tap Start Scan to begin again.";
+    updateFloorIndicator();
+    updateButtonVisibility();
+    updateInfoPanel();
+    log("SLAM reset.");
+  } catch (e) {
+    fail(e.stack || e.message || String(e));
+  }
+}
+
+// ============================================================================
+// MAIN LOOP
+// ============================================================================
+function loop(t) {
+  requestAnimationFrame(loop);
+
+  fpsFrameCount++;
+  if (t - lastFpsTime >= 1000) { fpsActual = fpsFrameCount; fpsFrameCount = 0; lastFpsTime = t; }
+
+  if (renderer && scene && camera) renderer.render(scene, camera);
+
+  if (!runtime || !procCanvas || !video.videoWidth || busy) return;
+  if (mode !== "scan" && mode !== "live") return;
+
+  const targetFPS = (mode === "scan") ? PROCESS_FPS_SCAN : PROCESS_FPS_LIVE;
+  if (t - lastProcessTime < 1000 / targetFPS) return;
+  lastProcessTime = t;
+
+  busy = true;
+  processOneFrame(t, false)
+    .catch(e => fail(e.stack || e.message || String(e)))
+    .finally(() => { busy = false; });
+}
+
+async function processOneFrame(t, isForced) {
+  const t0 = performance.now();
+
+  // ---- capture + grayscale ----
+  drawVideoCoverToProcessingCanvas();
+  const rgba = procCtx.getImageData(0, 0, procW, procH).data;
+  const gray = u8(ptrFrame, procW * procH);
+  let lumSum = 0, lumN = 0;
+  for (let i = 0, p = 0; i < gray.length; i++, p += 4) {
+    const g = (rgba[p] * 77 + rgba[p + 1] * 150 + rgba[p + 2] * 29) >> 8;
+    gray[i] = g;
+    if ((i & 63) === 0) { lumSum += g; lumN++; }
+  }
+  lastBrightness = lumN ? lumSum / lumN : 0;
+
+  // ---- inputs ----
+  writeGravityForProcess();
+  i32(ptrPoseSize, 1)[0] = 0;
+
+  const prevKf = keyframeCount, prevPts = mapPointCount;
+
+  // ---- SLAM ----
+  lastSLAMResult = await callWasm("slam_process_frame", ptrFrame, ptrIMU, ptrPose, ptrPoseSize);
+  lastProcMs = performance.now() - t0;
+  frameCounter++;
+
+  keyframeCount = await callWasm("slam_get_keyframe_count");
+  mapPointCount = await callWasm("slam_get_map_point_count");
+  if (hasExport("slam_get_keypoint_count")) lastKpCount     = await callWasm("slam_get_keypoint_count");
+  if (hasExport("slam_get_match_count"))    lastMatchCount  = await callWasm("slam_get_match_count");
+  if (hasExport("slam_get_inlier_count"))   lastInlierCount = await callWasm("slam_get_inlier_count");
+
+  await updateCameraPose();
+
+  // ---- AutoKF bootstrap ----
+  if (chkAutoKF.checked && mode === "scan" && keyframeCount < 3 && t - lastAutoKF > AUTOKF_MS) {
+    lastAutoKF = t;
+    log("[AutoKF] bootstrap attempt: KF=" + keyframeCount + " pts=" + mapPointCount +
+        " kps=" + lastKpCount + " matches=" + lastMatchCount + " inliers=" + lastInlierCount);
+    await opt("slam_force_keyframe");
+  }
+
+  // ---- per-frame logging ----
+  const kfNew  = keyframeCount > prevKf;
+  const ptsNew = mapPointCount > prevPts;
+  const doLog = isForced || chkVerbose.checked || frameCounter <= 12 ||
+                (frameCounter % 10 === 0) || kfNew || ptsNew;
+  if (doLog) {
+    let line = "[F" + frameCounter + "] KF=" + keyframeCount + " pts=" + mapPointCount +
+               " kps=" + lastKpCount + " match=" + lastMatchCount + " inl=" + lastInlierCount +
+               " lum=" + lastBrightness.toFixed(0) + " " + lastProcMs.toFixed(1) + "ms" +
+               " ret=" + lastSLAMResult;
+    if (kfNew)  line += " NEW_KF";
+    if (ptsNew) line += " NEW_PTS";
+    log(line);
+  }
+
+  if (frameCounter % 30 === 0) {
+    log("[IMU] g(cam,down)=(" + gravity.map(v => v.toFixed(3)).join(", ") +
+        ") |g|=" + Math.hypot(...gravity).toFixed(3) +
+        " src=" + (haveIMU ? "DeviceMotion" : "FALLBACK") + " screenAng=" + screenAngle);
+  }
+  if (frameCounter % 30 === 0 && haveCameraPose) {
+    const p = camera.position;
+    log("[POSE] cam=(" + p.x.toFixed(3) + ", " + p.y.toFixed(3) + ", " + p.z.toFixed(3) + ")");
+  }
+
+  // ---- diagnostics ----
+  if (frameCounter === 20 && keyframeCount <= 1 && mapPointCount === 0) {
+    warn("STUCK after 20 frames: KF=" + keyframeCount + " pts=0. kps=" + lastKpCount +
+         " matches=" + lastMatchCount + " inliers=" + lastInlierCount +
+         ". Need >15 matches AND >=6 essential inliers. Move phone SIDEWAYS for parallax.");
+  }
+  if (frameCounter === 50 && keyframeCount <= 1 && mapPointCount === 0) {
+    warn("INIT FAILED after 50 frames. kps=" + lastKpCount + " matches=" + lastMatchCount +
+         " inliers=" + lastInlierCount + " lum=" + lastBrightness.toFixed(0) +
+         " res=" + procW + "x" + procH +
+         ". Try: Ultra quality, more texture, brighter light, bigger lateral motion.");
+  }
+  if (lastBrightness < 25 && frameCounter % 40 === 0) {
+    warn("Frame very dark (lum=" + lastBrightness.toFixed(0) + ") — features will be unreliable.");
+  }
+  if (lastSLAMResult === -1 && frameCounter % 20 === 0) {
+    warn("SLAM returned -1 (tracking lost / relocalization timeout). Consider Reset.");
+  }
+
+  // ---- floor ----
+  if (t - lastFloorTime > FLOOR_UPDATE_MS || kfNew) {
+    lastFloorTime = t;
+    await updateFloorPlane(false);
+  }
+
+  // ---- markers ----
+  if (chkMarkers.checked && t - lastMarkerTime > MARKER_UPDATE_MS) {
+    lastMarkerTime = t;
+    await updateMapMarkers();
+  }
+
+  // ---- readiness ----
+  if (mode === "scan") {
+    const okKF  = keyframeCount >= MIN_KEYFRAMES_FOR_LIVE;
+    const okPts = mapPointCount >= MIN_MAP_POINTS_FOR_LIVE;
+    const okHull = floorPlane && floorHullCount >= MIN_HULL_VERTS_FOR_LIVE;
+
+    if (okHull && okPts && !scanReady) {
+      scanReady = true;
+      btnLive.disabled = false;
+      statusText.textContent = "Floor found!";
+      tapHint.textContent = "Floor locked. Tap Start Live.";
+      log("READY: KF=" + keyframeCount + " pts=" + mapPointCount + " hull=" + floorHullCount +
+          " angle=" + floorAngleError.toFixed(2) + "deg" + (okKF ? "" : " (KF below target, allowing anyway)"));
+    } else if (!scanReady) {
+      const el = ((performance.now() - scanStart) / 1000) | 0;
+      tapHint.textContent = "Scan " + el + "s — KF " + keyframeCount + "/" + MIN_KEYFRAMES_FOR_LIVE +
+                            " · pts " + mapPointCount + "/" + MIN_MAP_POINTS_FOR_LIVE +
+                            " · hull " + floorHullCount + "/" + MIN_HULL_VERTS_FOR_LIVE;
+    }
+  }
+
+  updateInfoPanel();
+}
+
+// ============================================================================
+// FRAME CAPTURE (cover-crop to match the on-screen video framing)
+// ============================================================================
+function drawVideoCoverToProcessingCanvas() {
+  const vw = video.videoWidth, vh = video.videoHeight;
+  const targetAspect = procW / procH, videoAspect = vw / vh;
+  let sx = 0, sy = 0, sw = vw, sh = vh;
+  if (videoAspect > targetAspect) { sw = vh * targetAspect; sx = (vw - sw) / 2; }
+  else                            { sh = vw / targetAspect; sy = (vh - sh) / 2; }
+  procCtx.drawImage(video, sx, sy, sw, sh, 0, 0, procW, procH);
+}
+
+// ============================================================================
+// CAMERA POSE
+// ============================================================================
+async function updateCameraPose() {
+  if (!hasExport("slam_get_camera_pose16")) { haveCameraPose = false; return; }
+  const res = await callWasm("slam_get_camera_pose16", ptrPose16);
+  if (res !== 0) { haveCameraPose = false; return; }
+
+  const m = f32(ptrPose16, 16);
+  for (let i = 0; i < 16; i++) {
+    if (!isFinite(m[i])) { haveCameraPose = false; return; }
+  }
+
+  // Keep raw row-major R for gravity math (m[0..2], m[4..6], m[8..10])
+  currentR = [m[0], m[1], m[2], m[4], m[5], m[6], m[8], m[9], m[10]];
+
+  const arr = Array.from(m);
+  if (chkFlip.checked) {
+    // CV -> GL: negate rows 1 and 2 of the rotation block
+    arr[4] *= -1; arr[5] *= -1; arr[6] *= -1;
+    arr[8] *= -1; arr[9] *= -1; arr[10] *= -1;
+  }
+
+  camera.matrixWorld.fromArray(arr);
+  camera.matrix.copy(camera.matrixWorld);
+  camera.matrixWorldInverse.copy(camera.matrixWorld).invert();
+  camera.matrixWorld.decompose(camera.position, camera.quaternion, camera.scale);
+  camera.matrixWorldNeedsUpdate = true;
+  haveCameraPose = true;
+}
+
+// ============================================================================
+// FLOOR PLANE + VALIDATION
+// ============================================================================
+async function updateFloorPlane(forceLog) {
+  writeGravityForFloor();
+  i32(ptrHullSize, 1)[0] = 0;
+  f32(ptrPlane, 4).set([0, 0, 0, 0]);
+
+  await callWasm("slam_get_floor_plane", ptrGravFloor, ptrPlane, ptrHullSize, ptrHull);
+
+  const pl = f32(ptrPlane, 4);
+  const nx = pl[0], ny = pl[1], nz = pl[2], d = pl[3];
+  const hullSize = i32(ptrHullSize, 1)[0];
+  const nlen = Math.hypot(nx, ny, nz);
+
+  floorNormalRaw = [nx, ny, nz];
+  floorDRaw = d;
+  floorHullCount = Math.max(0, hullSize);
+
+  const verbose = forceLog || (performance.now() - lastFloorLog > FLOOR_LOG_MS);
+  if (verbose) {
+    lastFloorLog = performance.now();
+    log("[FLOOR] n=(" + nx.toFixed(4) + ", " + ny.toFixed(4) + ", " + nz.toFixed(4) + ")" +
+        " |n|=" + nlen.toFixed(4) + " d=" + d.toFixed(4) +
+        " hull=" + hullSize + " KF=" + keyframeCount + " pts=" + mapPointCount);
+  }
+
+  if (nlen < 1e-4 || !isFinite(d) || hullSize < 3) {
+    floorPlane = null;
+    floorLocked = false;
+    floorAngleError = 0;
+    clearFloorMesh();
+    updateFloorIndicator();
+    if (verbose) {
+      const reasons = [];
+      if (nlen < 1e-4) reasons.push("zero normal");
+      if (!isFinite(d)) reasons.push("non-finite d");
+      if (hullSize < 3) reasons.push("hull=" + hullSize + "<3");
+      warn("[FLOOR] rejected: " + reasons.join(", "));
+    }
+    return;
+  }
+
+  const n = [nx / nlen, ny / nlen, nz / nlen];
+  floorPlane = new THREE.Plane(new THREE.Vector3(n[0], n[1], n[2]), d / nlen);
+
+  // Expected world-up = R^T * up_CV, where up_CV = -gravity
+  const upCam = [-gravity[0], -gravity[1], -gravity[2]];
+  const R = currentR;
+  let upWorld = [
+    R[0]*upCam[0] + R[3]*upCam[1] + R[6]*upCam[2],
+    R[1]*upCam[0] + R[4]*upCam[1] + R[7]*upCam[2],
+    R[2]*upCam[0] + R[5]*upCam[1] + R[8]*upCam[2]
+  ];
+  const ul = Math.hypot(...upWorld);
+  if (ul < 1e-6) upWorld = [0, 1, 0]; else upWorld = upWorld.map(v => v / ul);
+
+  const dot = Math.abs(n[0]*upWorld[0] + n[1]*upWorld[1] + n[2]*upWorld[2]);
+  floorAngleError = Math.acos(Math.min(1, dot)) * 180 / Math.PI;
+
+  if (haveCameraPose) {
+    const C = camera.position;
+    floorCamHeight = Math.abs(n[0]*C.x + n[1]*C.y + n[2]*C.z + floorPlane.constant);
+  }
+
+  const angleOk  = floorAngleError < MAX_FLOOR_ANGLE_ERR;
+  const hullOk   = hullSize >= MIN_HULL_VERTS_FOR_LIVE;
+  const heightOk = isFinite(floorCamHeight) && floorCamHeight > 1e-5 && floorCamHeight < 1e5;
+
+  // Lock only requires a usable plane; angle is a quality indicator
+  floorLocked = hullOk && heightOk;
+
+  if (verbose) {
+    log("[FLOOR CHECK] angle=" + floorAngleError.toFixed(2) + "deg (<" + MAX_FLOOR_ANGLE_ERR + ") " +
+        (angleOk ? "PASS" : "WARN") +
+        " | hull=" + hullSize + " (>=" + MIN_HULL_VERTS_FOR_LIVE + ") " + (hullOk ? "PASS" : "FAIL") +
+        " | camHeight=" + floorCamHeight.toFixed(4) + " " + (heightOk ? "PASS" : "FAIL") +
+        " => " + (floorLocked ? (angleOk ? "LOCKED" : "LOCKED (UNSTABLE ANGLE)") : "NOT LOCKED"));
+    log("[FLOOR] upWorld=(" + upWorld.map(v => v.toFixed(3)).join(", ") +
+        ") upCam=(" + upCam.map(v => v.toFixed(3)).join(", ") + ")");
+  }
+
+  if (chkFloor.checked) {
+    const count = Math.min(hullSize, MAX_HULL_VERTS);
+    const h = f32(ptrHull, count * 3);
+    const verts = [];
+    for (let i = 0; i < count; i++) {
+      const x = h[i*3], y = h[i*3+1], z = h[i*3+2];
+      if (isFinite(x) && isFinite(y) && isFinite(z)) verts.push(new THREE.Vector3(x, y, z));
+    }
+    buildFloorMesh(verts);
+  } else {
+    clearFloorMesh();
+  }
+
+  updateFloorIndicator();
+}
+
+function updateFloorIndicator() {
+  if (!floorPlane || floorHullCount < 3) {
+    floorIndicator.textContent = "NO FLOOR";
+    floorIndicator.className = "";
+  } else if (floorLocked && floorAngleError < MAX_FLOOR_ANGLE_ERR) {
+    floorIndicator.textContent = "FLOOR LOCKED";
+    floorIndicator.className = "locked";
+  } else {
+    floorIndicator.textContent = "FLOOR " + floorAngleError.toFixed(0) + "°";
+    floorIndicator.className = "";
+  }
+}
+
+function buildFloorMesh(vertices) {
+  clearFloorMesh();
+  if (!floorPlane || !vertices || vertices.length < 3) return;
+
+  const center = new THREE.Vector3();
+  for (const p of vertices) center.add(p);
+  center.multiplyScalar(1 / vertices.length);
+
+  // Fan triangulation from centroid — robust for convex-ish hulls, no earcut needed
+  const pos = [];
+  for (let i = 0; i < vertices.length; i++) {
+    const a = vertices[i], b = vertices[(i + 1) % vertices.length];
+    pos.push(center.x, center.y, center.z, a.x, a.y, a.z, b.x, b.y, b.z);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+  geo.computeVertexNormals();
+
+  const mat = new THREE.MeshBasicMaterial({
+    color: (floorLocked && floorAngleError < MAX_FLOOR_ANGLE_ERR) ? 0x00ff66 : 0xffa500,
+    transparent: true, opacity: 0.25, side: THREE.DoubleSide, depthWrite: false
+  });
+  floorMesh = new THREE.Mesh(geo, mat);
+  floorMesh.renderOrder = 1;
+  scene.add(floorMesh);
+}
+
+function clearFloorMesh() {
+  if (!floorMesh) return;
+  scene.remove(floorMesh);
+  floorMesh.geometry.dispose();
+  floorMesh.material.dispose();
+  floorMesh = null;
+}
+
+// ============================================================================
+// MAP MARKERS
+// ============================================================================
+async function updateMapMarkers() {
+  if (!chkMarkers.checked) { clearMapMarkers(); return; }
+  if (!hasExport("slam_get_map_points_xyz")) return;
+
+  const n = await callWasm("slam_get_map_points_xyz", ptrMapPoints, MAX_MAP_POINTS);
+  const count = Math.max(0, Math.min(n | 0, MAX_MAP_POINTS));
+  clearMapMarkers();
+  if (count < 1) return;
+
+  const src = f32(ptrMapPoints, count * 3);
+  const positions = new Float32Array(count * 3);
+  for (let i = 0; i < count * 3; i++) positions[i] = isFinite(src[i]) ? src[i] : 0;
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+  const size = Math.max(0.004, floorCamHeight * 0.014);
+  const mat = new THREE.PointsMaterial({
+    color: 0x00ff44, size: size, sizeAttenuation: true,
+    transparent: true, opacity: 0.9, depthTest: false, depthWrite: false
+  });
+  mapMarkers = new THREE.Points(geo, mat);
+  mapMarkers.renderOrder = 3;
+  scene.add(mapMarkers);
+}
+
+function clearMapMarkers() {
+  if (!mapMarkers) return;
+  scene.remove(mapMarkers);
+  mapMarkers.geometry.dispose();
+  mapMarkers.material.dispose();
+  mapMarkers = null;
+}
+
+// ============================================================================
+// PLACEMENT — mathematical plane raycast (works even with a tiny hull)
+// ============================================================================
+function onARTap(ev) {
+  if (mode !== "live") return;
+  placeCubeAtScreen(ev.clientX, ev.clientY);
+}
+
+function placeCubeAtScreen(clientX, clientY) {
+  if (!floorPlane) { warn("No floor plane yet."); return; }
+  if (!haveCameraPose) { warn("No camera pose yet — cannot raycast."); return; }
+
+  const rect = renderer.domElement.getBoundingClientRect();
+  const ndc = new THREE.Vector2(
+    ((clientX - rect.left) / rect.width) * 2 - 1,
+    -(((clientY - rect.top) / rect.height) * 2 - 1)
+  );
+  const rc = new THREE.Raycaster();
+  rc.setFromCamera(ndc, camera);
+
+  const hit = new THREE.Vector3();
+  if (!rc.ray.intersectPlane(floorPlane, hit)) {
+    warn("Tap ray parallel to floor — aim lower at the floor.");
+    return;
+  }
+  const dist = hit.distanceTo(camera.position);
+  if (!isFinite(dist) || dist <= 0 || dist > 1e4) {
+    warn("Floor hit invalid or too far (" + dist + ").");
+    return;
+  }
+  createCubeAtFloorPoint(hit, dist);
+}
+
+function createCubeAtFloorPoint(point, dist) {
+  clearCube();
+  const up = floorPlane.normal.clone().normalize();
+
+  // Monocular scale is arbitrary — size the cube relative to camera height
+  const size = Math.max(1e-4, (floorCamHeight > 1e-5 ? floorCamHeight : dist * 0.5) * 0.18);
+
+  const geo = new THREE.BoxGeometry(size, size, size);
+  const mat = new THREE.MeshStandardMaterial({ color: 0xffaa00, roughness: 0.45, metalness: 0.05 });
+  const cube = new THREE.Mesh(geo, mat);
+  cube.add(new THREE.LineSegments(
+    new THREE.EdgesGeometry(geo),
+    new THREE.LineBasicMaterial({ color: 0x111111 })
+  ));
+  cube.position.copy(point).addScaledVector(up, size / 2);
+  cube.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), up);
+  cube.renderOrder = 2;
+  placedCube = cube;
+  scene.add(placedCube);
+
+  log("Cube placed at (" + point.x.toFixed(3) + ", " + point.y.toFixed(3) + ", " + point.z.toFixed(3) +
+      ") dist=" + dist.toFixed(3) + " size=" + size.toFixed(4));
+}
+
+function clearCube() {
+  if (!placedCube) return;
+  scene.remove(placedCube);
+  placedCube.traverse(o => {
+    if (o.geometry) o.geometry.dispose();
+    if (o.material) o.material.dispose();
+  });
+  placedCube = null;
+}
+
+// ============================================================================
+// INFO PANEL
+// ============================================================================
+function updateInfoPanel() {
+  if (!infoPanel.classList.contains("show")) return;
+
+  $("infoMode").textContent = mode;
+  $("infoRes").textContent = procW + "x" + procH;
+  $("infoKeyframes").textContent = keyframeCount + " / " + MIN_KEYFRAMES_FOR_LIVE;
+  $("infoMapPoints").textContent = mapPointCount + " / " + MIN_MAP_POINTS_FOR_LIVE;
+  $("infoPose").textContent = haveCameraPose ? "valid" : "none";
+  $("infoResult").textContent = (lastSLAMResult === null) ? "-" : String(lastSLAMResult);
+
+  $("infoKeypoints").textContent = lastKpCount;
+  $("infoMatches").textContent = lastMatchCount;
+  $("infoInliers").textContent = lastInlierCount;
+  $("infoProcTime").textContent = lastProcMs.toFixed(1) + " ms";
+  $("infoBright").textContent = lastBrightness.toFixed(0);
+
+  $("infoHullVerts").textContent = floorHullCount + " / " + MIN_HULL_VERTS_FOR_LIVE;
+  $("infoPlaneN").textContent = floorNormalRaw.map(v => v.toFixed(3)).join(", ");
+  $("infoPlaneD").textContent = floorDRaw.toFixed(4);
+  $("infoCamHeight").textContent = floorCamHeight > 0 ? floorCamHeight.toFixed(4) : "-";
+
+  $("infoIMUSource").textContent = haveIMU ? "DeviceMotion" : "FALLBACK";
+  $("infoIMU").textContent = gravity.map(v => v.toFixed(3)).join(", ");
+  $("infoScreenAngle").textContent = screenAngle + "°";
+
+  $("infoFPS").textContent = fpsActual;
+  $("infoFrameCount").textContent = frameCounter;
+
+  const fs = $("infoFloorStatus"), ae = $("infoAngleError");
+  if (!floorPlane || floorHullCount < 3) {
+    fs.textContent = "Not detected"; fs.className = "warning";
+    ae.textContent = "-"; ae.className = "";
+  } else {
+    const good = floorLocked && floorAngleError < MAX_FLOOR_ANGLE_ERR;
+    fs.textContent = good ? "LOCKED" : "UNSTABLE (usable)";
+    fs.className = good ? "success" : "warning";
+    ae.textContent = floorAngleError.toFixed(1) + "° (limit " + MAX_FLOOR_ANGLE_ERR + "°)";
+    ae.className = floorAngleError < MAX_FLOOR_ANGLE_ERR ? "success" : "warning";
+  }
+}
+
+// periodic refresh so the panel stays live even if frames stall
+setInterval(updateInfoPanel, 500);
+
+log("Live SLAM demo loaded. Tap ⚙ → Initialize Runtime.");
+</script>
+</body>
+</html>

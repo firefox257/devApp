@@ -1,0 +1,216 @@
+# SVG 2.0 Feature Gap Analysis: Canvas2D Implementation
+
+After a thorough comparison of your requirements document against the actual implementation, here are the **missing or incomplete features**:
+
+---
+
+## 🔴 Critical Missing Features
+
+### 1. Path Commands (§1.1, §1.2, §1.3)
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| `H/h` (Horizontal Line) | ❌ Missing | No horizontal lineto command |
+| `V/v` (Vertical Line) | ❌ Missing | No vertical lineto command |
+| `S/s` (Smooth Cubic) | ❌ Missing | No reflection-based cubic |
+| `T/t` (Smooth Quadratic) | ❌ Missing | No reflection-based quadratic |
+| `A/a` (Elliptical Arc) | ❌ **Wrong Implementation** | Your `at()` is a **Canvas arc** (cx, cy, r, angles), NOT SVG elliptical arc (rx, ry, x-rotation, large-arc-flag, sweep-flag, x, y) |
+| Path Normalization for S/T | ❌ Missing | Cannot calculate reflected control points |
+
+**Impact:** Cannot render SVG paths with arcs, smooth curves, or H/V commands.
+
+---
+
+### 2. Fill Rules (§3.1)
+
+```cpp
+// In draw_shape_impl - ALWAYS uses even-odd:
+raster_edges(fill_paint, true, ...);  // ← hardcoded!
+```
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| `fill-rule: nonzero` | ❌ Missing | No property to select winding rule |
+| `fill-rule: evenodd` | ⚠️ Hardcoded | Always used, not configurable |
+
+**Missing API:**
+```cpp
+Canvas2D& fill_rule(FillRule rule);  // NonZero | EvenOdd
+Shape2D& set_fill_rule(FillRule rule);
+```
+
+---
+
+### 3. Global Composite Operations (§6.1)
+
+Only `BlendMode::Normal` (source-over) is implemented. **All Porter-Duff operators are missing:**
+
+| Operator | Status |
+|----------|--------|
+| `source-over` | ✅ (as Normal) |
+| `source-in` | ❌ Missing |
+| `source-out` | ❌ Missing |
+| `source-atop` | ❌ Missing |
+| `destination-over` | ❌ Missing |
+| `destination-in` | ❌ Missing |
+| `destination-out` | ❌ Missing |
+| `destination-atop` | ❌ Missing |
+| `clear` | ❌ Missing |
+| `copy` | ❌ Missing |
+
+---
+
+### 4. Markers (§7)
+
+**Completely absent.** No implementation of:
+
+- `marker-start`, `marker-mid`, `marker-end`
+- `orient="auto"` tangent calculation
+- Marker scaling/positioning at path vertices
+- `refX`, `refY`, `markerWidth`, `markerHeight`
+
+---
+
+### 5. Multi-Worker Tile Rasterization (§11.2)
+
+**Not implemented.** The requirements specify:
+
+- Bounding box partitioning into tiles
+- `ag_async` worker dispatch
+- Overlap margins for AA continuity
+- Direct writes to shared buffer
+
+Current code is **single-threaded only**.
+
+---
+
+## 🟡 Partially Implemented / Incomplete
+
+### 6. Gradients (§3.2)
+
+| Feature | Status | Issue |
+|---------|--------|-------|
+| `gradientTransform` | ❌ Missing | Gradients have no transform matrix |
+| RadialGradient `fr` (focal radius) | ❌ Missing | Only `fx`, `fy` supported |
+| Spread methods (`pad`, `reflect`, `repeat`) | ❌ Missing | Colors clamp at 0/1 |
+
+**Current RadialGradient:**
+```cpp
+RadialGradient(float acx, float acy, float ar, float afx, float afy)
+// Missing: fr (focal radius)
+// Missing: gradientTransform
+```
+
+---
+
+### 7. Patterns (§3.3)
+
+| Feature | Status | Issue |
+|---------|--------|-------|
+| Pattern from `Image` | ✅ | Works |
+| Pattern from `Path2D` | ❌ Missing | Cannot tile vector content |
+| Pattern from `Gradient` | ❌ Missing | Cannot tile gradients |
+| `patternContentUnits` | ❌ Missing | Only `patternUnits` |
+
+---
+
+### 8. Filters (§8)
+
+| Filter | Status | Notes |
+|--------|--------|-------|
+| `feDropShadow` | ⚠️ Partial | Basic shadow via `drop_shadow()`, not SVG filter syntax |
+| `feGaussianBlur` | ❌ Missing | `box_blur()` is internal-only, not exposed |
+| `feColorMatrix` | ❌ Missing | No color matrix support |
+| Filter chains | ❌ Missing | Cannot compose multiple filters |
+| Off-screen buffer API | ❌ Missing | No user-accessible filter regions |
+
+---
+
+### 9. Image Rendering (§9.2)
+
+| Feature | Status |
+|---------|--------|
+| `preserveAspectRatio` | ❌ Missing |
+| Alignment (`xMinYMin`, `xMidYMid`, etc.) | ❌ Missing |
+| `meet` / `slice` / `none` | ❌ Missing |
+| `imageSmoothingEnabled` | ❌ Missing |
+| `imageSmoothingQuality` | ❌ Missing |
+
+Current `draw_image()` always stretches to fit `w, h` with no aspect ratio preservation.
+
+---
+
+### 10. Text & Typography (§10.1, §10.2)
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| `text-anchor: start` | ❌ Missing | Default behavior only |
+| `text-anchor: middle` | ❌ Missing | |
+| `text-anchor: end` | ❌ Missing | |
+| `dominant-baseline` | ❌ Missing | All variants absent |
+| `dx`, `dy` per-glyph offsets | ❌ Missing | |
+| `rotate` per-character | ❌ Missing | |
+| `letter-spacing` | ❌ Missing | |
+| `word-spacing` | ❌ Missing | |
+| `font-weight` | ❌ Missing | No bold/numeric weight |
+| `font-style: italic` | ❌ Missing | |
+| `textLength` / `lengthAdjust` | ❌ Missing | |
+
+---
+
+### 11. State Properties
+
+| Property | Status |
+|----------|--------|
+| `globalAlpha` | ❌ Missing |
+| `globalCompositeOperation` | ❌ Missing (see §6.1) |
+| `fill-rule` | ❌ Missing (see §3.1) |
+
+---
+
+## 🟢 Correctly Implemented
+
+| Feature | Section |
+|---------|---------|
+| Basic path commands (M, L, C, Q, Z) | §1.1 |
+| Stroke width, linecap, linejoin, miterlimit | §2.1 |
+| Dash array/offset with generator | §2.2 |
+| Linear/Radial/Conical gradients (basic) | §3.2 |
+| Affine transforms (translate, scale, rotate, skew, matrix) | §4.1 |
+| State stack (save/restore) | §4.2 |
+| ClipPath with rules and transforms | §5.1 |
+| Mask (luminance/alpha) | §5.2 |
+| Blend modes (16 CSS modes) | §6.2 |
+| Basic drop shadow | §8.1 |
+| Vector glyph rendering | §10.3 |
+| Bilinear image sampling | §9.1 |
+
+---
+
+## Summary: Priority Implementation List
+
+### Must Have (SVG Compliance Broken)
+1. **SVG elliptical arc** (`A/a` command with rx, ry, rotation, flags)
+2. **Fill-rule selection** (nonzero vs evenodd)
+3. **H/V/S/T path commands**
+4. **Porter-Duff composite operations**
+5. **Markers** (start/mid/end with auto-orient)
+6. **`preserveAspectRatio`** for images
+7. **`text-anchor`** and **`dominant-baseline`**
+
+### Should Have (Feature Complete)
+8. **gradientTransform** on all paint servers
+9. **letter-spacing** / **word-spacing**
+10. **globalAlpha**
+11. **feGaussianBlur** / **feColorMatrix** as public API
+12. **RadialGradient `fr`** (focal radius)
+13. **Gradient spread methods**
+
+### Nice to Have (Autogen Optimization)
+14. **Tile-based multi-worker rasterization**
+15. **Pattern from Path2D/Gradient**
+16. **Filter chains with regions**
+
+---
+
+Would you like me to provide implementation code for any of these missing features?

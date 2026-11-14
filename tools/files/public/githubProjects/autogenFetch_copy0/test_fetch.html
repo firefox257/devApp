@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+	<html lang="en">
+		<head>
+			<meta charset="UTF-8">
+			<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+			<title>Autogen C++ Fetch Test</title>
+				<style>
+					body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace; background: #1e1e1e; color: #d4d4d4; margin: 0; padding: 15px; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
+					.container { background: #252526; border: 1px solid #3e3e42; border-radius: 8px; padding: 15px; width: 100%; max-width: 600px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+					h2 { margin-top: 0; color: #569cd6; font-size: 1.2rem; }
+					.status { padding: 10px; border-radius: 4px; margin-bottom: 15px; font-weight: bold; text-align: center; font-size: 0.9rem; }
+					.status.ready { background: #1e5c2e; color: #4ec9b0; }
+					.status.error { background: #5c1e1e; color: #f48771; }
+					.status.waiting { background: #3c3c3c; color: #cccccc; }
+					.control-group { margin-bottom: 15px; }
+					label { display: block; margin-bottom: 5px; color: #9cdcfe; font-size: 0.85rem; }
+					input[type="text"] { width: 100%; padding: 10px; background: #3c3c3c; border: 1px solid #555; color: #fff; border-radius: 4px; box-sizing: border-box; font-family: monospace; font-size: 0.9rem; -webkit-appearance: none; }
+					.btn-row { display: flex; gap: 8px; margin-top: 10px; }
+					button { flex: 1; padding: 12px; background: #0e639c; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 0.9rem; -webkit-tap-highlight-color: transparent; transition: background 0.2s; }
+					button:hover:not(:disabled) { background: #1177bb; }
+					button:active:not(:disabled) { background: #094d7a; }
+					button:disabled { background: #3c3c3c; color: #888; cursor: not-allowed; }
+					button.sec { background: #3c3c3c; }
+					button.sec:hover:not(:disabled) { background: #4c4c4c; }
+					.result-text { margin-top: 8px; color: #4ec9b0; font-weight: bold; font-size: 0.95rem; min-height: 1.2em; word-break: break-all; }
+					#console { margin-top: 15px; background: #000; border: 1px solid #3e3e42; border-radius: 4px; padding: 10px; height: 250px; overflow-y: auto; font-size: 0.75rem; white-space: pre-wrap; word-break: break-word; font-family: 'Courier New', monospace; -webkit-overflow-scrolling: touch; }
+					.log-info { color: #c8c8c8; }
+					.log-warn { color: #dcdcaa; }
+					.log-err { color: #f48771; font-weight: bold; }
+					.log-ok { color: #4ec9b0; }
+				</style>
+			</head>
+			<body>
+				<div class="container">
+					<h2>🚀 Autogen C++ Fetch Test</h2>
+						<div id="status" class="status waiting">Status: Waiting for initialization...</div>
+							<div class="control-group">
+								<button id="btnInit" onclick="initRuntime()">Initialize Runtime</button>
+								</div>
+								<div class="control-group">
+									<label>Target URL</label>
+										<input type="text" id="fetchUrl" value="https://jsonplaceholder.typicode.com/todos/1" autocapitalize="off" autocorrect="off" spellcheck="false">
+										<div class="btn-row">
+											<button id="btnFetch" onclick="runFetchTest()" disabled>Run Fetch Test</button>
+											</div>
+											<div id="fetchResult" class="result-text"></div>
+											</div>
+											<div class="btn-row">
+												<button id="copyBtn" class="sec" onclick="copyConsole()">📋 Copy Logs</button>
+													<button id="clrBtn" class="sec" onclick="clearConsole()">Clear Logs</button>
+													</div>
+													<div id="console"></div>
+													</div>
+
+													<script src="/system/autogen/autogen.js"></script>
+														<script type="module">
+															import { registerFetchExtension } from './fetch_ext.js';
+
+															const consoleDiv = document.getElementById('console');
+															const statusDiv = document.getElementById('status');
+															const btnInit = document.getElementById('btnInit');
+															const btnFetch = document.getElementById('btnFetch');
+															let runtime = null;
+															let logBuffer = "";
+
+															// --- CONSOLE INTERCEPTION ---
+															const origConsole = { log: console.log, warn: console.warn, error: console.error, info: console.info };
+															function formatArgs(args) {
+																return Array.prototype.map.call(args, function(a) {
+																		if (a instanceof Error) return a.name + ': ' + a.message + (a.stack ? '\n' + a.stack : '');
+																		if (typeof a === 'object' && a !== null) { try { return JSON.stringify(a, null, 1); } catch(e) { return String(a); } }
+																		return String(a);
+																	}).join(' ');
+															}
+															function appendLog(msg, type) {
+																type = type || 'info';
+																const line = new Date().toLocaleTimeString() + ' [' + type.toUpperCase() + '] ' + msg;
+																const d = document.createElement('div');
+																d.className = type === 'err' ? 'log-err' : type === 'warn' ? 'log-warn' : type === 'ok' ? 'log-ok' : 'log-info';
+																d.textContent = line;
+																consoleDiv.appendChild(d);
+																consoleDiv.scrollTop = consoleDiv.scrollHeight;
+																logBuffer += line + '\n';
+															}
+															['log', 'info', 'warn', 'error'].forEach(function(k) {
+																	console[k] = function() {
+																		origConsole[k].apply(console, arguments);
+																		appendLog(formatArgs(arguments), k === 'error' ? 'err' : k === 'warn' ? 'warn' : 'info');
+																	};
+																});
+															window.addEventListener('error', function(ev) { appendLog('UNCAUGHT: ' + (ev.message || '?'), 'err'); }, true);
+															window.addEventListener('unhandledrejection', function(ev) { appendLog('UNHANDLED REJECTION: ' + formatArgs([ev.reason]), 'err'); });
+
+															// --- UI HELPERS ---
+															window.clearConsole = function() { consoleDiv.innerHTML = ''; logBuffer = ""; appendLog("Console cleared.", "ok"); };
+															window.copyConsole = function() {
+																if (!logBuffer) { appendLog("Nothing to copy.", "warn"); return; }
+																navigator.clipboard.writeText(logBuffer).then(() => {
+																		const b = document.getElementById('copyBtn');
+																		b.textContent = '✅ Copied!';
+																		setTimeout(() => { b.textContent = '📋 Copy Logs'; }, 1500);
+																	}).catch(() => appendLog("Copy blocked.", "warn"));
+															};
+
+															// --- INITIALIZATION ---
+															window.initRuntime = async function() {
+																btnInit.disabled = true;
+																statusDiv.className = "status waiting";
+																statusDiv.textContent = "Status: Checking environment...";
+																window.clearConsole();
+
+																if (!window.crossOriginIsolated) {
+																	statusDiv.className = "status error";
+																	statusDiv.textContent = "Status: FAILED (Missing COOP/COEP headers)";
+																	appendLog("FATAL: crossOriginIsolated is false. Check server headers.", "err");
+																	btnInit.disabled = false;
+																	return;
+																}
+
+																try {
+																	appendLog("Environment OK. Initializing AutogenRuntime...", "ok");
+																	runtime = new window.AutogenRuntime();
+																	appendLog("Loading test_fetch.wasm...", "info");
+																	await runtime.initialize('test_fetch.wasm');
+
+																	// Register the reusable fetch extension library
+																	registerFetchExtension(runtime);
+
+																	statusDiv.className = "status ready";
+																	statusDiv.textContent = "Status: READY";
+																	appendLog("Runtime initialized. Workers ready. Fetch extension registered.", "ok");
+																	btnFetch.disabled = false;
+																} catch (err) {
+																	statusDiv.className = "status error";
+																	statusDiv.textContent = "Status: FAILED";
+																	appendLog("Init failed: " + (err.message || String(err)), "err");
+																	btnInit.disabled = false;
+																}
+															};
+
+															// --- TEST EXECUTION ---
+															window.runFetchTest = async function() {
+																if (!runtime) return;
+																const url = document.getElementById('fetchUrl').value.trim() || "https://httpbin.org/get";
+																const resultDiv = document.getElementById('fetchResult');
+
+																btnFetch.disabled = true;
+																resultDiv.textContent = "Executing C++ fetch...";
+																appendLog("Calling test_fetch_url('" + url + "')...", "info");
+
+																try {
+																	// 1. Allocate and write string to shared memory
+																	const encoder = new TextEncoder();
+																	const urlBytes = encoder.encode(url + '\0');
+																	const urlPtr = runtime.mainWasmInstance.exports.cppmalloc(urlBytes.length);
+																	new Uint8Array(runtime.sharedMemory.buffer).set(urlBytes, urlPtr);
+
+																	// 2. Call export (returns a future pointer because C++ uses ag_await)
+																	const futurePtr = await runtime.callExport(0, 'test_fetch_url', urlPtr);
+
+																	// 3. Wrap and await the future result
+																	const fut = runtime.wrapFuture(futurePtr);
+																	const statusCode = await fut.awaitResult('uint32');
+
+																	// 4. Free the string memory
+																	runtime.mainWasmInstance.exports.cppfree(urlPtr);
+
+																	resultDiv.textContent = "C++ Returned Status Code: " + statusCode;
+																	appendLog("Test completed successfully. Status: " + statusCode, "ok");
+																} catch (err) {
+																	resultDiv.textContent = "Error: " + err.message;
+																	appendLog("C++ call failed: " + err.message, "err");
+																} finally {
+																	btnFetch.disabled = false;
+																}
+															};
+
+															appendLog("Console capture active. Ready.", "ok");
+															appendLog("crossOriginIsolated = " + window.crossOriginIsolated, window.crossOriginIsolated ? "ok" : "err");
+														</script>
+													</body>
+												</html>

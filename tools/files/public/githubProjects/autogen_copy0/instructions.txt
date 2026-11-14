@@ -1,0 +1,16 @@
+
+
+in the code we still habe ag_ext
+like 
+ag_ext_async
+ag_ext_sync
+ag_ext_fire
+these need to be taken out. this was old cide that should never habe been out there.
+
+should only use 
+ag_async
+ag_sync
+ag_fire
+show the full code of only the files thwt have changes.
+
+

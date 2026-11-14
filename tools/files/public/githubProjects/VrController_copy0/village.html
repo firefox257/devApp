@@ -1,0 +1,1945 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<title>Whisperwood Village — World Space 3D Dialogue & Inventory</title>
+
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-user-select: none; user-select: none; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #000; font-family: Georgia, 'Times New Roman', serif; color: #f3e7c3; }
+  #game { position: fixed; inset: 0; }
+  #vr-canvas { position: fixed; inset: 0; z-index: 10; pointer-events: none; touch-action: none; }
+  #vr-canvas.active { pointer-events: auto; }
+  #hud { position: fixed; top: 10px; left: 10px; z-index: 20; background: rgba(0,0,0,0.45); padding: 8px 12px; border-radius: 8px; font-size: 12px; line-height: 1.4; color: #e8d8a8; border: 1px solid rgba(255,220,140,0.3); max-width: 60vw; }
+  #hud b { color: #ffd97a; }
+
+  #crosshair {
+    position: fixed; top: 50%; left: 50%; z-index: 5;
+    width: 8px; height: 8px; margin: -4px 0 0 -4px;
+    border-radius: 50%; background: rgba(255, 240, 200, 0.9);
+    border: 2px solid rgba(0,0,0,0.6);
+    pointer-events: none;
+    box-shadow: 0 0 10px rgba(255, 217, 122, 0.8);
+    transition: transform 0.15s ease-out, box-shadow 0.15s ease-out, background 0.15s;
+  }
+  #crosshair.active {
+    transform: scale(1.8);
+    box-shadow: 0 0 18px rgba(255, 100, 100, 0.9);
+    background: rgba(255, 200, 200, 0.95);
+    border-color: rgba(255, 50, 50, 0.8);
+  }
+
+  #start-screen { position: fixed; inset: 0; z-index: 100; background: radial-gradient(ellipse at center, #2a1f10 0%, #0a0604 100%); display: flex; flex-direction: column; align-items: center; justify-content: center; color: #f3e7c3; text-align: center; padding: 20px; }
+  #start-screen h1 { font-size: 38px; color: #ffd97a; margin-bottom: 10px; text-shadow: 0 0 20px rgba(255,200,100,0.5); letter-spacing: 3px; }
+  #start-screen p { max-width: 480px; line-height: 1.6; margin-bottom: 24px; color: #d9c79a; }
+  #start-btn { padding: 14px 36px; font-size: 18px; font-family: inherit; background: linear-gradient(180deg, #b8893f, #7a5520); color: #fff3d0; border: 2px solid #ffd97a; border-radius: 30px; cursor: pointer; letter-spacing: 2px; box-shadow: 0 4px 20px rgba(255,200,100,0.3); touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+  #start-btn:active { transform: scale(0.97); }
+  .controls-hint { font-size: 12px; color: #a8956a; margin-top: 18px; max-width: 420px; line-height: 1.5; text-align: center; }
+
+  /* DEBUG CONSOLE STYLES */
+  #debug-console {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    z-index: 9999;
+    background: rgba(10, 10, 15, 0.92);
+    color: #eee;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 11px;
+    pointer-events: auto;
+    border-top: 2px solid #555;
+    display: flex;
+    flex-direction: column;
+    max-height: 45vh;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transform: translateY(calc(100% - 36px));
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+  #debug-console.expanded { transform: translateY(0); }
+  #debug-header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 6px 12px; background: rgba(30,30,40,0.95);
+    border-bottom: 1px solid #444; flex-shrink: 0;
+    font-weight: bold; color: #aaa; letter-spacing: 1px;
+  }
+  #debug-actions { display: flex; gap: 8px; align-items: center; }
+  #debug-toggle {
+    background: none; border: none; color: #fff; font-size: 16px; cursor: pointer; padding: 4px 8px;
+  }
+  #debug-copy, #debug-clear {
+    border: none; padding: 4px 10px; border-radius: 4px; font-size: 11px; cursor: pointer; font-weight: bold;
+  }
+  #debug-copy { background: #007aff; color: #fff; }
+  #debug-clear { background: #ff3b30; color: #fff; }
+  #debug-logs {
+    flex-grow: 1; overflow-y: auto; padding: 8px 12px;
+    white-space: pre-wrap; word-break: break-word; -webkit-overflow-scrolling: touch;
+    line-height: 1.4;
+  }
+  .log-entry { margin-bottom: 6px; padding-bottom: 4px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+  .log-warn { color: #ffcc00; }
+  .log-error { color: #ff453a; font-weight: bold; }
+  .log-info { color: #32d74b; }
+  .log-time { color: #888; margin-right: 6px; }
+</style>
+</head>
+<body>
+
+<div id="debug-console">
+  <div id="debug-header">
+    <span>DEBUG CONSOLE</span>
+    <div id="debug-actions">
+      <button id="debug-clear">Clear</button>
+      <button id="debug-copy">Copy All</button>
+      <button id="debug-toggle">▲</button>
+    </div>
+  </div>
+  <div id="debug-logs"></div>
+</div>
+
+<script>
+  (function() {
+    const debugLogs = [];
+    const logsContainer = document.getElementById('debug-logs');
+    const debugConsole = document.getElementById('debug-console');
+    const debugToggle = document.getElementById('debug-toggle');
+    const debugCopy = document.getElementById('debug-copy');
+    const debugClear = document.getElementById('debug-clear');
+
+    const originalConsole = {
+      log: console.log.bind(console),
+      info: console.info.bind(console),
+      warn: console.warn.bind(console),
+      error: console.error.bind(console)
+    };
+
+    function addLog(type, args) {
+      const time = new Date().toLocaleTimeString();
+      const msg = Array.from(args).map(a => {
+        if (a instanceof Error) return a.stack || a.message;
+        if (typeof a === 'object') {
+          try { return JSON.stringify(a, null, 2); } catch(e) { return String(a); }
+        }
+        return String(a);
+      }).join(' ');
+      
+      const fullLog = `${msg}`;
+      debugLogs.push(`[${time}] [${type.toUpperCase()}] ${msg}`);
+      
+      const div = document.createElement('div');
+      div.className = `log-entry log-${type === 'warn' ? 'warn' : type === 'error' ? 'error' : 'info'}`;
+      
+      const timeSpan = document.createElement('span');
+      timeSpan.className = 'log-time';
+      timeSpan.textContent = `[${time}]`;
+      
+      div.appendChild(timeSpan);
+      div.appendChild(document.createTextNode(` [${type.toUpperCase()}] ${msg}`));
+      
+      logsContainer.appendChild(div);
+      
+      if (logsContainer.scrollTop + logsContainer.clientHeight >= logsContainer.scrollHeight - 50) {
+        logsContainer.scrollTop = logsContainer.scrollHeight;
+      }
+      
+      if (debugLogs.length > 500) {
+        debugLogs.shift();
+        if (logsContainer.firstChild) logsContainer.removeChild(logsContainer.firstChild);
+      }
+    }
+
+    console.log = function(...args) { originalConsole.log(...args); addLog('info', args); };
+    console.info = function(...args) { originalConsole.info(...args); addLog('info', args); };
+    console.warn = function(...args) { originalConsole.warn(...args); addLog('warn', args); };
+    console.error = function(...args) { originalConsole.error(...args); addLog('error', args); };
+
+    debugToggle.addEventListener('click', (e) => {
+      e.stopPropagation();
+      debugConsole.classList.toggle('expanded');
+      debugToggle.textContent = debugConsole.classList.contains('expanded') ? '▼' : '▲';
+    });
+
+    debugCopy.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const text = debugLogs.join('\n');
+      try {
+        await navigator.clipboard.writeText(text);
+        debugCopy.textContent = 'Copied!';
+      } catch (err) {
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+        debugCopy.textContent = 'Copied!';
+      }
+      setTimeout(() => { debugCopy.textContent = 'Copy All'; }, 2000);
+    });
+
+    debugClear.addEventListener('click', (e) => {
+      e.stopPropagation();
+      debugLogs.length = 0;
+      logsContainer.innerHTML = '';
+    });
+
+    window.addEventListener('error', (e) => {
+      console.error('Uncaught Error:', e.message, 'at', e.filename + ':' + e.lineno);
+    });
+    window.addEventListener('unhandledrejection', (e) => {
+      console.error('Unhandled Promise Rejection:', e.reason);
+    });
+    
+    console.log("Debug Console Initialized. Tap ▲ to expand.");
+  })();
+</script>
+
+<div id="game">
+  <canvas id="vr-canvas"></canvas>
+  <div id="crosshair"></div>
+  <div id="hud">
+    <b>Whisperwood Village</b><br/>
+    <span id="hud-pos">—</span><br/>
+    <span id="hud-prompt" style="color:#ffd97a; font-weight:bold;">Explore the village...</span><br/>
+    <span style="font-size:10px; color:#aaa;">[I]/[X]/[Y] Inventory · [A]/[Trigger] Interact · Look at choice + [RT] to select</span>
+  </div>
+</div>
+
+<div id="start-screen">
+  <h1>WHISPERWOOD</h1>
+  <p>A quiet village nestled between ancient pines. The elders speak of shadows stirring in the eastern woods, and the merchant has wares if you have coin.</p>
+  <button id="start-btn">ENTER THE WOODS</button>
+  <div class="controls-hint">
+    <b>Mobile VR:</b> Physically turn your phone to look around · Left stick = walk · Height slider on right edge · In dialogue: Look at choice to highlight, [A]/[RT] to confirm<br/>
+    <b>Desktop Fallback:</b> WASD = walk · Mouse drag = look · E = talk/confirm · ↑/↓ or 1-3 = choose reply · Q/Z = height · I = Inventory
+  </div>
+</div>
+
+<script type="importmap">
+{ "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { VRCom } from './vrCom.js';
+
+// ==========================================
+// WORLD-SPACE 3D DIALOGUE SYSTEM (branching + choices + speaking state)
+// ==========================================
+class DialogueSystem3D {
+  constructor(scene) {
+    this.scene = scene;
+    this.inventory = null; // assigned after InventorySystem3D is created
+
+    this.prompt = this._makePanel(512, 200, 0.8, 0.31);
+    this.dialog = this._makePanel(512, 440, 0.85, 0.73);
+
+    this.isActive = false;
+    this.isPrompt = false;
+    this.currentNPC = null;
+    this.tree = null;
+    this.node = null;
+    this.text = '';
+    this.choices = [];
+    this.selected = 0;
+    this.hoveredChoice = -1;
+    this.blinkTimer = 0;
+    this.typingCharIndex = 0;
+    this.typingComplete = false;
+    this.typingSpeed = 38; // characters per second
+    this.lastCursorX = 0;
+    this.lastCursorY = 0;
+  }
+
+  _makePanel(cw, ch, pw, ph) {
+    const group = new THREE.Group();
+    group.visible = false;
+    this.scene.add(group);
+
+    const canvas = document.createElement('canvas');
+    canvas.width = cw; canvas.height = ch;
+    const ctx = canvas.getContext('2d');
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.minFilter = THREE.LinearFilter;
+    texture.colorSpace = THREE.SRGBColorSpace;
+
+    const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true, side: THREE.DoubleSide, depthTest: true, toneMapped: false });
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(pw, ph), material);
+    group.add(mesh);
+
+    const bgMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.85, side: THREE.DoubleSide, depthTest: true });
+    const bg = new THREE.Mesh(new THREE.PlaneGeometry(pw + 0.04, ph + 0.04), bgMat);
+    bg.position.z = -0.01;
+    group.add(bg);
+
+    return { group, canvas, ctx, texture };
+  }
+
+  get visible() { return this.prompt.group.visible || this.dialog.group.visible; }
+  get speaking() { return this.isActive && !this.typingComplete; }
+  get choicesVisible() { return this.isActive && this.typingComplete && this.choices.length > 0; }
+
+  showPrompt(npc) {
+    if (this.isActive) return;
+    if (this.isPrompt && this.currentNPC === npc && this.prompt.group.visible) return;
+    this.currentNPC = npc;
+    this.isPrompt = true;
+    this.prompt.group.visible = true;
+    this.dialog.group.visible = false;
+    this._drawPrompt(npc.userData.name);
+  }
+
+  startConversation(npc) {
+    this.currentNPC = npc;
+    this.isActive = true;
+    this.isPrompt = false;
+    this.tree = npc.userData.tree;
+    this.prompt.group.visible = false;
+    this.dialog.group.visible = true;
+    this.goto('start');
+  }
+
+  goto(id) {
+    const node = this.tree && id ? this.tree[id] : null;
+    if (!node) { this.close(); return; }
+    this.node = node;
+    if (node.give && this.inventory && !this.inventory.has(node.give)) this.inventory.addItem(node.give);
+    this.text = node.text || '';
+    this.choices = (node.choices || []).filter(c => !c.if || c.if(this.inventory));
+    this.selected = 0;
+    this.typingCharIndex = 0;
+    this.typingComplete = this.text.length === 0;
+    this._drawDialogue();
+  }
+
+  advance() {
+    if (!this.isActive || !this.node) return;
+    if (!this.typingComplete) {
+      this.typingCharIndex = this.text.length;
+      this.typingComplete = true;
+      this._drawDialogue();
+      return;
+    }
+    if (this.choices.length > 0) { this.choose(this.selected); return; }
+    if (this.node.next) this.goto(this.node.next);
+    else this.close();
+  }
+
+  move(dir) {
+    if (!this.choicesVisible) return;
+    const n = this.choices.length;
+    this.selected = (this.selected + dir + n) % n;
+    this._drawDialogue();
+  }
+
+  choose(i) {
+    if (!this.choicesVisible || !this.choices[i]) return;
+    const c = this.choices[i];
+    if (c.take && this.inventory) this.inventory.remove(c.take);
+    if (c.give && this.inventory && !this.inventory.has(c.give)) this.inventory.addItem(c.give);
+    if (c.next) this.goto(c.next);
+    else this.close();
+  }
+
+  close() {
+    this.isActive = false;
+    this.isPrompt = false;
+    this.currentNPC = null;
+    this.tree = null;
+    this.node = null;
+    this.choices = [];
+    this.prompt.group.visible = false;
+    this.dialog.group.visible = false;
+  }
+
+  updateHover(raycaster) {
+    if (!this.isActive || !this.typingComplete || this.choices.length === 0) {
+      return;
+    }
+    const mesh = this.dialog.group.children[0];
+    const intersects = raycaster.intersectObject(mesh);
+    let newSelected = this.selected;
+    
+    if (intersects.length > 0 && intersects[0].uv) {
+      const uv = intersects[0].uv;
+      const w = this.dialog.canvas.width;
+      const h = this.dialog.canvas.height;
+      const cx = uv.x * w;
+      const cy = (1 - uv.y) * h;
+      
+      for (let i = 0; i < this.choices.length; i++) {
+        const y = 242 + i * 46;
+        if (cy >= y && cy <= y + 40 && cx >= 26 && cx <= w - 26) {
+          newSelected = i;
+          break;
+        }
+      }
+    }
+    
+    if (newSelected !== this.selected) {
+      this.selected = newSelected;
+      this._drawDialogue();
+    }
+  }
+
+  update(cameraPos, dt) {
+    const npc = this.currentNPC;
+    if (!npc || !this.visible) return;
+
+    const panel = this.isActive ? this.dialog : this.prompt;
+    const dirToCam = new THREE.Vector3().subVectors(cameraPos, npc.position);
+    dirToCam.y = 0;
+    if (dirToCam.lengthSq() < 0.01) dirToCam.set(0, 0, -1);
+    else dirToCam.normalize();
+
+    panel.group.position.copy(npc.position)
+      .add(dirToCam.multiplyScalar(1.0))
+      .setY(npc.position.y + (this.isActive ? 0.95 : 0.85));
+
+    const lookTarget = new THREE.Vector3().copy(cameraPos);
+    // Tilt the panel slightly upward towards the player's face for better visibility
+    lookTarget.y = panel.group.position.y + 0.8;
+    panel.group.lookAt(lookTarget);
+
+    if (!this.isActive) return;
+
+    if (!this.typingComplete) {
+      this.typingCharIndex += this.typingSpeed * dt;
+      if (this.typingCharIndex >= this.text.length) {
+        this.typingCharIndex = this.text.length;
+        this.typingComplete = true;
+      }
+      this._drawDialogue();
+    } else if (this.choices.length === 0) {
+      this.blinkTimer += 0.08;
+      this._drawDialogue();
+    }
+  }
+
+  _drawPrompt(name) {
+    const ctx = this.prompt.ctx;
+    const w = this.prompt.canvas.width, h = this.prompt.canvas.height;
+    ctx.clearRect(0, 0, w, h);
+
+    const grad = ctx.createLinearGradient(0, 0, 0, h);
+    grad.addColorStop(0, 'rgba(30, 20, 10, 0.95)');
+    grad.addColorStop(1, 'rgba(15, 10, 5, 0.98)');
+    ctx.fillStyle = grad;
+    this._roundRect(ctx, 10, 10, w - 20, h - 20, 16);
+    ctx.fill();
+
+    ctx.strokeStyle = '#b8893f'; ctx.lineWidth = 4; ctx.stroke();
+
+    ctx.fillStyle = '#ffd97a'; ctx.font = 'bold 36px Georgia, serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(`Speak with ${name || 'Someone'}?`, w / 2, h / 2 - 20);
+
+    ctx.fillStyle = '#a8956a'; ctx.font = 'italic 28px Georgia, serif';
+    ctx.fillText('Look at this and press [A] or [RT]', w / 2, h / 2 + 30);
+    this.prompt.texture.needsUpdate = true;
+  }
+
+  _drawDialogue() {
+    if (!this.currentNPC) return;
+    const ctx = this.dialog.ctx;
+    const w = this.dialog.canvas.width, h = this.dialog.canvas.height;
+    const u = this.currentNPC.userData;
+
+    ctx.clearRect(0, 0, w, h);
+
+    const grad = ctx.createLinearGradient(0, 0, 0, h);
+    grad.addColorStop(0, 'rgba(30, 20, 10, 0.95)');
+    grad.addColorStop(1, 'rgba(15, 10, 5, 0.98)');
+    ctx.fillStyle = grad;
+    this._roundRect(ctx, 10, 10, w - 20, h - 20, 16);
+    ctx.fill();
+
+    ctx.strokeStyle = '#b8893f'; ctx.lineWidth = 4; ctx.stroke();
+
+    ctx.fillStyle = '#b8893f';
+    this._drawCorner(ctx, 10, 10, 24, true, false, false, false);
+    this._drawCorner(ctx, w - 10, 10, 24, false, true, false, false);
+    this._drawCorner(ctx, 10, h - 10, 24, false, false, true, false);
+    this._drawCorner(ctx, w - 10, h - 10, 24, false, false, false, true);
+
+    // name tag
+    ctx.fillStyle = '#b8893f';
+    this._roundRect(ctx, 20, 20, 300, 50, 8);
+    ctx.fill();
+    ctx.fillStyle = '#1a1008'; ctx.font = 'bold 28px Georgia, serif';
+    ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    ctx.fillText(u.name || 'Unknown', 38, 45);
+
+    // portrait (pulses while speaking)
+    const pulse = this.speaking ? 1 + Math.sin(performance.now() * 0.02) * 0.04 : 1;
+    const pX = 65, pY = 150, pR = 44 * pulse;
+    ctx.beginPath(); ctx.arc(pX, pY, pR, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.4)'; ctx.fill();
+    ctx.strokeStyle = '#ffd97a'; ctx.lineWidth = 4; ctx.stroke();
+    ctx.fillStyle = '#ffd97a'; ctx.font = 'bold 48px Georgia, serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText((u.name || '?').charAt(0), pX, pY + 4);
+
+    // typed text
+    ctx.fillStyle = '#f3e7c3'; ctx.font = '24px Georgia, serif';
+    ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    const visibleText = this.text.substring(0, Math.floor(this.typingCharIndex));
+    this._wrapText(ctx, visibleText, 130, 100, w - 160, 32);
+
+    if (!this.typingComplete) {
+      ctx.fillStyle = '#ffd97a';
+      ctx.fillText('█', this.lastCursorX, this.lastCursorY);
+    }
+
+    // choices
+    if (this.typingComplete && this.choices.length > 0) {
+      ctx.strokeStyle = 'rgba(184,137,63,0.6)'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(30, 232); ctx.lineTo(w - 30, 232); ctx.stroke();
+
+      this.choices.forEach((c, i) => {
+        const y = 242 + i * 46, sel = i === this.selected;
+        this._roundRect(ctx, 26, y, w - 52, 40, 10);
+        ctx.fillStyle = sel ? 'rgba(184,137,63,0.9)' : 'rgba(255,255,255,0.07)';
+        ctx.fill();
+        if (sel) { ctx.strokeStyle = '#ffd97a'; ctx.lineWidth = 3; ctx.stroke(); }
+        ctx.fillStyle = sel ? '#1a1008' : '#f3e7c3';
+        ctx.font = (sel ? 'bold ' : '') + '22px Georgia, serif';
+        ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+        ctx.fillText(`${i + 1}. ${c.text}`, 42, y + 21);
+      });
+
+      ctx.fillStyle = '#a8956a'; ctx.font = 'italic 17px Georgia, serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+      ctx.fillText('Look at choice + [A] / [RT] to confirm', w / 2, h - 16);
+    } else if (this.typingComplete) {
+      const alpha = 0.4 + 0.6 * Math.abs(Math.sin(this.blinkTimer));
+      ctx.fillStyle = `rgba(255, 217, 122, ${alpha})`;
+      ctx.font = 'bold 22px Georgia, serif';
+      ctx.textAlign = 'right'; ctx.textBaseline = 'bottom';
+      const label = this.node && this.node.next ? '▼ Continue [A] / [RT]' : '■ End [A] / [RT]';
+      ctx.fillText(label, w - 30, h - 24);
+    }
+    this.dialog.texture.needsUpdate = true;
+  }
+
+  _drawCorner(ctx, x, y, size, tl, tr, bl, br) {
+    ctx.lineWidth = 4; ctx.strokeStyle = '#b8893f'; ctx.beginPath();
+    if (tl) { ctx.moveTo(x, y + size); ctx.lineTo(x, y); ctx.lineTo(x + size, y); }
+    else if (tr) { ctx.moveTo(x - size, y); ctx.lineTo(x, y); ctx.lineTo(x, y + size); }
+    else if (bl) { ctx.moveTo(x, y - size); ctx.lineTo(x, y); ctx.lineTo(x + size, y); }
+    else if (br) { ctx.moveTo(x - size, y); ctx.lineTo(x, y); ctx.lineTo(x, y - size); }
+    ctx.stroke();
+  }
+
+  _roundRect(ctx, x, y, w, h, r) {
+    ctx.beginPath(); ctx.moveTo(x + r, y); ctx.lineTo(x + w - r, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r); ctx.lineTo(x + w, y + h - r);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h); ctx.lineTo(x + r, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - r); ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y); ctx.closePath();
+  }
+
+  _wrapText(ctx, text, x, y, maxWidth, lineHeight) {
+    const words = text.split(' ');
+    let line = '', currentY = y;
+    for (let n = 0; n < words.length; n++) {
+      const testLine = line + words[n] + ' ';
+      if (ctx.measureText(testLine).width > maxWidth && n > 0) {
+        ctx.fillText(line, x, currentY);
+        line = words[n] + ' '; currentY += lineHeight;
+      } else { line = testLine; }
+    }
+    ctx.fillText(line, x, currentY);
+    this.lastCursorX = x + ctx.measureText(line).width;
+    this.lastCursorY = currentY;
+  }
+}
+
+// ==========================================
+// WORLD-SPACE 3D INVENTORY SYSTEM
+// ==========================================
+class InventorySystem3D {
+  constructor(scene, camera) {
+    this.scene = scene;
+    this.camera = camera;
+    this.group = new THREE.Group();
+    this.group.visible = false;
+    this.scene.add(this.group);
+    
+    this.canvas = document.createElement('canvas');
+    this.canvas.width = 512;
+    this.canvas.height = 512;
+    this.ctx = this.canvas.getContext('2d');
+    
+    this.texture = new THREE.CanvasTexture(this.canvas);
+    this.texture.minFilter = THREE.LinearFilter;
+    this.texture.colorSpace = THREE.SRGBColorSpace;
+    
+    const material = new THREE.MeshBasicMaterial({ 
+      map: this.texture, 
+      transparent: true, 
+      side: THREE.DoubleSide,
+      depthTest: false,
+      toneMapped: false
+    });
+    
+    this.mesh = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 1.8), material);
+    this.mesh.renderOrder = 100;
+    this.group.add(this.mesh);
+    
+    const bgMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.85, side: THREE.DoubleSide, depthTest: false });
+    this.bgMesh = new THREE.Mesh(new THREE.PlaneGeometry(1.55, 1.85), bgMat);
+    this.bgMesh.position.z = -0.01;
+    this.group.add(this.bgMesh);
+    
+    this.isOpen = false;
+    this.items = [];
+  }
+  
+  has(name) { return this.items.includes(name); }
+
+  addItem(name) {
+    this.items.push(name);
+    this._draw();
+  }
+
+  remove(name) {
+    const i = this.items.indexOf(name);
+    if (i > -1) this.items.splice(i, 1);
+    this._draw();
+  }
+  
+  toggle() {
+    this.isOpen = !this.isOpen;
+    this.group.visible = this.isOpen;
+    if (this.isOpen) {
+      this._draw();
+      this._placeInWorldSpace(); // Calculate fixed position ONLY when opening
+    }
+  }
+  
+  _placeInWorldSpace() {
+    const camPos = new THREE.Vector3();
+    this.camera.getWorldPosition(camPos);
+    
+    const camDir = new THREE.Vector3();
+    this.camera.getWorldDirection(camDir);
+    
+    const offset = new THREE.Vector3().copy(camDir).multiplyScalar(1.8).add(new THREE.Vector3(0, -0.4, 0));
+    this.group.position.copy(camPos).add(offset);
+    
+    const lookTarget = new THREE.Vector3().copy(camPos);
+    lookTarget.y = this.group.position.y;
+    this.group.lookAt(lookTarget);
+  }
+  
+  // The inventory stays fixed in world space once placed.
+  update() {}
+  
+  _draw() {
+    const ctx = this.ctx;
+    const w = this.canvas.width, h = this.canvas.height;
+    ctx.clearRect(0, 0, w, h);
+    
+    const grad = ctx.createLinearGradient(0, 0, 0, h);
+    grad.addColorStop(0, 'rgba(25, 18, 12, 0.95)');
+    grad.addColorStop(1, 'rgba(12, 9, 6, 0.98)');
+    ctx.fillStyle = grad;
+    this._roundRect(ctx, 10, 10, w - 20, h - 20, 20);
+    ctx.fill();
+    
+    ctx.strokeStyle = '#b8893f'; ctx.lineWidth = 6; ctx.stroke();
+    
+    ctx.fillStyle = '#b8893f';
+    this._drawCorner(ctx, 10, 10, 30, true, false, false, false);
+    this._drawCorner(ctx, w - 10, 10, 30, false, true, false, false);
+    this._drawCorner(ctx, 10, h - 10, 30, false, false, true, false);
+    this._drawCorner(ctx, w - 10, h - 10, 30, false, false, false, true);
+    
+    ctx.fillStyle = '#ffd97a'; ctx.font = 'bold 48px Georgia, serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    ctx.fillText('INVENTORY', w / 2, 40);
+    
+    ctx.strokeStyle = '#b8893f'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(40, 110); ctx.lineTo(w - 40, 110); ctx.stroke();
+    
+    ctx.fillStyle = '#f3e7c3'; ctx.font = '32px Georgia, serif';
+    ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+    
+    if (this.items.length === 0) {
+      ctx.fillStyle = '#a8956a'; ctx.font = 'italic 28px Georgia, serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('Your satchel is empty.', w / 2, 160);
+    } else {
+      let y = 140;
+      this.items.forEach((item) => {
+        ctx.fillStyle = '#ffd97a';
+        ctx.fillText(`• ${item}`, 60, y);
+        y += 55;
+      });
+    }
+    
+    ctx.fillStyle = '#a8956a'; ctx.font = '24px Georgia, serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+    ctx.fillText('Press [X], [Y], or [I] to close', w / 2, h - 30);
+    
+    this.texture.needsUpdate = true;
+  }
+  
+  _drawCorner(ctx, x, y, size, tl, tr, bl, br) {
+    ctx.lineWidth = 4; ctx.strokeStyle = '#b8893f'; ctx.beginPath();
+    if (tl) { ctx.moveTo(x, y + size); ctx.lineTo(x, y); ctx.lineTo(x + size, y); }
+    else if (tr) { ctx.moveTo(x - size, y); ctx.lineTo(x, y); ctx.lineTo(x, y + size); }
+    else if (bl) { ctx.moveTo(x, y - size); ctx.lineTo(x, y); ctx.lineTo(x + size, y); }
+    else if (br) { ctx.moveTo(x - size, y); ctx.lineTo(x, y); ctx.lineTo(x, y - size); }
+    ctx.stroke();
+  }
+  
+  _roundRect(ctx, x, y, w, h, r) {
+    ctx.beginPath(); ctx.moveTo(x + r, y); ctx.lineTo(x + w - r, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r); ctx.lineTo(x + w, y + h - r);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h); ctx.lineTo(x + r, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - r); ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y); ctx.closePath();
+  }
+}
+
+// ==========================================
+// HELPERS: procedural textures, materials, geometry
+// ==========================================
+const rnd = (a, b) => a + Math.random() * (b - a);
+const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+const cl255 = v => Math.max(0, Math.min(255, v | 0));
+const lp = (a, b, k) => a + (b - a) * k;
+
+function makeTex(kind, base, vari, rx = 1, ry = 1) {
+  const S = 128, c = document.createElement('canvas');
+  c.width = c.height = S;
+  const x = c.getContext('2d');
+  const [r, g, b] = base;
+  const col = (k = 1) => { const d = 1 + (Math.random() - 0.5) * vari * k; return `rgb(${cl255(r*d)},${cl255(g*d)},${cl255(b*d)})`; };
+  x.fillStyle = col(0); x.fillRect(0, 0, S, S);
+
+  if (kind === 'noise' || kind === 'plaster') {
+    const n = kind === 'plaster' ? 900 : 700;
+    for (let i = 0; i < n; i++) { x.fillStyle = col(); const s = rnd(2, 7); x.fillRect(rnd(0, S), rnd(0, S), s, s); }
+    if (kind === 'plaster') {
+      for (let i = 0; i < 6; i++) { x.fillStyle = 'rgba(80,60,40,0.07)'; x.fillRect(rnd(0, S), rnd(0, S), rnd(10, 40), rnd(10, 40)); }
+    }
+  } else if (kind === 'planks') {
+    for (let i = 0; i < 8; i++) {
+      x.fillStyle = col(); x.fillRect(i * 16, 0, 16, S);
+      for (let j = 0; j < 7; j++) {
+        x.strokeStyle = `rgba(0,0,0,${rnd(0.05, 0.18)})`; x.lineWidth = rnd(0.6, 1.4);
+        const lx = i * 16 + rnd(2, 14);
+        x.beginPath(); x.moveTo(lx, 0); x.bezierCurveTo(lx + rnd(-2, 2), S * 0.33, lx + rnd(-2, 2), S * 0.66, lx + rnd(-1, 1), S); x.stroke();
+      }
+      x.fillStyle = 'rgba(0,0,0,0.5)'; x.fillRect(i * 16, 0, 1.6, S);
+    }
+  } else if (kind === 'stone') {
+    for (let y = 0; y < S; y += 32) {
+      let xx = -rnd(0, 30);
+      while (xx < S) {
+        const w = rnd(28, 52);
+        x.fillStyle = col(1.3); x.fillRect(xx + 1.5, y + 1.5, w - 3, 29);
+        x.fillStyle = 'rgba(255,255,255,0.08)'; x.fillRect(xx + 1.5, y + 1.5, w - 3, 5);
+        xx += w;
+      }
+      x.fillStyle = 'rgba(30,28,25,0.65)'; x.fillRect(0, y, S, 2);
+    }
+  } else if (kind === 'tiles') {
+    for (let y = 0, row = 0; y < S; y += 16, row++) {
+      for (let xx = -12 + (row % 2) * 12; xx < S; xx += 24) {
+        x.fillStyle = col(1.2); x.fillRect(xx, y, 24, 16);
+        x.fillStyle = 'rgba(0,0,0,0.4)'; x.fillRect(xx, y + 13, 24, 3); x.fillRect(xx, y, 1.5, 16);
+      }
+    }
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(rx, ry);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 4;
+  return t;
+}
+
+const mat = (opts = {}) => new THREE.MeshStandardMaterial({ roughness: 0.9, metalness: 0, ...opts });
+
+// Deterministic jitter so shared vertices stay joined (no cracks)
+function blob(r, detail, jit, seed) {
+  const g = new THREE.IcosahedronGeometry(r, detail);
+  const p = g.attributes.position, v = new THREE.Vector3();
+  for (let i = 0; i < p.count; i++) {
+    v.fromBufferAttribute(p, i);
+    const h = Math.sin((v.x + seed) * 12.9898 + v.y * 78.233 + (v.z - seed) * 37.719) * 43758.5453;
+    const k = 1 + ((h - Math.floor(h)) - 0.5) * jit;
+    p.setXYZ(i, v.x * k, v.y * k, v.z * k);
+  }
+  g.computeVertexNormals();
+  return g;
+}
+
+function box(w, h, d, m, x, y, z, parent, shadow = true) {
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m);
+  mesh.position.set(x, y, z);
+  if (shadow) { mesh.castShadow = true; mesh.receiveShadow = true; }
+  parent.add(mesh);
+  return mesh;
+}
+
+// Terrain height: flat village centre, rolling hills outside
+function terrainH(x, z) {
+  const r = Math.hypot(x, z);
+  const t = Math.min(1, Math.max(0, (r - 18) / 27));
+  const s = t * t * (3 - 2 * t);
+  return s * (Math.sin(x * 0.1) * Math.cos(z * 0.1) * 1.3 + Math.sin(x * 0.23 + 1) * Math.sin(z * 0.19) * 0.5);
+}
+
+// ==========================================
+// SCENE SETUP
+// ==========================================
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xcfe0ea);
+scene.fog = new THREE.Fog(0xcfe0ea, 30, 115);
+
+const camera = new THREE.PerspectiveCamera(72, innerWidth/innerHeight, 0.1, 300);
+const cameraYaw = new THREE.Object3D();
+const cameraPit = new THREE.Object3D();
+cameraYaw.add(cameraPit);
+cameraPit.add(camera);
+scene.add(cameraYaw);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+document.getElementById('game').appendChild(renderer.domElement);
+renderer.domElement.style.position = 'fixed';
+renderer.domElement.style.inset = '0';
+renderer.domElement.style.zIndex = '1';
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+// --- Lighting: warm low sun, cool sky fill ---
+scene.add(new THREE.HemisphereLight(0xcfe3ff, 0x4a3a20, 0.75));
+const sun = new THREE.DirectionalLight(0xffe6b0, 2.4);
+sun.position.set(30, 45, 20);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.left = -40; sun.shadow.camera.right = 40;
+sun.shadow.camera.top = 40;   sun.shadow.camera.bottom = -40;
+sun.shadow.camera.near = 1;   sun.shadow.camera.far = 140;
+sun.shadow.bias = -0.0004;
+sun.shadow.normalBias = 0.03;
+scene.add(sun);
+
+// --- Sky dome + sun disc + clouds ---
+const sky = (() => {
+  const geo = new THREE.SphereGeometry(180, 24, 16);
+  const pa = geo.attributes.position, cols = [];
+  const hor = new THREE.Color(0xcfe0ea), top = new THREE.Color(0x4f86c0), c = new THREE.Color();
+  for (let i = 0; i < pa.count; i++) {
+    const t = Math.max(0, pa.getY(i) / 180);
+    c.copy(hor).lerp(top, Math.pow(t, 0.6));
+    cols.push(c.r, c.g, c.b);
+  }
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3));
+  const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide, fog: false, depthWrite: false }));
+  m.renderOrder = -2;
+  scene.add(m);
+  return m;
+})();
+const sunDisc = new THREE.Mesh(new THREE.SphereGeometry(7, 16, 12), new THREE.MeshBasicMaterial({ color: 0xfff4c8, fog: false }));
+sunDisc.position.copy(sun.position).normalize().multiplyScalar(160);
+sky.add(sunDisc);
+
+// FIX: Removed invalid `flatShading: true` property from MeshBasicMaterial
+const cloudMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.92, fog: false });
+const clouds = [];
+for (let i = 0; i < 9; i++) {
+  const cg = new THREE.Group();
+  const n = 4 + Math.floor(Math.random() * 3);
+  for (let j = 0; j < n; j++) {
+    const b = new THREE.Mesh(blob(1, 1, 0.25, j + i * 7), cloudMat);
+    b.scale.set(rnd(4, 8), rnd(2, 3.5), rnd(3, 5));
+    b.position.set(j * 5 - n * 2.5, rnd(-0.5, 1), rnd(-2, 2));
+    cg.add(b);
+  }
+  cg.position.set(rnd(-120, 120), rnd(55, 85), rnd(-120, 120));
+  scene.add(cg);
+  clouds.push(cg);
+}
+
+// --- Ground with vertex-coloured, textured terrain ---
+const groundGeo = new THREE.PlaneGeometry(200, 200, 120, 120);
+{
+  const pos = groundGeo.attributes.position, cols = [], c = new THREE.Color();
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i), y = pos.getY(i);
+    const h = terrainH(x, -y);
+    pos.setZ(i, h);
+    c.setHSL(0.25 + Math.sin(x * 0.13 + y * 0.09) * 0.025, 0.5, 0.26 + Math.sin(x * 0.4) * Math.cos(y * 0.35) * 0.03 + h * 0.02);
+    cols.push(c.r, c.g, c.b);
+  }
+  groundGeo.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3));
+  groundGeo.computeVertexNormals();
+}
+const ground = new THREE.Mesh(groundGeo, mat({ vertexColors: true, map: makeTex('noise', [200, 200, 200], 0.35, 60, 60), roughness: 1 }));
+ground.rotation.x = -Math.PI / 2;
+ground.receiveShadow = true;
+scene.add(ground);
+
+// --- Shared materials ---
+const barkTex = makeTex('planks', [92, 62, 34], 0.35, 1, 2);
+const barkMat = mat({ map: barkTex, flatShading: true });
+const birchMat = mat({ color: 0xe6e2d6 });
+const leafMats = [0x2f6b28, 0x3b7d2f, 0x2a5d26, 0x4a8a35].map(c => mat({ color: c, flatShading: true }));
+const autumnMats = [0x8a9a2a, 0xa8a030, 0x6f9a2e].map(c => mat({ color: c, flatShading: true }));
+const pineMats = [0x1f4a2a, 0x265a30, 0x1b4226].map(c => mat({ color: c, flatShading: true }));
+const stoneMat = mat({ map: makeTex('stone', [150, 146, 138], 0.25, 2, 1), flatShading: false, side: THREE.DoubleSide });
+const rockMat = mat({ color: 0x8b8b84, flatShading: true });
+const mossMat = mat({ color: 0x5a7a3a, flatShading: true });
+const blobGeos = [0, 1, 2, 3].map(i => blob(1, 1, 0.38, i * 3.7));
+
+// --- Trees ---
+function makeOak(x, z, s, kind = 'oak') {
+  const g = new THREE.Group();
+  const trunkMat = kind === 'birch' ? birchMat : barkMat;
+  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.36, 2.4, 8), trunkMat);
+  trunk.position.y = 1.2; trunk.castShadow = true; g.add(trunk);
+  for (let i = 0; i < 4; i++) {
+    const root = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.7, 5), trunkMat);
+    const a = i * 1.57 + rnd(-0.3, 0.3);
+    root.position.set(Math.cos(a) * 0.3, 0.2, Math.sin(a) * 0.3);
+    root.rotation.set(Math.sin(a) * 0.6, 0, -Math.cos(a) * 0.6);
+    g.add(root);
+  }
+  if (kind === 'birch') {
+    for (let i = 0; i < 5; i++) box(0.38, 0.05, 0.38, mat({ color: 0x222222 }), 0, 0.5 + i * 0.45, 0, g, false).rotation.y = rnd(0, 3);
+  }
+  const lm = kind === 'birch' ? autumnMats : leafMats;
+  const n = 5 + Math.floor(Math.random() * 2);
+  for (let i = 0; i < n; i++) {
+    const m = new THREE.Mesh(pick(blobGeos), pick(lm));
+    const a = (i / n) * Math.PI * 2 + rnd(-0.4, 0.4);
+    const rr = i === 0 ? 0 : rnd(0.7, 1.2);
+    const sc = i === 0 ? rnd(1.5, 1.8) : rnd(0.9, 1.4);
+    m.scale.set(sc, sc * 0.85, sc);
+    m.position.set(Math.cos(a) * rr, (i === 0 ? 4.0 : rnd(2.7, 3.6)), Math.sin(a) * rr);
+    m.rotation.y = rnd(0, 6);
+    m.castShadow = true; g.add(m);
+  }
+  g.scale.setScalar(s);
+  g.position.set(x, terrainH(x, z), z);
+  g.rotation.y = rnd(0, 6.28);
+  g.userData.sway = rnd(0, 6.28);
+  return g;
+}
+
+function makePine(x, z, s) {
+  const g = new THREE.Group();
+  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.3, 2.2, 7), barkMat);
+  trunk.position.y = 1.1; trunk.castShadow = true; g.add(trunk);
+  const tiers = 5, pm = pick(pineMats);
+  for (let i = 0; i < tiers; i++) {
+    const r = 1.9 - i * 0.32, h = 1.7;
+    const cone = new THREE.Mesh(new THREE.ConeGeometry(r, h, 8), i % 2 ? pm : pick(pineMats));
+    cone.position.y = 2.0 + i * 0.95;
+    cone.rotation.y = rnd(0, 6);
+    cone.castShadow = true; g.add(cone);
+  }
+  g.scale.setScalar(s);
+  g.position.set(x, terrainH(x, z), z);
+  g.userData.sway = rnd(0, 6.28);
+  return g;
+}
+
+const trees = [];
+function addTree(x, z, s) {
+  const r = Math.random();
+  const t = r < 0.45 ? makePine(x, z, s) : r < 0.85 ? makeOak(x, z, s) : makeOak(x, z, s * 0.9, 'birch');
+  scene.add(t); trees.push(t);
+}
+for (let i = 0; i < 85; i++) {
+  const a = Math.random() * Math.PI * 2, r = 18 + Math.random() * 42;
+  const x = Math.cos(a) * r, z = Math.sin(a) * r;
+  if (Math.hypot(x, z) < 15) continue;
+  addTree(x, z, 0.85 + Math.random() * 0.6);
+}
+[[-8,-6],[7,-8],[-12,12],[12,-12],[14,5]].forEach(p => addTree(p[0], p[1], 0.9));
+
+// --- Bushes with berries ---
+const berryMat = mat({ color: 0xc02030, roughness: 0.4 });
+const berryGeo = new THREE.SphereGeometry(0.06, 6, 5);
+function makeBush(x, z, s) {
+  const g = new THREE.Group();
+  const withBerries = Math.random() < 0.35;
+  for (let i = 0; i < 3; i++) {
+    const m = new THREE.Mesh(pick(blobGeos), pick(leafMats));
+    m.scale.set(0.5 * s, 0.38 * s, 0.5 * s);
+    m.position.set(rnd(-0.35, 0.35) * s, 0.3 * s, rnd(-0.35, 0.35) * s);
+    m.castShadow = true; g.add(m);
+    if (withBerries) for (let k = 0; k < 5; k++) {
+      const b = new THREE.Mesh(berryGeo, berryMat);
+      const a = rnd(0, 6.28), e = rnd(0.2, 1.2);
+      b.position.set(m.position.x + Math.cos(a) * Math.cos(e) * 0.5 * s, m.position.y + Math.sin(e) * 0.38 * s, m.position.z + Math.sin(a) * Math.cos(e) * 0.5 * s);
+      g.add(b);
+    }
+  }
+  g.position.set(x, terrainH(x, z), z);
+  return g;
+}
+
+// --- Cottages (placed first so grass/paths can avoid them) ---
+const plasterMats = [[226, 212, 184], [214, 196, 164], [222, 200, 176], [205, 205, 190], [230, 214, 190]]
+  .map(c => mat({ map: makeTex('plaster', c, 0.12, 2, 1.3), side: THREE.DoubleSide }));
+const timberMat = mat({ map: makeTex('planks', [58, 38, 22], 0.3, 1, 1), flatShading: true, side: THREE.DoubleSide });
+const roofMats = [[132, 62, 40], [110, 70, 50], [96, 74, 56], [120, 52, 44], [100, 62, 44]]
+  .map(c => mat({ map: makeTex('tiles', c, 0.25, 4, 2), side: THREE.DoubleSide }));
+const doorMat = mat({ map: makeTex('planks', [96, 62, 34], 0.3, 1, 1) });
+const glowMat = new THREE.MeshBasicMaterial({ color: 0xffd98a });
+const metalMat = mat({ color: 0x2a2a2a, metalness: 0.7, roughness: 0.4 });
+const flowerColors = [0xff5577, 0xffcc33, 0xffffff, 0xb070ff, 0xff8844];
+
+function addWindow(g, px, py, pz, ry, shutterHex) {
+  const w = new THREE.Group();
+  w.position.set(px, py, pz); w.rotation.y = ry;
+  const pane = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 0.6), glowMat);
+  pane.position.z = 0.02; w.add(pane);
+  box(0.76, 0.07, 0.07, timberMat, 0, 0.335, 0.04, w, false);
+  box(0.76, 0.07, 0.07, timberMat, 0, -0.335, 0.04, w, false);
+  box(0.07, 0.64, 0.07, timberMat, -0.345, 0, 0.04, w, false);
+  box(0.07, 0.64, 0.07, timberMat, 0.345, 0, 0.04, w, false);
+  box(0.04, 0.6, 0.05, timberMat, 0, 0, 0.04, w, false);
+  box(0.6, 0.04, 0.05, timberMat, 0, 0, 0.04, w, false);
+  const sh = mat({ color: shutterHex });
+  box(0.32, 0.7, 0.04, sh, -0.54, 0, 0.04, w); box(0.32, 0.7, 0.04, sh, 0.54, 0, 0.04, w);
+  box(0.9, 0.06, 0.16, stoneMat, 0, -0.41, 0.08, w);
+  box(0.74, 0.14, 0.14, timberMat, 0, -0.5, 0.11, w);
+  for (let i = 0; i < 6; i++) {
+    const f = new THREE.Mesh(new THREE.SphereGeometry(0.06, 6, 5), mat({ color: pick(flowerColors), roughness: 0.5 }));
+    f.position.set(-0.3 + i * 0.12, -0.38, 0.12 + rnd(-0.02, 0.02)); w.add(f);
+  }
+  g.add(w);
+}
+
+function makeCottage(x, z, rot, v) {
+  const g = new THREE.Group();
+  const wallMat = plasterMats[v % plasterMats.length], roofMat = roofMats[v % roofMats.length];
+  const shutters = [0x3a6a4a, 0x3a5a8a, 0x8a3a3a, 0x5a4a8a, 0x2f6a6a][v % 5];
+
+  // stone foundation + plaster walls
+  box(4.24, 0.45, 3.44, stoneMat, 0, 0.22, 0, g);
+  box(4, 2.6, 3.2, wallMat, 0, 1.3, 0, g);
+  // half-timber frame
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) box(0.16, 2.7, 0.16, timberMat, sx * 2.0, 1.35, sz * 1.6, g);
+  for (const sz of [-1, 1]) {
+    box(4.1, 0.14, 0.12, timberMat, 0, 2.55, sz * 1.62, g);
+    box(4.1, 0.12, 0.12, timberMat, 0, 0.55, sz * 1.62, g);
+    box(4.1, 0.1, 0.1, timberMat, 0, 1.55, sz * 1.62, g);
+  }
+  for (const sx of [-1, 1]) {
+    box(0.12, 0.14, 3.3, timberMat, sx * 2.02, 2.55, 0, g);
+    box(0.12, 0.12, 3.3, timberMat, sx * 2.02, 0.55, 0, g);
+  }
+  for (const dx of [-1.5, 1.5]) { const d = box(0.09, 1.1, 0.09, timberMat, dx, 2.05, 1.62, g, false); d.rotation.z = dx > 0 ? 0.7 : -0.7; }
+
+  // gabled roof with overhang, ridge cap and gable ends
+  for (const s of [1, -1]) {
+    const slab = new THREE.Mesh(new THREE.BoxGeometry(4.7, 0.12, 2.3), roofMat);
+    slab.position.set(0, 3.25, s * 0.925); slab.rotation.x = s * 0.61;
+    slab.castShadow = true; slab.receiveShadow = true; g.add(slab);
+  }
+  box(4.74, 0.14, 0.16, timberMat, 0, 3.92, 0, g);
+  const gable = new THREE.Shape(); gable.moveTo(-1.6, 0); gable.lineTo(1.6, 0); gable.lineTo(0, 1.3); gable.closePath();
+  for (const sx of [-1, 1]) {
+    const gm = new THREE.Mesh(new THREE.ShapeGeometry(gable), wallMat.clone());
+    gm.material.side = THREE.DoubleSide;
+    gm.position.set(sx * 2.0, 2.6, 0); gm.rotation.y = Math.PI / 2; g.add(gm);
+  }
+  // chimney
+  box(0.55, 1.9, 0.55, stoneMat, 1.3, 3.55, -0.6, g);
+  box(0.7, 0.12, 0.7, stoneMat, 1.3, 4.55, -0.6, g);
+
+  // door: frame, lintel, inset, swinging door
+  const inset = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 1.7), mat({ color: 0x120a04 }));
+  inset.position.set(0, 0.85 + 0.2, 1.61); g.add(inset);
+  box(0.1, 1.95, 0.12, timberMat, -0.5, 1.07, 1.65, g); box(0.1, 1.95, 0.12, timberMat, 0.5, 1.07, 1.65, g);
+  box(1.2, 0.14, 0.14, timberMat, 0, 2.05, 1.65, g);
+  box(1.5, 0.16, 0.7, stoneMat, 0, 0.08, 2.0, g);   // porch step
+  const doorGroup = new THREE.Group();
+  doorGroup.position.set(-0.45, 1.05, 1.63);
+  const doorMesh = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1.8, 0.05), doorMat);
+  doorMesh.position.set(0.4, 0, 0); doorMesh.castShadow = true; doorGroup.add(doorMesh);
+  box(0.8, 0.06, 0.06, metalMat, 0.4, 0.5, 0.04, doorGroup, false);
+  box(0.8, 0.06, 0.06, metalMat, 0.4, -0.5, 0.04, doorGroup, false);
+  const knob = new THREE.Mesh(new THREE.SphereGeometry(0.04, 8, 6), new THREE.MeshStandardMaterial({ color: 0xc9a24a, metalness: 0.8, roughness: 0.3 }));
+  knob.position.set(0.7, -0.05, 0.05); doorGroup.add(knob);
+  doorGroup.userData = { isDoor: true, isOpen: false };
+  g.add(doorGroup);
+
+  // windows
+  addWindow(g, 1.2, 1.7, 1.61, 0, shutters);
+  addWindow(g, -1.2, 1.7, -1.61, Math.PI, shutters);
+  addWindow(g, 2.01, 1.7, 0, Math.PI / 2, shutters);
+  addWindow(g, -2.01, 1.7, 0, -Math.PI / 2, shutters);
+
+  // props: barrel + firewood stack
+  const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.24, 0.7, 12), mat({ map: makeTex('planks', [110, 72, 40], 0.3, 2, 1) }));
+  barrel.position.set(1.75, 0.35, 2.0); barrel.castShadow = true; g.add(barrel);
+  for (const by of [0.15, 0.55]) { const band = new THREE.Mesh(new THREE.CylinderGeometry(0.285, 0.255, 0.04, 12), metalMat); band.position.set(1.75, by, 2.0); g.add(band); }
+  for (let i = 0; i < 6; i++) {
+    const log = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.8, 7), barkMat);
+    log.rotation.z = Math.PI / 2; log.position.set(-1.6 + (i % 3) * 0.2, 0.12 + Math.floor(i / 3) * 0.2, 1.85);
+    log.castShadow = true; g.add(log);
+  }
+
+  // interior: wooden floor, furniture, warm lamp (walls are double-sided so they render from inside)
+  const fl = new THREE.Mesh(new THREE.PlaneGeometry(3.8, 3.0), mat({ map: makeTex('planks', [130, 92, 56], 0.3, 3, 3), side: THREE.DoubleSide }));
+  fl.rotation.x = -Math.PI / 2; fl.position.y = 0.47; fl.receiveShadow = true; g.add(fl);
+  box(1.2, 0.8, 0.8, timberMat, 0, 0.87, -0.5, g);
+  box(0.8, 0.6, 0.5, timberMat, 1.2, 0.77, -1.1, g);
+  for (const sx of [-0.9, 0.9]) { const st = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.45, 10), barkMat); st.position.set(sx, 0.7, 0.3); st.castShadow = true; g.add(st); }
+  const lamp = new THREE.PointLight(0xffc477, 10, 7, 2); lamp.position.set(0, 2.2, 0); g.add(lamp);
+
+  g.position.set(x, terrainH(x, z), z); g.rotation.y = rot;
+  g.userData = { isCottage: true, doorGroup };
+  return g;
+}
+
+const cottages = [makeCottage(-9, -2, 0.3, 0), makeCottage(9, -3, -0.4, 1), makeCottage(-8, 7, -0.2, 2), makeCottage(8, 8, 0.5, 3), makeCottage(0, -10, Math.PI, 4)];
+cottages.forEach(c => scene.add(c));
+
+// bushes + flowers hugging the cottages
+cottages.forEach(c => {
+  for (let i = 0; i < 3; i++) {
+    const a = c.rotation.y, lx = rnd(-2.4, 2.4), lz = pick([-2.1, 2.3]);
+    scene.add(makeBush(c.position.x + Math.cos(a) * lx + Math.sin(a) * lz, c.position.z - Math.sin(a) * lx + Math.cos(a) * lz, rnd(0.8, 1.3)));
+  }
+});
+
+// --- Well ---
+const well = new THREE.Group();
+const wellBase = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.3, 0.9, 20), stoneMat);
+wellBase.position.y = 0.45; wellBase.castShadow = true; wellBase.receiveShadow = true; well.add(wellBase);
+const wellRim = new THREE.Mesh(new THREE.TorusGeometry(1.2, 0.1, 8, 24), stoneMat);
+wellRim.rotation.x = Math.PI / 2; wellRim.position.y = 0.92; well.add(wellRim);
+const wellWater = new THREE.Mesh(new THREE.CircleGeometry(1.08, 20), new THREE.MeshStandardMaterial({ color: 0x2f5f8a, roughness: 0.05, metalness: 0.3 }));
+wellWater.rotation.x = -Math.PI / 2; wellWater.position.y = 0.8; well.add(wellWater);
+box(0.14, 1.8, 0.14, timberMat, -1.1, 1.8, 0, well); box(0.14, 1.8, 0.14, timberMat, 1.1, 1.8, 0, well);
+const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 2.4, 8), barkMat);
+beam.rotation.z = Math.PI / 2; beam.position.y = 2.2; well.add(beam);
+for (const s of [1, -1]) {
+  const slab = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.08, 1.7), roofMats[0]);
+  slab.position.set(s * 0.62, 2.82, 0); slab.rotation.z = -s * 0.55; slab.castShadow = true; well.add(slab);
+}
+const rope = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 1.1, 5), mat({ color: 0x9a845a }));
+rope.position.set(0, 1.6, 0); well.add(rope);
+const bucket = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.15, 0.25, 10), barkMat);
+bucket.position.set(0, 0.98, 0); well.add(bucket);
+scene.add(well);
+
+// --- Cobblestone paths (instanced) ---
+const pathPts = [];
+for (let i = 0; i <= 28; i++) pathPts.push([-14 + i, Math.sin(i * 0.45) * 1.5]);
+for (let i = 0; i <= 10; i++) pathPts.push([Math.sin(i * 0.6) * 0.6, 9 - i * 0.8]);
+for (let i = 0; i <= 8; i++) pathPts.push([-1 + i * 0.1, -2 - i * 0.9]);
+const onPath = (x, z, r = 1.5) => pathPts.some(p => (p[0] - x) ** 2 + (p[1] - z) ** 2 < r * r);
+{
+  const N = pathPts.length * 4;
+  const im = new THREE.InstancedMesh(blobGeos[1], mat({ roughness: 1, flatShading: true }), N);
+  const d = new THREE.Object3D(), c = new THREE.Color();
+  let n = 0;
+  pathPts.forEach(p => {
+    for (let k = 0; k < 4; k++) {
+      const x = p[0] + rnd(-0.7, 0.7), z = p[1] + rnd(-0.7, 0.7);
+      d.position.set(x, terrainH(x, z) + 0.02, z);
+      d.rotation.set(0, rnd(0, 6.28), 0);
+      d.scale.set(rnd(0.35, 0.6), 0.1, rnd(0.3, 0.5));
+      d.updateMatrix(); im.setMatrixAt(n, d.matrix);
+      c.setHSL(rnd(0.07, 0.11), rnd(0.1, 0.25), rnd(0.35, 0.5)); im.setColorAt(n, c); n++;
+    }
+  });
+  im.receiveShadow = true; scene.add(im);
+}
+
+// --- Grass & wildflowers (instanced) ---
+const nearBuilding = (x, z) => cottages.some(c => (c.position.x - x) ** 2 + (c.position.z - z) ** 2 < 9) || x * x + z * z < 2.5;
+{
+  const geo = new THREE.ConeGeometry(0.045, 0.55, 3); geo.translate(0, 0.275, 0);
+  const N = 4200, im = new THREE.InstancedMesh(geo, mat({ roughness: 1 }), N);
+  const d = new THREE.Object3D(), c = new THREE.Color();
+  let n = 0;
+  while (n < N) {
+    const a = Math.random() * 6.283, r = 3 + Math.sqrt(Math.random()) * 48;
+    const x = Math.cos(a) * r, z = Math.sin(a) * r;
+    if (onPath(x, z, 1.2) || nearBuilding(x, z)) continue;
+    d.position.set(x, terrainH(x, z), z);
+    d.rotation.set(rnd(-0.25, 0.25), rnd(0, 6.28), rnd(-0.25, 0.25));
+    const s = rnd(0.6, 1.4); d.scale.set(s, s * rnd(0.8, 1.7), s);
+    d.updateMatrix(); im.setMatrixAt(n, d.matrix);
+    c.setHSL(rnd(0.2, 0.3), rnd(0.45, 0.7), rnd(0.2, 0.38)); im.setColorAt(n, c); n++;
+  }
+  scene.add(im);
+
+  const FN = 420;
+  const stemGeo = new THREE.CylinderGeometry(0.012, 0.012, 0.4, 4); stemGeo.translate(0, 0.2, 0);
+  const stems = new THREE.InstancedMesh(stemGeo, mat({ color: 0x3f7a2a }), FN);
+  const heads = new THREE.InstancedMesh(new THREE.SphereGeometry(0.075, 7, 5), mat({ roughness: 0.5 }), FN);
+  n = 0;
+  while (n < FN) {
+    const a = Math.random() * 6.283, r = 4 + Math.sqrt(Math.random()) * 38;
+    const x = Math.cos(a) * r, z = Math.sin(a) * r;
+    if (onPath(x, z, 1.2) || nearBuilding(x, z)) continue;
+    const y = terrainH(x, z), s = rnd(0.8, 1.4);
+    d.position.set(x, y, z); d.rotation.set(0, 0, 0); d.scale.set(1, s, 1); d.updateMatrix(); stems.setMatrixAt(n, d.matrix);
+    d.position.set(x, y + 0.4 * s, z); d.scale.setScalar(rnd(0.8, 1.3)); d.updateMatrix(); heads.setMatrixAt(n, d.matrix);
+    c.setHex(pick(flowerColors)); heads.setColorAt(n, c); n++;
+  }
+  scene.add(stems, heads);
+}
+// bushes & mushrooms across the meadow
+for (let i = 0; i < 45; i++) {
+  const a = Math.random() * 6.283, r = 6 + Math.random() * 40;
+  const x = Math.cos(a) * r, z = Math.sin(a) * r;
+  if (onPath(x, z, 1.8) || nearBuilding(x, z)) continue;
+  scene.add(makeBush(x, z, rnd(0.8, 1.6)));
+}
+for (let i = 0; i < 18; i++) {
+  const a = Math.random() * 6.283, r = 16 + Math.random() * 30;
+  const x = Math.cos(a) * r, z = Math.sin(a) * r, s = rnd(0.6, 1.3);
+  const m = new THREE.Group();
+  const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.03 * s, 0.045 * s, 0.14 * s, 6), mat({ color: 0xe8dcc0 }));
+  stem.position.y = 0.07 * s; m.add(stem);
+  const cap = new THREE.Mesh(new THREE.SphereGeometry(0.1 * s, 8, 6, 0, Math.PI * 2, 0, Math.PI / 2), mat({ color: pick([0xc0392b, 0xb8863a]) }));
+  cap.position.y = 0.13 * s; m.add(cap);
+  m.position.set(x, terrainH(x, z), z); scene.add(m);
+}
+
+// --- Rocks ---
+for (let i = 0; i < 26; i++) {
+  const r = new THREE.Mesh(pick(blobGeos), Math.random() < 0.3 ? mossMat : rockMat);
+  const a = Math.random() * Math.PI * 2, d = 5 + Math.random() * 38, s = rnd(0.25, 0.7);
+  const x = Math.cos(a) * d, z = Math.sin(a) * d;
+  if (onPath(x, z, 1.5) || nearBuilding(x, z)) continue;
+  r.scale.set(s * rnd(0.9, 1.5), s * rnd(0.5, 0.8), s * rnd(0.8, 1.3));
+  r.position.set(x, terrainH(x, z) + s * 0.15, z);
+  r.rotation.y = rnd(0, 6.28);
+  r.castShadow = true; r.receiveShadow = true; scene.add(r);
+}
+
+// --- Interactables Setup ---
+const interactables = [];
+
+// ==========================================
+// DIALOGUE TREES
+// node: { text, choices?: [{ text, next?, if?(inv), take?, give? }], next?, give? }
+// A choice (or node) with no `next` ends the conversation.
+// ==========================================
+const thorneTree = {
+  start: { text: "Welcome, traveler. The woods whisper of your coming.", choices: [
+    { text: "Who are you?", next: 'who' },
+    { text: "What shadows do you speak of?", next: 'shadows' },
+    { text: "Farewell, elder." }
+  ]},
+  hub: { text: "Is there anything else you wish to know?", choices: [
+    { text: "Tell me about the well.", next: 'well' },
+    { text: "Who are you again?", next: 'who' },
+    { text: "Not now. Farewell." }
+  ]},
+  who: { text: "I am Thorne, keeper of Whisperwood's old tales. Sixty winters I have watched over this village.", next: 'hub' },
+  shadows: { text: "Strange shadows have crept in from the east. Keep your blade close.", choices: [
+    { text: "Where, exactly?", next: 'east' },
+    { text: "I'll stay alert.", next: 'hub' }
+  ]},
+  east: { text: "Past the old pines, where the path is closed. Take this charm. It may ward off the worst of it.", give: "Thorne's Charm", next: 'hub' },
+  well: { text: "The well's water grows cold. Something stirs beneath.", choices: [
+    { text: "I'll keep my distance.", next: 'hub' },
+    { text: "Then I'll look closer." }
+  ]}
+};
+
+const brynnTree = {
+  start: { text: "Ah! Fine steel, rare herbs, enchanted trinkets — all at fair prices!", choices: [
+    { text: "What do you sell?", next: 'wares' },
+    { text: "Any work for me?", next: 'work' },
+    { text: "Just looking." }
+  ]},
+  hub: { text: "Anything else catch your eye?", choices: [
+    { text: "What do you sell?", next: 'wares' },
+    { text: "Any work for me?", next: 'work' },
+    { text: "No thanks." }
+  ]},
+  wares: { text: "Steel, herbs, trinkets. Coin is scarce, though. I'd pay well for a Rusty Key, mind you.", choices: [
+    { text: "I have a Rusty Key.", if: inv => inv.has('Rusty Key'), take: 'Rusty Key', give: "Merchant's Token", next: 'trade' },
+    { text: "Maybe later.", next: 'hub' }
+  ]},
+  trade: { text: "Splendid! Here, a Merchant's Token for your trouble. Show it to any trader.", next: 'hub' },
+  work: { text: "Come back when you've got coin. Or favors. I take both.", next: 'hub' }
+};
+
+const kaelTree = {
+  start: { text: "Halt. State your business in Whisperwood.", choices: [
+    { text: "Just passing through.", next: 'pass' },
+    { text: "Tell me about the eastern path.", next: 'east' },
+    { text: "Can I be of help?", next: 'help' }
+  ]},
+  hub: { text: "Anything else?", choices: [
+    { text: "The eastern path?", next: 'east' },
+    { text: "Can I be of help?", next: 'help' },
+    { text: "Goodbye." }
+  ]},
+  pass: { text: "Move along. And stay off the grass." },
+  east: { text: "The eastern path is closed. Wolves, or worse.", next: 'hub' },
+  help: { text: "Bring me a Health Potion and I'll make it worth your while.", choices: [
+    { text: "I have one.", if: inv => inv.has('Health Potion'), take: 'Health Potion', give: "Guard's Badge", next: 'badge' },
+    { text: "Not yet.", next: 'hub' }
+  ]},
+  badge: { text: "Hah! That'll patch up the lads. Wear this badge and the gate will open for you.", next: 'hub' }
+};
+
+// Characters: tapered robe, arms/hands, head with face, hair/beard, hat and props.
+// Structure: root (position/heading) > rig (bob/lean/sway) > body parts.
+function makeNPC(name, o, x, z, tree) {
+  const root = new THREE.Group();
+  const g = new THREE.Group();   // rig
+  root.add(g);
+
+  const skin = mat({ color: o.skin, roughness: 0.65 });
+  const robe = mat({ color: o.robe, roughness: 0.85 });
+  const trim = mat({ color: o.trim || 0x3a2a18, roughness: 0.6 });
+  const hairM = mat({ color: o.hair, roughness: 0.9 });
+  const dark = mat({ color: 0x1a1210, roughness: 0.3 });
+
+  const prof = [[0.46,0],[0.44,0.25],[0.36,0.75],[0.29,1.15],[0.23,1.32],[0.13,1.42]].map(p => new THREE.Vector2(p[0], p[1]));
+  const body = new THREE.Mesh(new THREE.LatheGeometry(prof, 18), robe);
+  body.position.y = 0.05; body.castShadow = true; g.add(body);
+  const hem = new THREE.Mesh(new THREE.TorusGeometry(0.455, 0.025, 6, 20), trim);
+  hem.rotation.x = Math.PI / 2; hem.position.y = 0.08; g.add(hem);
+  const belt = new THREE.Mesh(new THREE.CylinderGeometry(0.325, 0.335, 0.09, 18), trim);
+  belt.position.y = 0.92; g.add(belt);
+  box(0.1, 0.1, 0.03, new THREE.MeshStandardMaterial({ color: 0xc9a24a, metalness: 0.8, roughness: 0.3 }), 0, 0.92, 0.33, g, false);
+  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.08, 0.14, 8), skin);
+  neck.position.y = 1.45; g.add(neck);
+
+  // feet: hidden under the robe at rest, step out front/back while walking
+  const shoeM = mat({ color: 0x2a1a10, roughness: 0.8 });
+  const feet = [-1, 1].map(s => box(0.14, 0.1, 0.24, shoeM, s * 0.13, 0.06, 0, g));
+
+  const arms = [];
+  for (const s of [-1, 1]) {
+    const arm = new THREE.Group(); arm.position.set(s * 0.29, 1.3, 0); arm.rotation.z = s * 0.12;
+    const sh = new THREE.Mesh(new THREE.SphereGeometry(0.1, 10, 8), robe); arm.add(sh);
+    const up = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.095, 0.56, 10), robe);
+    up.position.y = -0.28; up.castShadow = true; arm.add(up);
+    const cuff = new THREE.Mesh(new THREE.CylinderGeometry(0.095, 0.1, 0.05, 10), trim); cuff.position.y = -0.55; arm.add(cuff);
+    const hand = new THREE.Mesh(new THREE.SphereGeometry(0.07, 10, 8), skin); hand.position.y = -0.62; arm.add(hand);
+    g.add(arm); arms.push(arm);
+  }
+
+  const head = new THREE.Group(); head.position.y = 1.64; g.add(head);
+  const skull = new THREE.Mesh(new THREE.SphereGeometry(0.21, 20, 16), skin);
+  skull.scale.set(0.92, 1.06, 0.98); skull.castShadow = true; head.add(skull);
+  const nose = new THREE.Mesh(new THREE.ConeGeometry(0.035, 0.1, 6), skin);
+  nose.rotation.x = Math.PI / 2; nose.position.set(0, -0.01, 0.22); head.add(nose);
+  const eyes = [];
+  for (const s of [-1, 1]) {
+    const eyeW = new THREE.Mesh(new THREE.SphereGeometry(0.03, 8, 6), mat({ color: 0xf5f0e6, roughness: 0.2 }));
+    eyeW.position.set(s * 0.075, 0.04, 0.185); eyeW.scale.z = 0.5; head.add(eyeW);
+    const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.016, 8, 6), dark);
+    pupil.position.set(s * 0.075, 0.04, 0.2); head.add(pupil);
+    eyes.push(eyeW, pupil);
+    const brow = box(0.075, 0.016, 0.02, hairM, s * 0.075, 0.1, 0.19, head, false); brow.rotation.z = s * -0.12;
+    const ear = new THREE.Mesh(new THREE.SphereGeometry(0.04, 8, 6), skin);
+    ear.scale.set(0.5, 1, 0.8); ear.position.set(s * 0.2, 0, 0); head.add(ear);
+  }
+  // mouth: a dark ellipsoid whose height opens and closes while speaking
+  const mouth = new THREE.Mesh(new THREE.SphereGeometry(0.035, 10, 8), mat({ color: 0x4a1510, roughness: 0.5 }));
+  mouth.scale.set(1.7, 0.12, 0.6); mouth.position.set(0, -0.1, 0.185); head.add(mouth);
+
+  if (o.hairStyle) {
+    const hair = new THREE.Mesh(new THREE.SphereGeometry(0.225, 16, 12, 0, Math.PI * 2, 0, Math.PI * (o.hairStyle === 'long' ? 0.62 : 0.5)), hairM);
+    hair.scale.set(0.95, 1.08, 1.02); hair.position.y = 0.01; head.add(hair);
+    if (o.hairStyle === 'long') { const back = new THREE.Mesh(new THREE.SphereGeometry(0.2, 12, 10), hairM); back.scale.set(1, 1.4, 0.7); back.position.set(0, -0.12, -0.1); head.add(back); }
+  }
+  if (o.beard) {
+    const bm = mat({ color: o.beard, roughness: 0.95 });
+    const b = new THREE.Mesh(new THREE.ConeGeometry(0.15, o.beardLen || 0.4, 10), bm);
+    b.rotation.x = Math.PI; b.position.set(0, -0.2 - (o.beardLen || 0.4) * 0.15, 0.08); b.scale.z = 0.7; head.add(b);
+    for (const s of [-1, 1]) { const m = new THREE.Mesh(new THREE.SphereGeometry(0.04, 8, 6), bm); m.scale.set(1.4, 0.6, 0.8); m.position.set(s * 0.045, -0.075, 0.19); head.add(m); }
+  }
+
+  if (o.hat === 'wizard') {
+    const hm = mat({ color: o.hatColor });
+    const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.38, 0.03, 24), hm); brim.position.y = 0.17; head.add(brim);
+    const cone = new THREE.Mesh(new THREE.ConeGeometry(0.24, 0.75, 14), hm); cone.position.set(0, 0.55, -0.03); cone.rotation.x = -0.12; head.add(cone);
+    const band = new THREE.Mesh(new THREE.CylinderGeometry(0.245, 0.26, 0.06, 14), mat({ color: 0xc9a24a, metalness: 0.6, roughness: 0.4 })); band.position.y = 0.23; head.add(band);
+  } else if (o.hat === 'cap') {
+    const hm = mat({ color: o.hatColor });
+    const cap = new THREE.Mesh(new THREE.SphereGeometry(0.25, 14, 10), hm); cap.scale.set(1, 0.5, 1.05); cap.position.set(0, 0.17, 0); head.add(cap);
+    const rim = new THREE.Mesh(new THREE.CylinderGeometry(0.235, 0.235, 0.05, 16), trim); rim.position.y = 0.11; head.add(rim);
+    const f = new THREE.Mesh(new THREE.ConeGeometry(0.025, 0.28, 5), mat({ color: 0xf0e6d0 })); f.position.set(0.17, 0.3, -0.02); f.rotation.z = -0.9; head.add(f);
+  } else if (o.hat === 'helmet') {
+    const hm = new THREE.MeshStandardMaterial({ color: 0x8a909a, metalness: 0.85, roughness: 0.35 });
+    const dome = new THREE.Mesh(new THREE.SphereGeometry(0.235, 18, 12, 0, Math.PI * 2, 0, Math.PI * 0.55), hm); dome.scale.set(1, 1.05, 1.05); dome.position.y = 0.02; head.add(dome);
+    box(0.05, 0.2, 0.025, hm, 0, 0.0, 0.235, head, false);
+    const plume = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.22, 6), mat({ color: 0xa02020 })); plume.position.y = 0.3; head.add(plume);
+  }
+
+  if (o.staff) {
+    const st = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.04, 2.0, 7), barkMat); st.position.set(0.55, 1.0, 0.18); st.castShadow = true; g.add(st);
+    const orb = new THREE.Mesh(new THREE.SphereGeometry(0.09, 12, 10), new THREE.MeshStandardMaterial({ color: 0x66ccff, emissive: 0x3388cc, emissiveIntensity: 1.2 })); orb.position.set(0.55, 2.05, 0.18); g.add(orb);
+  }
+  if (o.pack) {
+    box(0.5, 0.6, 0.24, mat({ color: 0x6b4423 }), 0, 1.0, -0.34, g);
+    const roll = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.55, 10), mat({ color: 0xb08a5a })); roll.rotation.z = Math.PI / 2; roll.position.set(0, 1.38, -0.34); g.add(roll);
+  }
+  if (o.spear) {
+    const sp = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 2.3, 6), barkMat); sp.position.set(-0.52, 1.15, 0.12); sp.castShadow = true; g.add(sp);
+    const tip = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.28, 6), new THREE.MeshStandardMaterial({ color: 0xb0b6c0, metalness: 0.9, roughness: 0.3 })); tip.position.set(-0.52, 2.4, 0.12); g.add(tip);
+    const plate = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.36, 0.5, 14), new THREE.MeshStandardMaterial({ color: 0x7a828c, metalness: 0.8, roughness: 0.4 })); plate.position.y = 1.0; g.add(plate);
+    for (const s of [-1, 1]) { const pd = new THREE.Mesh(new THREE.SphereGeometry(0.13, 10, 8), new THREE.MeshStandardMaterial({ color: 0x7a828c, metalness: 0.8, roughness: 0.4 })); pd.position.set(s * 0.3, 1.35, 0); pd.scale.y = 0.6; g.add(pd); }
+  }
+
+  const canvas = document.createElement('canvas');
+  canvas.width = 256; canvas.height = 64;
+  const cx = canvas.getContext('2d');
+  cx.fillStyle = 'rgba(0,0,0,0.55)'; cx.fillRect(0, 0, 256, 64);
+  cx.fillStyle = '#ffe9a8'; cx.font = 'bold 28px Georgia';
+  cx.textAlign = 'center'; cx.textBaseline = 'middle';
+  cx.fillText(name, 128, 32);
+  const tex = new THREE.CanvasTexture(canvas); tex.colorSpace = THREE.SRGBColorSpace;
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, toneMapped: false }));
+  sprite.position.y = o.tagY || 2.6; sprite.scale.set(1.6, 0.4, 1);
+  root.add(sprite); // on root so the name tag doesn't bob with the body
+
+  root.position.set(x, 0, z);
+  root.rotation.y = Math.atan2(0 - x, 8 - z);
+  root.userData = {
+    name, tree, isNPC: true, head, rig: g, arms, feet, mouth, eyes,
+    ai: {
+      home: { x, z }, radius: o.wander || 3, speed: o.speed || 0.9,
+      target: null, wait: rnd(0.5, 3), walk: 0, talk: 0, phase: 0,
+      blink: rnd(2, 5), blinkT: 0, mouth: 0.12
+    }
+  };
+  return root;
+}
+
+const npcs = [
+  makeNPC('Elder Thorne', { robe: 0x5b3a8a, trim: 0xc9a24a, skin: 0xe8c4a0, hair: 0xdddddd, hairStyle: 'long', beard: 0xe6e6e6, beardLen: 0.55, hat: 'wizard', hatColor: 0x3d2766, staff: true, tagY: 2.95, wander: 2.8, speed: 0.7 }, -3, 2, thorneTree),
+  makeNPC('Brynn the Merchant', { robe: 0x9a6b2c, trim: 0x4a2e14, skin: 0xd9a877, hair: 0x3a2412, hairStyle: 'short', beard: 0x3a2412, beardLen: 0.2, hat: 'cap', hatColor: 0x7a2e2e, pack: true, tagY: 2.5, wander: 3.2, speed: 0.95 }, 4, -1, brynnTree),
+  makeNPC('Guard Kael', { robe: 0x3f5566, trim: 0x2a2a2a, skin: 0xc98f66, hair: 0x2a1a10, hat: 'helmet', spear: true, tagY: 2.65, wander: 3.5, speed: 1.05 }, 2, 5, kaelTree)
+];
+npcs.forEach(n => {
+  n.position.y = terrainH(n.position.x, n.position.z);
+  scene.add(n);
+  interactables.push(n);
+});
+
+cottages.forEach(c => {
+  interactables.push(c.userData.doorGroup);
+});
+
+function makeItem(name, color, x, y, z) {
+  const g = new THREE.Group();
+  const mesh = new THREE.Mesh(
+    new THREE.OctahedronGeometry(0.25, 0),
+    new THREE.MeshStandardMaterial({ color: color, emissive: color, emissiveIntensity: 0.6, roughness: 0.3 })
+  );
+  mesh.castShadow = true;
+  g.add(mesh);
+  const halo = new THREE.Mesh(new THREE.SphereGeometry(0.42, 12, 10), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.15, depthWrite: false }));
+  g.add(halo);
+  g.position.set(x, y, z);
+  g.userData = { isItem: true, name: name, mesh: mesh, id: Math.random() };
+  scene.add(g);
+  interactables.push(g);
+  return g;
+}
+
+makeItem('Rusty Key', 0xffaa00, -9, 1.2, -2);
+makeItem('Health Potion', 0xff3333, 0, 1.2, -10);
+makeItem('Ancient Coin', 0x33ff33, 8, 1.2, 8);
+
+// --- Player & VR Setup ---
+const player = {
+  pos: new THREE.Vector3(0, 0, 8),
+  yaw: 0, pitch: 0, yawOffset: 0,
+  height: 1.775, speed: 4.5, turnSpeed: 2.2
+};
+
+const vrCanvas = document.getElementById('vr-canvas');
+const vr = new VRCom(vrCanvas, { deadzone: 0.08, showOverlay: true, overlayOpacity: 0.55 });
+
+const keys = {};
+addEventListener('keydown', e => {
+  keys[e.code] = true;
+  if (e.code === 'ArrowUp' || e.code === 'ArrowDown' || e.code === 'Space') e.preventDefault();
+});
+addEventListener('keyup',   e => { keys[e.code] = false; });
+
+// one-shot key edge detector (call once per frame per key)
+const keyPrev = {};
+function edge(code) {
+  const now = !!keys[code];
+  const r = now && !keyPrev[code];
+  keyPrev[code] = now;
+  return r;
+}
+
+let mouseDown = false, lastMX = 0, lastMY = 0;
+renderer.domElement.addEventListener('mousedown', e => { mouseDown = true; lastMX = e.clientX; lastMY = e.clientY; });
+addEventListener('mousemove', e => {
+  if (!mouseDown) return;
+  player.yaw -= (e.clientX - lastMX) * 0.004;
+  player.pitch -= (e.clientY - lastMY) * 0.004;
+  player.pitch = Math.max(-1.5, Math.min(1.5, player.pitch));
+  lastMX = e.clientX; lastMY = e.clientY;
+});
+addEventListener('mouseup', () => mouseDown = false);
+
+const dialogueSystem = new DialogueSystem3D(scene);
+const inventorySystem = new InventorySystem3D(scene, camera);
+dialogueSystem.inventory = inventorySystem;
+const crosshairEl = document.getElementById('crosshair');
+const raycaster = new THREE.Raycaster();
+const center = new THREE.Vector2(0, 0);
+
+let prevTrigger = false, prevB = false, prevMenu = false, prevInv = false, prevNav = 0;
+const clock = new THREE.Clock();
+const hudPos = document.getElementById('hud-pos');
+const hudPrompt = document.getElementById('hud-prompt');
+
+// ==========================================
+// NPC AI + ANIMATION
+// ==========================================
+const blocked = (x, z) =>
+  Math.hypot(x, z) < 2.0 ||
+  cottages.some(c => (c.position.x - x) ** 2 + (c.position.z - z) ** 2 < 3.4 * 3.4);
+
+function pathClear(ax, az, bx, bz) {
+  for (let k = 1; k <= 8; k++) {
+    const f = k / 8;
+    if (blocked(ax + (bx - ax) * f, az + (bz - az) * f)) return false;
+  }
+  return true;
+}
+
+function pickTarget(n) {
+  const ai = n.userData.ai;
+  for (let i = 0; i < 10; i++) {
+    const a = rnd(0, 6.283), r = rnd(1, ai.radius);
+    const x = ai.home.x + Math.cos(a) * r, z = ai.home.z + Math.sin(a) * r;
+    if (pathClear(n.position.x, n.position.z, x, z)) return { x, z };
+  }
+  return null;
+}
+
+function updateNPCs(dt, t) {
+  npcs.forEach((n, i) => {
+    const u = n.userData, ai = u.ai;
+    const inTalk = dialogueSystem.isActive && dialogueSystem.currentNPC === n;
+    const dx = player.pos.x - n.position.x, dz = player.pos.z - n.position.z;
+    const d2 = dx * dx + dz * dz;
+    const engaged = inTalk || (d2 < 20 && !dialogueSystem.isActive);
+    let moving = false;
+
+    if (engaged) {
+      // stop and face the player
+      const want = Math.atan2(dx, dz);
+      const diff = Math.atan2(Math.sin(want - n.rotation.y), Math.cos(want - n.rotation.y));
+      n.rotation.y += diff * Math.min(1, dt * 4);
+      ai.target = null;
+      ai.wait = Math.max(ai.wait, 1.0);
+    } else if (ai.target) {
+      const tx = ai.target.x - n.position.x, tz = ai.target.z - n.position.z;
+      const dist = Math.hypot(tx, tz);
+      if (dist < 0.15) {
+        ai.target = null; ai.wait = rnd(2, 6);
+      } else {
+        const want = Math.atan2(tx, tz);
+        const diff = Math.atan2(Math.sin(want - n.rotation.y), Math.cos(want - n.rotation.y));
+        n.rotation.y += Math.max(-3.5 * dt, Math.min(3.5 * dt, diff));
+        if (Math.abs(diff) < 0.9) {
+          const step = Math.min(dist, ai.speed * dt);
+          n.position.x += tx / dist * step;
+          n.position.z += tz / dist * step;
+          moving = true;
+        }
+      }
+    } else {
+      ai.wait -= dt;
+      if (ai.wait <= 0) {
+        ai.target = pickTarget(n);
+        if (!ai.target) ai.wait = rnd(1.5, 3);
+      }
+    }
+    n.position.y = terrainH(n.position.x, n.position.z);
+
+    // blend factors
+    const speaking = inTalk && dialogueSystem.speaking;
+    ai.walk = lp(ai.walk, moving ? 1 : 0, Math.min(1, dt * 6));
+    ai.talk = lp(ai.talk, speaking ? 1 : 0, Math.min(1, dt * 5));
+    ai.phase += dt * 6.2 * ai.walk * (ai.speed / 0.9);
+    const ph = ai.phase, w = ai.walk, k = ai.talk;
+
+    // body: step bob, side sway, forward lean
+    u.rig.position.y = Math.abs(Math.sin(ph)) * 0.05 * w;
+    u.rig.rotation.z = Math.sin(ph) * 0.035 * w;
+    u.rig.rotation.x = 0.05 * w + 0.03 * k;
+
+    // feet step out from under the robe
+    u.feet.forEach((f, j) => {
+      const s = Math.sin(ph + j * Math.PI);
+      f.position.z = s * 0.5 * w;
+      f.position.y = 0.06 + Math.max(0, Math.cos(ph + j * Math.PI)) * 0.1 * w;
+    });
+
+    // arms: idle sway + walking swing + talking gestures
+    u.arms.forEach((a, j) => {
+      const idle = Math.sin(t * 1.2 + i + j * Math.PI) * 0.05;
+      const swing = Math.sin(ph + j * Math.PI) * 0.55 * w;
+      const gest = (-0.55 + Math.sin(t * 3.1 + j * 1.9 + i) * 0.4) * (j === 1 ? 1 : 0.5) * k;
+      a.rotation.x = idle + swing + gest;
+    });
+
+    // head: breathing bob, talk nods and turns
+    u.head.position.y = 1.64 + Math.sin(t * 1.5 + i) * 0.012;
+    u.head.rotation.x = Math.sin(t * 4.3 + i) * 0.05 * k;
+    u.head.rotation.y = Math.sin(t * 1.7 + i) * 0.12 * k;
+
+    // mouth flap while text is being typed
+    const mTarget = speaking
+      ? 0.25 + Math.abs(Math.sin(t * 16 + i)) * 0.9 * (0.55 + 0.45 * Math.abs(Math.sin(t * 4.1 + i)))
+      : 0.12;
+    ai.mouth = lp(ai.mouth, mTarget, Math.min(1, dt * 30));
+    u.mouth.scale.y = ai.mouth;
+
+    // blinking
+    ai.blink -= dt;
+    if (ai.blink <= 0) { ai.blinkT = 0.12; ai.blink = rnd(2.5, 5.5); }
+    if (ai.blinkT > 0) ai.blinkT -= dt;
+    const bs = ai.blinkT > 0 ? 0.1 : 1;
+    u.eyes.forEach(e => { e.scale.y = bs; });
+  });
+}
+
+function tick() {
+  const dt = Math.min(clock.getDelta(), 0.1);
+  const st = vr.getState();
+  const L = st.controllers.left;
+  const R = st.controllers.right;
+  const talking = dialogueSystem.isActive;
+
+  // sample key edges every frame so they never go stale
+  const digitEdges = [edge('Digit1'), edge('Digit2'), edge('Digit3')];
+
+  if (st.headset && st.headset.orientation) {
+    player.yaw = -st.headset.orientation.yaw + player.yawOffset;
+    player.pitch = st.headset.orientation.pitch;
+    player.pitch = Math.max(-1.5, Math.min(1.5, player.pitch));
+  }
+
+  // ==========================================
+  // MOVEMENT LOGIC (enabled even while in conversation)
+  // ==========================================
+  let kx = 0, ky = 0;
+  if (keys['KeyW']) ky += 1;
+  if (keys['KeyS']) ky -= 1;
+  if (keys['KeyA']) kx -= 1;
+  if (keys['KeyD']) kx += 1;
+  if (keys['KeyQ']) player.height = Math.max(0.5, player.height - 2*dt);
+  if (keys['KeyZ']) player.height = Math.min(2.2, player.height + 2*dt);
+
+  const mx = L.joystick.x + kx;
+  const my = L.joystick.y + ky;
+  const mMag = Math.hypot(mx, my);
+  
+  if (mMag > 0.001) {
+    const nx = mx / Math.max(1, mMag);
+    const ny = my / Math.max(1, mMag);
+    const fx = -Math.sin(player.yaw);
+    const fz = -Math.cos(player.yaw);
+    const rx =  Math.cos(player.yaw);
+    const rz = -Math.sin(player.yaw);
+    const vx = fx * ny + rx * nx;
+    const vz = fz * ny + rz * nx;
+    player.pos.x += vx * player.speed * dt;
+    player.pos.z += vz * player.speed * dt;
+  }
+
+  const targetHeight = 0.5 + st.headset.squatScalar * 1.7;
+  player.height += (targetHeight - player.height) * Math.min(1, dt * 8);
+
+  cameraYaw.position.copy(player.pos);
+  cameraYaw.position.y = terrainH(player.pos.x, player.pos.z) + player.height;
+  cameraYaw.rotation.y = player.yaw;
+  cameraPit.rotation.x = player.pitch;
+
+  // Sky follows the player so the horizon never moves
+  sky.position.copy(cameraYaw.position);
+
+  // Animate interactables
+  interactables.forEach(obj => {
+    if (obj.userData.isDoor) {
+      const target = obj.userData.isOpen ? -Math.PI / 2 : 0;
+      obj.rotation.y += (target - obj.rotation.y) * 0.15;
+    }
+    if (obj.userData.isItem) {
+      obj.userData.mesh.rotation.y += 0.03;
+      obj.userData.mesh.rotation.x += 0.015;
+      obj.position.y = 1.2 + Math.sin(clock.elapsedTime * 2 + obj.userData.id * 10) * 0.15;
+    }
+  });
+
+  // Walk away from a conversation = it ends (distance threshold = 4 meters)
+  if (talking && dialogueSystem.currentNPC) {
+    const n = dialogueSystem.currentNPC;
+    const ddx = player.pos.x - n.position.x, ddz = player.pos.z - n.position.z;
+    if (ddx * ddx + ddz * ddz > 16) dialogueSystem.close();
+  }
+
+  // Always update the raycaster from the center of the screen so hover works in dialogue
+  raycaster.setFromCamera(center, camera);
+
+  let nearestInteractable = null;
+  let interactType = null;
+  let minDist = Infinity;
+  let interactPromptText = "Explore the village...";
+
+  if (!inventorySystem.isOpen && !dialogueSystem.isActive) {
+    const intersects = raycaster.intersectObjects(interactables, true);
+
+    for (const hit of intersects) {
+      let obj = hit.object;
+      let root = obj;
+      while (root.parent && !root.userData.isNPC && !root.userData.isDoor && !root.userData.isItem) {
+        root = root.parent;
+      }
+      
+      if ((root.userData.isNPC || root.userData.isDoor || root.userData.isItem) && hit.distance < 6.5) {
+        if (hit.distance < minDist) {
+          minDist = hit.distance;
+          nearestInteractable = root;
+          if (root.userData.isNPC) interactType = 'npc';
+          else if (root.userData.isDoor) interactType = 'door';
+          else if (root.userData.isItem) interactType = 'item';
+        }
+      }
+    }
+
+    if (nearestInteractable) {
+      crosshairEl.classList.add('active');
+      if (interactType === 'npc') {
+        interactPromptText = `Look at prompt and press [A] / [RT] to speak with ${nearestInteractable.userData.name}`;
+        dialogueSystem.showPrompt(nearestInteractable);
+      } else if (interactType === 'door') {
+        const state = nearestInteractable.userData.isOpen ? "Close" : "Open";
+        interactPromptText = `[A] / [RT] to ${state} Door`;
+        dialogueSystem.close();
+      } else if (interactType === 'item') {
+        interactPromptText = `[A] / [RT] to Pick up ${nearestInteractable.userData.name}`;
+        dialogueSystem.close();
+      }
+    } else {
+      crosshairEl.classList.remove('active');
+      if (!dialogueSystem.isActive) {
+        dialogueSystem.close();
+      }
+    }
+  } else if (dialogueSystem.isActive) {
+    crosshairEl.classList.add('active');
+    interactPromptText = dialogueSystem.choicesVisible ? "Look at choice and press [A] / [RT] to select" : "In conversation...";
+  } else {
+    crosshairEl.classList.remove('active');
+    interactPromptText = "Inventory Open (Fixed in World Space)";
+    dialogueSystem.close();
+  }
+  
+  hudPrompt.textContent = interactPromptText;
+
+  // ---- dialogue choice navigation (right stick, arrows, or 1-3) ----
+  if (dialogueSystem.isActive) {
+    dialogueSystem.updateHover(raycaster);
+    
+    const axis = R.joystick.y;
+    const navDir = (axis < -0.6 || keys['ArrowDown']) ? 1 : (axis > 0.6 || keys['ArrowUp']) ? -1 : 0;
+    if (navDir !== 0 && navDir !== prevNav) dialogueSystem.move(navDir);
+    prevNav = navDir;
+    digitEdges.forEach((e, i) => { if (e) dialogueSystem.choose(i); });
+  } else {
+    prevNav = 0;
+  }
+
+  const rightTrigger = R.trigger;
+  const aPressed = R.buttons.a || keys['KeyE'] || keys['Enter'] || keys['Space'];
+  const triggerActive = rightTrigger > 0.5 || aPressed;
+
+  if (triggerActive && !prevTrigger) {
+    if (dialogueSystem.isActive) {
+      dialogueSystem.advance();
+    } else if (nearestInteractable && !inventorySystem.isOpen) {
+      if (interactType === 'npc') {
+        dialogueSystem.startConversation(nearestInteractable);
+      } else if (interactType === 'door') {
+        nearestInteractable.userData.isOpen = !nearestInteractable.userData.isOpen;
+      } else if (interactType === 'item') {
+        inventorySystem.addItem(nearestInteractable.userData.name);
+        scene.remove(nearestInteractable);
+        const idx = interactables.indexOf(nearestInteractable);
+        if (idx > -1) interactables.splice(idx, 1);
+        nearestInteractable = null;
+        interactType = null;
+      }
+    }
+  }
+  prevTrigger = triggerActive;
+
+  const bPressed = R.buttons.b || keys['Escape'];
+  if (bPressed && !prevB && dialogueSystem.isActive) {
+    dialogueSystem.close();
+  }
+  prevB = bPressed;
+
+  if (L.buttons.menu && !prevMenu) {
+    player.yawOffset = st.headset.orientation.yaw;
+  }
+  prevMenu = L.buttons.menu;
+
+  const invPressed = L.buttons.y || L.buttons.x || keys['KeyI'];
+  if (invPressed && !prevInv && !dialogueSystem.isActive) {
+    inventorySystem.toggle();
+  }
+  prevInv = invPressed;
+
+  if (dialogueSystem.visible) {
+    dialogueSystem.update(cameraYaw.position, dt);
+  }
+  
+  inventorySystem.update();
+
+  hudPos.textContent = `x:${player.pos.x.toFixed(1)} z:${player.pos.z.toFixed(1)} h:${player.height.toFixed(2)}`;
+
+  const t = clock.elapsedTime;
+
+  // NPC wandering, walk cycle, speaking animation, blinking
+  updateNPCs(dt, t);
+
+  // Wind sway on trees, drifting clouds
+  trees.forEach(tr => {
+    tr.rotation.z = Math.sin(t * 0.8 + tr.userData.sway) * 0.012;
+    tr.rotation.x = Math.cos(t * 0.65 + tr.userData.sway) * 0.008;
+  });
+  clouds.forEach(c => { c.position.x += dt * 0.8; if (c.position.x > 140) c.position.x = -140; });
+
+  renderer.render(scene, camera);
+  requestAnimationFrame(tick);
+}
+
+// ==========================================
+// UPDATED START / PERMISSION FLOW
+// ==========================================
+const startBtn = document.getElementById('start-btn');
+let permissionFlowStarted = false;
+
+function launchGame() {
+  document.getElementById('start-screen').style.display = 'none';
+  vrCanvas.classList.add('active');
+  vr.start().catch(err => console.error('Failed to start vrCom:', err));
+}
+
+function requestIosPermissions() {
+  if (permissionFlowStarted) return;
+  permissionFlowStarted = true;
+
+  const DOE = window.DeviceOrientationEvent;
+  const DME = window.DeviceMotionEvent;
+
+  // Non-iOS / no special permission prompt required
+  if (!DOE || typeof DOE.requestPermission !== 'function') {
+    window._vrComPermissionHandled = true;
+    window._vrComPermissionGranted = true;
+    console.info('No iOS-style sensor permission prompt required.');
+    launchGame();
+    return;
+  }
+
+  let orientationPromise;
+
+  try {
+    // IMPORTANT:
+    // This must be the first meaningful call inside the user gesture.
+    // Do not log, hide UI, await, or preventDefault before this.
+    orientationPromise = DOE.requestPermission();
+    window._vrComPermissionHandled = true;
+  } catch (err) {
+    window._vrComPermissionHandled = true;
+    window._vrComPermissionGranted = false;
+
+    console.error('Permission call threw immediately:', err && err.message ? err.message : err);
+    console.error('isSecureContext:', window.isSecureContext);
+    console.error('In iframe:', window.self !== window.top);
+    console.warn('If In iframe is true, open the page directly in Safari, not in a preview/in-app browser.');
+    console.warn('If isSecureContext is false, serve over HTTPS or localhost.');
+
+    launchGame();
+    return;
+  }
+
+  // Also request motion permission in the same gesture if available.
+  // Harmless if unused, but helps avoid future iOS quirks.
+  try {
+    if (DME && typeof DME.requestPermission === 'function') {
+      DME.requestPermission().catch(() => {});
+    }
+  } catch (err) {
+    // Ignore motion permission errors; orientation is the important one.
+  }
+
+  console.info('iOS permission prompt triggered.');
+  console.info('isSecureContext:', window.isSecureContext);
+  console.info('In iframe:', window.self !== window.top);
+
+  orientationPromise.then(response => {
+    console.info('Orientation permission response:', response);
+
+    if (response === 'granted') {
+      window._vrComPermissionGranted = true;
+    } else {
+      window._vrComPermissionGranted = false;
+      console.warn('Orientation permission response was:', response);
+      console.warn('Check iPhone Settings > Safari > Motion & Orientation Access.');
+    }
+
+    launchGame();
+  }).catch(err => {
+    window._vrComPermissionGranted = false;
+
+    console.warn('Orientation permission error:', err && err.message ? err.message : err);
+    console.warn('Open the page directly in Safari, not in an iframe/in-app browser.');
+    console.warn('Also check Settings > Safari > Motion & Orientation Access.');
+
+    launchGame();
+  });
+}
+
+// IMPORTANT:
+// Use click only here.
+// Do not use touchstart with preventDefault for the permission request.
+startBtn.addEventListener('click', requestIosPermissions);
+
+tick();
+</script>
+</body>
+</html>

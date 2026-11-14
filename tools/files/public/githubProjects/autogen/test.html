@@ -1,0 +1,197 @@
+<!-- ./test.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Autogen Phase 2 Test</title>
+<style>
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace; background: #111; color: #eee; margin: 0; padding: 10px; display: flex; flex-direction: column; height: 100vh; box-sizing: border-box; }
+#console { flex: 1; overflow-y: scroll; border: 1px solid #333; background: #000; padding: 8px; white-space: pre-wrap; word-wrap: break-word; font-size: 13px; margin-bottom: 10px; border-radius: 6px; -webkit-overflow-scrolling: touch; }
+.log-info { color: #4caf50; } .log-warn { color: #ff9800; } .log-err { color: #f44336; font-weight: bold; }
+#controls { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+button { padding: 16px; font-size: 16px; font-weight: bold; background: #222; color: #fff; border: 1px solid #444; border-radius: 8px; cursor: pointer; touch-action: manipulation; transition: background 0.2s; }
+button:active:not(:disabled) { background: #444; } button:disabled { opacity: 0.4; cursor: not-allowed; }
+#btnTest { background: #1a73e8; border-color: #1a73e8; }
+#status { margin-top: 10px; color: #aaa; font-size: 14px; text-align: center; border-top: 1px solid #333; padding-top: 10px; }
+#testReport { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.95); z-index: 1000; flex-direction: column; padding: 20px; overflow-y: hidden; }
+#testReport.active { display: flex; }
+.report-header { text-align: center; margin-bottom: 15px; flex-shrink: 0; }
+.report-title { font-size: 28px; font-weight: bold; margin-bottom: 10px; }
+.report-pass { color: #00e676; } .report-fail { color: #ff1744; }
+.report-stats { font-size: 18px; color: #ccc; margin-bottom: 10px; }
+#reportDetails { flex: 1; overflow-y: auto; background: #111; padding: 15px; border-radius: 8px; border: 1px solid #333; font-family: monospace; font-size: 13px; margin-bottom: 15px; }
+.modal-actions { display: flex; gap: 10px; flex-shrink: 0; }
+.modal-actions button { flex: 1; }
+.copy-results-btn { background: #2e7d32 !important; border-color: #2e7d32 !important; }
+.close-btn { background: #333 !important; }
+</style>
+</head>
+<body>
+<div id="console"></div>
+<div id="controls">
+<button id="btnInit" onclick="initAutogen()">1. Initialize</button>
+<button id="btnTest" onclick="runTests()" disabled>2. Run Tests</button>
+<button onclick="copyConsole()">📋 Copy Log</button>
+<button onclick="clearConsole()">🗑️ Clear</button>
+</div>
+<div id="status">Status: Waiting for initialization...</div>
+<div id="testReport">
+<div class="report-header">
+<div id="reportTitle" class="report-title"></div>
+<div id="reportStats" class="report-stats"></div>
+</div>
+<div id="reportDetails"></div>
+<div class="modal-actions">
+<button class="copy-results-btn" onclick="copyTestResults()">📋 Copy Results</button>
+<button class="close-btn" onclick="closeReport()">Close Report</button>
+</div>
+</div>
+<script src="autogen.js"></script>
+<script src="tests/async.js"></script>
+<script src="tests/errors.js"></script>
+<script src="tests/lifecycle.js"></script>
+<script src="tests/mesh.js"></script>
+<script src="tests/globals.js"></script>
+<script src="tests/extensions.js"></script>
+<script src="tests.js"></script>
+<script>
+const consoleDiv = document.getElementById('console');
+const statusDiv = document.getElementById('status');
+let lastTestReport = null;
+const originalConsole = {
+	log: console.log.bind(console), warn: console.warn.bind(console), error: console.error.bind(console),
+	info: console.info ? console.info.bind(console) : console.log.bind(console),
+	debug: console.debug ? console.debug.bind(console) : console.log.bind(console)
+};
+function logToScreen(type, ...args) {
+	const msg = args.map(a => {
+			if (a instanceof Error) return `Error: ${a.message}\n${a.stack || ''}`;
+			if (typeof a === 'object' && a !== null) { try { return JSON.stringify(a, Object.getOwnPropertyNames(a)); } catch(e) { return String(a); } }
+			return String(a);
+		}).join(' ');
+	const div = document.createElement('div');
+	div.className = `log-${type}`;
+	div.textContent = `[${new Date().toLocaleTimeString()}] [${type.toUpperCase()}] ${msg}`;
+	consoleDiv.appendChild(div); consoleDiv.scrollTop = consoleDiv.scrollHeight;
+	const consoleType = type === 'err' ? 'error' : type;
+	if (originalConsole[consoleType]) { originalConsole[consoleType](...args); }
+}
+console.log = (...args) => logToScreen('info', ...args);
+console.warn = (...args) => logToScreen('warn', ...args);
+console.error = (...args) => logToScreen('err', ...args);
+function clearConsole() { consoleDiv.innerHTML = ''; }
+async function copyConsole() {
+	try { await navigator.clipboard.writeText(consoleDiv.innerText); logToScreen('info', '📋 Console copied!'); }
+	catch (err) { logToScreen('err', '🚫 Clipboard denied.'); }
+}
+async function copyTestResults() {
+	if (!lastTestReport) return;
+	let text = `=== AUTOGEN TEST RESULTS ===\n`;
+	text += `Status: ${lastTestReport.failed === 0 ? 'ALL PASSED ✅' : 'FAILURES DETECTED ❌'}\n`;
+	text += `Total: ${lastTestReport.total} | Passed: ${lastTestReport.passed} | Failed: ${lastTestReport.failed}\n`;
+	text += `==============================\n`;
+	lastTestReport.allResults.forEach(r => {
+			const status = r.passed ? '✅ PASS' : '❌ FAIL';
+			text += `[${status}] ${r.testName}\nWorker: ${r.workerId}\nDetails: ${r.message}\n`;
+		});
+	try {
+		await navigator.clipboard.writeText(text);
+		const btn = document.querySelector('.copy-results-btn');
+		const originalText = btn.innerHTML;
+		btn.innerHTML = '✅ Copied!'; btn.style.background = '#1b5e20';
+		setTimeout(() => { btn.innerHTML = originalText; btn.style.background = ''; }, 2000);
+	} catch (err) { console.error('Failed to copy:', err); alert('Failed to copy results to clipboard.'); }
+}
+let autogen = null;
+function registerExtensions() {
+	// Main Thread Extension: receives normal args, just returns the value
+	autogen.registerMainExtension("test_main_ext_add", (workerId, a, b) => {
+			return a + b;
+		});
+
+	// Main Thread Extension: async function returning a promise
+	autogen.registerMainExtension("test_main_ext_async_add", async (workerId, a, b) => {
+			await new Promise(r => setTimeout(r, 10)); // simulate async work
+			return a + b + 100;
+		});
+
+	// Worker Local Extension: receives normal args, just returns the value
+	const mulFunc = function(a, b) {
+		return a * b;
+	};
+	autogen.registerWorkerExtension("test_worker_ext_mul", mulFunc);
+
+	// Worker Local Extension: async function returning a promise (NEW)
+	const asyncMulFunc = async function(a, b) {
+		await new Promise(r => setTimeout(r, 10)); // simulate async work
+		return a * b;
+	};
+	autogen.registerWorkerExtension("test_worker_ext_async_mul", asyncMulFunc);
+
+	// Worker Local Extension: fire and forget, receives normal args
+	const fnfFunc = function(counter_ptr) {
+		Atomics.add(SharedViews.int32, counter_ptr / 4, 1);
+	};
+	autogen.registerWorkerExtension("test_worker_ext_fnf", fnfFunc);
+}
+async function initAutogen() {
+	const btnInit = document.getElementById('btnInit'), btnTest = document.getElementById('btnTest');
+	btnInit.disabled = true; statusDiv.textContent = "Status: Checking environment...";
+	if (!crossOriginIsolated) {
+		console.error("FATAL: crossOriginIsolated is false. Server must send COOP/COEP headers.");
+		statusDiv.textContent = "Status: FAILED (Missing COOP/COEP headers)";
+		btnInit.disabled = false; return;
+	}
+	try {
+		console.log("🌍 Environment OK. Initializing AutogenRuntime...");
+		autogen = new AutogenRuntime();
+		await autogen.initialize('test.wasm');
+		registerExtensions();
+		statusDiv.textContent = "Status: READY.";
+		btnTest.disabled = false;
+		console.log("🚀 Initialization complete.");
+	} catch (err) {
+		console.error("Init failed:", err);
+		statusDiv.textContent = "Status: FAILED.";
+		btnInit.disabled = false;
+	}
+}
+async function runTests() {
+	if (!autogen) return;
+	const btnTest = document.getElementById('btnTest');
+	btnTest.disabled = true; statusDiv.textContent = "Status: Running tests...";
+	try {
+		const testSuite = new AutogenTestSuite(autogen);
+		const report = await testSuite.runAll();
+		lastTestReport = report;
+		document.getElementById('reportTitle').textContent = report.failed === 0 ? "✅ ALL TESTS PASSED" : "❌ TESTS FAILED";
+		document.getElementById('reportTitle').className = `report-title ${report.failed === 0 ? 'report-pass' : 'report-fail'}`;
+		document.getElementById('reportStats').textContent = `${report.passed} Passed, ${report.failed} Failed out of ${report.total}.`;
+		const detailsDiv = document.getElementById('reportDetails');
+		detailsDiv.innerHTML = '';
+		report.allResults.forEach(r => {
+				const div = document.createElement('div');
+				div.style.marginBottom = '10px'; div.style.padding = '10px'; div.style.borderRadius = '4px';
+				div.style.borderLeft = r.passed ? '4px solid #00e676' : '4px solid #ff1744';
+				div.style.background = r.passed ? 'rgba(0, 230, 118, 0.1)' : 'rgba(255, 23, 68, 0.1)';
+				div.innerHTML = `
+<div style="font-weight: bold; margin-bottom: 4px; color: ${r.passed ? '#00e676' : '#ff1744'};">
+${r.passed ? '✅ PASS' : '❌ FAIL'}: ${r.testName}
+</div>
+<div style="color: #ccc; font-size: 12px; white-space: pre-wrap;">${r.message}</div>
+`;
+				detailsDiv.appendChild(div);
+			});
+		document.getElementById('testReport').classList.add('active');
+	} catch (err) {
+		console.error("Test suite failed:", err);
+		statusDiv.textContent = "Status: Failed.";
+	} finally {
+		btnTest.disabled = false; statusDiv.textContent = "Status: Tests complete.";
+	}
+}
+function closeReport() { document.getElementById('testReport').classList.remove('active'); }
+</script>
+</body>
+</html>

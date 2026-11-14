@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Autogen Image Format Test</title>
+<style>
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 16px; background-color: #f5f5f7; color: #1c1c1e; margin: 0; }
+h1 { font-size: 1.3rem; margin-bottom: 16px; }
+#imageCanvas { display: block; max-width: 100%; height: auto; background-color: #fff; border: 1px solid #d1d1d6; border-radius: 10px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+#console-output { background-color: #1c1c1e; color: #34c759; font-family: "SF Mono", monospace; font-size: 12px; padding: 12px; border-radius: 10px; height: 30vh; min-height: 200px; overflow-y: auto; white-space: pre-wrap; margin-bottom: 16px; border: 1px solid #333; }
+.log-info { color: #34c759; } .log-warn { color: #ffcc00; } .log-error { color: #ff3b30; }
+.btn { display: block; width: 100%; padding: 16px; margin-bottom: 12px; border: none; border-radius: 10px; font-size: 17px; font-weight: 600; cursor: pointer; text-align: center; transition: opacity 0.2s; }
+.btn:active { opacity: 0.6; } .btn-primary { background-color: #007aff; color: white; } .btn-secondary { background-color: #e5e5ea; color: #007aff; }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+#status { margin-bottom: 16px; font-weight: 600; color: #007aff; font-size: 15px; }
+</style>
+</head>
+<body>
+<h1>Autogen Image Format Test</h1>
+<div id="status">Checking environment...</div>
+<canvas id="imageCanvas" width="300" height="150"></canvas>
+
+<button id="btnPng" class="btn btn-primary" disabled>Load PNG (Alpha)</button>
+<button id="btnJpg" class="btn btn-primary" disabled>Load JPG</button>
+<button id="btnGif" class="btn btn-primary" disabled>Load GIF (First Frame)</button>
+
+<button id="copyBtn" class="btn btn-secondary">Copy Console to Clipboard</button>
+<div id="console-output"></div>
+
+<script src="/system/autogen/autogen.js"></script>
+<script type="module">
+    import { registerFetchExtension } from '/system/fetch/fetch_ext.js';
+
+    const consoleOutput = document.getElementById('console-output');
+    const originalLog = console.log, originalWarn = console.warn, originalError = console.error;
+    
+    function appendConsole(type, args) {
+        const msg = Array.from(args).map(arg => {
+            if (arg instanceof Error) return arg.message + (arg.stack ? '\n' + arg.stack : '');
+            if (typeof arg === 'object' && arg !== null) {
+                try { return JSON.stringify(arg, null, 2); } catch (e) { return String(arg); }
+            }
+            return String(arg);
+        }).join(' ');
+        const div = document.createElement('div');
+        div.className = `log-${type}`;
+        div.textContent = `[${new Date().toLocaleTimeString()}] [${type.toUpperCase()}] ${msg}`;
+        consoleOutput.appendChild(div);
+        consoleOutput.scrollTop = consoleOutput.scrollHeight;
+    }
+    
+    console.log = (...args) => { originalLog(...args); appendConsole('info', args); };
+    console.warn = (...args) => { originalWarn(...args); appendConsole('warn', args); };
+    console.error = (...args) => { originalError(...args); appendConsole('error', args); };
+
+    document.getElementById('copyBtn').addEventListener('click', () => {
+        navigator.clipboard.writeText(consoleOutput.innerText).then(() => {
+            const btn = document.getElementById('copyBtn');
+            btn.textContent = '✅ Copied!'; btn.style.backgroundColor = '#34c759'; btn.style.color = 'white';
+            setTimeout(() => { btn.textContent = 'Copy Console to Clipboard'; btn.style.backgroundColor = ''; btn.style.color = ''; }, 2000);
+        });
+    });
+
+    const statusDiv = document.getElementById('status');
+    const btnPng = document.getElementById('btnPng');
+    const btnJpg = document.getElementById('btnJpg');
+    const btnGif = document.getElementById('btnGif');
+    const buttons = [btnPng, btnJpg, btnGif];
+    
+    const canvas = document.getElementById('imageCanvas');
+    const ctx = canvas.getContext('2d');
+    let runtime;
+
+    // Standard test images from Wikipedia Commons
+    const testImages = {
+        png: "https://upload.wikimedia.org/wikipedia/commons/4/47/PNG_transparency_demonstration_1.png",
+        jpg: "https://upload.wikimedia.org/wikipedia/commons/b/b6/Felis_catus-cat_on_snow.jpg",
+        
+        // FIX: Removed "/thumb/" and the "/200px-..." suffix. 
+        // Using the direct original file link prevents the 400 Bad Request error.
+        gif: "https://upload.wikimedia.org/wikipedia/commons/2/2c/Rotating_earth_%28large%29.gif"
+    };
+
+    async function init() {
+        if (!crossOriginIsolated) {
+            statusDiv.textContent = 'ERROR: Missing COOP/COEP headers.';
+            statusDiv.style.color = '#ff3b30';
+            console.error('Server must send Cross-Origin-Opener-Policy & Cross-Origin-Embedder-Policy');
+            return;
+        }
+        try {
+            statusDiv.textContent = 'Initializing Autogen Runtime...';
+            runtime = new AutogenRuntime();
+            await runtime.initialize('./image_test.wasm');
+            registerFetchExtension(runtime); 
+            
+            statusDiv.textContent = 'Runtime Ready! Select a format to test.';
+            statusDiv.style.color = '#34c759';
+            buttons.forEach(b => b.disabled = false);
+        } catch (err) {
+            statusDiv.textContent = 'Initialization failed!';
+            statusDiv.style.color = '#ff3b30';
+            console.error('Autogen init error:', err);
+        }
+    }
+
+    async function loadAndRender(url, formatName) {
+        if (!runtime) return;
+        
+        // Disable all buttons while loading
+        buttons.forEach(b => { b.disabled = true; b.textContent = 'Loading...'; });
+        
+        try {
+            console.log(`📥 Requesting ${formatName} image load from: ${url}`);
+            
+            const encoder = new TextEncoder();
+            const urlBytes = encoder.encode(url + '\0');
+            const urlPtr = await runtime.callExport(0, 'cppmalloc', urlBytes.length);
+            new Uint8Array(runtime.sharedMemory.buffer).set(urlBytes, urlPtr);
+            
+            try {
+                const futurePtr = await runtime.callExport(0, 'test_load_image', urlPtr);
+                const fut = runtime.wrapFuture(futurePtr);
+                const result = await fut.awaitResult('int32');
+                
+                if (result === 1) {
+                    console.log(`✅ SUCCESS: ${formatName} decoded. Rendering to canvas...`);
+                    await renderImageToCanvas(formatName);
+                } else {
+                    console.warn(`❌ FAILED: ${formatName} loading returned 0.`);
+                }
+            } finally {
+                await runtime.callExport(0, 'cppfree', urlPtr);
+            }
+        } catch (err) {
+            console.error(`🔥 ${formatName} test execution failed:`, err);
+        } finally {
+            // Restore buttons
+            btnPng.disabled = false; btnPng.textContent = 'Load PNG (Alpha)';
+            btnJpg.disabled = false; btnJpg.textContent = 'Load JPG';
+            btnGif.disabled = false; btnGif.textContent = 'Load GIF (First Frame)';
+        }
+    }
+
+    btnPng.addEventListener('click', () => loadAndRender(testImages.png, 'PNG'));
+    btnJpg.addEventListener('click', () => loadAndRender(testImages.jpg, 'JPG'));
+    btnGif.addEventListener('click', () => loadAndRender(testImages.gif, 'GIF'));
+
+    async function renderImageToCanvas(formatName) {
+        const infoPtr = await runtime.callExport(0, 'get_image_info');
+        if (infoPtr === 0) {
+            console.error("No image data available to render.");
+            return;
+        }
+        const view = new DataView(runtime.sharedMemory.buffer);
+        const width = view.getUint32(infoPtr, true);
+        const height = view.getUint32(infoPtr + 4, true);
+        const channels = view.getUint32(infoPtr + 8, true);
+        const dataPtr = view.getUint32(infoPtr + 12, true);
+        const dpiX = view.getUint32(infoPtr + 16, true);
+        const dpiY = view.getUint32(infoPtr + 20, true);
+        
+        console.log(`Image Metadata: ${width}x${height}, ${channels} channels, DPI: ${dpiX}x${dpiY}, Data Ptr: ${dataPtr}`);
+        
+        const pixelCount = width * height * 4;
+        
+        // Copy out of SharedArrayBuffer to satisfy Canvas API
+        const sharedPixels = new Uint8ClampedArray(runtime.sharedMemory.buffer, dataPtr, pixelCount);
+        const pixels = new Uint8ClampedArray(sharedPixels); 
+        const imageData = new ImageData(pixels, width, height);
+        
+        canvas.width = width;
+        canvas.height = height;
+        ctx.putImageData(imageData, 0, 0);
+        
+        if (formatName === 'GIF') {
+            console.log('🎨 Rendered first frame of GIF (Note: stb_image only decodes static frames, not animations).');
+        } else if (formatName === 'JPG') {
+            console.log('🎨 JPG rendered (Alpha channel automatically padded by C++ for Canvas compatibility).');
+        } else {
+            console.log('🎨 PNG with alpha transparency rendered successfully!');
+        }
+        
+        await runtime.callExport(0, 'cppfree', infoPtr);
+    }
+
+    init();
+</script>
+</body>
+</html>

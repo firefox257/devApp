@@ -1,0 +1,120 @@
+================================================================================
+REQUIREMENTS DOCUMENT: PURE JAVASCRIPT NES EMULATOR
+================================================================================
+
+1. CORE ARCHITECTURE & MODULE STRUCTURE
+   - Pure JavaScript Implementation: The entire emulator core (CPU, PPU, APU, 
+     Mappers) must be written in standard, modern JavaScript without any external 
+     WebAssembly (WASM) modules or native binary dependencies.
+   - ES Modules (ESM): All code must be structured using standard JavaScript 
+     modules (`import` / `export`) to ensure clean modularity, clear dependencies, 
+     and maintainability.
+   - Main-Thread Execution: For initial phases, execution will reside on the 
+     main thread alongside rendering loops (e.g., Three.js), optimized to maintain 
+     smooth performance.
+
+2. ROM LOADING & iNES FILE FORMAT
+   - iNES Header Parsing: Implement a robust parser for the standard 16-byte iNES 
+     header. Must accurately extract PRG-ROM size, CHR-ROM size, Mapper ID, 
+     mirroring type, battery presence, and trainer flags to load the actual ROM data.
+   - iNES 2.0 & Extended Formats: Research and implement support for the iNES 2.0 
+     specification to handle modern homebrew, accurate mapper variants, and 
+     extended ROM sizes beyond the original iNES limits.
+   - Data Extraction & Allocation: Correctly slice the loaded ArrayBuffer into 
+     PRG-ROM, CHR-ROM, and Trainer (if present) memory blocks based on the header.
+   - Format Research & Edge Cases: The development phase must include deep research 
+     into the iNES specification to ensure edge cases (e.g., VS. System, 
+     Playchoice-10, or malformed headers) are identified and handled gracefully.
+
+3. MOBILE & FRONTEND USER INTERFACE (HTML/CSS)
+   - Mobile-First & Responsive Design: HTML/CSS setup must fully support mobile 
+     devices, specifically optimized for iPhone and touch-screen smartphones.
+   - Portrait Layout Optimization:
+     - Main Canvas (Top): Placed at the top half of the screen for natural viewing 
+       while holding the phone upright.
+     - On-Screen Controller (Bottom): Placed at the lower half of the viewport, 
+       providing accessible touch controls (D-Pad, A/B buttons, Select/Start) 
+       for single-hand or thumb interaction while holding the device.
+     - Viewport & Touch Lock: Viewport tags must prevent unwanted double-tap zoom, 
+       panning, or rubber-banding scrolling on mobile browsers.
+
+4. PROCESSING MODULES
+   - Three Asynchronous/Independent Units:
+     1. CPU (Central Processing Unit)
+     2. PPU (Picture Processing Unit)
+     3. APU (Audio Processing Unit)
+
+5. TIMING & SYNCHRONIZATION
+   - Master Clock Function: A unified clock/tick loop will drive all three units.
+   - Fixed Cycle Ratios: CPU, PPU, and APU timing will be governed by explicit 
+     hardware cycle ratios (e.g., 3 CPU cycles to 1 PPU cycle) to ensure accurate 
+     synchronization between instruction execution, frame rendering, and audio 
+     generation.
+
+6. MAPPER ARCHITECTURE & EXTENSIBILITY
+   - Modular Mapper Interface: Define a strict interface/contract for mappers 
+     (e.g., `step()`, `cpuRead()`, `cpuWrite()`, `ppuRead()`, `ppuWrite()`) so 
+     the core bus remains completely agnostic to specific mapper logic.
+   - Standard & Complex Mappers: Implement support for common and complex mappers 
+     (MMC1, MMC2, MMC3, MMC5, UNROM, CNROM, etc.) including scanline counters, 
+     IRQ generation, and dynamic bank switching.
+   - Custom Chips & Audio Expansions: Provide a framework for mappers that include 
+     extra audio channels or custom hardware (e.g., VRC6, VRC7, FME-7, Namco 163, 
+     MMC5 audio). These must integrate cleanly with the APU mixer without breaking 
+     core audio timing.
+   - Custom & Unofficial Mappers: Design the architecture to easily allow the 
+     addition of custom, homebrew, or obscure mappers. Developers should be able 
+     to register a new mapper by simply implementing the interface and adding it 
+     to a lookup table, without requiring modifications to the core CPU/PPU bus.
+
+7. VIDEO & COLOR RENDERING (PPU)
+   - Correct Color Palette: Implement highly accurate color generation. This must 
+     be achieved either via accurate hardware color math (YUV/luma-chroma decoding) 
+     or by using a precise, pre-calculated palette (e.g., Nestopia NTSC palette) 
+     to ensure colors perfectly match original hardware output.
+   - Emphasis & Blending: Correctly handle PPU emphasis bits (red, green, blue 
+     tinting) and color blending for proper visual fidelity and grayscale modes.
+
+8. INSTRUCTION & COMMAND DECODING (FUNCTION POINTERS)
+   - Lookup Tables / Arrays of Functions: Opcode and command handling across all 
+     modules must use direct function reference arrays (function pointers in JS) 
+     for fast index-based execution.
+   - Consistency: Applies to:
+     - CPU instruction set opcodes.
+     - PPU rendering commands / register operations.
+     - APU channel controls / audio registers.
+
+9. MEMORY MAP & HARDWARE I/O INTERCEPTION
+   - Shared Address Space: Simulated 64 KB CPU memory bus and 32 KB PPU address 
+     space.
+   - Interception: Memory-mapped I/O operations (e.g., controller input registers, 
+     PPU/APU registers) must be intercepted via dedicated getter/setter functions.
+   - Mapper Integration: The CPU and PPU buses must route reads/writes to the 
+     active Mapper module for addresses mapped to PRG-ROM ($8000-$FFFF) and 
+     CHR-ROM/VRAM ($0000-$1FFF).
+
+10. CODEBASE DOCUMENTATION & COMMENTS
+   - Thorough Code Annotation: Every memory getter, setter, and I/O handler must be 
+     explicitly commented with its target hardware mapping (e.g., gamepad/joystick 
+     strobe registers, PPU control registers, APU channels).
+   - Hook Identification: Detailed inline comments must mark where external hooks 
+     and event listeners can be attached without breaking timing or execution logic.
+
+11. EXTENSIBILITY & HOOK SYSTEM
+   - Tile ID Extraction: Hooks exposed in the PPU pipeline to report current tile 
+     IDs and sprite states (for integration with 3D/custom graphic overlays).
+   - Audio Event Tracking: Hooks exposed in the APU pipeline to identify active 
+     sound effects and background music tracks using unique identifiers (sound IDs 
+     / track IDs).
+
+12. IMPLEMENTATION PHASES
+   - Phase 1: Requirements definition, architecture documentation, and deep research 
+     into the iNES file format specifications and accurate color palettes.
+   - Phase 2: Base NES emulator core implementation (functional CPU, PPU, APU cycle 
+     sync, iNES ROM loading, accurate color rendering, ESM architecture, mobile 
+     touch UI).
+   - Phase 3: Mapper implementation (standard mappers, custom chips, audio 
+     expansions) and establishing the custom mapper registration framework.
+   - Phase 4: Integration of custom hooks (tile ID extraction, audio track 
+     tracking, 3D/custom asset binding).
+================================================================================

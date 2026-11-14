@@ -1,0 +1,207 @@
+./phase2Doc.txt
+PHASE 2 IMPLEMENTATION DOCUMENTATION
+====================================
+
+1. OVERVIEW
+-----------
+Phase 2 focuses on expanding the Autogen runtime capabilities, enhancing the
+C++/JS interoperability, establishing a robust testing framework, and strictly
+adhering to the shared-memory architecture requirements.
+
+Native implementation (Phase 3) has not begun.
+
+As of the latest Phase 2 validation, the test suite reports:
+
+    Total: 29
+    Passed: 28
+    Failed: 1
+
+The remaining failure is:
+
+    Concurrent_Shared_Counter_Atomic
+
+This failure is now treated as a Phase 2 platform limitation rather than a
+normal implementation defect. See section 4, "Known Limitations & Unsupported
+Mechanisms".
+
+
+2. KEY ADDITIONS & ARCHITECTURAL FIXES
+--------------------------------------
+
+2.1 Shared Globals Storage Mechanism (Req 3)
+- Fixed critical flaw where WASM globals were instance-local.
+- Introduced `AutogenContext` struct allocated in shared linear memory via `AtomicMalloc`.
+- The main thread allocates this context and passes the pointer to all workers during initialization.
+- The `sharedGlobal` macro now uses a lock-free, open-addressing hash map within the shared context to guarantee true single-instance allocation across all WASM workers without relying on instance-local storage.
+
+2.2 Structured System/Runtime Error Handling (Req 19, 31)
+- Replaced magic numbers (`0xDEADBEEF`) with a formal `ag_status` enum (`AG_ERR_INVALID_HASH`, `AG_ERR_INVALID_WORKER`, `AG_ERR_CAPACITY_EXHAUSTED`, etc.).
+- Expanded `ag_sync_req` struct to include dedicated `status` and `error_code` fields.
+- Synchronous calls now properly preserve and propagate specific system error codes back to the caller instead of generic failures.
+
+2.3 Reflection Metadata Completeness (Req 21)
+- Expanded `ag_meta_entry` to include `size`, `alignment`, `return_type_ptr`, and `params_ptr`.
+- Expanded `ag_member_entry` to include `alignment`, `is_pointer`, and `is_reference`.
+- Updated `registerClass` and `registerMember` macros to automatically populate size and alignment using `sizeof` and `alignof`.
+
+2.4 Initialization State Blocking (Req 11)
+- Added `isReady` boolean flag in `autogen_worker.js`.
+- Workers now actively reject `CALL_EXPORT` messages with a structured error if they arrive before the mesh and metadata initialization phases are fully complete.
+
+2.5 JavaScript Object Allocation & Type Support (Req 23, 24)
+- Added `runtime.allocateObject(className)` API to JS, backed by a new `ag_allocate_object` C++ export that looks up class metadata to determine allocation size.
+- Added explicit `bool` (1-byte) support to `AgObject` getters/setters.
+- Added `getAgString(offset)` to safely wrap C++ `ag_string` members.
+
+2.6 String ABI Safety Validation (Req 26)
+- Added `ag_string_is_valid(ptr)` C++ export to validate shared-heap string structures before JS attempts to read them, preventing catastrophic memory reads from `.rodata` pointers.
+
+2.7 Robust Shared Globals & Synchronization (Req 3 & 17)
+- `sharedGlobal(type, name, ...)` macro uses lock-free atomic compare-exchange within the shared registry.
+- Introduced `ag_spinlock` with proper lifecycle management for low-level, worker-safe synchronization.
+
+2.8 Comprehensive JavaScript Class/Struct Wrappers (Req 22, 23, 26)
+- Expanded `AgObject` to include full typed getters/setters operating directly on shared memory.
+- Added `getArray` and `setArray` to `AgObject` for direct manipulation of C++ primitive arrays.
+- Introduced `AgString` to safely read C++ `ag_string` structs from shared memory.
+
+2.9 Developer-Friendly ag_async Macro (Req 33)
+- Implemented a C++17 metaprogramming engine (`ag_func_traits`, `ag_trampoline`, `ag_async_impl`) to automatically deduce function signatures, pack arguments into the shared heap, and unpack them on the target worker.
+- Added `ag_register(func)` and `ag_async(func, ...)` macros, completely hiding hash calculation, pointer casting, and manual memory management from the application developer.
+
+2.10 Comprehensive C++ Test Suite (`src/test.cpp`)
+- Fully implemented all C++ structs and 30+ exported test functions referenced by the JS test harness.
+- Added specific tests for Bool Member Access, JS Object Allocation, String ABI Validation, and Structured Error Handling.
+
+2.11 Generic Async/Future Return Types & ag_await (Req 16, 33)
+- Redesigned `ag_future` struct to store a `result_ptr` (pointer to allocated return value) instead of a fixed 32-bit result, enabling ANY return type (primitives, strings, classes, structs, pointers).
+- Implemented C++17 generic `ag_trampoline` that automatically allocates shared memory for the return type, placement-news it, and returns the pointer.
+- Implemented C++ `ag_await<T>` template function that safely spins, moves the result, explicitly destructs the heap object, and frees memory without leaks. Added a spin-wait timeout to prevent infinite deadlocks if a target worker fails.
+- Implemented JS `AgFuture` class with `awaitResult(type)` that dynamically reads primitives, strings, or wraps returned objects into `AgObject` based on the type hint.
+- Added robust error handling (`0xDEADBEEF` propagation) for invalid hashes or worker failures in async tasks.
+
+2.12 Real-time Test Suite Logging
+- Updated `runTestSuite` in `autogen.js` to log each test result immediately as it executes.
+- This prevents silent hangs where a test fails or deadlocks and the final summary is never printed, ensuring complete visibility into the execution flow.
+
+2.13 Packed ABI / Atomic Alignment Investigation
+- Investigated the failing `Concurrent_Shared_Counter_Atomic` test.
+- The failure manifests as an unaligned memory access inside WASM dispatch when executing a raw C++ atomic operation on a shared global.
+- The JS side inspects certain structures using packed-layout assumptions.
+- Applying `__attribute__((packed))` broadly is not safe by itself because packed structs can reduce member alignment to 1 byte.
+- When Clang sees atomic operations on insufficiently aligned packed members, it may emit compiler-rt atomic helper calls such as `__atomic_compare_exchange`, or generate misaligned atomic operations that trap in WASM.
+- Therefore, packing cannot be blindly applied to runtime structures that participate in atomic operations.
+- The issue is not simply missing `packed`; it is an ABI/alignment/toolchain boundary problem involving JS inspection, WASM atomics, shared heap allocation alignment, and browser engine behavior.
+
+
+3. REQUIREMENTS ADDRESSED
+-------------------------
+- Req 3: Shared Globals (Fixed via AutogenContext shared registry).
+- Req 4: Memory Allocation and Growth (JS wrappers safely handle buffer refresh).
+- Req 11: Worker Initialization Blocking (isReady flag enforcement).
+- Req 12/13: MessagePort Mesh & Thread-to-Thread Calls (Direct worker-to-worker communication implemented).
+- Req 14: Function Hashes (WyHash integration verified, dynamic JS resolution implemented).
+- Req 15/31: Synchronous Calls & Error Propagation (Structured ag_sync_req with error codes).
+- Req 16: Async and Futures (implemented shared-memory future structs, C++ ag_async_dispatch, generic return type support via result_ptr, and ag_await with timeout).
+- Req 17: Synchronization (spinlocks and shared-global locking are supported; raw cross-boundary C++ atomics are limited and should not be used as a primary application mechanism in Phase 2).
+- Req 18: Shared Pointer and Lifetime Rules (validated by nested struct pointer tests and strict adherence to AtomicMalloc).
+- Req 19: Error and Logging System (msginfo/warn/err pipeline validated, global worker error capture).
+- Req 21/22/23: Reflection, JS Wrappers, and Member Access (expanded metadata, bool/ag_string support).
+- Req 24: JS Object Lifetime (allocateObject API implemented).
+- Req 25: JavaScript Function Reflection (function metadata syncing and lookup implemented).
+- Req 26: String ABI (ag_string struct, AgString JS wrapper, validation implemented).
+- Req 29/30: Runtime Lifecycle & Shutdown (State machine and graceful worker termination implemented).
+- Req 31: Function-Call Error Handling (ag_status enum, structured error codes).
+- Req 33: Developer-Friendly Source API (clean macro names, minimal boilerplate, generic ag_await).
+
+
+4. KNOWN LIMITATIONS & UNSUPPORTED MECHANISMS
+---------------------------------------------
+
+4.1 Cross-JS-Boundary C++ Atomics Are Not Reliable
+- Raw C++ atomic operations on shared globals do not currently provide a predictable, portable mechanism when used across the JS/WASM worker boundary.
+- The failing `Concurrent_Shared_Counter_Atomic` test demonstrates this limitation.
+- The failure appears as an unaligned memory access inside WASM dispatch.
+- The issue is affected by several factors:
+  - WASM atomic alignment requirements.
+  - Allocator alignment behavior.
+  - Struct packing and member alignment.
+  - Compiler lowering of atomic operations.
+  - Browser/engine-specific shared-memory behavior.
+  - Interaction between JS dispatch, worker messaging, and WASM execution.
+- Therefore, raw C++ atomics should not be treated as a supported cross-worker application mechanism in Phase 2.
+- Shared mutable state should instead be protected by:
+  - `ag_spinlock`
+  - higher-level shared-global access functions
+  - explicit dispatch/message coordination
+  - future native synchronization mechanisms in Phase 3
+
+4.2 `Concurrent_Shared_Counter_Atomic` Is Expected to Remain Limited
+- The test currently fails due to the limitation above.
+- The corresponding spinlock-based test passes:
+  - `Concurrent_Shared_Counter_Spinlock`
+- The shared global struct test also passes:
+  - `Concurrent_Shared_Global_Struct`
+- This indicates that lock-protected shared state is the safer Phase 2 mechanism.
+- The atomic counter test should be considered a known platform limitation, not a normal regression.
+
+4.3 Packed Structure ABI Is Not Fully Resolved
+- The JS side inspects certain C++ structures using packed-layout assumptions.
+- The current C++ structures are not uniformly declared with a safe packed ABI policy.
+- This creates a potential ABI mismatch risk between JS hardcoded layout expectations and C++ compiled layout.
+- The safest long-term direction is one of the following:
+  1. Use reflection metadata exclusively and avoid hardcoded JS offsets.
+  2. Define explicit ABI-visible structs with a controlled packed/aligned policy.
+  3. Keep runtime structures naturally aligned and forbid JS hardcoded assumptions except where verified by static assertions.
+- Blind use of `__attribute__((packed))` is not acceptable because it can break atomic alignment and cause compiler-rt atomic fallbacks or WASM traps.
+
+4.4 AtomicMalloc Alignment Is External
+- `AtomicMalloc.cpp` must not be overwritten, regenerated, replaced, deleted, or silently substituted.
+- Because the allocator is external, Phase 2 cannot freely change its internal alignment guarantees.
+- Any alignment-sensitive feature must assume that allocator alignment behavior is fixed and may be limited.
+- This contributes to the instability of raw atomic operations on small shared allocations.
+
+4.5 Instance-Local Storage Cannot Be Shared
+- Normal C/C++ static storage, `.data`, `.bss`, `.rodata`, worker stacks, and normal WASM globals remain instance-local.
+- These must never be used as cross-worker shared pointers.
+- All shared objects must be placed in the shared WASM heap via the shared allocator and shared runtime mechanisms.
+
+4.6 JS Future Await Uses Polling
+- JS `AgFuture.awaitResult` currently uses polling rather than a true cross-boundary blocking wait.
+- C++ `ag_await` uses a spin-wait with a timeout.
+- These mechanisms are sufficient for Phase 2 testing but are not a substitute for native condition-variable-like synchronization.
+- Better blocking/wait mechanisms should be revisited in Phase 3 native implementation.
+
+4.7 Memory Growth Requires View Refresh
+- WebAssembly.Memory growth invalidates existing JavaScript ArrayBuffer views.
+- `AgObject`, `AgString`, and future JS-side memory access wrappers must recreate `DataView`/typed-array views from the current `sharedMemory.buffer`.
+- Logical WASM addresses remain valid after growth, but JS-side cached views are not automatically valid.
+
+4.8 Reflection Parameter Metadata Is Limited
+- C++17 template limitations currently restrict automatic extraction of full function parameter type metadata.
+- Function hashes and dispatch work correctly.
+- Full parameter introspection may require additional generated metadata or Phase 3 tooling support.
+
+
+5. RECOMMENDED PHASE 2 USAGE GUIDELINES
+---------------------------------------
+- Do not use raw C++ atomics on shared globals as the primary cross-worker synchronization mechanism.
+- Use `ag_spinlock` for shared mutable state when low-level synchronization is required.
+- Prefer dispatch-based coordination when state ownership naturally belongs to a worker.
+- Do not assume JS hardcoded struct offsets are portable unless verified against C++ reflection metadata or static assertions.
+- Do not pass pointers to `.data`, `.bss`, `.rodata`, static locals, thread-local storage, or worker stacks across workers.
+- Treat all cross-worker pointers as valid only when they point into the shared WASM heap.
+
+
+6. NEXT STEPS (Phase 3)
+-----------------------
+- Native C++ threading implementation (std::thread replacements).
+- True async/future resolution across the MessagePort mesh without main thread routing (C++ side).
+- Advanced reflection metadata population (C++17 limitations on automatic parameter type extraction).
+- Re-evaluate atomics under Phase 3 native runtime where threads, allocator alignment, and memory model are directly controlled.
+- Define a formal ABI policy for JS-visible structs:
+  - explicit packed/aligned rules,
+  - static layout assertions,
+  - metadata-driven JS access,
+  - removal of hardcoded JS offsets where possible.
+- Provide a supported shared-counter/shared-state API built on locks or dispatch rather than exposing raw cross-boundary atomics directly to application code.

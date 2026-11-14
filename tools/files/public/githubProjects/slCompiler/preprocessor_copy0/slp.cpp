@@ -9,6 +9,9 @@
 #include <cmath>
 #include <cstdlib>
 #include <cctype>
+#include <sstream>
+#include <iomanip>
+#include <utility>
 
 // ============================================================================
 // 1. AST Definitions (RTTI-free with explicit type tags)
@@ -678,15 +681,25 @@ struct Environment;
 struct Value {
     enum Type { Undefined, Integer, Float, Boolean, String, Array, Object, Function };
     Type type;
-    uint64_t intVal; double floatVal; bool boolVal; std::string strVal;
+    uint64_t intVal; 
+    bool isNegative = false; // Flag to distinguish negative numbers from large positive uint64_t
+    double floatVal; bool boolVal; std::string strVal;
     std::vector<std::shared_ptr<Value>> arrVal;
     std::unordered_map<std::string, std::shared_ptr<Value>> objVal;
     std::shared_ptr<ASTNode> funcAst;
     std::shared_ptr<Environment> closureEnv;
 
-    Value() : type(Undefined), intVal(0), floatVal(0.0), boolVal(false) {}
+    Value() : type(Undefined), intVal(0), isNegative(false), floatVal(0.0), boolVal(false) {}
     static std::shared_ptr<Value> undefined() { auto v = std::make_shared<Value>(); v->type = Undefined; return v; }
-    static std::shared_ptr<Value> makeInt(uint64_t v) { auto val = std::make_shared<Value>(); val->type = Integer; val->intVal = v; return val; }
+    
+    static std::shared_ptr<Value> makeInt(uint64_t v, bool neg = false) { 
+        auto val = std::make_shared<Value>(); 
+        val->type = Integer; 
+        val->intVal = v; 
+        val->isNegative = neg; 
+        return val; 
+    }
+    
     static std::shared_ptr<Value> makeFloat(double v) { auto val = std::make_shared<Value>(); val->type = Float; val->floatVal = v; return val; }
     static std::shared_ptr<Value> makeBool(bool v) { auto val = std::make_shared<Value>(); val->type = Boolean; val->boolVal = v; return val; }
     static std::shared_ptr<Value> makeString(const std::string& v) { auto val = std::make_shared<Value>(); val->type = String; val->strVal = v; return val; }
@@ -698,8 +711,20 @@ struct Value {
 
     std::string toString() const {
         if (type == Undefined) return "undefined";
-        if (type == Integer) return std::to_string(intVal);
-        if (type == Float) return std::to_string(floatVal);
+        if (type == Integer) {
+            if (isNegative) {
+                return std::to_string(static_cast<int64_t>(intVal));
+            }
+            return std::to_string(intVal);
+        }
+        if (type == Float) {
+            std::ostringstream oss;
+            oss << std::fixed << std::setprecision(6) << floatVal;
+            std::string s = oss.str();
+            s.erase(s.find_last_not_of('0') + 1, std::string::npos);
+            if (!s.empty() && s.back() == '.') s.pop_back();
+            return s;
+        }
         if (type == Boolean) return boolVal ? "true" : "false";
         if (type == String) return strVal;
         if (type == Array) {
@@ -1022,7 +1047,13 @@ class SLP {
             if (opRes.is_error) return opRes;
             std::shared_ptr<Value> op = opRes.value;
             if (unOp->op == "!") return EvalResult::make(Value::makeBool(!isTruthy(op)));
-            if (unOp->op == "-") return EvalResult::make(op->type == Value::Integer ? Value::makeInt(-(int64_t)op->intVal) : Value::makeFloat(-op->toFloat()));
+            if (unOp->op == "-") {
+                if (op->type == Value::Integer) {
+                    uint64_t negVal = static_cast<uint64_t>(-static_cast<int64_t>(op->intVal));
+                    return EvalResult::make(Value::makeInt(negVal, true));
+                }
+                return EvalResult::make(Value::makeFloat(-op->toFloat()));
+            }
             if (unOp->op == "~") return EvalResult::make(Value::makeInt(~op->toInt()));
         }
         if (auto update = ast_cast<UpdateNode>(node, NodeType::Update)) {
@@ -1102,7 +1133,7 @@ class SLP {
                 }
             } else if (iterable->type == Value::Array) {
                 for (size_t i = 0; i < iterable->arrVal.size(); ++i) {
-                    env->set(forIn->varName, Value::makeInt(i));
+                    env->set(forIn->varName, Value::makeInt(static_cast<uint64_t>(i)));
                     EvalResult res = evaluate(forIn->body, env);
                     if (res.is_error || res.is_return) return res;
                     if (res.is_break) return EvalResult::make(Value::undefined());
@@ -1186,6 +1217,7 @@ class SLP {
                 EvalResult objRes = evaluate(member->object, env);
                 if (objRes.is_error) return objRes;
                 std::shared_ptr<Value> obj = objRes.value;
+                
                 if (obj->type == Value::Array) {
                     if (member->property == "push") { 
                         for (auto arg : call->args) { 
@@ -1193,7 +1225,7 @@ class SLP {
                             if (argRes.is_error) return argRes;
                             obj->arrVal.push_back(argRes.value); 
                         } 
-                        return EvalResult::make(Value::makeInt(obj->arrVal.size())); 
+                        return EvalResult::make(Value::makeInt(static_cast<uint64_t>(obj->arrVal.size()))); 
                     }
                     if (member->property == "unshift") { 
                         for (auto it = call->args.rbegin(); it != call->args.rend(); ++it) { 
@@ -1201,7 +1233,7 @@ class SLP {
                             if (argRes.is_error) return argRes;
                             obj->arrVal.insert(obj->arrVal.begin(), argRes.value); 
                         } 
-                        return EvalResult::make(Value::makeInt(obj->arrVal.size())); 
+                        return EvalResult::make(Value::makeInt(static_cast<uint64_t>(obj->arrVal.size()))); 
                     }
                     if (member->property == "pop") { 
                         if (obj->arrVal.empty()) return EvalResult::make(Value::undefined()); 
@@ -1214,6 +1246,92 @@ class SLP {
                         return EvalResult::make(val); 
                     }
                 }
+                
+                if (obj->type == Value::String) {
+                    std::string str = obj->strVal;
+                    if (member->property == "charAt") {
+                        if (call->args.size() != 1) return EvalResult::error("charAt requires 1 argument");
+                        EvalResult argRes = evaluate(call->args[0], env);
+                        if (argRes.is_error) return argRes;
+                        size_t idx = argRes.value->toInt();
+                        if (idx >= str.length()) return EvalResult::make(Value::makeString(""));
+                        return EvalResult::make(Value::makeString(std::string(1, str[idx])));
+                    }
+                    if (member->property == "charCodeAt") {
+                        if (call->args.size() != 1) return EvalResult::error("charCodeAt requires 1 argument");
+                        EvalResult argRes = evaluate(call->args[0], env);
+                        if (argRes.is_error) return argRes;
+                        size_t idx = argRes.value->toInt();
+                        if (idx >= str.length()) return EvalResult::make(Value::undefined());
+                        return EvalResult::make(Value::makeInt(static_cast<uint64_t>(static_cast<uint8_t>(str[idx]))));
+                    }
+                    if (member->property == "substring") {
+                        size_t start = 0, end = str.length();
+                        if (call->args.size() >= 1) {
+                            EvalResult argRes = evaluate(call->args[0], env);
+                            if (argRes.is_error) return argRes;
+                            start = argRes.value->toInt();
+                        }
+                        if (call->args.size() >= 2) {
+                            EvalResult argRes = evaluate(call->args[1], env);
+                            if (argRes.is_error) return argRes;
+                            end = argRes.value->toInt();
+                        }
+                        if (start > end) std::swap(start, end);
+                        if (start > str.length()) start = str.length();
+                        if (end > str.length()) end = str.length();
+                        return EvalResult::make(Value::makeString(str.substr(start, end - start)));
+                    }
+                    if (member->property == "startsWith") {
+                        if (call->args.size() < 1) return EvalResult::error("startsWith requires at least 1 argument");
+                        EvalResult argRes = evaluate(call->args[0], env);
+                        if (argRes.is_error) return argRes;
+                        std::string search = argRes.value->toString();
+                        size_t pos = 0;
+                        if (call->args.size() >= 2) {
+                            EvalResult posRes = evaluate(call->args[1], env);
+                            if (posRes.is_error) return posRes;
+                            pos = posRes.value->toInt();
+                        }
+                        if (pos > str.length()) return EvalResult::make(Value::makeBool(false));
+                        return EvalResult::make(Value::makeBool(str.compare(pos, search.length(), search) == 0));
+                    }
+                    if (member->property == "endsWith") {
+                        if (call->args.size() < 1) return EvalResult::error("endsWith requires at least 1 argument");
+                        EvalResult argRes = evaluate(call->args[0], env);
+                        if (argRes.is_error) return argRes;
+                        std::string search = argRes.value->toString();
+                        size_t len = str.length();
+                        if (call->args.size() >= 2) {
+                            EvalResult lenRes = evaluate(call->args[1], env);
+                            if (lenRes.is_error) return lenRes;
+                            len = lenRes.value->toInt();
+                        }
+                        if (len > str.length()) len = str.length();
+                        if (len < search.length()) return EvalResult::make(Value::makeBool(false));
+                        return EvalResult::make(Value::makeBool(str.compare(len - search.length(), search.length(), search) == 0));
+                    }
+                    if (member->property == "indexOf") {
+                        if (call->args.size() < 1) return EvalResult::error("indexOf requires at least 1 argument");
+                        EvalResult argRes = evaluate(call->args[0], env);
+                        if (argRes.is_error) return argRes;
+                        std::string search = argRes.value->toString();
+                        int64_t fromIndex = 0;
+                        if (call->args.size() >= 2) {
+                            EvalResult posRes = evaluate(call->args[1], env);
+                            if (posRes.is_error) return posRes;
+                            fromIndex = static_cast<int64_t>(posRes.value->toInt());
+                        }
+                        if (fromIndex < 0) fromIndex = 0;
+                        size_t start = static_cast<size_t>(fromIndex);
+                        if (start > str.length()) start = str.length();
+                        size_t pos = str.find(search, start);
+                        if (pos == std::string::npos) return EvalResult::make(Value::makeInt(static_cast<uint64_t>(-1LL), true)); // Mark as negative
+                        return EvalResult::make(Value::makeInt(static_cast<uint64_t>(pos)));
+                    }
+                    return EvalResult::error("Unsupported string method: " + member->property);
+                }
+                
                 return EvalResult::error("Unsupported array method: " + member->property);
             }
             EvalResult calleeRes = evaluate(call->callee, env);
@@ -1240,7 +1358,7 @@ class SLP {
             EvalResult objRes = evaluate(member->object, env);
             if (objRes.is_error) return objRes;
             std::shared_ptr<Value> obj = objRes.value;
-            if (member->property == "length" && obj->type == Value::Array) return EvalResult::make(Value::makeInt(obj->arrVal.size()));
+            if (member->property == "length" && obj->type == Value::Array) return EvalResult::make(Value::makeInt(static_cast<uint64_t>(obj->arrVal.size())));
             if (obj->type == Value::Object) return EvalResult::make(obj->objVal.count(member->property) ? obj->objVal[member->property] : Value::undefined());
             return EvalResult::error("Cannot access property " + member->property + " on non-object");
         }
@@ -1336,7 +1454,7 @@ class SLP {
         if (isInt) {
             uint64_t val = 0;
             for (size_t i = start; i < str.size(); ++i) val = val * 10 + static_cast<uint64_t>(str[i] - '0');
-            return negative ? Value::makeInt(static_cast<uint64_t>(-(int64_t)val)) : Value::makeInt(val);
+            return negative ? Value::makeInt(static_cast<uint64_t>(-(int64_t)val), true) : Value::makeInt(val, false);
         }
         if (isFloat) {
             double val = 0.0, fraction = 0.0, divisor = 1.0;
@@ -1428,7 +1546,10 @@ private:
         if constexpr (std::is_same_v<std::decay_t<T>, bool>) {
             return Value::makeBool(arg);
         } else if constexpr (std::is_integral_v<T>) {
-            return Value::makeInt(static_cast<uint64_t>(arg));
+            if (arg < 0) {
+                return Value::makeInt(static_cast<uint64_t>(arg), true);
+            }
+            return Value::makeInt(static_cast<uint64_t>(arg), false);
         } else if constexpr (std::is_floating_point_v<T>) {
             return Value::makeFloat(static_cast<double>(arg));
         } else if constexpr (std::is_same_v<std::decay_t<T>, const char*> || std::is_same_v<std::decay_t<T>, std::string>) {
