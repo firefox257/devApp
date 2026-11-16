@@ -6,7 +6,7 @@ const os = require('os');
 // ==========================================
 // CONFIGURATION
 // ==========================================
-const ROOT_DIR = path.join(__dirname, 'public');
+const ROOT_DIR = path.join(__dirname, 'ftp_root');
 const PORT = 2121; // Using 2121 to avoid requiring root privileges (port 21)
 
 // Ensure root directory exists on startup
@@ -47,13 +47,18 @@ function formatDate(date) {
 
 // Get local IP for PASV mode (fallback to 127.0.0.1)
 function getLocalIP() {
-    const interfaces = os.networkInterfaces();
-    for (const name of Object.keys(interfaces)) {
-        for (const iface of interfaces[name]) {
-            if (iface.family === 'IPv4' && !iface.internal) {
-                return iface.address;
+    try {
+        const interfaces = os.networkInterfaces();
+        for (const name of Object.keys(interfaces)) {
+            for (const iface of interfaces[name]) {
+                // Check for both string 'IPv4' (Node 18+) and number 4 (older Node)
+                if ((iface.family === 'IPv4' || iface.family === 4) && !iface.internal) {
+                    return iface.address;
+                }
             }
         }
+    } catch (err) {
+        console.warn('Warning: Could not read network interfaces. Falling back to 127.0.0.1');
     }
     return '127.0.0.1';
 }
