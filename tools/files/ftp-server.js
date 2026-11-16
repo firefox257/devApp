@@ -2,12 +2,17 @@ const net = require('net');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const dns = require('dns');
 
 // ==========================================
 // CONFIGURATION
 // ==========================================
 const ROOT_DIR = path.join(__dirname, 'ftp_root');
-const PORT = 2121; // Using 2121 to avoid requiring root privileges (port 21)
+const PORT = 2121;
+
+// >>> SET THIS TO YOUR SERVER'S IP IF CLIENTS CONNECT REMOTELY <<<
+// Leave as null to auto-detect. Set to '127.0.0.1' for local-only testing.
+const PASV_HOST = null;
 
 // Ensure root directory exists on startup
 if (!fs.existsSync(ROOT_DIR)) {
@@ -18,16 +23,15 @@ if (!fs.existsSync(ROOT_DIR)) {
 // HELPER FUNCTIONS
 // ==========================================
 
-// Security: Prevent directory traversal attacks (e.g., CWD ../../etc)
+// Security: Prevent directory traversal attacks
 function resolveSandboxPath(clientCwd, relativePath) {
     const target = path.resolve(ROOT_DIR, clientCwd, relativePath);
     if (!target.startsWith(ROOT_DIR)) {
-        return null; // Escaped sandbox
+        return null;
     }
     return target;
 }
 
-// Format date for LIST command (standard FTP format)
 function formatDate(date) {
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const month = months[date.getMonth()];
@@ -35,7 +39,6 @@ function formatDate(date) {
     const hours = date.getHours().toString().padStart(2, '0');
     const minutes = date.getMinutes().toString().padStart(2, '0');
     
-    // If file is older than 6 months, show year instead of time
     const sixMonthsAgo = new Date();
     sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
     
@@ -45,21 +48,36 @@ function formatDate(date) {
     return `${month} ${day} ${hours}:${minutes}`;
 }
 
-// Get local IP for PASV mode (fallback to 127.0.0.1)
+// Bulletproof IP detection with multiple fallbacks
 function getLocalIP() {
+    // 1. If user hardcoded it, use that
+    if (PASV_HOST) {
+        return PASV_HOST;
+    }
+
+    // 2. Try os.networkInterfaces() — wrapped in multiple layers of safety
     try {
         const interfaces = os.networkInterfaces();
-        for (const name of Object.keys(interfaces)) {
-            for (const iface of interfaces[name]) {
-                // Check for both string 'IPv4' (Node 18+) and number 4 (older Node)
-                if ((iface.family === 'IPv4' || iface.family === 4) && !iface.internal) {
-                    return iface.address;
+        if (interfaces) {
+            for (const name of Object.keys(interfaces)) {
+                const ifaces = interfaces[name];
+                if (!ifaces) continue;
+                for (const iface of ifaces) {
+                    if (!iface) continue;
+                    const family = iface.family;
+                    const isIPv4 = family === 'IPv4' || family === 4 || family === 'ipv4';
+                    if (isIPv4 && !iface.internal) {
+                        return iface.address;
+                    }
                 }
             }
         }
     } catch (err) {
-        console.warn('Warning: Could not read network interfaces. Falling back to 127.0.0.1');
+        console.warn('[WARN] os.networkInterfaces() failed:', err.message);
     }
+
+    // 3. Fallback: just return localhost
+    console.warn('[WARN] Falling back to 127.0.0.1 for PASV. Set PASV_HOST in config if remote access is needed.');
     return '127.0.0.1';
 }
 
@@ -68,32 +86,26 @@ function getLocalIP() {
 // ==========================================
 
 const server = net.createServer((socket) => {
-    // Client state
     let clientState = {
         cwd: '/',
         authenticated: false,
         username: null,
-        dataType: 'A', // ASCII or Binary
-        pasvServer: null
+        dataType: 'A',
+        pasvServer: null,
+        pendingDataTransfer: null
     };
 
-    // Send response to client
     const send = (code, message) => {
-        const response = `${code} ${message}\r\n`;
-        socket.write(response);
+        socket.write(`${code} ${message}\r\n`);
     };
 
-    // Handle incoming data from client
     let buffer = '';
     socket.on('data', (data) => {
         buffer += data.toString();
-        
-        // FTP commands are terminated by \r\n
         let newlineIndex;
         while ((newlineIndex = buffer.indexOf('\r\n')) !== -1) {
             const line = buffer.slice(0, newlineIndex);
             buffer = buffer.slice(newlineIndex + 2);
-            
             if (line.trim()) {
                 handleCommand(line);
             }
@@ -101,19 +113,17 @@ const server = net.createServer((socket) => {
     });
 
     socket.on('close', () => {
-        if (clientState.pasvServer) clientState.pasvServer.close();
+        if (clientState.pasvServer) {
+            try { clientState.pasvServer.close(); } catch (e) {}
+        }
     });
 
     socket.on('error', (err) => {
         console.error('Socket error:', err.message);
     });
 
-    // Welcome message
     send(220, 'Welcome to the Node.js Scratch FTP Server');
 
-    // ==========================================
-    // COMMAND HANDLER
-    // ==========================================
     function handleCommand(line) {
         const spaceIndex = line.indexOf(' ');
         const cmd = (spaceIndex === -1 ? line : line.slice(0, spaceIndex)).toUpperCase();
@@ -128,7 +138,6 @@ const server = net.createServer((socket) => {
                 break;
 
             case 'PASS':
-                // Accept any password for this scratch implementation
                 clientState.authenticated = true;
                 send(230, 'User logged in, proceed');
                 break;
@@ -145,18 +154,18 @@ const server = net.createServer((socket) => {
                 send(257, `"${clientState.cwd}" is current directory`);
                 break;
 
-            case 'CWD':
+            case 'CWD': {
                 const newCwd = arg || '/';
                 const resolvedCwd = resolveSandboxPath(clientState.cwd, newCwd);
                 if (!resolvedCwd || !fs.existsSync(resolvedCwd) || !fs.statSync(resolvedCwd).isDirectory()) {
                     send(550, 'Directory not found');
                 } else {
-                    // Update CWD to be relative to ROOT_DIR
                     clientState.cwd = '/' + path.relative(ROOT_DIR, resolvedCwd).replace(/\\/g, '/');
                     if (clientState.cwd === '') clientState.cwd = '/';
                     send(250, 'Directory changed to ' + clientState.cwd);
                 }
                 break;
+            }
 
             case 'CDUP':
                 handleCommand('CWD ..');
@@ -184,7 +193,7 @@ const server = net.createServer((socket) => {
                 handleStor(arg);
                 break;
 
-            case 'MKD':
+            case 'MKD': {
                 const mkdPath = resolveSandboxPath(clientState.cwd, arg);
                 if (!mkdPath) {
                     send(550, 'Permission denied');
@@ -197,8 +206,9 @@ const server = net.createServer((socket) => {
                     }
                 }
                 break;
+            }
 
-            case 'DELE':
+            case 'DELE': {
                 const delePath = resolveSandboxPath(clientState.cwd, arg);
                 if (!delePath) {
                     send(550, 'Permission denied');
@@ -211,6 +221,7 @@ const server = net.createServer((socket) => {
                     }
                 }
                 break;
+            }
 
             case 'QUIT':
                 send(221, 'Goodbye');
@@ -222,25 +233,26 @@ const server = net.createServer((socket) => {
         }
     }
 
-    // ==========================================
-    // DATA CONNECTION (PASSIVE MODE)
-    // ==========================================
     function handlePasv() {
-        // Close previous PASV server if it exists
         if (clientState.pasvServer) {
-            clientState.pasvServer.close();
+            try { clientState.pasvServer.close(); } catch (e) {}
+            clientState.pasvServer = null;
         }
 
         clientState.pasvServer = net.createServer((dataSocket) => {
-            // Once client connects to data port, we close the listening server
-            clientState.pasvServer.close();
+            try { clientState.pasvServer.close(); } catch (e) {}
             clientState.pasvServer = null;
             
-            // Pass the data socket to the pending transfer
             if (clientState.pendingDataTransfer) {
-                clientState.pendingDataTransfer(dataSocket);
+                const cb = clientState.pendingDataTransfer;
                 clientState.pendingDataTransfer = null;
+                cb(dataSocket);
             }
+        });
+
+        clientState.pasvServer.on('error', (err) => {
+            console.error('PASV server error:', err.message);
+            send(425, 'Cannot open data connection');
         });
 
         clientState.pasvServer.listen(0, () => {
@@ -248,7 +260,6 @@ const server = net.createServer((socket) => {
             const ip = getLocalIP().split('.').join(',');
             const p1 = Math.floor(port / 256);
             const p2 = port % 256;
-            
             send(227, `Entering Passive Mode (${ip},${p1},${p2})`);
         });
     }
@@ -261,9 +272,6 @@ const server = net.createServer((socket) => {
         }
     }
 
-    // ==========================================
-    // FILE TRANSFER COMMANDS
-    // ==========================================
     function handleList(arg, isNlst) {
         send(150, 'Opening data connection for directory list');
         
@@ -277,13 +285,13 @@ const server = net.createServer((socket) => {
                     return;
                 }
 
-                let output = '';
                 if (files.length === 0) {
                     dataSocket.end();
                     send(226, 'Transfer complete');
                     return;
                 }
 
+                let output = '';
                 let processed = 0;
                 files.forEach((file) => {
                     const filePath = path.join(dirPath, file);
@@ -322,13 +330,8 @@ const server = net.createServer((socket) => {
             const readStream = fs.createReadStream(filePath);
             readStream.pipe(dataSocket);
             
-            readStream.on('end', () => {
-                send(226, 'Transfer complete');
-            });
-            
-            readStream.on('error', () => {
-                send(550, 'File read error');
-            });
+            readStream.on('end', () => send(226, 'Transfer complete'));
+            readStream.on('error', () => send(550, 'File read error'));
         });
     }
 
@@ -345,13 +348,8 @@ const server = net.createServer((socket) => {
             const writeStream = fs.createWriteStream(filePath);
             dataSocket.pipe(writeStream);
             
-            writeStream.on('finish', () => {
-                send(226, 'Transfer complete');
-            });
-            
-            writeStream.on('error', () => {
-                send(550, 'File write error');
-            });
+            writeStream.on('finish', () => send(226, 'Transfer complete'));
+            writeStream.on('error', () => send(550, 'File write error'));
         });
     }
 });
@@ -359,5 +357,6 @@ const server = net.createServer((socket) => {
 server.listen(PORT, () => {
     console.log(`FTP Server running on port ${PORT}`);
     console.log(`Root directory: ${ROOT_DIR}`);
+    console.log(`PASV host: ${PASV_HOST || '(auto-detect, fallback 127.0.0.1)'}`);
     console.log(`Connect using: ftp localhost ${PORT}`);
 });
