@@ -13,9 +13,6 @@ const crypto = require('crypto');
 const FILES_ROOT = path.join(__dirname, 'files');
 const TRASH_DIR = path.join(FILES_ROOT, 'trash');
 
-
-
-
 // ==========================================================
 // 🚨 ENHANCED ERROR HANDLING
 // Global catch-alls for uncaught syntax/runtime errors
@@ -201,15 +198,22 @@ function computeAcceptKey(key) {
     return crypto.createHash('sha1').update(key + magic).digest('base64');
 }
 
-// ✅ FIX 1: Return bytesConsumed to prevent dropping subsequent frames in the same TCP chunk
+// ✅ FIX 1: Handle Control Frames (Ping/Pong/Close) to prevent buffer stalling
 function parseWebSocketFrame(buffer) {
     if (buffer.length < 2) return null;
+    const isFin = (buffer[0] & 0x80) !== 0;
     const opcode = buffer[0] & 0x0F;
-    if (opcode !== 1) return null; // Only handling text frames (opcode 1) for simplicity
+    
+    // Handle Text (1), Close (8), Ping (9), and Pong (10)
+    if (![1, 8, 9, 10].includes(opcode)) {
+        console.warn(`[WS] Unsupported opcode: ${opcode}`);
+        return null; 
+    }
+
     const isMasked = (buffer[1] & 0x80) === 0x80;
-    if (!isMasked) return null;
     let payloadLen = buffer[1] & 0x7F;
     let dataStart = 2;
+    
     if (payloadLen === 126) {
         if (buffer.length < 4) return null;
         payloadLen = buffer.readUInt16BE(2);
@@ -220,16 +224,21 @@ function parseWebSocketFrame(buffer) {
         dataStart = 10;
     }
     
-    const frameLength = dataStart + 4 + payloadLen;
+    const frameLength = dataStart + (isMasked ? 4 : 0) + payloadLen;
     if (buffer.length < frameLength) return null; // Wait for more data
     
-    const masks = buffer.slice(dataStart, dataStart + 4);
-    const payload = buffer.slice(dataStart + 4, frameLength);
-    for (let i = 0; i < payload.length; i++) {
-        payload[i] ^= masks[i % 4];
+    let payload = buffer.slice(dataStart + (isMasked ? 4 : 0), frameLength);
+    
+    if (isMasked) {
+        const masks = buffer.slice(dataStart, dataStart + 4);
+        for (let i = 0; i < payload.length; i++) {
+            payload[i] ^= masks[i % 4];
+        }
     }
     
     return {
+        opcode,
+        isFin,
         message: payload.toString('utf8'),
         bytesConsumed: frameLength
     };
@@ -409,7 +418,7 @@ async function handleApiRequest(req, res, relativePath) {
 // ===== MULTIPART FORM PARSER =====
 const MAX_UPLOAD_SIZE = 500 * 1024 * 1024;
 
-// ✅ FIX 2: Parse entirely at the Buffer level to prevent binary file corruption
+// ✅ FIX 2: Manual buffer splitting to ensure 100% compatibility with Node v18.x / iOS environments
 function parseMultipartForm(req) {
     return new Promise((resolve, reject) => {
         const contentType = req.headers['content-type'] || '';
@@ -436,48 +445,67 @@ function parseMultipartForm(req) {
                 const buffer = Buffer.concat(bodyChunks);
                 const result = { fields: {}, files: [] };
                 
-                // Node.js v18+ supports Buffer.split(Buffer)
-                const parts = buffer.split(boundary);
-                
-                for (let i = 1; i < parts.length - 1; i++) {
-                    let part = parts[i];
+                // Manual split to avoid Buffer.split compatibility issues
+                let offset = 0;
+                while (true) {
+                    const boundaryIndex = buffer.indexOf(boundary, offset);
+                    if (boundaryIndex === -1) break;
                     
-                    // Strip leading \r\n after the boundary
-                    if (part.length >= 2 && part[0] === 0x0D && part[1] === 0x0A) {
-                        part = part.slice(2);
+                    // Check if this is the final boundary (--boundary--)
+                    const nextChars = buffer.slice(boundaryIndex + boundary.length, boundaryIndex + boundary.length + 4).toString('ascii');
+                    if (nextChars.startsWith('--')) {
+                        break; // End of multipart
                     }
                     
-                    const headerEndIdx = part.indexOf('\r\n\r\n');
-                    if (headerEndIdx === -1) continue;
+                    offset = boundaryIndex + boundary.length;
                     
-                    const headersRaw = part.slice(0, headerEndIdx).toString('utf8');
-                    let content = part.slice(headerEndIdx + 4);
-                    
-                    // Strip trailing \r\n (separator before the next boundary)
-                    if (content.length >= 2 && content[content.length - 2] === 0x0D && content[content.length - 1] === 0x0A) {
-                        content = content.slice(0, -2);
+                    // Skip leading \r\n
+                    if (buffer[offset] === 0x0D && buffer[offset + 1] === 0x0A) {
+                        offset += 2;
                     }
+                    
+                    const headerEndIdx = buffer.indexOf('\r\n\r\n', offset);
+                    if (headerEndIdx === -1) break;
+                    
+                    const headersRaw = buffer.slice(offset, headerEndIdx).toString('utf8');
+                    offset = headerEndIdx + 4;
+                    
+                    // Find the start of the next boundary to determine content end
+                    let contentEndIdx = buffer.indexOf(boundary, offset);
+                    if (contentEndIdx === -1) {
+                        contentEndIdx = buffer.length;
+                    } else {
+                        // Strip trailing \r\n before the next boundary
+                        if (contentEndIdx >= 2 && buffer[contentEndIdx - 2] === 0x0D && buffer[contentEndIdx - 1] === 0x0A) {
+                            contentEndIdx -= 2;
+                        }
+                    }
+                    
+                    const content = buffer.slice(offset, contentEndIdx);
                     
                     const dispMatch = headersRaw.match(/Content-Disposition:\s*form-data;\s*name="([^"]+)"/i);
-                    if (!dispMatch) continue;
-                    const fieldName = dispMatch[1];
-                    const filenameMatch = headersRaw.match(/filename="([^"]+)"/i);
-                    
-                    if (filenameMatch) {
-                        const filename = filenameMatch[1];
-                        const contentTypeMatch = headersRaw.match(/Content-Type:\s*([^\r\n]+)/i);
-                        const contentType = contentTypeMatch ? contentTypeMatch[1].trim() : 'application/octet-stream';
+                    if (dispMatch) {
+                        const fieldName = dispMatch[1];
+                        const filenameMatch = headersRaw.match(/filename="([^"]+)"/i);
                         
-                        result.files.push({ 
-                            field: fieldName, 
-                            name: filename, 
-                            type: contentType, 
-                            content: content, // Now a safe, uncorrupted Buffer
-                            isBinary: true 
-                        });
-                    } else {
-                        result.fields[fieldName] = content.toString('utf8');
+                        if (filenameMatch) {
+                            const filename = filenameMatch[1];
+                            const contentTypeMatch = headersRaw.match(/Content-Type:\s*([^\r\n]+)/i);
+                            const contentType = contentTypeMatch ? contentTypeMatch[1].trim() : 'application/octet-stream';
+                            
+                            result.files.push({ 
+                                field: fieldName, 
+                                name: filename, 
+                                type: contentType, 
+                                content: content, // Safe, uncorrupted Buffer
+                                isBinary: true 
+                            });
+                        } else {
+                            result.fields[fieldName] = content.toString('utf8');
+                        }
                     }
+                    
+                    offset = contentEndIdx;
                 }
                 resolve(result);
             } catch (error) { 
@@ -502,7 +530,6 @@ async function handleFileUpload(req, res) {
         const dir = path.dirname(fullPath);
         await mkdir(dir, { recursive: true });
         
-        // ✅ FIX 2b: Write Buffer directly without string conversion
         if (file.isBinary) {
             await writeFile(fullPath, file.content);
         } else {
@@ -515,7 +542,9 @@ async function handleFileUpload(req, res) {
         } else if (error.message.includes('Missing boundary')) {
             sendPlainTextResponse(res, 'Invalid request format', 400);
         } else {
-            logModuleError('UPLOAD', 'multipart-parser', error);
+            // ✅ FIX 2b: Direct console logging to prevent ENOENT crash from logModuleError
+            console.error(`\x1b[31m[UPLOAD] ❌ ERROR:\x1b[0m ${error.message}`);
+            if (error.stack) console.error(`\x1b[2mStack:\x1b[0m\n${error.stack}`);
             sendPlainTextResponse(res, 'Upload failed: ' + error.message, 500);
         }
     }
@@ -618,7 +647,6 @@ function handleWsUpgrade(serverType, req, socket, head) {
                 _socket: socket
             };
             
-            // [FIX] Execute handler ONCE immediately after successful handshake
             let wsInstance;
             try {
                 wsInstance = handlerMod.handler(ws, req);
@@ -626,10 +654,10 @@ function handleWsUpgrade(serverType, req, socket, head) {
             } catch (e) {
                 logModuleError('WS-OPEN', cacheKey, e);
                 ws.close(1011, 'Init failed');
-                return; // Stop execution to prevent attaching listeners to a failed connection
+                return;
             }
             
-            // ✅ FIX 1b: Slice buffer instead of resetting to prevent dropping subsequent frames
+            // ✅ FIX 1b: Properly handle Ping/Pong/Close and slice buffer to prevent memory leaks
             let frameBuffer = Buffer.alloc(0);
             socket.on('data', (chunk) => {
                 frameBuffer = Buffer.concat([frameBuffer, chunk]);
@@ -639,8 +667,34 @@ function handleWsUpgrade(serverType, req, socket, head) {
                     if (parsed === null) break; // Incomplete frame, wait for next chunk
                     
                     try {
-                        if (typeof wsInstance?.onMessage === 'function') {
-                            wsInstance.onMessage(parsed.message);
+                        if (parsed.opcode === 8) {
+                            // Client requested close
+                            ws.close(1000, 'Closed by client');
+                            return; // Stop processing
+                        } else if (parsed.opcode === 9) {
+                            // Ping: respond with Pong (opcode 10)
+                            const pongPayload = Buffer.from(parsed.message, 'utf8');
+                            const pongLen = pongPayload.length;
+                            let pongFrame;
+                            if (pongLen <= 125) {
+                                pongFrame = Buffer.allocUnsafe(2 + pongLen);
+                                pongFrame[0] = 0x8A; // Pong opcode, FIN bit set
+                                pongFrame[1] = pongLen;
+                                pongPayload.copy(pongFrame, 2);
+                            } else {
+                                // Fallback for unusually large pings (rare)
+                                pongFrame = Buffer.allocUnsafe(4 + pongLen);
+                                pongFrame[0] = 0x8A;
+                                pongFrame[1] = 126;
+                                pongFrame.writeUInt16BE(pongLen, 2);
+                                pongPayload.copy(pongFrame, 4);
+                            }
+                            socket.write(pongFrame);
+                        } else if (parsed.opcode === 1) {
+                            // Text frame
+                            if (typeof wsInstance?.onMessage === 'function') {
+                                wsInstance.onMessage(parsed.message);
+                            }
                         }
                     } catch (e) {
                         logModuleError('WS-MSG', cacheKey, e);
