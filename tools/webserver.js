@@ -7,6 +7,16 @@ const { promisify } = require('util');
 const crypto = require('crypto');
 
 // ==========================================================
+// ===== PATH CONSTANTS =====
+//const __dirname="/web/devApp/tools";
+
+const FILES_ROOT = path.join(__dirname, 'files');
+const TRASH_DIR = path.join(FILES_ROOT, 'trash');
+
+
+
+
+// ==========================================================
 // 🚨 ENHANCED ERROR HANDLING
 // Global catch-alls for uncaught syntax/runtime errors
 process.on('uncaughtException', (err, origin) => {
@@ -77,7 +87,7 @@ const _mimetype = {
     '.png': 'image/png',
     '.mp3': 'audio/mpeg',
     '.mp4': 'video/mp4',
-	'.m3u': 'text/plain', 
+    '.m3u': 'text/plain', 
     '.svg': 'image/svg+xml',
     '.gltf': 'model/gltf+json',
     '.bin': 'application/octet-stream',
@@ -130,8 +140,7 @@ const _mimetype = {
     '.webm': 'video/webm',
     '.wat': 'text/plain',
     '.pdf': 'application/pdf',
-	'.wasm': 'application/wasm',
-	".onnx": ' application/octet-stream'
+    '.wasm': 'application/wasm'
 };
 
 // ==========================================================
@@ -192,6 +201,7 @@ function computeAcceptKey(key) {
     return crypto.createHash('sha1').update(key + magic).digest('base64');
 }
 
+// ✅ FIX 1: Return bytesConsumed to prevent dropping subsequent frames in the same TCP chunk
 function parseWebSocketFrame(buffer) {
     if (buffer.length < 2) return null;
     const opcode = buffer[0] & 0x0F;
@@ -209,13 +219,20 @@ function parseWebSocketFrame(buffer) {
         payloadLen = Number(buffer.readBigUInt64BE(2));
         dataStart = 10;
     }
-    if (buffer.length < dataStart + 4 + payloadLen) return null;
+    
+    const frameLength = dataStart + 4 + payloadLen;
+    if (buffer.length < frameLength) return null; // Wait for more data
+    
     const masks = buffer.slice(dataStart, dataStart + 4);
-    const payload = buffer.slice(dataStart + 4, dataStart + 4 + payloadLen);
+    const payload = buffer.slice(dataStart + 4, frameLength);
     for (let i = 0; i < payload.length; i++) {
         payload[i] ^= masks[i % 4];
     }
-    return payload.toString('utf8');
+    
+    return {
+        message: payload.toString('utf8'),
+        bytesConsumed: frameLength
+    };
 }
 
 function createWebSocketFrame(message) {
@@ -254,36 +271,17 @@ const serverOptions = {
     cert: './files/cert.crt',
     additionalMethods: []
 };
-/*
-const allowHead = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'OPTIONS, POST, GET, PUT, PATCH, DELETE',
-    'Access-Control-Max-Age': 2592000,
-    'Access-Control-Allow-Headers': 'Origin, X-Requested-With, Content-Type, Accept, Authorization, X-LS-Path, X-Read-File, X-Read-File-Binary, X-Save-File, X-File-Path, X-File-Content, X-MKPATH, X-MV-Source, X-MV-Destination, X-DEL-Path, X-COPY-Source, X-COPY-Destination, X-RN-Source, X-RN-Destination, X-CMD, X-SRC, X-DST',
-    // 👇 ADD THESE 3 HEADERS FOR WEB WORKER THREADING 👇
-    'Cross-Origin-Opener-Policy': 'same-origin',
-    'Cross-Origin-Embedder-Policy': 'require-corp',
-    'Cross-Origin-Resource-Policy': 'cross-origin'
-};
-*/
-
-
 
 const allowHead = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'OPTIONS, POST, GET, PUT, PATCH, DELETE',
     'Access-Control-Max-Age': 2592000,
     'Access-Control-Allow-Headers': 'Origin, X-Requested-With, Content-Type, Accept, Authorization, X-LS-Path, X-Read-File, X-Read-File-Binary, X-Save-File, X-File-Path, X-File-Content, X-MKPATH, X-MV-Source, X-MV-Destination, X-DEL-Path, X-COPY-Source, X-COPY-Destination, X-RN-Source, X-RN-Destination, X-CMD, X-SRC, X-DST',
-    
     'Access-Control-Expose-Headers': 'Content-Length, Content-Range, Accept-Ranges',
-    
     'Cross-Origin-Opener-Policy': 'same-origin',
     'Cross-Origin-Embedder-Policy': 'require-corp',
     'Cross-Origin-Resource-Policy': 'cross-origin'
 };
-
-
-
 
 // ==========================================================
 // ===== RESPONSE HELPERS =====
@@ -411,12 +409,16 @@ async function handleApiRequest(req, res, relativePath) {
 // ===== MULTIPART FORM PARSER =====
 const MAX_UPLOAD_SIZE = 500 * 1024 * 1024;
 
+// ✅ FIX 2: Parse entirely at the Buffer level to prevent binary file corruption
 function parseMultipartForm(req) {
     return new Promise((resolve, reject) => {
         const contentType = req.headers['content-type'] || '';
         const boundaryMatch = contentType.match(/boundary=(?:"([^"]+)"|([^;]+))/i);
         if (!boundaryMatch) return reject(new Error('Missing boundary in Content-Type'));
-        const boundary = '--' + (boundaryMatch[1] || boundaryMatch[2]).trim();
+        
+        const boundaryStr = (boundaryMatch[1] || boundaryMatch[2]).trim();
+        const boundary = Buffer.from('--' + boundaryStr);
+        
         let bodyChunks = [];
         let totalSize = 0;
         req.on('data', (chunk) => {
@@ -428,39 +430,59 @@ function parseMultipartForm(req) {
             }
             bodyChunks.push(chunk);
         });
+        
         req.on('end', () => {
             try {
                 const buffer = Buffer.concat(bodyChunks);
-                const bodyStr = buffer.toString('binary');
-                const parts = bodyStr.split(boundary);
                 const result = { fields: {}, files: [] };
+                
+                // Node.js v18+ supports Buffer.split(Buffer)
+                const parts = buffer.split(boundary);
+                
                 for (let i = 1; i < parts.length - 1; i++) {
-                    const part = parts[i].trim();
-                    if (!part) continue;
-                    const headerEnd = part.indexOf('\r\n\r\n');
-                    if (headerEnd === -1) continue;
-                    const headersRaw = part.substring(0, headerEnd);
-                    const content = part.substring(headerEnd + 4);
+                    let part = parts[i];
+                    
+                    // Strip leading \r\n after the boundary
+                    if (part.length >= 2 && part[0] === 0x0D && part[1] === 0x0A) {
+                        part = part.slice(2);
+                    }
+                    
+                    const headerEndIdx = part.indexOf('\r\n\r\n');
+                    if (headerEndIdx === -1) continue;
+                    
+                    const headersRaw = part.slice(0, headerEndIdx).toString('utf8');
+                    let content = part.slice(headerEndIdx + 4);
+                    
+                    // Strip trailing \r\n (separator before the next boundary)
+                    if (content.length >= 2 && content[content.length - 2] === 0x0D && content[content.length - 1] === 0x0A) {
+                        content = content.slice(0, -2);
+                    }
+                    
                     const dispMatch = headersRaw.match(/Content-Disposition:\s*form-data;\s*name="([^"]+)"/i);
                     if (!dispMatch) continue;
                     const fieldName = dispMatch[1];
                     const filenameMatch = headersRaw.match(/filename="([^"]+)"/i);
+                    
                     if (filenameMatch) {
                         const filename = filenameMatch[1];
                         const contentTypeMatch = headersRaw.match(/Content-Type:\s*([^\r\n]+)/i);
                         const contentType = contentTypeMatch ? contentTypeMatch[1].trim() : 'application/octet-stream';
-                        let fileContent = content;
-                        if (fileContent.endsWith('\r\n')) fileContent = fileContent.substring(0, fileContent.length - 2);
-                        const isBinary = !contentType.startsWith('text/');
-                        result.files.push({ field: fieldName, name: filename, type: contentType, content: fileContent, isBinary });
+                        
+                        result.files.push({ 
+                            field: fieldName, 
+                            name: filename, 
+                            type: contentType, 
+                            content: content, // Now a safe, uncorrupted Buffer
+                            isBinary: true 
+                        });
                     } else {
-                        let fieldValue = content;
-                        if (fieldValue.endsWith('\r\n')) fieldValue = fieldValue.substring(0, fieldValue.length - 2);
-                        result.fields[fieldName] = fieldValue;
+                        result.fields[fieldName] = content.toString('utf8');
                     }
                 }
                 resolve(result);
-            } catch (error) { reject(error); }
+            } catch (error) { 
+                reject(error); 
+            }
         });
         req.on('error', reject);
     });
@@ -479,8 +501,10 @@ async function handleFileUpload(req, res) {
         const fullPath = path.join(FILES_ROOT, filePathHeader);
         const dir = path.dirname(fullPath);
         await mkdir(dir, { recursive: true });
+        
+        // ✅ FIX 2b: Write Buffer directly without string conversion
         if (file.isBinary) {
-            await writeFile(fullPath, Buffer.from(file.content, 'binary'));
+            await writeFile(fullPath, file.content);
         } else {
             await writeFile(fullPath, file.content, 'utf8');
         }
@@ -605,24 +629,27 @@ function handleWsUpgrade(serverType, req, socket, head) {
                 return; // Stop execution to prevent attaching listeners to a failed connection
             }
             
+            // ✅ FIX 1b: Slice buffer instead of resetting to prevent dropping subsequent frames
             let frameBuffer = Buffer.alloc(0);
             socket.on('data', (chunk) => {
                 frameBuffer = Buffer.concat([frameBuffer, chunk]);
+                
                 while (frameBuffer.length >= 2) {
-                    const message = parseWebSocketFrame(frameBuffer);
-                    if (message === null) break;
-                    
-                    // Note: Clearing the buffer here is a pre-existing quirk in your parser. 
-                    // If multiple frames arrive in a single TCP chunk, this drops the subsequent frames.
-                    frameBuffer = Buffer.alloc(0); 
+                    const parsed = parseWebSocketFrame(frameBuffer);
+                    if (parsed === null) break; // Incomplete frame, wait for next chunk
                     
                     try {
-                        // [FIX] Use the stored instance instead of re-calling handler
-                        if (typeof wsInstance?.onMessage === 'function') wsInstance.onMessage(message);
+                        if (typeof wsInstance?.onMessage === 'function') {
+                            wsInstance.onMessage(parsed.message);
+                        }
                     } catch (e) {
                         logModuleError('WS-MSG', cacheKey, e);
                         ws.close(1011, 'Handler error');
+                        return; // Stop processing further frames on error
                     }
+                    
+                    // Slice the buffer to remove the consumed frame, preserving remaining data
+                    frameBuffer = frameBuffer.slice(parsed.bytesConsumed);
                 }
             });
             
@@ -630,7 +657,6 @@ function handleWsUpgrade(serverType, req, socket, head) {
                 ws.readyState = 3;
                 if (wsCache.has(cacheKey)) wsCache.get(cacheKey).lastAccessed = Date.now();
                 try {
-                    // [FIX] Use the stored instance instead of re-calling handler
                     if (typeof wsInstance?.onClose === 'function') wsInstance.onClose();
                 } catch (e) { }
             });
@@ -639,8 +665,6 @@ function handleWsUpgrade(serverType, req, socket, head) {
                 console.error(`[WS] ${serverType} Socket error ${cacheKey}:`, err.message);
                 ws.close(1006, 'Socket error');
             });
-            
-            // [FIX] Removed the duplicate handler call that was previously located here
         });
     } catch (e) {
         logModuleError('WS-UPGRADE', req.url || 'unknown', e);
@@ -684,10 +708,6 @@ setInterval(() => {
     }
 }, 10 * 60 * 1000);
 
-// ==========================================================
-// ===== PATH CONSTANTS =====
-const FILES_ROOT = path.join(__dirname, 'files');
-const TRASH_DIR = path.join(FILES_ROOT, 'trash');
 
 // ==========================================================
 // ===== FILE SYSTEM HANDLERS =====
@@ -743,9 +763,7 @@ async function handleReadFile(res, filePathHeader) {
 }
 
 async function handleReadFileBinary(req, res, filePathHeader) {
-    //console.log("file:");
-	//console.log(JSON.stringify(filePathHeader));
-	if (!isPathInsideRoot(FILES_ROOT, filePathHeader)) return sendPlainTextResponse(res, 'Access Denied', 403);
+    if (!isPathInsideRoot(FILES_ROOT, filePathHeader)) return sendPlainTextResponse(res, 'Access Denied', 403);
     const fullPath = path.join(FILES_ROOT, filePathHeader);
     try {
         const stats = await stat(fullPath);
@@ -763,7 +781,6 @@ async function handleSaveFile(req, res, filePathHeader) {
     if (!isPathInsideRoot(FILES_ROOT, filePathHeader)) return sendPlainTextResponse(res, 'Access Denied', 403);
     const fullPath = path.join(FILES_ROOT, filePathHeader);
     
-    // ✅ FIX: Collect raw Buffer chunks, do NOT convert to string
     const chunks = [];
     let totalSize = 0;
     let sizeExceeded = false;
@@ -785,7 +802,6 @@ async function handleSaveFile(req, res, filePathHeader) {
             const dir = path.dirname(fullPath);
             await mkdir(dir, { recursive: true });
             
-            // ✅ FIX: Concatenate buffers and write as raw binary (no 'utf8' flag)
             const buffer = Buffer.concat(chunks);
             await writeFile(fullPath, buffer);
             
@@ -1015,20 +1031,10 @@ function webHandler(req, res) {
         return;
     }
 	
-	 
-	//res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');    
-	//res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');   
-	//res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');    
-	
-	// Inside function webHandler(req, res)
-	res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');    
-	res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');   
-	res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-
-// 👇 ADD THIS LINE HERE TOO 👇
-	res.setHeader('Access-Control-Expose-Headers', 'Content-Length, Content-Range, Accept-Ranges');
-	
-	
+    res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');    
+    res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');   
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    res.setHeader('Access-Control-Expose-Headers', 'Content-Length, Content-Range, Accept-Ranges');
     
     if (req.method === 'OPTIONS') { res.writeHead(204, allowHead); res.end(); return; }
     
@@ -1123,6 +1129,7 @@ try {
         else if (err.code === 'ERR_SSL_KEY_FORMAT_INVALID') console.error('Invalid private key format.');
         httpsServer = null;
     });
+	
     httpsServer.listen(serverOptions.sslport, () => {
         if (typeof webAppReady === 'function') webAppReady();
     });

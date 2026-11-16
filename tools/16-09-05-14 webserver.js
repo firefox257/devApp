@@ -254,7 +254,7 @@ const serverOptions = {
     cert: './files/cert.crt',
     additionalMethods: []
 };
-
+/*
 const allowHead = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'OPTIONS, POST, GET, PUT, PATCH, DELETE',
@@ -265,6 +265,25 @@ const allowHead = {
     'Cross-Origin-Embedder-Policy': 'require-corp',
     'Cross-Origin-Resource-Policy': 'cross-origin'
 };
+*/
+
+
+
+const allowHead = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'OPTIONS, POST, GET, PUT, PATCH, DELETE',
+    'Access-Control-Max-Age': 2592000,
+    'Access-Control-Allow-Headers': 'Origin, X-Requested-With, Content-Type, Accept, Authorization, X-LS-Path, X-Read-File, X-Read-File-Binary, X-Save-File, X-File-Path, X-File-Content, X-MKPATH, X-MV-Source, X-MV-Destination, X-DEL-Path, X-COPY-Source, X-COPY-Destination, X-RN-Source, X-RN-Destination, X-CMD, X-SRC, X-DST',
+    
+    'Access-Control-Expose-Headers': 'Content-Length, Content-Range, Accept-Ranges',
+    
+    'Cross-Origin-Opener-Policy': 'same-origin',
+    'Cross-Origin-Embedder-Policy': 'require-corp',
+    'Cross-Origin-Resource-Policy': 'cross-origin'
+};
+
+
+
 
 // ==========================================================
 // ===== RESPONSE HELPERS =====
@@ -288,6 +307,12 @@ globalThis.streamFile = function (req, res, filePath, contentType, statusCode = 
             }
             return;
         }
+		
+		// 🛡️ PREVENT EISDIR CRASH: Return 400 if targeting a directory
+        if (stats.isDirectory()) {
+            return sendPlainTextResponse(res, 'Cannot read a directory', 400);
+        }
+		
         const fileSize = stats.size;
         const range = req.headers.range;
         if (range) {
@@ -329,6 +354,12 @@ function handleFileRequest(req, res, filePath) {
             }
             return;
         }
+		
+		// 🛡️ PREVENT EISDIR CRASH: Return 400 if targeting a directory
+        if (stats.isDirectory()) {
+            return sendPlainTextResponse(res, 'Cannot read a directory', 400);
+        }
+		
         const ext = path.extname(filePath).toLowerCase();
         const contentType = _mimetype[ext] || 'application/octet-stream';
         streamFile(req, res, filePath, contentType);
@@ -731,26 +762,43 @@ async function handleReadFileBinary(req, res, filePathHeader) {
 async function handleSaveFile(req, res, filePathHeader) {
     if (!isPathInsideRoot(FILES_ROOT, filePathHeader)) return sendPlainTextResponse(res, 'Access Denied', 403);
     const fullPath = path.join(FILES_ROOT, filePathHeader);
-    let body = '', sizeExceeded = false;
+    
+    // ✅ FIX: Collect raw Buffer chunks, do NOT convert to string
+    const chunks = [];
+    let totalSize = 0;
+    let sizeExceeded = false;
+
     req.on('data', chunk => {
         if (sizeExceeded) return;
-        body += chunk.toString();
-        if (body.length > MAX_UPLOAD_SIZE) {
+        chunks.push(chunk);
+        totalSize += chunk.length;
+        if (totalSize > MAX_UPLOAD_SIZE) {
             sizeExceeded = true;
             req.destroy();
             if (!res.headersSent) sendPlainTextResponse(res, 'Payload too large (max 500MB)', 413);
         }
     });
+
     req.on('end', async () => {
         if (sizeExceeded) return;
         try {
             const dir = path.dirname(fullPath);
             await mkdir(dir, { recursive: true });
-            await writeFile(fullPath, body, 'utf8');
+            
+            // ✅ FIX: Concatenate buffers and write as raw binary (no 'utf8' flag)
+            const buffer = Buffer.concat(chunks);
+            await writeFile(fullPath, buffer);
+            
             sendPlainTextResponse(res, `File saved: ${filePathHeader}`, 200);
-        } catch (error) { console.error(`SAVEFILE Error: ${error.message}`); sendPlainTextResponse(res, 'Internal Server Error', 500); }
+        } catch (error) { 
+            console.error(`SAVEFILE Error: ${error.message}`); 
+            sendPlainTextResponse(res, 'Internal Server Error', 500); 
+        }
     });
-    req.on('error', (error) => { if (!res.headersSent) sendPlainTextResponse(res, 'Request Error', 500); });
+
+    req.on('error', (error) => { 
+        if (!res.headersSent) sendPlainTextResponse(res, 'Request Error', 500); 
+    });
 }
 
 async function handleMkpath(res, mkPathHeader) {
@@ -959,6 +1007,7 @@ async function handleDel(res, delPathHeader) {
 // ==========================================================
 // ===== MAIN HTTP REQUEST HANDLER =====
 function webHandler(req, res) {
+	console.log("here1")
     const clientIP = req.socket?.remoteAddress || req.connection?.remoteAddress;
     if (!isLanIP(clientIP)) {
         console.warn(`[SECURITY] Blocked external request from ${clientIP} to ${req.url}`);
@@ -968,9 +1017,18 @@ function webHandler(req, res) {
     }
 	
 	 
+	//res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');    
+	//res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');   
+	//res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');    
+	
+	// Inside function webHandler(req, res)
 	res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');    
 	res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');   
-	res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');    
+	res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+
+// 👇 ADD THIS LINE HERE TOO 👇
+	res.setHeader('Access-Control-Expose-Headers', 'Content-Length, Content-Range, Accept-Ranges');
+	
 	
     
     if (req.method === 'OPTIONS') { res.writeHead(204, allowHead); res.end(); return; }
@@ -1066,6 +1124,7 @@ try {
         else if (err.code === 'ERR_SSL_KEY_FORMAT_INVALID') console.error('Invalid private key format.');
         httpsServer = null;
     });
+	
     httpsServer.listen(serverOptions.sslport, () => {
         if (typeof webAppReady === 'function') webAppReady();
     });

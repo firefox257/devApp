@@ -1,0 +1,198 @@
+================================================================================
+AUTOGEN PHASE 2: fetch_ext DEVELOPER DOCUMENTATION
+================================================================================
+
+OVERVIEW
+--------
+The fetch_ext library provides a seamless, asynchronous bridge between C++ 
+WebAssembly workers and the browser's native fetch API. It allows C++ code to 
+perform network requests without blocking the worker's event loop, returning 
+the raw binary/text payload and HTTP status code directly into the shared 
+WebAssembly memory.
+
+PREREQUISITES
+-------------
+- Autogen Phase 2 runtime initialized.
+- Server configured with mandatory SharedArrayBuffer headers:
+    Cross-Origin-Opener-Policy: same-origin
+    Cross-Origin-Embedder-Policy: require-corp
+- C++20 compiler with coroutine support (required for ag_await).
+
+================================================================================
+1. INTEGRATION
+================================================================================
+
+C++ Side
+--------
+Include the header in your C++ translation unit:
+
+    #include <fetch_ext.hpp>
+
+JavaScript Side
+---------------
+Import and register the extension with your AutogenRuntime instance after 
+initialization:
+
+    import { registerFetchExtension } from '/system/fetch/fetch_ext.js';
+
+    // After runtime.initialize('module.wasm')
+    registerFetchExtension(runtime);
+
+================================================================================
+2. API REFERENCE
+================================================================================
+
+C++ API (fetch_ext.hpp)
+-----------------------
+
+FetchResult Struct
+The structure written to shared memory by the JS extension.
+
+    struct FetchResult {
+        uint64_t data_ptr;    // Pointer to the raw payload data in shared memory
+        uint32_t size;        // Size of the payload in bytes
+        uint32_t status_code; // HTTP status code (e.g., 200, 404)
+    };
+
+fetch(const char* url)
+Initiates an asynchronous fetch request from the worker.
+- Parameters: url - Null-terminated C-string of the target URL.
+- Returns: ag_future* - A future that resolves to a uint32_t pointer to a 
+  FetchResult struct in shared memory.
+- Context: Must be called from within a worker. 
+
+================================================================================
+3. STEP-BY-STEP USAGE EXAMPLE
+================================================================================
+
+C++ Implementation
+------------------
+CRITICAL: Coroutine Infection Rule
+Because this function uses ag_await, it MUST return ag_future* and use 
+ag_return instead of a standard return.
+
+    #include <autogen.hpp>
+    #include <cstring>
+    #include "fetch_ext.hpp"
+
+    ag_export(fetch_my_data)
+    ag_future* fetch_my_data(const char* url) {
+        msginfo << "Fetching: " << url;
+        
+        // 1. Dispatch async fetch to JS worker context
+        ag_future* fut = fetch(url);
+        
+        // 2. Await the pointer to the FetchResult struct (yields to JS event loop)
+        uint32_t structPtr = ag_await(uint32_t, fut);
+        
+        if (structPtr == 0) {
+            msgwarn << "Fetch failed or returned null pointer.";
+            ag_return 0;
+        }
+        
+        // 3. Cast raw pointer to struct
+        FetchResult* res = (FetchResult*)(uintptr_t)structPtr;
+        
+        if (res->status_code == 200 && res->data_ptr != 0 && res->size > 0) {
+            // 4. Allocate temporary buffer for null-terminated string (STANDARD C++ malloc)
+            char* null_terminated_data = (char*)malloc(res->size + 1);
+            if (null_terminated_data) {
+                memcpy(null_terminated_data, (const void*)(uintptr_t)res->data_ptr, res->size);
+                null_terminated_data[res->size] = '\0';
+                
+                msginfo << "Success! Payload:\n" << null_terminated_data;
+                
+                // 5. Free temporary buffer (STANDARD C++ free)
+                free(null_terminated_data);
+            }
+        } else {
+            msgwarn << "Fetch completed with status: " << res->status_code;
+        }
+        
+        // 6. CLEANUP: Free the shared memory allocated by JS
+        if (res->data_ptr != 0) {
+            free((void*)(uintptr_t)res->data_ptr);
+        }
+        free((void*)(uintptr_t)structPtr);
+        
+        ag_return res->status_code;
+    }
+
+JavaScript Implementation
+-------------------------
+When calling the C++ function from JS, you must manually allocate the URL 
+string in shared memory, pass the pointer, and wrap the resulting future.
+
+    async function runFetch(url) {
+        // 1. Encode URL and add null-terminator
+        const encoder = new TextEncoder();
+        const urlBytes = encoder.encode(url + '\0');
+        
+        // 2. Allocate memory in shared WASM heap
+        const urlPtr = runtime.mainWasmInstance.exports.cppmalloc(urlBytes.length);
+        new Uint8Array(runtime.sharedMemory.buffer).set(urlBytes, urlPtr);
+        
+        try {
+            // 3. Call C++ export (returns a future pointer)
+            const futurePtr = await runtime.callExport(0, 'fetch_my_data', urlPtr);
+            
+            // 4. Wrap and await the future result
+            const fut = runtime.wrapFuture(futurePtr);
+            const statusCode = await fut.awaitResult('uint32');
+            
+            console.log("Fetch completed with status:", statusCode);
+        } catch (err) {
+            console.error("Fetch failed:", err);
+        } finally {
+            // 5. Free the URL string memory
+            runtime.mainWasmInstance.exports.cppfree(urlPtr);
+        }
+    }
+
+================================================================================
+4. MEMORY MANAGEMENT RULES (STRICT)
+================================================================================
+
+Autogen enforces strict boundaries between JS and C++ memory management. 
+Violating these will cause heap corruption or crashes.
+
+1. JS Allocation: The fetch_ext.js library allocates both the data_ptr 
+   (payload) and structPtr (metadata) using wasmInstance.exports.cppmalloc.
+2. C++ Reading: C++ reads these pointers by casting them to uintptr_t. 
+3. C++ Deallocation: C++ MUST free both res->data_ptr and structPtr when done. 
+4. Forbidden C++ Functions: Do NOT use cppfree in C++ code. The Autogen 
+   documentation explicitly reserves cppmalloc, cppfree, and cpprealloc 
+   EXCLUSIVELY for JavaScript usage. In C++, always use standard malloc, free, 
+   new, and delete. The Autogen toolchain intercepts standard C++ allocation 
+   calls and routes them to the shared AtomicMalloc allocator automatically.
+
+================================================================================
+5. ERROR HANDLING
+================================================================================
+
+- Network Failure: If the JS fetch throws (e.g., CORS error, offline), the 
+  exception is caught by fetch_ext.js and re-thrown. The Autogen core will 
+  automatically reject the C++ ag_future with the system error code 0xDEADBEEF.
+- Null Pointer Check: Always check if (structPtr == 0) after ag_await before 
+  dereferencing, as a failed allocation or rejected future may return null.
+- Empty Payloads: A 204 No Content response will result in size == 0 and 
+  data_ptr == 0. Handle this gracefully to avoid allocating 0-byte buffers.
+
+================================================================================
+6. BEST PRACTICES & GOTCHAS
+================================================================================
+
+1. URL Null-Termination: The C++ fetch function expects a const char*. When 
+   passing from JS, always append \0 to the encoded string and allocate 
+   length + 1 bytes.
+2. Heap Growth Invalidation: The fetch_ext.js library automatically re-creates 
+   Uint8Array and DataView instances *after* calling cppmalloc. This is a 
+   critical safety measure, as heap growth can detach the underlying 
+   SharedArrayBuffer, invalidating old typed array views.
+3. Binary vs Text: This library fetches arrayBuffer() by default, making it 
+   suitable for both JSON/text and raw binary files (images, WASM modules, 
+   etc.). If you need text, handle the null-termination in C++ as shown in 
+   the example.
+4. No Main Thread Blocking: Because this uses ag_ext_async and ag_await, the 
+   C++ worker yields to the JS event loop. The worker remains responsive to 
+   MessagePort traffic while the network request is in flight.
