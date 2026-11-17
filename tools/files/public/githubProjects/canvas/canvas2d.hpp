@@ -203,7 +203,7 @@ return *this;
 }
 float global_alpha() const { return m_global_alpha; }
 Canvas2D& globalAlpha(float alpha) { return global_alpha(alpha); }
-float globalAlpha() const { return m_global_alpha; }
+float globalAlpha() const { return global_alpha(); }
 Canvas2D& set_mask(Mask* m) { m_mask = m; return *this; }
 Canvas2D& clear_mask() { m_mask = nullptr; return *this; }
 Mask* get_mask() const { return m_mask; }
@@ -236,7 +236,7 @@ Canvas2D& line_dash_offset(float offset) { m_line_dash_offset = offset; return *
 float line_dash_offset() const { return m_line_dash_offset; }
 Canvas2D& setLineDash(std::initializer_list<float> segments) { return set_line_dash(segments); }
 Canvas2D& setLineDash(const float* segments, size_t count) { return set_line_dash(segments, count); }
-const std::vector<float>& getLineDash() const { return m_line_dash; }
+const std::vector<float>& getLineDash() const { return get_line_dash(); }
 Canvas2D& lineDashOffset(float offset) { return line_dash_offset(offset); }
 // SVG 2 §9.2 image sampling state (part of save()/restore()).
 Canvas2D& image_smoothing_enabled(bool enabled) { m_image_smoothing = enabled; return *this; }
@@ -244,9 +244,9 @@ bool image_smoothing_enabled() const { return m_image_smoothing; }
 Canvas2D& image_smoothing_quality(ImageSmoothingQuality quality) { m_image_smoothing_quality = quality; return *this; }
 ImageSmoothingQuality image_smoothing_quality() const { return m_image_smoothing_quality; }
 Canvas2D& imageSmoothingEnabled(bool enabled) { return image_smoothing_enabled(enabled); }
-bool imageSmoothingEnabled() const { return m_image_smoothing; }
+bool imageSmoothingEnabled() const { return image_smoothing_enabled(); }
 Canvas2D& imageSmoothingQuality(ImageSmoothingQuality quality) { return image_smoothing_quality(quality); }
-ImageSmoothingQuality imageSmoothingQuality() const { return m_image_smoothing_quality; }
+ImageSmoothingQuality imageSmoothingQuality() const { return image_smoothing_quality(); }
 Canvas2D& clear(uint32_t color) { std::fill(buffer, buffer + static_cast<size_t>(width) * height, color); return *this; }
 Canvas2D& fill_solid(uint32_t color) { return clear(color); }
 // ----------------------------------------------------------------------
@@ -309,6 +309,13 @@ std::vector<Edge> m_edges; std::vector<ActiveEdge> m_active;
 std::vector<float> m_partial, m_delta; std::vector<uint32_t> m_shadow_buf;
 std::vector<uint8_t> m_blur_a, m_blur_b; std::vector<uint32_t> m_blur_col, m_blur_recip;
 std::vector<uint32_t> m_layer, m_mask_buf; std::vector<uint8_t> m_clip_cov, m_clip_tmp;
+// Device-space clip coverage cache (full canvas). Rasterized once per
+// (clip content, CTM [, object bbox for OBB clips]) change instead of once
+// per clipped draw; each draw copies its sub-rect out of it.
+std::vector<uint8_t> m_clip_cache;
+uint64_t m_clip_cache_sig = 0; Transform m_clip_cache_t;
+float m_clip_cache_ub[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+bool m_clip_cache_valid = false, m_clip_cache_obb = false;
 Shape2D m_marker_clip_shape; ClipPath m_marker_clip;
 friend class Filter;
 bool filtered() const { return m_filter && !m_filter->empty(); }
@@ -355,6 +362,8 @@ template <class F> void draw_layered(const float db[4], const float ub[4], F&& d
 void render_mask_content(Mask* mk, int bx0, int by0, int bw, int bh, const float ub[4]);
 void clip_device_bounds(const ClipPath* cp, const float ub[4], float b[4], int depth = 0) const;
 void clip_union(ClipPath* cp, int bx0, int by0, int bw, int bh, const float ub[4], uint8_t* out, int depth);
+uint64_t clip_signature(const ClipPath* cp, bool& obb) const;
+void clip_coverage_cached(ClipPath* cp, int bx0, int by0, int bw, int bh, const float ub[4], uint8_t* out);
 void draw_shape_impl(const Shape2D& shape, const Paint& fill_paint, const Paint& stroke_paint, float offset_x, float offset_y, float scale_x, float scale_y);
 void draw_pixels_impl(const uint8_t* src, int iw, int ih, int ch, float x, float y, float w, float h,
 ImageAlign align = ImageAlign::None, ImageFit fit = ImageFit::Meet);

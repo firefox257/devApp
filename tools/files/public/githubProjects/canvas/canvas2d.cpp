@@ -218,6 +218,69 @@ clip_union(par, bx0, by0, bw, bh, ub, pv.data(), depth + 1);
 for (size_t i = 0; i < n; ++i) out[i] = static_cast<uint8_t>((out[i] * pv[i] + 127u) / 255u);
 }
 }
+// ----------------------------------------------------------------------
+// Clip coverage cache. Coverage in device space depends only on the clip
+// chain's content + the CTM (plus the object bbox for OBB clips), NOT on
+// the draw's bbox -- so rasterize once over the full canvas and copy the
+// sub-rect per draw. The signature hashes the actual path commands (clip
+// objects are often stack-allocated and rebuilt at the same address every
+// frame, so pointer identity alone is not a safe key).
+// ----------------------------------------------------------------------
+uint64_t Canvas2D::clip_signature(const ClipPath* cp, bool& obb) const {
+obb = false;
+uint64_t h = 1469598103934665603ull;
+auto hu = [&](uint64_t v) { h ^= v; h *= 0x100000001b3ull; };
+auto hf = [&](float v) { uint32_t u; std::memcpy(&u, &v, 4); hu(u); };
+hu(static_cast<uint64_t>(m_stroke_curve_steps));   // affects curve flattening
+int depth = 0;
+for (const ClipPath* p = cp; p && depth <= CLIP_MAX_DEPTH; p = p->clip_path(), ++depth) {
+hu(static_cast<uint64_t>(reinterpret_cast<uintptr_t>(p)));
+hu(static_cast<uint64_t>(p->units()));
+if (p->units() == ClipPath::Units::ObjectBoundingBox) obb = true;
+const Transform& t = p->transform();
+hf(t.a); hf(t.b); hf(t.c); hf(t.d); hf(t.e); hf(t.f);
+for (const auto& item : p->items()) {
+hu(static_cast<uint64_t>(item.rule));
+if (!item.shape) continue;
+hu(static_cast<uint64_t>(item.shape->commands.size()));
+for (const auto& c : item.shape->commands) {
+hu(static_cast<uint64_t>(c.type));
+hf(c.x1); hf(c.y1); hf(c.x2); hf(c.y2); hf(c.x3); hf(c.y3);
+}
+}
+}
+return h;
+}
+void Canvas2D::clip_coverage_cached(ClipPath* cp, int bx0, int by0, int bw, int bh, const float ub[4], uint8_t* out) {
+bool obb = false;
+const uint64_t sig = clip_signature(cp, obb);
+const Transform& t = m_transform;
+const bool hit = m_clip_cache_valid && m_clip_cache_sig == sig && m_clip_cache_obb == obb &&
+t.a == m_clip_cache_t.a && t.b == m_clip_cache_t.b && t.c == m_clip_cache_t.c &&
+t.d == m_clip_cache_t.d && t.e == m_clip_cache_t.e && t.f == m_clip_cache_t.f &&
+(!obb || (ub[0] == m_clip_cache_ub[0] && ub[1] == m_clip_cache_ub[1] &&
+ub[2] == m_clip_cache_ub[2] && ub[3] == m_clip_cache_ub[3]));
+if (!hit) {
+m_clip_cache.assign(static_cast<size_t>(width) * height, 0u);
+clip_union(cp, 0, 0, width, height, ub, m_clip_cache.data(), 0);
+m_clip_cache_sig = sig; m_clip_cache_t = t; m_clip_cache_obb = obb;
+if (obb) { m_clip_cache_ub[0] = ub[0]; m_clip_cache_ub[1] = ub[1]; m_clip_cache_ub[2] = ub[2]; m_clip_cache_ub[3] = ub[3]; }
+m_clip_cache_valid = true;
+}
+// Copy the draw's sub-rect out of the cached full-canvas coverage.
+const uint8_t* cache = m_clip_cache.data();
+for (int y = 0; y < bh; ++y) {
+uint8_t* dst = out + static_cast<size_t>(y) * bw;
+const int gy = by0 + y;
+if (gy < 0 || gy >= height) { std::fill(dst, dst + bw, 0u); continue; }
+const uint8_t* src = cache + static_cast<size_t>(gy) * width;
+int x = 0;
+for (; x < bw && bx0 + x < 0; ++x) dst[x] = 0u;
+const int run = std::min(bw - x, width - (bx0 + x));
+if (run > 0) { std::memcpy(dst + x, src + (bx0 + x), static_cast<size_t>(run)); x += run; }
+for (; x < bw; ++x) dst[x] = 0u;
+}
+}
 void Canvas2D::render_mask_content(Mask* mk, int bx0, int by0, int bw, int bh, const float ub[4]) {
 const Transform saved_t = m_transform; const BlendMode saved_b = m_blend_mode;
 const bool saved_shadow = m_shadow_enabled; Mask* saved_mask = m_mask; ClipPath* saved_clip = m_clip;
@@ -335,7 +398,7 @@ layer[static_cast<size_t>(yy) * bw + xx] = (gx >= rx0 && gx < rx1 && gy >= ry0 &
 }
 }
 if (mk) render_mask_content(mk, bx0, by0, bw, bh, ub);
-if (cp) clip_union(cp, bx0, by0, bw, bh, ub, m_clip_cov.data(), 0);
+if (cp) clip_coverage_cached(cp, bx0, by0, bw, bh, ub, m_clip_cov.data());
 if (comp) { m_blend_mode = saved_blend; m_composite_op = op; }
 const Mask::Type mt = mk ? mk->effective_type() : Mask::Type::Alpha;
 uint32_t* layer = m_layer.data(); const uint32_t* mb = mk ? m_mask_buf.data() : nullptr; const uint8_t* cv = cp ? m_clip_cov.data() : nullptr;
@@ -682,7 +745,6 @@ const int n = static_cast<int>(std::ceil(std::sqrt(0.75f * std::sqrt(m2) / 0.05f
 if (n < steps) steps = n < 4 ? 4 : n;
 }
 t.compile(steps);
-t.compile(curve_steps > 0 ? curve_steps : m_stroke_curve_steps);
 return t;
 }
 void Canvas2D::paint_shape(const Shape2D& t, bool do_fill, bool do_stroke) {
@@ -735,7 +797,7 @@ segment(c.x2, c.y2, sx, sy, ex, ey); break;
 case 3: {
 float sx = c.x1 - px, sy = c.y1 - py, ex = c.x3 - c.x2, ey = c.y3 - c.y2;
 if (sx * sx + sy * sy < 1e-12f) { sx = c.x2 - px; sy = c.y2 - py; }
-if (sx * sx + sy * sy < 1e-12f) { sx = c.x3 - px; sy = c.y3 - py; }
+if (sy * sy + sy * sy < 1e-12f) { sx = c.x3 - px; sy = c.y3 - py; }
 if (ex * ex + ey * ey < 1e-12f) { ex = c.x3 - c.x1; ey = c.y3 - c.y1; }
 if (ex * ex + ey * ey < 1e-12f) { ex = c.x3 - px; ey = c.y3 - py; }
 segment(c.x3, c.y3, sx, sy, ex, ey); break;

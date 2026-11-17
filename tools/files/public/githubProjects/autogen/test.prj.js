@@ -19,6 +19,7 @@
 		'-Wl,--max-memory=268435456',
 		'-Wl,--no-check-features',
 		'-Wl,--allow-undefined',
+		'-Wl,--export=__stack_pointer',
 
 		//ADD THESE WRAPPER FLAGS:
 		"-Wl,--wrap=malloc",

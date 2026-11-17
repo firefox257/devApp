@@ -350,6 +350,13 @@ if (wasmInstance.exports.ag_set_worker_id) wasmInstance.exports.ag_set_worker_id
 if (data.autogenCtxPtr && wasmInstance.exports.set_autogen_context) wasmInstance.exports.set_autogen_context(data.autogenCtxPtr);
 if (wasmInstance.exports.ag_ensure_context) wasmInstance.exports.ag_ensure_context();
 if (wasmInstance.exports.init_shared_globals) wasmInstance.exports.init_shared_globals();
+// Private shadow stack per worker. Every instance otherwise starts with the
+// SAME __stack_pointer constant and would stomp the others in shared memory.
+if (wasmInstance.exports.__stack_pointer && wasmInstance.exports.cppmalloc) {
+    const STACK_BYTES = 256 * 1024;                 // 4x the 64KB main stack; tune if needed
+    const base = wasmInstance.exports.cppmalloc(STACK_BYTES) >>> 0;
+    if (base) wasmInstance.exports.__stack_pointer.value = ((base + STACK_BYTES) & ~15) >>> 0;
+}
 isReady = true; sendToMain({ type: 'READY' });
 } catch (err) {
 let errMsg = "Unknown initialization error";

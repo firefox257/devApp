@@ -44,15 +44,16 @@
 #define WASM_LOCK_PTR ((volatile int*)SHARED_LOCK_ADDR)
 
 static inline void wasm_lock_acquire(void) {
-	// Spin until we successfully change the lock from 0 to 1
-	while (__atomic_exchange_n(WASM_LOCK_PTR, 1, __ATOMIC_ACQUIRE)) {
-		// Optional: __builtin_wasm_memory_atomic_wait32 could be used here
-		// to yield the thread instead of burning CPU, but a simple spin works.
-	}
+    while (__atomic_exchange_n(WASM_LOCK_PTR, 1, __ATOMIC_ACQUIRE)) {
+        // Sleep until the lock word stops being 1. wait32 re-checks the value
+        // atomically, so a release between the exchange and the wait just
+        // returns "not-equal" and we retry — no lost wakeups.
+        __builtin_wasm_memory_atomic_wait32((int32_t*)WASM_LOCK_PTR, 1, -1);
+    }
 }
-
 static inline void wasm_lock_release(void) {
-	__atomic_store_n(WASM_LOCK_PTR, 0, __ATOMIC_RELEASE);
+    __atomic_store_n(WASM_LOCK_PTR, 0, __ATOMIC_RELEASE);
+    __builtin_wasm_memory_atomic_notify((int32_t*)WASM_LOCK_PTR, 1);
 }
 
 #define MALLOC_PREACTION   (wasm_lock_acquire(), 0)

@@ -1,0 +1,1689 @@
+================================================================================
+AUTOGEN DEVELOPER DOCUMENTATION
+PHASE 2 — COMPREHENSIVE · REVISION 2
+================================================================================
+REVISION 2 SUMMARY
+--------------------------------------------------------------------------------
+Revision 1 described the API surface but omitted the two contracts that govern
+whether a dispatched task runs at all: the CALLABLE ABI and the WORKER EXECUTION
+ENVELOPE. Real-world debugging of a heavy render workload produced repeated
+`call_indirect to a signature that does not match` and `Out of bounds memory
+access` traps inside `autogen_dispatch` that Revision 1 gave no way to diagnose.
+
+New sections:
+  0.   How to read this document (verification markers)
+  1.4  Reserved identifiers / language-mode pitfalls
+  2.5  Worker execution envelope (instances, statics, stacks)
+  2.6  Memory growth semantics (CORRECTED)
+  2.7  Allocator concurrency and failure behaviour
+  3.3  JS view invalidation rules
+  4.2.1  Dispatched callable contract  <-- THE CRITICAL SECTION
+  4.2.2  Argument marshalling and lifetime
+  4.2.3  Proven vs unproven dispatch signatures
+  4.5.1  registerGlobal construction and resolution semantics
+  4.8.1  ag_await_all limits, ownership, and error behaviour
+  4.9  ag_spinlock
+  7.7  Dispatch failure modes
+  10.  Heavy-task end-to-end example
+  11.  Troubleshooting: trap message -> cause -> fix
+  12.  Source audit checklist (closes every UNVERIFIED item)
+  A.   Corrections applied in Revision 2
+  B.   Case study: canvas2d parallel render debugging timeline
+
+Corrected claims:
+  * SharedArrayBuffer is NEVER detached (old 7.3 was wrong).
+  * `.rodata` / const statics are not blanket-invalid cross-worker (old 2.3).
+  * `ag_spinlock` was listed as REQUIRED but never documented.
+  * Worker 0's identity (Web Worker vs UI thread) is now explicit.
+
+================================================================================
+0. HOW TO READ THIS DOCUMENT
+================================================================================
+Every normative statement carries one of three markers. Do not treat them as
+interchangeable.
+
+  VERIFIED
+      Demonstrated by a working artefact: /system/autogen/examples/example1.cpp
+      (+ its .html), or by directly observed runtime behaviour. Safe to rely on.
+
+  SPEC
+      The intended design contract. Consistent with all available evidence but
+      not exercised by any shipped example. Prefer the VERIFIED subset when a
+      SPEC-only feature is convenient but not essential.
+
+  UNVERIFIED — CONFIRM IN SOURCE
+      Behaviour that materially affects correctness and is NOT determinable from
+      the documentation or examples. The item names the file and symbol to read.
+      Do NOT build on an assumption here; either confirm it or design so that
+      both possible answers are safe.
+
+Rationale: Revision 1 presented SPEC and unknown behaviour in the same
+authoritative voice as VERIFIED behaviour. That made several failure modes
+unfalsifiable from the docs alone and turned a minutes-long diagnosis into an
+hours-long search. The markers exist to prevent that.
+
+================================================================================
+1. ENVIRONMENT & BUILD REQUIREMENTS
+================================================================================
+1.1 HTTP Security Headers (Mandatory)
+--------------------------------------------------------------------------------
+To enable SharedArrayBuffer and WASM atomics (especially on iOS Safari), your
+server MUST serve the application with these exact headers:
+
+    Cross-Origin-Opener-Policy: same-origin
+    Cross-Origin-Embedder-Policy: require-corp
+
+Verify in the console before initializing:
+
+    if (!crossOriginIsolated) { /* SharedArrayBuffer unavailable — stop */ }
+
+1.2 Toolchain & Compiler Flags
+--------------------------------------------------------------------------------
+Target C++17/C++20 with the YoWASM/Clang-LLVM toolchain. Required flags:
+
+    -O2 -std=c++20 -pthread -fno-exceptions -fno-rtti
+    -matomics -mbulk-memory -mshared-memory
+
+Consequences of these flags that affect application design:
+
+  -fno-exceptions
+      C++ `throw` / `try` / `catch` are unavailable. A failing `operator new`
+      (including std::vector growth past capacity) does NOT throw std::bad_alloc;
+      it terminates and surfaces as a WASM trap. Allocation failure is therefore
+      indistinguishable from a memory bug at the JS boundary. See 2.7.
+
+  -fno-rtti
+      No `dynamic_cast`, no `typeid`. Virtual dispatch still works (vtables are
+      not RTTI). Gradient/Pattern-style polymorphism is fine.
+
+  -pthread -matomics -mshared-memory
+      Required for the shared-memory model. Also enables the wasm threads data
+      segment model, which is the subject of 2.5.
+
+STACK SIZE — UNVERIFIED — CONFIRM IN SOURCE
+      The default linear-memory stack size and the per-worker stack size are not
+      stated anywhere in Revision 1 and are not observable from the examples.
+      This matters enormously for deep C++ call chains (see 2.5 and 11).
+
+      To set the MAIN module stack explicitly at link time:
+          -Wl,-z,stack-size=8388608        # 8 MiB
+      Whether Autogen honours this for WORKER instances, or allocates its own
+      per-worker stack, must be confirmed in autogen_worker.js.
+
+      Audit: autogen_worker.js — search for `__stack_pointer`, `stack`,
+             `setStackPointer`, `__heap_base`, instantiation options.
+             autogen.hpp      — search for any `ag_stack_size` style macro.
+
+1.3 C++ Threading Restrictions
+--------------------------------------------------------------------------------
+Autogen provides its own concurrency model. DO NOT use standard C++ threading:
+
+    FORBIDDEN: std::thread, std::async, std::future, std::promise,
+               std::mutex, std::condition_variable, std::atomic.
+    REQUIRED:  Use Autogen's ag_async, ag_async_on, ag_sync, ag_spinlock,
+               ag_await, ag_await_all, ag_yield.
+
+Also forbidden by implication:
+    thread_local storage for anything read by another worker. A thread_local
+    object is per-worker scratch space only. (See 2.3.)
+
+1.4 Reserved Identifiers & Language-Mode Pitfalls  [NEW IN REV 2]
+--------------------------------------------------------------------------------
+C++ reserves the ISO646 alternative operator tokens as KEYWORDS. They are not
+identifiers, even without including <ciso646>:
+
+    and   and_eq   bitand   bitor   compl   not   not_eq   or   or_eq
+    xor   xor_eq
+
+Using one as a variable name produces confusing diagnostics far from the cause:
+
+    const float compl[] = {1.0f, 0.0f};
+    // error: expected a class name after '~' to name a destructor
+    g_state[H_COMPLETE] = compl[p];
+    // error: expected body of lambda expression
+
+because `compl` IS `~`. Rename (e.g. `comple`, `cmpl`).
+
+Single-letter macro leakage: if any included header defines single-letter
+macros, scrub them immediately after the include. The canvas2d stack does this
+for image.cpp:
+
+    #include "image.cpp"
+    #undef e
+    #undef epuc
+    #undef BM
+    ...
+
+(`#undef` of an undefined name is legal.) Without this, member names such as
+`Transform::e` fail to compile.
+
+================================================================================
+2. ARCHITECTURE & WORKER MODEL
+================================================================================
+2.1 Configuring Worker Topology (Thread Counts)
+--------------------------------------------------------------------------------
+The number of workers is strictly defined at compile time using two macros.
+These macros generate exported WASM functions that the JavaScript
+AutogenRuntime reads during initialization to know how many workers to spawn.
+
+RULES:
+  1. MUST be at global scope in your main C++ entry file.
+  2. MUST be placed BEFORE any other function definitions or logic.
+  3. Counts are absolute. 0 means no workers of that type are created.
+
+VERIFIED: `registerGlobal` is NOT subject to rule 2. example1.cpp places it
+after several function definitions and works. Only the thread-count macros must
+precede other code.
+
+EXAMPLE: 1 Dedicated and 2 Undedicated Workers
+
+    // ./main.cpp
+    #include <autogen.hpp>
+
+    ag_dedicated_thread_count(1);
+    ag_undedicated_thread_count(2);
+
+    ag_export(my_function)
+    uint32_t my_function(uint32_t a, uint32_t b) { return a + b; }
+
+2.2 Worker ID Addressing Scheme
+--------------------------------------------------------------------------------
+IDs are assigned sequentially from the counts above.
+
+Given ag_dedicated_thread_count(1) and ag_undedicated_thread_count(2):
+
+  | Worker Type   | ID Range       | IDs here | Purpose                          |
+  |---------------|----------------|----------|----------------------------------|
+  | Main Autogen  | always 0       | 0        | Default target of callExport     |
+  | Dedicated     | 1 .. D         | 1        | Pinned workloads (physics/audio) |
+  | Undedicated   | D+1 .. D+U     | 2, 3     | Round-robin async pool           |
+
+  D = dedicated count, U = undedicated count.
+
+WORKER 0 IDENTITY  [CLARIFIED IN REV 2]
+    Worker 0 ("Main Autogen") is a WEB WORKER, not the browser UI thread.
+    Evidence: 5.1 defines a SEPARATE context `ag_ext::main` for "the Browser
+    Main/UI Thread", and 4.4 / 9 use blocking ag_sync from worker 0 — which
+    would throw on the UI thread, where Atomics.wait is forbidden.
+
+    Consequence: ag_sync and Atomics.wait ARE usable from worker 0.
+    Consequence: DOM access from worker 0 requires ag_ext::main extensions.
+
+    UNVERIFIED — CONFIRM IN SOURCE: that worker 0 is instantiated via
+    `new Worker(...)` rather than run inline on the UI thread.
+    Audit: autogen.js — the initialize() path, worker creation loop, and
+           whether ID 0 is special-cased.
+
+2.3 Shared Memory Rules  [CORRECTED IN REV 2]
+--------------------------------------------------------------------------------
+Cross-worker data MUST reside in the shared WASM heap.
+
+  VALID cross-worker:
+      Pointers returned by malloc / calloc / realloc / new / new[].
+      Interior pointers into such an allocation (e.g. &ctx->jobs[i]).
+      Pointers returned by cppmalloc (JS-side allocation).
+
+  INVALID cross-worker:
+      Worker stack addresses (including locals of a coroutine frame's caller).
+      thread_local objects.
+      Instance-local statics whose value was WRITTEN by one worker and is READ
+      by another — UNLESS the statics model in 2.5 has been confirmed shared.
+
+  NOT blanket-invalid (Revision 1 was over-broad here):
+      `.rodata` and const statics with constant initializers. Every instance of
+      the same module is laid out identically, so a worker reading its OWN copy
+      of a const table reads correct data. Passing a POINTER to such data across
+      workers is also safe when the segment model of 2.5 is confirmed, because
+      the address is the same in every instance.
+
+      Practical guidance: a `const IconFn kDraw[N] = {...}` table of function
+      pointers is safe to read locally on any worker — the values are function
+      table indices, and the table layout is identical module-wide (2.5).
+      A mutable `Canvas2D* g_icons[N]` written on worker 0 is NOT safe to read on
+      worker N until 2.5 is resolved. Prefer registerGlobal (4.5) or a pointer
+      carried in the job payload (4.2.2).
+
+ALLOCATION API SPLIT
+    cppmalloc / cppfree / cpprealloc are reserved EXCLUSIVELY for JavaScript.
+    In C++ use standard malloc / free / realloc / new / delete / new[] / delete[].
+    These are intercepted and routed to the shared AtomicMalloc allocator.
+
+2.4 MessagePort Mesh
+--------------------------------------------------------------------------------
+During initialization a full-connect MessagePort mesh is established. Every
+worker holds a direct port to every other worker. Worker-to-worker calls bypass
+the browser main thread entirely.
+
+2.5 WORKER EXECUTION ENVELOPE  [NEW IN REV 2]
+--------------------------------------------------------------------------------
+This section did not exist in Revision 1. It is the second of the two contracts
+whose absence made heavy-task failures undiagnosable.
+
+INSTANCE MODEL  [SPEC]
+    * ONE compiled WebAssembly.Module.
+    * ONE shared WebAssembly.Memory (SharedArrayBuffer).
+    * ONE WebAssembly.Instance PER WORKER, all importing that same memory.
+
+    Therefore:
+      - Linear memory ADDRESSES are shared. Address X means the same byte in
+        every worker.
+      - Each instance has its OWN globals and its OWN function table.
+      - Because all instances come from the same module, table LAYOUT is
+        identical, so a function-table index is valid module-wide. This is why
+        raw function pointers survive cross-worker dispatch.
+
+STATICS / DATA SEGMENT MODEL  [UNVERIFIED — CONFIRM IN SOURCE]
+    `.data` and `.bss` occupy the SAME addresses in every instance (shared
+    memory). The open question is whether the module's data segments are
+    re-applied on each instantiation:
+
+      MODEL A — segments applied ONCE (guarded, e.g. __wasm_init_memory with an
+                atomic flag; the standard clang -pthread behaviour).
+                => Statics are effectively SHARED. A static written on worker 0
+                   is visible on worker N. Concurrent writes to the same static
+                   are a data race.
+
+      MODEL B — segments applied PER INSTANCE.
+                => Each instantiation re-initializes (and clobbers) the same
+                   bytes. Statics are unusable for cross-worker state, and
+                   worker startup can corrupt worker 0's already-written state.
+
+    Revision 1 asserted Model B ("instance-local static storage") while 4.5
+    justified registerGlobal by "WASM instance-local global limitations". Those
+    statements are about GLOBALS (which genuinely are per-instance), not about
+    LINEAR-MEMORY statics, and conflating them made the model undecidable.
+
+    DETERMINE IT EMPIRICALLY (cheap, decisive):
+        static uint32_t probe = 0;
+        ag_export(set_probe) uint32_t set_probe(uint32_t v){ probe = v; return probe; }
+        ag_export(get_probe) uint32_t get_probe(){ return probe; }
+
+        await runtime.callExport(0, 'set_probe', 0xC0FFEE);
+        await runtime.callExport(3, 'get_probe');
+        // 0xC0FFEE -> Model A (shared). 0 -> Model B (per-instance).
+
+    Audit: autogen_worker.js — instantiation, and whether __wasm_init_memory /
+           _initialize is invoked per worker.
+           Compile output — are data segments active or passive?
+
+    DESIGN RULE THAT IS SAFE UNDER BOTH MODELS:
+        Never rely on a mutable static for cross-worker state. Either
+          (a) registerGlobal (4.5), whose whole purpose is to resolve to one
+              shared-heap address on every worker, or
+          (b) allocate the context with `new` and CARRY ITS POINTER IN EVERY
+              JOB PAYLOAD (4.2.2), re-establishing any local accessor at task
+              entry. Because every task writes the SAME pointer value, this is
+              race-free under Model A and correct under Model B.
+
+STACK MODEL  [UNVERIFIED — CONFIRM IN SOURCE]
+    `__stack_pointer` is a mutable WASM global, therefore PER INSTANCE. Two
+    possibilities:
+
+      MODEL S — Autogen relocates each worker's __stack_pointer to its own
+                region. Correct, but each region has a FIXED SIZE. Exceeding it
+                is a stack overflow.
+      MODEL T — Autogen leaves __stack_pointer at its initial value in every
+                instance. All workers then use the SAME stack region in shared
+                memory and stomp on each other's frames concurrently.
+
+    WASM HAS NO STACK GUARD PAGES. Overflow does not raise a "stack overflow"
+    error. It either silently corrupts adjacent memory or pushes the stack
+    pointer below the memory base, which traps as:
+
+        RuntimeError: Out of bounds memory access
+
+    ...reported inside WHATEVER EXPORT IS CURRENTLY RUNNING. For a dispatched
+    task that is `autogen_dispatch`. This is precisely the trap signature that
+    Revision 1 provided no way to interpret.
+
+    WHY HEAVY C++ TASKS ARE THE DANGER CASE:
+    Frame size is dominated by large locals and nesting, not by loop count.
+    Real example from the canvas2d renderer:
+
+        Shape2D::compile()'s add_circle lambda declares `float p[256]` = 1 KiB
+        of stack, invoked for EVERY round cap and EVERY round join. A stroke
+        with CAP_ROUND/JOIN_ROUND and 60 vertices can nest that frame dozens of
+        times inside:
+
+          autogen_dispatch
+            -> dispatcher trampoline
+              -> task
+                -> draw_icon
+                  -> icon_*
+                    -> fillShape / strokeShape
+                      -> Canvas2D::path
+                        -> prepare_shape          (local Shape2D)
+                          -> Shape2D::compile     (dashed/pts/dirs vectors)
+                            -> draw_join / draw_cap
+                              -> add_circle       (float p[256])
+
+        and, when a clip is active, draw_layered -> clip_union -> prepare_shape
+        again. Tens of KiB per task is easy to reach.
+
+    Contrast example1.cpp's `heavy_computation`: a loop over uint32_t. It uses
+    almost no stack, which is why every shipped example passes while a real
+    renderer traps.
+
+    MEASURE IT:
+      1. Export a probe that dispatches a trivial canonical task (10.1). If it
+         succeeds, dispatch machinery is fine.
+      2. Export a probe that dispatches ONE heavy task. If the trivial probe
+         succeeds and the heavy probe traps with OOB, stack depth is the prime
+         suspect.
+      3. Re-run the heavy probe with the deepest feature disabled (e.g. switch
+         CAP_ROUND/JOIN_ROUND to CAP_BUTT/JOIN_BEVEL, drop clips/masks). If it
+         now succeeds, stack pressure is confirmed.
+
+    MITIGATIONS, in order of preference:
+      * Raise the worker stack (1.2) once the setting is confirmed.
+      * Reduce per-frame stack: avoid round caps/joins on high-vertex paths;
+        hoist repeated prepare_shape work; flatten clip nesting.
+      * Move large scratch arrays out of locals into a per-worker heap scratch
+        buffer allocated once.
+      * Run the heavy stage on worker 0 (which demonstrably has a working stack)
+        and dispatch only light stages.
+
+    Audit: autogen_worker.js — __stack_pointer initialization / relocation,
+           any per-worker stack allocation and its size.
+
+2.6 MEMORY GROWTH SEMANTICS  [CORRECTED IN REV 2]
+--------------------------------------------------------------------------------
+Revision 1 said: "If the shared heap grows, the underlying ArrayBuffer is
+detached." THAT IS WRONG for shared memory. Correct semantics:
+
+  * A SharedArrayBuffer is NEVER detached. Detachment is an ArrayBuffer-only
+    operation.
+  * Growing a shared WebAssembly.Memory does not invalidate existing memory
+    contents or addresses. The `.buffer` getter returns a NEW SharedArrayBuffer
+    OBJECT exposing the larger byteLength.
+  * Previously obtained SharedArrayBuffer objects, and every DataView /
+    TypedArray created over them, REMAIN VALID but still cover only the OLD,
+    SMALLER length. Reads/writes past that old length are out of range on the JS
+    side even though the WASM side can address them.
+  * WASM-side loads/stores always use the CURRENT memory. Logical addresses
+    remain valid across growth. Growth is therefore transparent to C++ and
+    hazardous to cached JS views.
+
+CONSEQUENCE FOR CPU-BOUND TASKS  [SPEC]
+    Autogen refreshes worker-side JS views "upon waking from Atomics.wait".
+    A worker executing a long compute task NEVER calls Atomics.wait during that
+    task. Any JS view it holds across the task is stale if the heap grew.
+
+    Rule: never cache a DataView / TypedArray across an await, a callExport, or
+    a dispatched task. Re-create it from the live buffer every time:
+
+        const memBuf = () => runtime.sharedMemory.buffer;   // re-read each use
+        const F = new Float32Array(memBuf(), statePtr, stateLen);
+
+    UNVERIFIED — CONFIRM IN SOURCE: whether AtomicMalloc can grow memory while
+    another worker is mid-task, and whether any notification/refresh is issued
+    to that worker. Audit: autogen.js / autogen_worker.js — memory.grow call
+    sites, view cache invalidation.
+
+2.7 ALLOCATOR CONCURRENCY & FAILURE BEHAVIOUR  [NEW IN REV 2]
+--------------------------------------------------------------------------------
+  SPEC: malloc/new are routed to a thread-safe "AtomicMalloc" shared allocator,
+  safe under concurrent use from all workers.
+
+  UNVERIFIED — CONFIRM IN SOURCE:
+    * Contention correctness at high worker counts (8+ simultaneous allocators).
+    * Whether growth can occur while other workers are executing (2.6).
+    * Behaviour on exhaustion. Under -fno-exceptions a failed operator new
+      cannot throw; expect termination / an unreachable trap, NOT a recoverable
+      error and NOT a rejected future.
+    Audit: autogen.hpp / the allocator implementation — AtomicMalloc, cppmalloc,
+           growth path, failure path.
+
+  DESIGN GUIDANCE THAT SIDESTEPS ALL OF THE ABOVE:
+    Warm up before dispatching. Run every heavy task once SEQUENTIALLY on
+    worker 0 during initialization, with representative inputs that exercise
+    all branches and quality tiers. This
+      (a) grows the shared heap BEFORE any worker starts,
+      (b) brings every reusable scratch std::vector to its steady-state
+          capacity, so the parallel phase performs ~no allocation,
+      (c) precomputes cached paint data (gradient LUTs, pattern tiles).
+    Then reuse persistent job payloads instead of new/delete per frame (10.2).
+
+    This single technique removes allocator contention, mid-task growth, and
+    first-frame allocation storms from the parallel path at once.
+
+================================================================================
+3. JAVASCRIPT API REFERENCE
+================================================================================
+3.1 AutogenRuntime Class
+--------------------------------------------------------------------------------
+    const runtime = new AutogenRuntime();
+
+    // 1. Initialize: load WASM, create workers, establish mesh.
+    await runtime.initialize('path/to/module.wasm');
+
+    // 2. Call an exported WASM function on a specific worker.
+    //    workerId: 0 (Main Autogen worker), 1+ (Dedicated/Undedicated)
+    const result = await runtime.callExport(0, 'my_function', 10, 20);
+
+    // 3. Wrap a C++ ag_future* pointer into a JS-awaitable object.
+    const future = runtime.wrapFuture(futurePtr);
+    const value  = await future.awaitResult('int32');
+    // Types: 'void', 'int32', 'uint32', 'float', 'double', or omit for raw ptr.
+
+    // 4. Gracefully shut down, terminating all workers.
+    runtime.shutdown();
+
+Useful properties: runtime.sharedMemory, runtime.workers (Map),
+runtime.dedicatedCount, runtime.undedicatedCount, runtime.wasmInstance.
+
+3.2 AgFuture Class
+--------------------------------------------------------------------------------
+Wraps a C++ ag_future* for JavaScript consumption.
+    status     : 0 pending, 1 resolved, 2 rejected
+    resultPtr  : pointer to the result in shared memory
+    errorCode  : system/application error code (0xDEADBEEF for system errors)
+    awaitResult(type) : waits, returns the typed value, and FREES the future
+                        and result payload.
+
+CRITICAL LIMITATION  [NEW IN REV 2]
+    A WASM TRAP inside a dispatched task is NOT a future rejection. The task
+    never writes the future, so status stays 0 and awaitResult() hangs forever.
+    The only signal is a worker console error. See 7.7 and 11.
+
+    Defensive pattern for development:
+        const withTimeout = (p, ms) => Promise.race([
+          p, new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), ms))
+        ]);
+        const v = await withTimeout(future.awaitResult('uint32'), 5000);
+
+    UNVERIFIED — CONFIRM IN SOURCE: whether the dispatcher wraps the call in a
+    try/catch that rejects the future on trap. Audit: autogen_worker.js —
+    autogen_dispatch call site and its error handler.
+
+3.3 JS View Invalidation Rules  [NEW IN REV 2]
+--------------------------------------------------------------------------------
+See 2.6. Summary:
+    DO   re-create views from runtime.sharedMemory.buffer at each use.
+    DO   re-read `.buffer` after any call that may allocate.
+    DON'T cache a DataView/TypedArray in a module-level variable.
+    DON'T assume a TypedArray's length tracks memory growth — it does not.
+    DON'T expect a "detached buffer" TypeError to warn you; with SABs you get
+        silent range errors instead.
+
+================================================================================
+4. C++ API REFERENCE
+================================================================================
+4.1 Function Export
+--------------------------------------------------------------------------------
+    ag_export(my_function)
+    uint32_t my_function(uint32_t a, uint32_t b) { return a + b; }
+
+Exports are callable from JS via callExport and from other workers. Place them
+at global scope.
+
+4.2 Asynchronous Execution (ag_async)
+--------------------------------------------------------------------------------
+Dispatches to the UNDEDICATED pool using a thread-safe round-robin algorithm.
+It skips the current worker to prevent self-deadlock.
+
+    ag_export(dispatch_to_pool)
+    ag_future* dispatch_to_pool() {
+        ag_future* fut = ag_async(my_function, 10u, 20u);
+        uint32_t result = ag_await(uint32_t, fut);
+        ag_return result;                       // 30
+    }
+
+Note the coroutine requirements (4.6): using ag_await forces ag_future* return
+and ag_return.
+
+4.2.1 DISPATCHED CALLABLE CONTRACT  [NEW IN REV 2 — READ THIS FIRST]
+--------------------------------------------------------------------------------
+Revision 1 promised "zero-overhead direct function pointer dispatch" without
+stating which callable signatures are legal. That omission is the single most
+expensive gap in the document: an illegal signature traps as
+
+    RuntimeError: call_indirect to a signature that does not match
+
+inside autogen_dispatch, with no indication that the CALLABLE is at fault.
+
+WHY SIGNATURES MATTER AT THE WASM LEVEL
+    Dispatch goes through `call_indirect`, which checks the callee's exact WASM
+    signature against the caller's expected type. In the WASM ABI:
+        uint32_t / int32_t / pointer / reference   -> i32
+        float                                      -> f32
+        double                                     -> f64
+        struct by value                            -> i32 (byval pointer)
+    So `void(int, float, Snap)` is (i32, f32, i32)->void while
+    `void(int, const float&, Snap&)` is (i32, i32, i32)->void. These are DIFFERENT
+    types. A dispatcher generated from decayed argument types will not match a
+    callable declared with reference parameters, and vice versa.
+
+THE SAFE ENVELOPE  [VERIFIED]
+    Every dispatched callable in example1.cpp — plain functions, captureless
+    lambdas, AND capturing lambdas — has this shape:
+
+        uint32_t f(uint32_t a0, uint32_t a1, ...)
+
+    Return: uint32_t. Parameters: uint32_t only. Zero, one and two parameters
+    are all demonstrated.
+
+    REQUIRED PATTERN:
+        uint32_t my_task(uint32_t arg);
+        uint32_t my_task(uint32_t a, uint32_t b);
+        ag_async(my_task, 41u);
+        ag_async([](uint32_t x, uint32_t y){ return x*y + 1u; }, a, b);
+        ag_async([k](uint32_t v){ return v*k; }, base);   // capturing: VERIFIED
+
+DO NOT USE  [known-broken or unproven]
+    Reference parameters        (const float&, Snap&)  -> observed trap
+    float / double parameters                          -> observed trap
+    Struct-by-value parameters                         -> observed trap
+    void return                                        -> UNPROVEN; observed
+                                                          trap in combination
+                                                          with the above
+    More than 2 parameters                             -> UNPROVEN
+
+    Revision 1's 4.8 Example B appears to show struct-by-value and float in
+    dispatch. That example is not part of the shipped, working example1.cpp and
+    must be treated as SPEC-only until confirmed. Do not model new code on it.
+
+PASSING COMPLEX DATA — THE JOB PAYLOAD PATTERN  [VERIFIED PATTERN]
+    Put everything non-i32 into a struct on the SHARED HEAP and pass its address
+    as a uint32_t. This keeps the callable inside the safe envelope with zero
+    loss of expressiveness.
+
+        struct IconJob {
+            HudCtx* ctx;        // shared-heap context pointer
+            int     id;
+            float   t;          // floats live HERE, not in the signature
+            Snap    snap;       // structs live HERE too
+        };
+
+        uint32_t render_icon_task(uint32_t job_ptr) {
+            IconJob* job = reinterpret_cast<IconJob*>(
+                               static_cast<uintptr_t>(job_ptr));
+            if (!job || !job->ctx) return 2u;       // status code, not a trap
+            // ... do the work using job->t, job->snap ...
+            return 0u;                              // 0 = success
+        }
+
+        // dispatch
+        IconJob& j = g_ctx->jobs[i];                // persistent, shared heap
+        j.ctx = g_ctx; j.id = i; j.t = t; j.snap = s;
+        ag_future* f = ag_async(render_icon_task,
+            static_cast<uint32_t>(reinterpret_cast<uintptr_t>(&j)));
+
+    On wasm32 a pointer is exactly 32 bits, so the round trip is lossless.
+
+CALLABLE PLACEMENT
+    VERIFIED: plain functions at GLOBAL scope (external linkage) work.
+    Lambdas defined inline inside an export work, including capturing ones.
+    UNVERIFIED: whether internal-linkage callables (anonymous namespace /
+    `static`) behave identically. Prefer global scope for dispatched functions
+    to eliminate the variable.
+
+RETURN STATUS INSTEAD OF TRAPPING
+    Because a trap hangs the future (3.2), return a status code and validate
+    every pointer at task entry. This converts silent hangs into diagnosable
+    numbers:
+        0 ok · 1 null job · 2 null ctx · 3 bad id · 4 null target
+        5 not initialized · 6 missing resource · 7 null payload pointer
+
+4.2.2 ARGUMENT MARSHALLING & LIFETIME  [NEW IN REV 2]
+--------------------------------------------------------------------------------
+UNVERIFIED — CONFIRM IN SOURCE, and design defensively until confirmed:
+
+  Q1. Are arguments COPIED into a shared-heap args buffer at dispatch time, or
+      forwarded by address?
+  Q2. Are argument types DECAYED (references stripped, cv stripped) before the
+      dispatcher is generated?
+  Q3. When is the args buffer freed — after the call returns, or by the callee?
+  Q4. What is `this_ptr` for a captureless lambda / plain function (0?), and for
+      a capturing lambda (address of a shared-heap closure copy?)?
+
+  Audit: autogen.hpp — the ag_async template, the dispatcher/trampoline
+         generation, argument packing, closure handling.
+         autogen_worker.js — the autogen_dispatch call site:
+         `autogen_dispatch(dispatcher_ptr, 0, this_ptr, args_ptr)`.
+
+SAFE ASSUMPTIONS THAT WORK EITHER WAY:
+  * Pass only uint32_t values (4.2.1) — no marshalling ambiguity is possible.
+  * Anything a task dereferences must be a SHARED-HEAP pointer that OUTLIVES
+    the await. Never pass the address of a caller local.
+  * Keep job payloads alive until ag_await / ag_await_all has returned, then
+    free (or reuse) them. Persistent payloads (10.2) remove the question.
+  * Do not pass a named lambda lvalue; pass a plain function or an inline
+    lambda, matching every VERIFIED example.
+
+OBSERVED EVIDENCE (from the canvas2d case study, Appendix B):
+    void(int, const float&, Snap&)  -> signature mismatch + OOB
+    void(int, float, Snap)          -> signature mismatch + OOB
+    uint32_t(uint32_t)              -> signature mismatch DISAPPEARED
+This is strong evidence that the dispatcher canonicalizes to i32 slots and that
+f32/struct/reference parameters break the call_indirect type check.
+
+4.2.3 PROVEN vs UNPROVEN DISPATCH SIGNATURES  [NEW IN REV 2]
+--------------------------------------------------------------------------------
+  | Signature                              | Status                        |
+  |----------------------------------------|-------------------------------|
+  | uint32_t(uint32_t)                     | VERIFIED (example1)           |
+  | uint32_t(uint32_t, uint32_t)           | VERIFIED (example1)           |
+  | uint32_t()                             | VERIFIED (ag_sync lambda, 9)  |
+  | capturing lambda -> uint32_t(u32)      | VERIFIED (example1 Example D) |
+  | void(int)                              | SPEC only (Rev 1 sec.9)       |
+  | float(Point) / Point(int,int)          | SPEC only (Rev 1 4.8 Ex. B)   |
+  | void(int, float, Struct)               | OBSERVED TRAP                 |
+  | void(int, const float&, Struct&)       | OBSERVED TRAP                 |
+  | any float/double parameter             | OBSERVED TRAP                 |
+
+  Rule: build on the VERIFIED rows. If you need a SPEC-only row, first prove it
+  with a two-line probe export in YOUR module (10.1) — do not infer it from docs.
+
+4.3 Targeted Asynchronous Execution (ag_async_on)
+--------------------------------------------------------------------------------
+Dispatches to a SPECIFIC dedicated worker by ID (target ID is the FIRST arg).
+
+    ag_export(dispatch_to_dedicated)
+    ag_future* dispatch_to_dedicated() {
+        ag_future* fut = ag_async_on(1, my_function, 10u, 20u);
+        uint32_t r = ag_await(uint32_t, fut);
+        ag_return r;
+    }
+
+The callable contract of 4.2.1 applies identically.
+
+4.4 Synchronous Execution (ag_sync)
+--------------------------------------------------------------------------------
+Blocking worker-to-worker call. The caller suspends via Atomics.wait; the callee
+writes the shared ag_sync_req struct and calls Atomics.notify. No MessagePort
+routing for the response, so no deadlock.
+
+    ag_export(sync_call_example)
+    uint32_t sync_call_example() {
+        return ag_sync(1, my_function, 10u, 20u);
+    }
+
+Usable from worker 0 because worker 0 is a Web Worker (2.2). NOT usable from the
+browser UI thread — Atomics.wait throws there.
+The callable contract of 4.2.1 applies identically.
+
+4.5 Global Shared State (registerGlobal)
+--------------------------------------------------------------------------------
+Registers a globally shared pointer that resolves to the SAME shared-heap
+address across ALL workers, overcoming per-instance WASM globals.
+
+    class MyConfig { public: int value = 42; };
+    registerGlobal(MyConfig, globalConfig);
+
+    ag_export(use_config)
+    uint32_t use_config() {
+        if (globalConfig) globalConfig->value = 100;
+        return globalConfig ? globalConfig->value : 0;
+    }
+
+VERIFIED (example1.cpp section 6): a struct with a USER-PROVIDED CONSTRUCTOR is
+constructed correctly and its initialized value is observable:
+
+    struct AppContext {
+        uint32_t startup_count;
+        AppContext() : startup_count(1) {}
+    };
+    registerGlobal(AppContext, g_appContext);
+
+Placement: global scope. May appear AFTER function definitions (unlike the
+thread-count macros). Always null-check the accessor, as both examples do.
+
+4.5.1 CONSTRUCTION & RESOLUTION SEMANTICS  [NEW IN REV 2]
+--------------------------------------------------------------------------------
+  VERIFIED: a user-provided default constructor runs and its effects are visible.
+  UNVERIFIED — CONFIRM IN SOURCE:
+    * Is T default-constructed, value-initialized, or raw-zeroed when T has only
+      default member initializers (NSDMIs) and no user ctor?
+    * At which lifecycle step is it constructed (6, INITIALIZING_RUNTIME)?
+    * Is it valid to touch during another global's construction?
+    * Is it valid on a worker BEFORE that worker's first message?
+    * Is the accessor a pointer variable, a function, or a macro-generated
+      getter? Does it resolve once per worker or on every access?
+    Audit: autogen.hpp — the registerGlobal macro expansion and its registrar.
+
+  ROBUST DESIGN THAT WORKS UNDER ANY ANSWER:
+    * Give every member a default initializer, and make all defaults ZERO
+      (nullptr / 0 / false). Then zero-fill and value-init are equivalent.
+    * Or give T a user-provided constructor (the VERIFIED path).
+    * Null-check the accessor at every entry point.
+    * For maximum independence, ALSO carry the context pointer in each job
+      payload (4.2.2) so a task never depends on global resolution at all.
+
+4.6 Coroutines & Yielding (ag_yield & ag_await)
+--------------------------------------------------------------------------------
+Yields control to the JS event loop so the worker can process MessagePort
+messages while logically paused. Requires compiler coroutine support.
+
+*** CRITICAL: COROUTINE INFECTION ***
+ag_await and ag_yield are strictly non-blocking and rely on C++20 coroutines.
+Any function using them MUST:
+    - return ag_future*
+    - use ag_return (or co_return) instead of return
+
+    // A: yielding with progress
+    ag_export(long_task_with_yield)
+    ag_future* long_task_with_yield(uint32_t* progress_ptr) {
+        if (progress_ptr) {
+            *progress_ptr = 25; ag_yield();
+            *progress_ptr = 50; ag_yield();
+            *progress_ptr = 75; ag_yield();
+            *progress_ptr = 100;
+        }
+        ag_return 1;
+    }
+
+    // B: chaining
+    ag_export(chain_async_tasks)
+    ag_future* chain_async_tasks() {
+        ag_future* f1 = ag_async(compute_step_1, 10u);
+        uint32_t s1 = ag_await(uint32_t, f1);
+        ag_future* f2 = ag_async(compute_step_2, s1);
+        uint32_t s2 = ag_await(uint32_t, f2);
+        ag_return s2;
+    }
+
+COROUTINE FRAME LIFETIME  [SPEC]
+    The frame is heap-allocated via operator new, therefore on the shared heap.
+    Locals of the coroutine survive across ag_await. Locals of a NON-coroutine
+    caller do not outlive a dispatch — never hand their addresses to a task.
+
+4.7 Stream-like Logging (msginfo, msgwarn, msgerr)
+--------------------------------------------------------------------------------
+    msginfo << "Value: " << 42 << ", Hex: " << 0xDEADBEEF;
+    msgwarn << "Warning: double value is " << 3.14159;
+    msgerr  << "Error code: " << (int32_t)-1;
+
+Flushed to the JS environment when the statement ends. Invaluable inside
+dispatched tasks, because it is the only channel that reports progress from a
+task that later traps.
+
+4.8 Waiting on Multiple Futures (ag_await_all)
+--------------------------------------------------------------------------------
+    ag_export(await_multiple_ints)
+    ag_future* await_multiple_ints() {
+        std::vector<ag_future*> futures;
+        futures.push_back(ag_async(add, 10u, 20u));
+        futures.push_back_back:;
+        futures.push_back(ag_async(add, 30u, 40u));
+        auto results = ag_await_all(futures);
+        uint32_t sum = results.get<uint32_t>(0) + results.get<uint32_t>(1);
+        ag_return sum;                          // 100
+    }
+
+Heterogeneous extraction is SPEC-only (`results.get<Point>(1)`,
+`results.get<float>(2)`); see 4.2.3 — those task signatures are unproven.
+
+4.8.1 LIMITS, OWNERSHIP & ERROR BEHAVIOUR  [NEW IN REV 2]
+--------------------------------------------------------------------------------
+  UNVERIFIED — CONFIRM IN SOURCE:
+    * Maximum number of futures in one ag_await_all.
+    * Whether dispatching N tasks in a tight loop from ONE coroutine before
+      awaiting any of them is supported, or whether the pool/queue has a
+      capacity that silently drops or corrupts beyond it.
+    * Whether ag_await_all FREES the futures and their result payloads.
+      (3.2 says JS awaitResult frees; 5.5 rule 5 says ag_await frees. Nothing
+      states it for ag_await_all.)
+    * Whether results.get<T>(i) is type-checked, and what happens on a mismatch.
+    * Whether ONE trapped task rejects the aggregate, or hangs it forever.
+    Audit: autogen.hpp — ag_await_all, the results container, get<T>().
+           autogen.js / autogen_worker.js — pending-dispatch queue and capacity.
+
+  PREFERRED PATTERN UNTIL CONFIRMED  [VERIFIED SHAPE]
+    example1.cpp exclusively dispatches ONE task and awaits it immediately.
+    Replicate that proven shape in a loop:
+
+        for (int i = 0; i < N; ++i) {
+            ag_future* f = ag_async(task, payload_ptr[i]);
+            uint32_t st  = ag_await(uint32_t, f);
+            if (st && !err) err = (i << 8) | st;
+        }
+
+    This serializes the round trips but is the only fan-out shape with direct
+    evidence. Offer the batched ag_await_all path as a SEPARATE, opt-in export
+    so it can be A/B tested against the proven one (10.3).
+
+4.9 ag_spinlock  [NEW IN REV 2]
+--------------------------------------------------------------------------------
+Revision 1 listed ag_spinlock as REQUIRED in 1.3 but never documented it.
+
+  UNVERIFIED — CONFIRM IN SOURCE: the entire API. Expected shape is a
+  shared-heap lock with lock()/unlock() or a scoped guard, but the type name,
+  header, construction, and whether it is re-entrant are all unknown.
+  Audit: autogen.hpp — grep `spinlock`.
+
+  PREFERRED ALTERNATIVE THAT NEEDS NO LOCK:
+    Partition mutable state so that each concurrently-running task owns its
+    slice exclusively. In the canvas2d demo, giving each icon its own gradient
+    pool and its own bloom surface removed all cross-task mutation without a
+    single lock:
+
+        struct IconPools { RadialGradient* r[6]; LinearGradient* l[6];
+                           int rs, ls; Canvas2D* bloom; };
+        IconPools pool[ICON_COUNT];      // one per icon, one worker per icon
+
+    Combine with a JS-side `busy` flag so frames cannot overlap, and each slot
+    has exactly one writer at a time.
+
+================================================================================
+5. EXTENSIBILITY & EXTERNAL CALLS
+================================================================================
+Extensions bridge isolated workers to the browser environment (Main/UI thread)
+or to worker-local JS capabilities, WITHOUT routing worker-to-worker application
+logic through the main thread.
+
+5.1 Execution Contexts
+--------------------------------------------------------------------------------
+    ag_ext::main   (0) — handler runs on the BROWSER MAIN/UI THREAD.
+                         DOM, standard WebGL, AudioContext, localStorage.
+    ag_ext::worker (1) — handler runs locally in the CALLING Web Worker.
+                         fetch, IndexedDB, OffscreenCanvas, background work.
+
+Note this is distinct from Autogen worker 0 (2.2).
+
+5.2 The Three Extension Communication Modes
+--------------------------------------------------------------------------------
+MODE A: ag_ext_async (Non-Blocking)
+    ag_ext_async(ReturnType, Context, "name", arg1, arg2, ...)
+    Packs arguments as JSON in shared memory, creates an ag_future*, sends a
+    message, continues immediately. You must ag_await the future (yields).
+    Use: network requests, heavy main-thread computation.
+
+MODE B: ag_ext_sync (Blocking)
+    ag_ext_sync(ReturnType, Context, "name", arg1, arg2, ...)
+    Packs arguments, borrows an ag_sync_req, sends the message, SUSPENDS via
+    Atomics.wait; resumes when the handler returns and the library notifies.
+    Use: synchronous DOM reads, or logic strictly dependent on the result.
+    Not usable from the browser UI thread.
+
+MODE C: ag_ext_fire (Fire-and-Forget)
+    ag_ext_fire(Context, "name", arg1, arg2, ...)
+    One-way message. No future, no result, no blocking.
+    Use: logging, analytics, visual update triggers.
+
+5.3 JavaScript Handler Contract
+--------------------------------------------------------------------------------
+Handlers receive NORMAL arguments (deserialized from JSON) and simply RETURN
+the result. The core library handles allocation, atomics, and cleanup.
+
+  ASYNC — MAIN THREAD
+    runtime.registerMainExtension("my_ext", async (callerWorkerId, a, b) => {
+        return resultValue;   // primitive or shared-memory pointer
+    });
+  Library automatically: allocates shared memory for primitive results, writes
+  the ag_future struct, triggers Atomics.notify, frees the JSON args buffer.
+
+  SYNC — MAIN THREAD
+    runtime.registerMainExtension("my_ext", (callerWorkerId, a) => resultValue);
+
+  FIRE-AND-FORGET — MAIN THREAD
+    runtime.registerMainExtension("my_ext", (callerWorkerId, a, b) => {
+        console.log(`Worker ${callerWorkerId}: ${a}`);
+    });   // return nothing
+
+  WORKER-LOCAL
+    runtime.registerWorkerExtension("my_ext", (a, b) => resultValue);
+    // callerWorkerId omitted; the global `workerId` from autogen_worker.js is
+    // accessible inside the evaluated function closure.
+
+Throwing from a handler rejects the C++ future with 0xDEADBEEF. (This is JS
+throwing — C++ itself has no exceptions under -fno-exceptions.)
+
+5.4 Comprehensive Extension Examples
+--------------------------------------------------------------------------------
+EXAMPLE 1: Main Thread Async (fetch)
+
+    // C++ (extensions/fetch.hpp)
+    inline ag_future* fetch_data_async(const char* url) {
+        return ag_ext_async(char*, ag_ext::main, "fetch_from_main", url);
+    }
+
+    // JS (main thread)
+    runtime.registerMainExtension("fetch_from_main", async (workerId, url) => {
+        const response = await fetch(url);
+        const text = await response.text();
+        const resultPtr = await runtime.callExport(0, 'cppmalloc', text.length + 1);
+        const view = new Uint8Array(runtime.sharedMemory.buffer);  // fresh view
+        for (let i = 0; i < text.length; i++)
+            view[resultPtr + i] = text.charCodeAt(i);
+        view[resultPtr + text.length] = 0;
+        return resultPtr;   // library resolves the future
+    });
+
+EXAMPLE 2: Worker-Local Sync (hash)
+
+    inline uint32_t hash_string_sync(const char* data) {
+        return ag_ext_sync(uint32_t, ag_ext::worker, "compute_hash_worker", data);
+    }
+
+    runtime.registerWorkerExtension("compute_hash_worker", (data) => {
+        let hash = 0;
+        for (let i = 0; i < data.length; i++)
+            hash = (hash * 31 + data.charCodeAt(i)) | 0;
+        return hash;
+    });
+
+EXAMPLE 3: Fire-and-Forget (analytics)
+
+    inline void log_event(const char* name, uint32_t value) {
+        ag_ext_fire(ag_ext::main, "track_analytics", name, value);
+    }
+
+    runtime.registerMainExtension("track_analytics", (workerId, name, value) => {
+        console.log(`[Analytics] Worker ${workerId}: ${name} = ${value}`);
+    });
+
+EXAMPLE 4: Complex Shared Memory Pointers
+
+    struct ImageData { uint32_t width, height; uint32_t* pixels; };
+
+    inline ag_future* process_image_async(ImageData* img) {
+        return ag_ext_async(ImageData*, ag_ext::worker, "apply_filter",
+                            (uint32_t)(uintptr_t)img);
+    }
+
+    runtime.registerWorkerExtension("apply_filter", async (imgPtr) => {
+        const view = new DataView(runtime.sharedMemory.buffer);
+        const width  = view.getUint32(imgPtr, true);
+        const height = view.getUint32(imgPtr + 4, true);
+        const pixPtr = view.getUint32(imgPtr + 8, true);
+        const pixels = new Uint32Array(runtime.sharedMemory.buffer, pixPtr,
+                                       width * height);
+        for (let i = 0; i < pixels.length; i++) pixels[i] ^= 0x00FFFFFF;
+        const outPtr = await runtime.callExport(0, 'cppmalloc', 12);
+        const v2 = new DataView(runtime.sharedMemory.buffer);  // re-read: grew
+        v2.setUint32(outPtr, width, true);
+        v2.setUint32(outPtr + 4, height, true);
+        v2.setUint32(outPtr + 8, pixPtr, true);
+        return outPtr;
+    });
+
+5.5 Critical Memory Management Rules for Extensions
+--------------------------------------------------------------------------------
+  1. Caller Allocates Args — ag_ext_* serializes to JSON on the shared heap.
+  2. Library Frees Args — you do NOT free the args buffer in your handler.
+  3. Handler Returns Results — a primitive, or a pointer you allocated.
+  4. Library Allocates Primitives — 4 bytes, writes the number, passes the ptr.
+  5. Caller Frees Results — ag_await / ag_ext_sync read, copy/move, then cppfree.
+  6. Strings — const char* becomes a JS string. Returned strings must be
+     allocated with length + 1 and null-terminated by JS; return the pointer.
+
+================================================================================
+6. RUNTIME LIFECYCLE
+================================================================================
+Work is ONLY accepted in READY/RUNNING. Initialization failure -> FAILED.
+
+  1. UNINITIALIZED
+  2. CONFIGURING           (fetching WASM)
+  3. INITIALIZING_WASM     (compiling module)
+  4. CREATING_WORKERS      (spawning per thread-count macros)
+  5. ESTABLISHING_MESH     (MessageChannel between all workers)
+  6. INITIALIZING_RUNTIME  (globals, allocators, sync pools)
+  7. READY / RUNNING
+  8. SHUTDOWN / FAILED     (terminal)
+
+registerGlobal objects are constructed during step 6 (SPEC — see 4.5.1). Do not
+call exports before initialize() resolves.
+
+================================================================================
+7. BEST PRACTICES & SAFETY RULES
+================================================================================
+7.1 Pointer Validity
+    Never pass stack addresses or instance-local pointers between workers.
+    Allocate cross-worker data with malloc/new. Interior pointers into a shared
+    allocation are fine.
+
+7.2 Lifetime Management
+    The caller ensures shared objects outlive their usage. Autogen does not
+    auto-free shared memory. Use explicit ownership or reference counting.
+    Keep job payloads alive until the await completes (4.2.2).
+
+7.3 Memory Growth  [CORRECTED — see 2.6]
+    SharedArrayBuffer is never detached. Growth yields a new buffer object;
+    existing views keep their old length. WASM-side addresses remain valid.
+    Re-create JS views from the live buffer at every use.
+
+7.4 Error Handling
+    Check future status. System errors (invalid worker ID, capacity exhaustion)
+    set errorCode = 0xDEADBEEF and status = 2. A WASM TRAP IS NOT COVERED BY
+    THIS — see 7.7.
+
+7.5 No Dynamic Workers
+    Worker counts are FIXED at initialization. Busy pool -> tasks queue.
+    Autogen never spawns hidden or replacement workers. Queue capacity is
+    UNVERIFIED (4.8.1).
+
+7.6 Coroutine Infection
+    ag_await / ag_yield force ag_future* + ag_return. Isolate coroutine
+    requirements at the edges of your architecture.
+
+7.7 DISPATCH FAILURE MODES  [NEW IN REV 2]
+--------------------------------------------------------------------------------
+`autogen_dispatch` is the runtime entry point that invokes a dispatched task:
+
+    wasmInstance.exports.autogen_dispatch(
+        dispatcher_ptr, 0, (data.this_ptr ?? 0) >>> 0, (data.args_ptr ?? 0) >>> 0)
+
+It appears in every dispatch trap message yet was absent from Revision 1.
+`dispatcher_ptr`, `this_ptr` and `args_ptr` are internal; their exact meaning is
+UNVERIFIED (4.2.2). What matters is the failure taxonomy:
+
+  TRAP: call_indirect to a signature that does not match
+      CAUSE: the callable is outside the canonical ABI (4.2.1) — a float,
+             double, struct-by-value or reference parameter, or an unproven
+             return type. The dispatcher's expected WASM type differs from the
+             function's table entry type.
+      FIX:   uint32_t f(uint32_t...). Move complex data into a shared-heap job.
+
+  TRAP: Out of bounds memory access
+      CAUSE (in rough order of likelihood for heavy tasks):
+        a) worker stack overflow (2.5) — deep call chain / large locals
+        b) an argument or payload pointer that is not shared-heap (stack/static)
+        c) a payload freed before the task ran
+        d) an instance-local static read as null on this worker (2.5 Model B)
+        e) a stale JS view after growth (2.6) or an allocator race (2.7)
+      FIX:   bisect with 10.1 probes; validate pointers and return status codes.
+
+  NO TRAP, FUTURE NEVER RESOLVES
+      CAUSE: a trapped task does not reject its future (3.2). ag_await hangs.
+      FIX:   development timeouts; status codes; msginfo breadcrumbs.
+
+  UNVERIFIED — CONFIRM IN SOURCE: whether the dispatcher catches traps and
+  rejects the future, or leaves it pending. Audit: autogen_worker.js.
+
+================================================================================
+8. BROWSER-SIDE JAVASCRIPT DEVELOPMENT GUIDE
+================================================================================
+8.1 HTML Setup & Security Headers
+--------------------------------------------------------------------------------
+COOP/COEP are mandatory (1.1).
+
+  Node.js (Express)
+    app.use((req, res, next) => {
+      res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+      res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
+      next();
+    });
+
+  Python (Flask)
+    @app.after_request
+    def add_security_headers(response):
+        response.headers['Cross-Origin-Opener-Policy'] = 'same-origin'
+        response.headers['Cross-Origin-Embedder-Policy'] = 'require-corp'
+        return response
+
+  Nginx
+    add_header Cross-Origin-Opener-Policy "same-origin";
+    add_header Cross-Origin-Embedder-Policy "require-corp";
+
+  Minimal skeleton
+    <!DOCTYPE html>
+    <html lang="en"><head><meta charset="UTF-8"><title>Autogen App</title></head>
+    <body>
+      <div id="status">Loading...</div>
+      <script src="/system/autogen/autogen.js"></script>
+      <script src="app.js"></script>
+    </body></html>
+
+8.2 Runtime Initialization Lifecycle
+--------------------------------------------------------------------------------
+    async function initializeAutogen() {
+      const statusDiv = document.getElementById('status');
+      if (!crossOriginIsolated) {
+        statusDiv.textContent = 'ERROR: Missing COOP/COEP headers';
+        return null;
+      }
+      try {
+        statusDiv.textContent = 'Initializing runtime...';
+        const runtime = new AutogenRuntime();
+        await runtime.initialize('./my_module.wasm');
+        statusDiv.textContent = 'Runtime ready!';
+        console.log(`Workers: ${runtime.workers.size}`);
+        console.log(`Dedicated: ${runtime.dedicatedCount}, ` +
+                    `Undedicated: ${runtime.undedicatedCount}`);
+        return runtime;
+      } catch (err) {
+        statusDiv.textContent = 'Initialization failed';
+        console.error('Autogen init error:', err);
+        return null;
+      }
+    }
+
+8.3 Calling C++ Functions from JavaScript
+--------------------------------------------------------------------------------
+    const result = await runtime.callExport(0, 'add_numbers', 10, 20);   // 30
+
+    // Future-returning export
+    const futurePtr = await runtime.callExport(0, 'compute_async', 100000);
+    const future = runtime.wrapFuture(futurePtr);
+    const result2 = await future.awaitResult('uint32');
+
+    // Target a specific worker
+    const r3 = await runtime.callExport(1, 'dedicated_task', 42);
+
+    // Errors
+    try { await runtime.callExport(0, 'some_function'); }
+    catch (err) {
+      // "Worker X not ready"        -> not initialized
+      // "Invalid function name"     -> not exported
+      // "Future rejected: 0xDEADBEEF" -> system error in C++
+      console.error('C++ call failed:', err.message);
+    }
+
+8.4 Working with Futures
+--------------------------------------------------------------------------------
+    const future = runtime.wrapFuture(futurePtr);
+    const value  = await future.awaitResult('uint32');  // frees future + payload
+
+  Result types: 'void' (undefined), 'int32', 'uint32', 'float', 'double',
+  or omit for the raw pointer.
+
+  Manual polling (note: re-read the buffer each iteration, 3.3):
+    const future = runtime.wrapFuture(futurePtr);
+    while (future.status === 0) await new Promise(r => setTimeout(r, 100));
+    if (future.status === 1) console.log('ptr', future.resultPtr);
+    else console.error('rejected', future.errorCode);
+
+  ALWAYS bound the wait during development — a trapped task never resolves:
+    const withTimeout = (p, ms) => Promise.race([p,
+      new Promise((_, j) => setTimeout(() => j(new Error('future timeout')), ms))]);
+
+8.5 Shared Memory Management from JavaScript
+--------------------------------------------------------------------------------
+Use cppmalloc / cppfree / cpprealloc for JS-side allocation. NEVER call these
+from C++ (2.3).
+
+    const ptr = await runtime.callExport(0, 'cppmalloc', 100);
+    const view = new DataView(runtime.sharedMemory.buffer);   // fresh view
+    view.setUint32(ptr, 42, true);
+    await runtime.callExport(0, 'cppfree', ptr);
+
+  Reading/writing (all little-endian):
+    view.setUint32(ptr,      12345,  true);
+    view.setInt32 (ptr + 4,  -99,    true);
+    view.setFloat32(ptr + 8, 3.14,   true);
+    view.setFloat64(ptr + 12, 2.71828, true);
+    const u = view.getUint32(ptr, true);   // etc.
+
+  Arrays:
+    const arrayPtr = await runtime.callExport(0, 'cppmalloc', 400);
+    const a = new Uint32Array(runtime.sharedMemory.buffer, arrayPtr, 100);
+    for (let i = 0; i < a.length; i++) a[i] = i * 10;
+    await runtime.callExport(0, 'process_array', arrayPtr, 100);
+    await runtime.callExport(0, 'cppfree', arrayPtr);
+
+  Strings:
+    function writeString(ptr, str) {
+      const bytes = new TextEncoder().encode(str);
+      const v = new Uint8Array(runtime.sharedMemory.buffer);
+      v.set(bytes, ptr); v[ptr + bytes.length] = 0;
+    }
+    function readString(ptr) {
+      const v = new Uint8Array(runtime.sharedMemory.buffer);
+      let end = ptr; while (v[end] !== 0) end++;
+      return new TextDecoder().decode(v.slice(ptr, end));
+    }
+
+8.6 Registering Extensions
+--------------------------------------------------------------------------------
+  Main thread (DOM/WebGL/AudioContext/localStorage):
+    runtime.registerMainExtension('get_dom_value', (callerWorkerId, id) => {
+      const el = document.getElementById(id); return el ? el.value : '';
+    });
+    runtime.registerMainExtension('fetch_data', async (callerWorkerId, url) => {
+      const data = await (await fetch(url)).json();
+      const json = JSON.stringify(data);
+      const ptr = await runtime.callExport(0, 'cppmalloc', json.length + 1);
+      writeString(ptr, json);
+      return ptr;
+    });
+    runtime.registerMainExtension('update_ui', (callerWorkerId, message) => {
+      document.getElementById('status').textContent = message;
+    });
+
+  Worker-local (fetch/IndexedDB/background):
+    runtime.registerWorkerExtension('compute_hash', (data) => {
+      let h = 0; for (let i = 0; i < data.length; i++)
+        h = (h * 31 + data.charCodeAt(i)) | 0; return h;
+    });
+    runtime.registerWorkerExtension('async_process', async (input) => {
+      await new Promise(r => setTimeout(r, 100)); return input * 2;
+    });
+
+8.7 Error Handling in JavaScript
+--------------------------------------------------------------------------------
+  Initialization: distinguish HTTP Error / compile / unknown.
+  Function calls: distinguish "not ready" / "Invalid function" / other.
+  Futures: distinguish "timed out" / "rejected".
+  Extensions: throwing rejects the C++ future with 0xDEADBEEF.
+
+  ADDITIONAL, REV 2: a worker-side `dispatch error: RuntimeError:` line in the
+  console is a WASM TRAP, not any of the above. Go to 11.
+
+================================================================================
+9. COMPLETE END-TO-END EXAMPLE (LIGHT WORKLOAD)
+================================================================================
+This is the shape proven by example1.cpp. Note how little stack it uses and that
+every dispatched callable is uint32_t(uint32_t...).
+
+[C++ — main.cpp]
+
+    #include <autogen.hpp>
+
+    ag_dedicated_thread_count(1);
+    ag_undedicated_thread_count(2);
+
+    class AppState { public: int score = 0; };
+    registerGlobal(AppState, appState);
+
+    ag_export(add_numbers)
+    uint32_t add_numbers(uint32_t a, uint32_t b) { return a + b; }
+
+    uint32_t add_points(uint32_t pts) {
+        if (appState) appState->score += (int)pts;
+        return appState ? (uint32_t)appState->score : 0u;
+    }
+
+    ag_export(update_score_async)
+    ag_future* update_score_async(uint32_t points) {
+        ag_future* fut = ag_async(add_points, points);   // canonical ABI
+        uint32_t s = ag_await(uint32_t, fut);
+        ag_return s;
+    }
+
+    ag_export(get_score_sync)
+    uint32_t get_score_sync() {
+        return ag_sync(1, []() -> uint32_t {
+            return appState ? (uint32_t)appState->score : 0u; });
+    }
+
+    ag_export(get_large_data)
+    uint32_t get_large_data() {
+        uint32_t* data = (uint32_t*)malloc(100 * sizeof(uint32_t));
+        for (int i = 0; i < 100; ++i) data[i] = i * 10;
+        return (uint32_t)(uintptr_t)data;
+    }
+
+[JS — app.js]
+
+    async function startApp() {
+      const runtime = new AutogenRuntime();
+      await runtime.initialize('./main.wasm');
+
+      runtime.registerMainExtension('log_to_console', (workerId, message) =>
+        console.log(`[Worker ${workerId}] ${message}`));
+      runtime.registerWorkerExtension('multiply', (a, b) => a * b);
+
+      console.log('10+20 =', await runtime.callExport(0,'add_numbers',10,20));
+
+      const fp = await runtime.callExport(0, 'update_score_async', 50);
+      console.log('score:', await runtime.wrapFuture(fp).awaitResult('uint32'));
+
+      console.log('sync score:', await runtime.callExport(0,'get_score_sync'));
+
+      const dataPtr = await runtime.callExport(0, 'get_large_data');
+      const arr = new Uint32Array(runtime.sharedMemory.buffer, dataPtr, 100);
+      console.log('first 5:', Array.from(arr.slice(0, 5)));
+      console.log('sum:', arr.reduce((a, b) => a + b, 0));      // 4950
+      await runtime.callExport(0, 'cppfree', dataPtr);
+
+      runtime.shutdown();
+    }
+    startApp().catch(err => console.error('App failed:', err));
+
+================================================================================
+10. HEAVY-TASK END-TO-END EXAMPLE  [NEW IN REV 2]
+================================================================================
+Revision 1's examples never allocate inside a task, never touch a shared object
+with std::vector members, and never build a deep call chain. Consequently they
+exercise none of the failure surface in 2.5 / 2.7 / 4.2.1. This section does.
+
+10.1 STEP 1 — PROVE DISPATCH IN *YOUR* MODULE
+--------------------------------------------------------------------------------
+Add these two exports BEFORE debugging anything else. They split the problem in
+half in one run.
+
+    uint32_t probe_fn(uint32_t x) { return x + 1u; }
+
+    ag_export(probe_async)
+    ag_future* probe_async() {
+        ag_future* fut = ag_async(probe_fn, 41u);
+        uint32_t r = ag_await(uint32_t, fut);
+        ag_return r;                       // expect 42
+    }
+
+    ag_export(probe_heavy)
+    ag_future* probe_heavy(uint32_t id) {
+        // fill ONE persistent job, dispatch ONE heavy task
+        Job& j = g_ctx->jobs[id];
+        j.ctx = g_ctx; j.id = (int)id;
+        ag_future* fut = ag_async(heavy_task,
+            static_cast<uint32_t>(reinterpret_cast<uintptr_t>(&j)));
+        uint32_t st = ag_await(uint32_t, fut);
+        ag_return st;                      // expect 0
+    }
+
+    // JS
+    const p = await runtime.callExport(0, 'probe_async');
+    console.log('probe_async =', await runtime.wrapFuture(p).awaitResult('uint32'));
+    const q = await runtime.callExport(0, 'probe_heavy', 2);
+    console.log('probe_heavy =', await runtime.wrapFuture(q).awaitResult('uint32'));
+
+INTERPRETATION
+    42 and 0        -> dispatch AND the heavy path both work on a worker.
+    42, heavy traps -> dispatch is fine; the task is too heavy for the worker
+                       envelope. Go to 2.5 (stack) and 2.7 (allocation).
+    probe_async
+      itself traps  -> ag_async is broken for even trivial signatures in THIS
+                       build. Compare compile/link flags against example1.wasm.
+                       Nothing in your application code can fix this.
+
+10.2 STEP 2 — THE SAFE HEAVY-TASK ARCHITECTURE
+--------------------------------------------------------------------------------
+Five rules, each eliminating one failure class:
+
+  1. Canonical ABI: uint32_t task(uint32_t job_ptr).            (4.2.1)
+  2. Context on the shared heap, pointer carried in every job.  (2.5, 4.2.2)
+  3. Per-task ownership of all mutable paint/scratch objects.   (4.9)
+  4. Sequential warm-up at init: grow heap + size all caches.   (2.7)
+  5. Persistent job payloads: zero allocation per frame.        (4.2.2)
+
+    struct Job { Ctx* ctx = nullptr; int id = 0; float t = 0; Snap snap; };
+
+    struct Ctx {
+        Canvas*  targets[N] = {};
+        Pools    pool[N];                 // per-task scratch, no sharing
+        Job      jobs[N];                 // persistent payloads
+        bool     ready = false;
+        uint32_t sequential = 0;          // diagnostic switch
+        uint32_t mask = (1u << N) - 1u;   // diagnostic bisection
+        Ctx() {}                          // user ctor: the VERIFIED path
+    };
+    registerGlobal(Ctx, g_ctx);
+
+    uint32_t heavy_task(uint32_t job_ptr) {
+        if (!job_ptr) return 1u;
+        Job* j = reinterpret_cast<Job*>(static_cast<uintptr_t>(job_ptr));
+        if (!j->ctx) return 2u;
+        const int id = j->id;
+        if (id < 0 || id >= N) return 3u;
+        Canvas* c = g_ctx->targets[id];
+        if (!c) return 4u;
+        if (!g_ctx->ready) return 5u;
+        if (!g_ctx->pool[id].ready()) return 6u;
+        // ... deep render using j->t, j->snap, g_ctx->pool[id] ...
+        return 0u;
+    }
+
+    static void warm_up() {                // worker 0 only, before any dispatch
+        // exercise EVERY branch and quality tier, 2-3 passes, varied inputs
+        for (int pass = 0; pass < 3; ++pass) {
+            configure_snapshot_for_pass(pass);
+            for (int i = 0; i < N; ++i) {
+                Job& j = g_ctx->jobs[i];
+                j.ctx = g_ctx; j.id = i; j.t = pass_time(pass);
+                heavy_task((uint32_t)(uintptr_t)&j);   // DIRECT call: stack OK
+            }
+        }
+    }
+
+    ag_export(init)
+    uint32_t init() {
+        if (!g_ctx) return 0u;
+        build_shared_resources();          // new -> shared heap
+        for (int i = 0; i < N; ++i) g_ctx->targets[i] = new Canvas(W, H);
+        g_ctx->ready = true;
+        warm_up();                         // <-- the critical step
+        reset_snapshot_to_defaults();
+        return (uint32_t)N;
+    }
+
+10.3 STEP 3 — TWO FRAME PATHS, A/B TESTABLE
+--------------------------------------------------------------------------------
+    // PROVEN shape: one ag_async + ag_await per task (example1 Example B).
+    ag_export(render_all)
+    ag_future* render_all(uint32_t time_ms, uint32_t packed) {
+        if (!g_ctx || !g_ctx->targets[0]) ag_return 0u;
+        const float t = (float)time_ms * 0.001f;
+        Snap s = read_snap(packed);
+        uint32_t err = 0;
+        for (int i = 0; i < N; ++i) {
+            if (!(g_ctx->mask & (1u << i))) continue;
+            Job& j = g_ctx->jobs[i];
+            j.ctx = g_ctx; j.id = i; j.t = t; j.snap = s;
+            uint32_t st;
+            if (g_ctx->sequential) {
+                st = heavy_task((uint32_t)(uintptr_t)&j);      // no dispatch
+            } else {
+                ag_future* f = ag_async(heavy_task, (uint32_t)(uintptr_t)&j);
+                st = ag_await(uint32_t, f);
+            }
+            if (st && !err) err = (uint32_t)((i << 8) | st);
+        }
+        ag_return err ? err : 123u;
+    }
+
+    // OPT-IN batched fan-out, only after the above is proven.
+    ag_export(render_all_batch)
+    ag_future* render_all_batch(uint32_t time_ms, uint32_t packed) { /* 4.8 */ }
+
+    ag_export(set_sequential)
+    uint32_t set_sequential(uint32_t on) {
+        if (!g_ctx) return 0u; g_ctx->sequential = on ? 1u : 0u;
+        return g_ctx->sequential;
+    }
+    ag_export(set_mask)
+    uint32_t set_mask(uint32_t m) {
+        if (!g_ctx) return 0u; g_ctx->mask = m & ((1u << N) - 1u);
+        return g_ctx->mask;
+    }
+
+DIAGNOSTIC LADDER (run from the DevTools console; no HTML edit needed)
+    await runtime.callExport(0, 'set_sequential', 1);   // works? logic is fine
+    await runtime.callExport(0, 'set_sequential', 0);
+    await runtime.callExport(0, 'set_mask', 1 << 6);    // ONE task at a time
+    // widen the mask until the failing task is isolated
+
+RETURN VALUE ENCODING
+    123                       -> success
+    (index << 8) | status     -> which task failed and why (4.2.1)
+    Log this every frame during development. It replaces a bare trap with a
+    number you can act on.
+
+================================================================================
+11. TROUBLESHOOTING: TRAP MESSAGE -> CAUSE -> FIX  [NEW IN REV 2]
+================================================================================
+Symptom: RuntimeError: call_indirect to a signature that does not match
+         (inside autogen_dispatch)
+  Cause:  callable outside the canonical ABI. A float/double/struct-by-value/
+          reference parameter, or an unproven return type. f32 != i32 at the
+          WASM type check.
+  Fix:    uint32_t f(uint32_t...). Move complex data into a shared-heap job
+          payload and pass its address as uint32_t. (4.2.1)
+  Note:   this is an ABI error, not a logic error. No amount of pointer or
+          lifetime fixing will clear it.
+
+Symptom: RuntimeError: Out of bounds memory access (inside autogen_dispatch)
+  Cause:  one of —
+          (a) worker stack overflow: deep chain / large locals (2.5)
+          (b) non-shared pointer argument (caller stack or mutable static)
+          (c) payload freed before the task ran
+          (d) mutable static read as null on this worker (2.5 Model B)
+          (e) stale JS view after growth (2.6) / allocator contention (2.7)
+  Fix:    run 10.1 probes. trivial-ok + heavy-trap => (a). Add entry validation
+          and status codes to separate (b)/(c)/(d). Warm up sequentially to
+          remove (e). Bisect with set_mask.
+
+Symptom: future never resolves; ag_await / awaitResult hangs; no JS exception
+  Cause:  the task trapped. A trap is not a future rejection (3.2, 7.7).
+  Fix:    look for the worker console `dispatch error` line; add development
+          timeouts (8.4); return status codes instead of trapping.
+
+Symptom: works sequentially on worker 0, fails when dispatched
+  Cause:  the worker execution envelope, not your logic — stack size, statics
+          model, or concurrency (2.5, 2.7).
+  Fix:    keep a set_sequential(0/1) switch permanently; it is the fastest
+          way to make this distinction for the rest of the project's life.
+
+Symptom: only SOME tasks fail, on scattered workers, first frame only
+  Cause:  cold-cache allocation storm and/or heap growth during concurrent
+          execution (2.7), or per-task stack peaks differing by workload.
+  Fix:    sequential warm-up at init (10.2 rule 4) + persistent payloads.
+
+Symptom: compile error "expected a class name after '~' to name a destructor"
+         or "expected body of lambda expression"
+  Cause:  an identifier is a C++ alternative operator token (compl/and/or/...).
+  Fix:    rename. (1.4)
+
+Symptom: TypeError from Atomics.wait
+  Cause:  called on the browser UI thread, where it is forbidden.
+  Fix:    ensure the caller is an Autogen worker (2.2), or use ag_ext_async.
+
+Symptom: JS RangeError / silently wrong data after heavy allocation
+  Cause:  a cached DataView/TypedArray created before memory grew (2.6, 3.3).
+  Fix:    re-create views from runtime.sharedMemory.buffer at every use.
+
+Symptom: `probe_async` (trivial canonical task) itself traps
+  Cause:  ag_async is broken in this build for ANY callable.
+  Fix:    compare compile/link flags with the working example1.wasm build;
+          verify -pthread -matomics -mbulk-memory -mshared-memory and the
+          runtime/worker JS versions match the module. Not an app-code bug.
+
+================================================================================
+12. SOURCE AUDIT CHECKLIST  [NEW IN REV 2]
+================================================================================
+Every UNVERIFIED item above is closable by reading two files. This is the
+highest-leverage action available; it replaces guesswork with fact.
+
+FILE: /system/autogen/include/autogen.hpp
+  [ ] ag_async template          -> 4.2.1 legal signatures; 4.2.2 Q1/Q2 packing
+  [ ] dispatcher / trampoline    -> the exact call_indirect type; return handling
+  [ ] closure handling           -> 4.2.2 Q4 this_ptr for captureless/capturing
+  [ ] args buffer alloc/free     -> 4.2.2 Q3 lifetime
+  [ ] ag_await / ag_await_all    -> 4.8.1 ownership, capacity, get<T> checking
+  [ ] registerGlobal macro       -> 4.5.1 construction + resolution semantics
+  [ ] ag_spinlock                -> 4.9 the entire undocumented API
+  [ ] AtomicMalloc / cppmalloc   -> 2.7 contention, growth, failure behaviour
+  [ ] any stack-size macro       -> 1.2 / 2.5
+
+FILE: /system/autogen/autogen_worker.js  (and autogen.js)
+  [ ] autogen_dispatch call site -> 7.7 argument meanings; trap handling
+  [ ] error handler around it    -> 3.2 does a trap reject the future?
+  [ ] __stack_pointer handling   -> 2.5 Model S vs T, and the stack SIZE
+  [ ] instantiation / __wasm_init_memory -> 2.5 Model A vs B (statics)
+  [ ] memory.grow call sites     -> 2.6 growth during task execution
+  [ ] view cache invalidation    -> 2.6 / 3.3
+  [ ] worker 0 creation          -> 2.2 Web Worker vs UI thread
+  [ ] pending-dispatch queue     -> 4.8.1 capacity
+
+EMPIRICAL TESTS THAT NEED NO SOURCE READING
+  [ ] statics model: set_probe on worker 0, get_probe on worker 3 (2.5)
+  [ ] dispatch ABI: probe_async in YOUR module (10.1)
+  [ ] heavy envelope: probe_heavy in YOUR module (10.1)
+  [ ] stack pressure: re-run probe_heavy with round caps/joins and clips
+      disabled; a change in outcome confirms 2.5
+  [ ] fan-out: render_all (per-task await) vs render_all_batch (10.3)
+
+================================================================================
+APPENDIX A. CORRECTIONS APPLIED IN REVISION 2
+================================================================================
+A.1 "the underlying ArrayBuffer is detached" (old 7.3) — WRONG.
+    A SharedArrayBuffer is never detached. Growth produces a new buffer object;
+    old views remain valid over the old length. Rewritten as 2.6, with the
+    CPU-bound-task consequence that Revision 1 omitted entirely.
+
+A.2 ".rodata / instance-local static storage" blanket-invalid (old 2.3) —
+    OVER-BROAD. Const, identically-initialized data is safe to read locally on
+    any worker, and function-table indices are valid module-wide. The genuine
+    per-instance entities are WASM GLOBALS and the function TABLE, not
+    linear-memory bytes. Rewritten as 2.3 + 2.5, with the unresolved data
+    segment question stated explicitly instead of asserted.
+
+A.3 registerGlobal's justification ("WASM instance-local global limitations")
+    conflated globals with statics, making the memory model undecidable.
+    Separated in 2.5.
+
+A.4 ag_spinlock listed as REQUIRED (old 1.3) but never documented. Now 4.9,
+    honestly marked UNVERIFIED, with a lock-free partitioning alternative.
+
+A.5 autogen_dispatch, dispatcher_ptr, this_ptr, args_ptr appeared in every
+    observed error message and nowhere in the docs. Now 7.7.
+
+A.6 Worker 0's identity was implicit, leaving ag_sync's usability from worker 0
+    ambiguous (Atomics.wait throws on the UI thread). Now explicit in 2.2.
+
+A.7 The dispatch ABI was entirely absent while every example silently used only
+    i32 parameters. Now 4.2.1 / 4.2.3, with the observed traps recorded.
+
+A.8 ag_await_all had no stated capacity, ownership, or trap behaviour. Now
+    4.8.1, with the VERIFIED one-at-a-time alternative.
+
+A.9 -fno-exceptions implications (allocation failure traps, can't throw) were
+    unstated. Now 1.2 / 2.7.
+
+A.10 No example exercised allocation inside a task, shared mutable objects, or
+     a deep call chain. Now section 10.
+
+================================================================================
+APPENDIX B. CASE STUDY: CANVAS2D PARALLEL RENDER
+================================================================================
+Real timeline, retained as the empirical basis for sections 2.5, 4.2.1 and 11.
+
+Setup: 14 icons, each rendered into its own 128x128 Canvas2D; 1 dedicated +
+8 undedicated workers; a software renderer with gradients, patterns, masks,
+clip paths, dashes, markers, blend modes and a gaussian bloom pass.
+
+  Iteration 0 — original code
+    Dispatched: [](int i, const float& t, Snap& s) -> void
+    Result: 1x call_indirect signature mismatch + 8x OOB.
+    Violations: reference parameters (ABI), mutable statics for cross-worker
+                state, a 6-slot gradient pool shared by 14 concurrent tasks.
+
+  Iteration 1 — registerGlobal context, per-icon pools,
+                void render_icon_task(int, float, Snap)
+    Result: unchanged. Signature mismatch persisted.
+    Lesson: the float parameter and void return were still outside the ABI.
+            Fixing lifetime/ownership cannot fix a type mismatch.
+
+  Iteration 2 — canonical uint32_t render_icon_task(uint32_t job_ptr),
+                IconJob on the shared heap
+    Result: SIGNATURE MISMATCH DISAPPEARED. OOB remained (6 errors).
+    Lesson: decisive confirmation of 4.2.1. Two independent bug classes were
+            present; only one was visible until the other was removed.
+
+  Iteration 3 — dropped registerGlobal for a new-allocated context carried in
+                each job; replaced the indirect icon table with a switch of
+                direct calls; added validation + status codes + bisection mask
+    Result: 1 OOB, first frame only.
+
+  Iteration 4 — sequential warm-up at init + persistent job payloads
+    Result: build failed on `const float compl[]` — a C++ alternative operator
+            token (1.4). Unrelated to Autogen; recorded so the diagnostic is
+            findable.
+
+  Iteration 5 — mirrored example1 structurally (global-scope task,
+                registerGlobal with a user ctor, one ag_async + ag_await per
+                icon) and added probe_async / probe_icon
+    Result: OOB on all workers again.
+
+Analysis of what the process cost and why:
+  * The docs never stated the dispatch ABI, so iterations 0-2 were spent
+    discovering it by bisection. 4.2.1 would have prevented all three.
+  * The docs never stated the statics model, so the context was moved into
+    registerGlobal and then back out again on opposite assumptions. 2.5's
+    two-line probe settles it in one run.
+  * The docs never mentioned worker stack size, so "OOB inside
+    autogen_dispatch" could not be connected to a deep render call chain.
+    2.5 + 11 make that link explicit.
+  * Process failures compounded it: multiple variables changed per iteration
+    (ambiguous results); the trivial-dispatch probe was deferred to iteration 5
+    instead of iteration 1; and internals were guessed at rather than read
+    from autogen.hpp / autogen_worker.js.
+
+Standing recommendation: run 10.1's probes FIRST in any new Autogen module,
+keep a sequential/dispatched switch permanently, and close section 12's
+checklist before building anything heavy on top.
+
+================================================================================
+END OF DOCUMENTATION — REVISION 2
+================================================================================
