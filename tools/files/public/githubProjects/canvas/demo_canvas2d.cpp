@@ -16,7 +16,7 @@
 //   returns 123 on success, else (iconIndex << 8) | status:
 //     1 null job  2 null ctx  3 bad id  4 null canvas  5 no art  6 no pool
 #include <autogen.hpp>
-#include "canvas2d.cpp"
+#include <graphics/canvas2d.cpp>
 #include <cmath>
 #include <vector>
 ag_dedicated_thread_count(1);

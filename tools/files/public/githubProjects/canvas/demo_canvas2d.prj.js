@@ -7,7 +7,7 @@
 		'-std=c++20',
 		'-O2',
 		'-I', '/system/cpp/include',
-		'-I', '/githubProjects/canvas',
+		//'-I', '/githubProjects/canvas',
 		'-pthread',
 		'-fno-exceptions',
 		'-fno-rtti',

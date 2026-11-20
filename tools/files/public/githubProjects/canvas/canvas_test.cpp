@@ -26,62 +26,62 @@ ag_undedicated_thread_count(2);
 template <class T, class = void> struct has_set_mask : std::false_type {};
 template <class T> struct has_set_mask<T, decltype(void(std::declval<T&>().set_mask(nullptr)))> : std::true_type {};
 static_assert(has_set_mask<Canvas2D>::value,
-"Test 16 requires the mask-enabled canvas2d.hpp (class Mask + Canvas2D::set_mask/clear_mask).");
+	"Test 16 requires the mask-enabled canvas2d.hpp (class Mask + Canvas2D::set_mask/clear_mask).");
 // Test 17 needs the clip-enabled canvas2d.hpp (class ClipPath + Canvas2D::set_clip).
 template <class T, class = void> struct has_set_clip : std::false_type {};
 template <class T> struct has_set_clip<T, decltype(void(std::declval<T&>().set_clip(nullptr)))> : std::true_type {};
 static_assert(has_set_clip<Canvas2D>::value,
-"Test 17 requires the clip-enabled canvas2d.hpp (class ClipPath + Canvas2D::set_clip/clear_clip).");
+	"Test 17 requires the clip-enabled canvas2d.hpp (class ClipPath + Canvas2D::set_clip/clear_clip).");
 // Test 18 needs the fill-rule-enabled library (FillRule + Canvas2D::fill_rule
 // + Shape2D::set_fill_rule).
 template <class T, class = void> struct has_fill_rule : std::false_type {};
 template <class T> struct has_fill_rule<T, decltype(void(std::declval<T&>().fill_rule(FillRule::NonZero)))> : std::true_type {};
 static_assert(has_fill_rule<Canvas2D>::value,
-"Test 18 requires the fill-rule-enabled canvas2d.hpp (enum FillRule + Canvas2D::fill_rule).");
+	"Test 18 requires the fill-rule-enabled canvas2d.hpp (enum FillRule + Canvas2D::fill_rule).");
 template <class T, class = void> struct has_set_fill_rule : std::false_type {};
 template <class T> struct has_set_fill_rule<T, decltype(void(std::declval<T&>().set_fill_rule(FillRule::NonZero)))> : std::true_type {};
 static_assert(has_set_fill_rule<Shape2D>::value,
-"Test 18 requires the fill-rule-enabled shape2d.hpp (Shape2D::set_fill_rule/clear_fill_rule).");
+	"Test 18 requires the fill-rule-enabled shape2d.hpp (Shape2D::set_fill_rule/clear_fill_rule).");
 // Test 19 needs the Porter-Duff-enabled library (CompositeOp +
 // Canvas2D::composite_op / global_composite_operation).
 template <class T, class = void> struct has_composite_op : std::false_type {};
 template <class T> struct has_composite_op<T, decltype(void(std::declval<T&>().composite_op(CompositeOp::SourceOver)))> : std::true_type {};
 static_assert(has_composite_op<Canvas2D>::value,
-"Test 19 requires the composite-enabled canvas2d.hpp (enum CompositeOp + Canvas2D::composite_op).");
+	"Test 19 requires the composite-enabled canvas2d.hpp (enum CompositeOp + Canvas2D::composite_op).");
 // Test 20 needs the marker-enabled library (Marker + Canvas2D::set_markers).
 template <class T, class = void> struct has_set_markers : std::false_type {};
 template <class T> struct has_set_markers<T, decltype(void(std::declval<T&>().set_markers(nullptr, nullptr, nullptr)))> : std::true_type {};
 static_assert(has_set_markers<Canvas2D>::value,
-"Test 20 requires the marker-enabled canvas2d.hpp (class Marker + Canvas2D::set_markers).");
+	"Test 20 requires the marker-enabled canvas2d.hpp (class Marker + Canvas2D::set_markers).");
 // Test 21 needs the filter-enabled library (Filter + Canvas2D::set_filter /
 // apply_filter + Filter::apply off-screen buffer API).
 template <class T, class = void> struct has_set_filter : std::false_type {};
 template <class T> struct has_set_filter<T, decltype(void(std::declval<T&>().set_filter(nullptr)))> : std::true_type {};
 static_assert(has_set_filter<Canvas2D>::value,
-"Test 21 requires the filter-enabled canvas2d.hpp (class Filter + Canvas2D::set_filter/clear_filter).");
+	"Test 21 requires the filter-enabled canvas2d.hpp (class Filter + Canvas2D::set_filter/clear_filter).");
 template <class T, class = void> struct has_filter_apply : std::false_type {};
 template <class T> struct has_filter_apply<T, decltype(void(std::declval<const T&>().apply(nullptr, 0, 0)))> : std::true_type {};
 static_assert(has_filter_apply<Filter>::value,
-"Test 21 requires the off-screen filter API (Filter::apply(uint32_t*, int, int)).");
+	"Test 21 requires the off-screen filter API (Filter::apply(uint32_t*, int, int)).");
 // Test 22 needs the SVG 2 §10 typography API (TextStyle + text_anchor /
 // dominant_baseline / letter_spacing / font_weight / text_length).
 template <class T, class = void> struct has_text_anchor : std::false_type {};
 template <class T> struct has_text_anchor<T, decltype(void(std::declval<T&>().text_anchor(TextAnchor::Start)))> : std::true_type {};
 static_assert(has_text_anchor<Canvas2D>::value,
-"Test 22 requires the typography-enabled canvas2d.hpp (enum TextAnchor + Canvas2D::text_anchor).");
+	"Test 22 requires the typography-enabled canvas2d.hpp (enum TextAnchor + Canvas2D::text_anchor).");
 template <class T, class = void> struct has_text_style : std::false_type {};
 template <class T> struct has_text_style<T, decltype(void(std::declval<T&>().text_style(TextStyle())))> : std::true_type {};
 static_assert(has_text_style<Canvas2D>::value,
-"Test 22 requires the typography-enabled canvas2d.hpp (struct TextStyle + Canvas2D::text_style).");
+	"Test 22 requires the typography-enabled canvas2d.hpp (struct TextStyle + Canvas2D::text_style).");
 template <class T, class = void> struct has_font_weight_class : std::false_type {};
 template <class T> struct has_font_weight_class<T, decltype(void(std::declval<const T&>().weight_class()))> : std::true_type {};
 static_assert(has_font_weight_class<Font>::value,
-"Test 22 requires the OS/2-aware font.hpp (Font::weight_class/is_italic/get_vmetrics).");
+	"Test 22 requires the OS/2-aware font.hpp (Font::weight_class/is_italic/get_vmetrics).");
 // Test 23 needs the globalAlpha state API (Canvas2D::global_alpha setter/getter).
 template <class T, class = void> struct has_global_alpha : std::false_type {};
 template <class T> struct has_global_alpha<T, decltype(void(std::declval<T&>().global_alpha(1.0f)))> : std::true_type {};
 static_assert(has_global_alpha<Canvas2D>::value,
-"Test 23 requires the globalAlpha-enabled canvas2d.hpp (Canvas2D::global_alpha).");
+	"Test 23 requires the globalAlpha-enabled canvas2d.hpp (Canvas2D::global_alpha).");
 // ============================================================================
 // SHARED STATE (used by the fragments and the inspection exports below)
 // ============================================================================
@@ -118,43 +118,43 @@ static size_t g_prefetched_font_size = 0;
 // ============================================================================
 ag_export(prefetch_image)
 ag_future* prefetch_image(const char* url) {
-ag_future* fut = fetch(url);
-uint32_t structPtr = ag_await(uint32_t, fut);
-if (structPtr == 0) ag_return 0;
-FetchResult* res = (FetchResult*)(uintptr_t)structPtr;
-int ok = 0;
-if (res->status_code == 200 && res->data_ptr != 0 && res->size > 0) {
-if (g_prefetched_image_data) free(g_prefetched_image_data);
-g_prefetched_image_size = res->size;
-g_prefetched_image_data = (unsigned char*)malloc(g_prefetched_image_size);
-if (g_prefetched_image_data) {
-memcpy(g_prefetched_image_data, (const void*)(uintptr_t)res->data_ptr, g_prefetched_image_size);
-ok = 1;
-}
-}
-if (res->data_ptr != 0) free((void*)(uintptr_t)res->data_ptr);
-free((void*)(uintptr_t)structPtr);
-ag_return ok;
+	ag_future* fut = fetch(url);
+	uint32_t structPtr = ag_await(uint32_t, fut);
+	if (structPtr == 0) ag_return 0;
+	FetchResult* res = (FetchResult*)(uintptr_t)structPtr;
+	int ok = 0;
+	if (res->status_code == 200 && res->data_ptr != 0 && res->size > 0) {
+		if (g_prefetched_image_data) free(g_prefetched_image_data);
+		g_prefetched_image_size = res->size;
+		g_prefetched_image_data = (unsigned char*)malloc(g_prefetched_image_size);
+		if (g_prefetched_image_data) {
+			memcpy(g_prefetched_image_data, (const void*)(uintptr_t)res->data_ptr, g_prefetched_image_size);
+			ok = 1;
+		}
+	}
+	if (res->data_ptr != 0) free((void*)(uintptr_t)res->data_ptr);
+	free((void*)(uintptr_t)structPtr);
+	ag_return ok;
 }
 ag_export(prefetch_font)
 ag_future* prefetch_font(const char* url) {
-ag_future* fut = fetch(url);
-uint32_t structPtr = ag_await(uint32_t, fut);
-if (structPtr == 0) ag_return 0;
-FetchResult* res = (FetchResult*)(uintptr_t)structPtr;
-int ok = 0;
-if (res->status_code == 200 && res->data_ptr != 0 && res->size > 0) {
-if (g_prefetched_font_data) free(g_prefetched_font_data);
-g_prefetched_font_size = res->size;
-g_prefetched_font_data = (unsigned char*)malloc(g_prefetched_font_size);
-if (g_prefetched_font_data) {
-memcpy(g_prefetched_font_data, (const void*)(uintptr_t)res->data_ptr, g_prefetched_font_size);
-ok = 1;
-}
-}
-if (res->data_ptr != 0) free((void*)(uintptr_t)res->data_ptr);
-free((void*)(uintptr_t)structPtr);
-ag_return ok;
+	ag_future* fut = fetch(url);
+	uint32_t structPtr = ag_await(uint32_t, fut);
+	if (structPtr == 0) ag_return 0;
+	FetchResult* res = (FetchResult*)(uintptr_t)structPtr;
+	int ok = 0;
+	if (res->status_code == 200 && res->data_ptr != 0 && res->size > 0) {
+		if (g_prefetched_font_data) free(g_prefetched_font_data);
+		g_prefetched_font_size = res->size;
+		g_prefetched_font_data = (unsigned char*)malloc(g_prefetched_font_size);
+		if (g_prefetched_font_data) {
+			memcpy(g_prefetched_font_data, (const void*)(uintptr_t)res->data_ptr, g_prefetched_font_size);
+			ok = 1;
+		}
+	}
+	if (res->data_ptr != 0) free((void*)(uintptr_t)res->data_ptr);
+	free((void*)(uintptr_t)structPtr);
+	ag_return ok;
 }
 // ============================================================================
 // TEST FRAGMENTS (order matters: demos, SVG, fill-rule, composite, markers,

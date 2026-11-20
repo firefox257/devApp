@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>🧠 Chat-Ready Browser LLM (SwiGLU + RoPE + Special Tokens)</title>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0/dist/tf.min.js"></script>
+<style>
+:root {
+	--primary: #6366f1; --primary-hover: #4f46e5; --bg: #0f172a;
+	--card: #1e293b; --text: #f1f5f9; --text-dim: #94a3b8;
+	--success: #22c55e; --warning: #f59e0b; --error: #ef4444;
+	--code-bg: #020617; --border: #334155;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+	font-family: 'Segoe UI', system-ui, sans-serif;
+	background: var(--bg); color: var(--text); line-height: 1.6;
+	padding: 20px; min-height: 100vh;
+}
+.container { max-width: 1100px; margin: 0 auto; }
+header { text-align: center; padding: 2rem 1rem; border-bottom: 1px solid #334155; margin-bottom: 2rem; }
+h1 { font-size: 1.8rem; margin-bottom: 0.5rem;
+	background: linear-gradient(135deg, #6366f1, #a855f7);
+	-webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.subtitle { color: var(--text-dim); font-size: 0.95rem; }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
+.card { background: var(--card); border-radius: 12px; padding: 1.5rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.3); border: 1px solid var(--border); }
+.card h3 { margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 0.5rem; color: var(--primary); }
+
+textarea, input, select {
+	width: 100%; padding: 0.75rem; border: 1px solid var(--border);
+	border-radius: 8px; background: var(--code-bg); color: var(--text);
+	font-size: 0.95rem; font-family: 'Consolas', monospace; resize: vertical;
+}
+textarea:focus, input:focus, select:focus {
+	outline: none; border-color: var(--primary);
+	box-shadow: 0 0 0 3px rgba(99,102,241,0.3);
+}
+textarea[readonly] {
+	cursor: default; opacity: 0.85; background: #0b1120; color: #cbd5e1;
+	font-size: 0.85rem; min-height: 60px; letter-spacing: 0.02em;
+}
+#rawOutput { min-height: 180px; }
+textarea { min-height: 120px; }
+#chatInput { min-height: 60px !important; max-height: 150px; }
+
+.input-group { margin-bottom: 1rem; }
+label { display: block; margin-bottom: 0.4rem; font-size: 0.9rem; color: var(--text-dim); }
+.checkbox-group { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem; }
+.checkbox-group input[type="checkbox"] { width: auto; margin: 0; cursor: pointer; }
+.checkbox-group label { margin: 0; cursor: pointer; color: var(--text); font-size: 0.9rem; }
+
+.btn {
+	background: var(--primary); color: white; border: none;
+	padding: 0.75rem 1.5rem; border-radius: 8px; font-size: 1rem;
+	font-weight: 600; cursor: pointer; transition: all 0.2s;
+	display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
+}
+.btn:hover { background: var(--primary-hover); transform: translateY(-1px); }
+.btn:disabled { background: #475569; cursor: not-allowed; transform: none; opacity: 0.7; }
+.btn-row { display: flex; gap: 0.75rem; margin-top: 1rem; }
+.btn-row .btn { flex: 1; }
+
+.status { margin-top: 1rem; padding: 0.75rem; border-radius: 8px; font-size: 0.9rem; display: none; }
+.status.show { display: block; }
+.status.training { background: rgba(245,158,11,0.2); color: var(--warning); }
+.status.success { background: rgba(34,197,94,0.2); color: var(--success); }
+.status.error { background: rgba(239,68,68,0.2); color: var(--error); }
+
+.log-area {
+	background: var(--code-bg); border-radius: 8px; padding: 1rem;
+	font-family: monospace; font-size: 0.85rem; max-height: 180px;
+	overflow-y: auto; border: 1px solid var(--border); white-space: pre-wrap;
+}
+
+.loss-chart { height: 120px; background: var(--code-bg); border-radius: 8px; margin-top: 1rem; position: relative; overflow: hidden; border: 1px solid var(--border); }
+.loss-bar { position: absolute; bottom: 0; width: 3px; background: linear-gradient(to top, var(--primary), #a855f7); border-radius: 2px 2px 0 0; transition: height 0.1s; }
+
+.chat-area { margin-top: 1rem; }
+.chat-input-container { display: flex; gap: 0.5rem; margin-bottom: 0.5rem; align-items: flex-start; }
+.chat-input-container select { width: auto; min-width: 130px; flex-shrink: 0; }
+.chat-input-container textarea { flex: 1; }
+.chat-input-container .btn { width: auto; min-width: 120px; flex-shrink: 0; padding: 0.75rem; }
+
+.chat-output {
+	background: linear-gradient(135deg, var(--card), #334155);
+	border-radius: 12px; padding: 1.25rem; text-align: left;
+	border: 2px solid transparent; transition: border-color 0.3s;
+	min-height: 80px;
+}
+.chat-output.ready { border-color: var(--success); }
+.chat-output .role { font-weight: bold; color: var(--primary); margin-bottom: 0.25rem; }
+.chat-output .text { font-size: 1.1rem; color: var(--text); line-height: 1.5; }
+.chat-output .text span { color: var(--success); font-weight: 500; }
+
+.stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.75rem; margin-top: 1rem; }
+.stat-box { background: var(--code-bg); padding: 0.75rem; border-radius: 8px; text-align: center; }
+.stat-box .value { font-size: 1.4rem; font-weight: bold; color: var(--primary); }
+.stat-box .label { font-size: 0.8rem; color: var(--text-dim); }
+
+.tokenizer-status { display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: var(--text-dim); margin-top: 0.5rem; }
+.status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--warning); }
+.status-dot.success { background: var(--success); }
+.status-dot.error { background: var(--error); }
+
+.arch-info { font-size: 0.9rem; color: var(--text-dim); line-height: 1.8; }
+.arch-info code { background: var(--code-bg); padding: 2px 6px; border-radius: 4px; color: #a5b4fc; font-family: monospace; }
+
+.prediction-panel {
+    margin-top: 1rem;
+    background: var(--code-bg);
+    border-radius: 8px;
+    border: 2px solid var(--primary);
+    overflow: hidden;
+    display: none !important;
+    animation: slideDown 0.3s ease-out;
+}
+.prediction-panel.show { display: block !important; }
+@keyframes slideDown {
+    from { opacity: 0; transform: translateY(-10px); max-height: 0; }
+    to { opacity: 1; transform: translateY(0); max-height: 300px; }
+}
+.prediction-header {
+    padding: 0.6rem 0.85rem;
+    background: rgba(99,102,241,0.2);
+    border-bottom: 1px solid var(--border);
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--primary);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.prediction-list {
+    max-height: 180px;
+    overflow-y: auto;
+    font-family: 'Consolas', monospace;
+    font-size: 0.85rem;
+}
+.prediction-item {
+    padding: 0.5rem 0.85rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid rgba(51,65,85,0.5);
+    cursor: pointer;
+    transition: background 0.15s;
+}
+.prediction-item:hover { background: rgba(99,102,241,0.15); }
+.prediction-item:last-child { border-bottom: none; }
+.prediction-token {
+    color: var(--text);
+    font-weight: 500;
+    white-space: pre-wrap;
+    word-break: break-all;
+    max-width: 70%;
+}
+.prediction-prob {
+    color: var(--success);
+    font-size: 0.85rem;
+    min-width: 55px;
+    text-align: right;
+    font-weight: 600;
+}
+.prediction-bar {
+    height: 6px;
+    background: linear-gradient(90deg, var(--primary), transparent);
+    border-radius: 3px;
+    margin-left: 0.75rem;
+    flex: 1;
+    max-width: 90px;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+footer { text-align: center; padding: 2rem; color: var(--text-dim); font-size: 0.9rem; border-top: 1px solid var(--border); margin-top: 2rem; }
+footer a { color: var(--primary); text-decoration: none; }
+footer a:hover { text-decoration: underline; }
+
+@media (max-width: 768px) {
+	.grid { grid-template-columns: 1fr; }
+	.chat-input-container { flex-direction: column; }
+	.chat-input-container select, .chat-input-container textarea, .chat-input-container .btn { width: 100%; min-width: 0; }
+	.stats-grid { grid-template-columns: 1fr 1fr; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+<header>
+<h1>🧠 Chat-Ready Browser LLM <span style="font-size:0.7em;vertical-align:super;color:var(--warning)">SwiGLU + RoPE</span></h1>
+<p class="subtitle">Train a conversational model in-browser • Segment-aware training • Autoregressive generation</p>
+</header>
+
+<div class="grid">
+<!-- Training Data -->
+<div class="card">
+<h3>📚 Chat Training Data</h3>
+<p style="color:var(--text-dim);margin-bottom:1rem;font-size:0.9rem">Use `<|user|>`, `<|assistant|>`, `<|system|>`, and `<|stop|>` tokens. Each `<|stop|>` isolates a training segment.</p>
+<textarea id="sampleText" placeholder="Enter chat examples..."><|user|>Hello, how are you?<|assistant|>I'm running smoothly in your browser! How can I help?<|stop|>
+<|user|>What is SwiGLU?<|assistant|>A gated activation that splits the feedforward layer into gate and value paths, then multiplies them.<|stop|>
+<|system|>Be concise.<|user|>Explain RoPE simply.<|assistant|>Rotary Positional Embedding rotates token vectors to encode position without adding fixed embeddings.<|stop|>
+<|user|>Can you run offline?<|assistant|>Yes! Everything happens locally. No data leaves your machine.<|stop|>
+<|user|>Thanks!<|assistant|>You're welcome! Ask me anything else.<|stop|></textarea>
+<div class="stats-grid">
+<div class="stat-box"><div class="value" id="sampleCount">5</div><div class="label">Examples</div></div>
+<div class="stat-box"><div class="value" id="vocabSize">—</div><div class="label">Vocab Size</div></div>
+</div>
+<div class="tokenizer-status">
+<span class="status-dot" id="tokDot"></span>
+<span id="tokStatus">Building tokenizer...</span>
+</div>
+<div class="btn-row" style="margin-top: 0.75rem;">
+  <button class="btn" id="rebuildTokenBtn" style="background:#475569; padding: 0.5rem 1rem; font-size: 0.9rem;" disabled>
+    🔄 Rebuild Tokenizer
+  </button>
+</div>
+</div>
+
+<!-- Training Controls -->
+<div class="card">
+<h3>⚙️ Train Model</h3>
+<div class="input-group">
+<label for="epochs">Epochs</label>
+<input type="number" id="epochs" value="100" min="10" max="150" step="10">
+</div>
+<div class="input-group">
+<label for="learningRate">Learning Rate</label>
+<select id="learningRate">
+<option value="0.01">0.01 (Stable)</option>
+<option value="0.005" selected>0.005 (Balanced)</option>
+<option value="0.001">0.001 (Precise)</option>
+</select>
+</div>
+<div class="input-group">
+<label for="seqLength">Context Window</label>
+<select id="seqLength">
+<option value="8">8 tokens (Fast)</option>
+<option value="16">16 tokens (Balanced)</option>
+<option value="32">32 tokens (Deep)</option>
+<option value="64">64 tokens (Long)</option>
+<option value="128">128 tokens (Extended)</option>
+<option value="300" selected>300 tokens (⚠️ Auto-capped to longest segment)</option>
+</select>
+</div>
+<div class="checkbox-group">
+<input type="checkbox" id="enableRoPE" checked />
+<label for="enableRoPE">Enable RoPE</label>
+</div>
+<button class="btn" id="trainBtn" disabled>🔄 Building tokenizer...</button>
+<div id="trainStatus" class="status"></div>
+<div class="loss-chart" id="lossChart"></div>
+<div class="log-area" id="trainLog">Waiting for tokenizer...</div>
+</div>
+
+<!-- Architecture -->
+<div class="card">
+<h3>🏗️ Model Architecture</h3>
+<div class="arch-info">
+<strong>Input:</strong> Token IDs via chat-aware tokenizer<br>
+<strong>Special Tokens:</strong> <code>&lt;|user|&gt;</code>, <code>&lt;|assistant|&gt;</code>, <code>&lt;|system|&gt;</code>, <code>&lt;|stop|&gt;</code><br>
+<strong>Embedding:</strong> <code>Embedding(vocab+1, hidden_dim)</code> (+1 for &lt;unk&gt;)<br>
+<strong>RoPE:</strong> <span id="ropeStatus">Enabled</span><br>
+<strong>SwiGLU Blocks ×2:</strong> Residual gated MLP<br>
+<strong>Output Head:</strong> <code>Dense(vocab+1)</code> + softmax<br>
+<strong>Generation:</strong> Autoregressive loop with temperature sampling<br>
+<strong>Optimizer:</strong> Adam | <strong>Max Seq:</strong> <span id="archSeq">300</span><br>
+<strong style="color:var(--success);">Training Mode:</strong> Segment-Aware (`<|stop|>` boundaries)
+</div>
+</div>
+
+<!-- Chat Interface -->
+<div class="card">
+<h3>💬 Raw Prompt Input</h3>
+<div class="chat-area">
+<div class="chat-input-container">
+<select id="tagSelector">
+<option value="">+ Insert Tag</option>
+<option value="<|user|>"><|user|></option>
+<option value="<|assistant|>"><|assistant|></option>
+<option value="<|system|>"><|system|></option>
+<option value="<|stop|>"><|stop|></option>
+</select>
+<textarea id="chatInput" placeholder="Type your prompt here... (Press Ctrl+Enter to generate)" rows="3" disabled></textarea>
+<button class="btn" id="generateBtn" disabled>🤖 Generate</button>
+</div>
+
+<div class="prediction-panel" id="predictionPanel">
+    <div class="prediction-header">
+        <span>🔮 Next Token Predictions</span>
+        <span style="font-size:0.75rem;color:var(--text-dim)" id="predictionCount">Top 5</span>
+    </div>
+    <div class="prediction-list" id="predictionList"></div>
+</div>
+
+<p style="color:var(--text-dim);font-size:0.8rem;margin-bottom:0.75rem">Predictions appear automatically after Generate. Click any token to insert it.</p>
+<div class="chat-output" id="chatOutput">
+<div class="role">🤖 Raw Output</div>
+<div class="text" id="responseText">Train the model first, then start prompting!</div>
+</div>
+<div class="input-group" style="margin-top: 1rem;">
+<label>📜 Model Generation Output (Decoded Tokens)</label>
+<textarea id="rawOutput" readonly placeholder="AI output will appear here..."></textarea>
+</div>
+<div class="btn-row">
+<button class="btn" style="background:#475569" onclick="clearChat()">🧹 Clear</button>
+<button class="btn" style="background:var(--success)" onclick="exportModel()" id="exportBtn" disabled>💾 Export</button>
+</div>
+</div>
+<div id="chatStatus" class="status"></div>
+</div>
+
+<!-- Generation Controls -->
+<div class="card">
+<h3>🎛️ Generation Settings</h3>
+<div class="input-group">
+<label for="temperature">Temperature</label>
+<input type="number" id="temperature" value="0.8" min="0.1" max="2.0" step="0.1">
+</div>
+<div class="input-group">
+<label for="maxGenTokens">Max New Tokens</label>
+<input type="number" id="maxGenTokens" value="25" min="5" max="50" step="5">
+</div>
+<div class="input-group">
+    <label for="topK">Top-K Predictions</label>
+    <select id="topK">
+        <option value="3">Top 3</option>
+        <option value="5" selected>Top 5</option>
+        <option value="10">Top 10</option>
+        <option value="20">Top 20</option>
+    </select>
+</div>
+<p style="color:var(--text-dim);font-size:0.85rem;margin-top:0.5rem">Lower temp = deterministic. Higher temp = creative.</p>
+<div class="btn-row" style="margin-top: 0.5rem;">
+  <button class="btn" style="background:#334155;font-size:0.85rem;padding:0.5rem 1rem;" onclick="showBackendDetails()">
+    ℹ️ Backend Details
+  </button>
+</div>
+</div>
+</div>
+
+<footer>
+<p>Built with ❤️ using <a href="https://www.tensorflow.org/js" target="_blank">TensorFlow.js</a></p>
+</footer>
+</div>
+
+<script src ="tensorindex_worker.js">
+</script>
+</body>
+</html>

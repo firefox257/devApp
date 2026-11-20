@@ -3,1089 +3,592 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>🧠 Chat-Ready Browser LLM (SwiGLU + RoPE + Special Tokens)</title>
-<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.17.0/dist/tf.min.js"></script>
+<title>TENSOR LAB — Copy-Rule Trainer · Schema Provenance · Belief Probe</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="nn.js"></script>
 <style>
-:root {
-	--primary: #6366f1; --primary-hover: #4f46e5; --bg: #0f172a;
-	--card: #1e293b; --text: #f1f5f9; --text-dim: #94a3b8;
-	--success: #22c55e; --warning: #f59e0b; --error: #ef4444;
-	--code-bg: #020617; --border: #334155;
+:root{
+--sub:#0a0618; --sub2:#0e0a22; --surf:#150e2e; --surf2:#1b1240; --over:#241852;
+--line:#332170; --line2:#4a2f9c;
+--vio:#7c5cff; --cyan:#22d3ee; --lime:#a3e635; --mag:#ff3df0; --amber:#fbbf24; --red:#ff3b5c;
+--bone:#f6f1e9; --slate:#9b8fc4; --slate2:#6f639c;
+--r:14px; --nav:60px; --pad:18px;
+--mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+--disp:'Space Grotesk','Segoe UI',system-ui,-apple-system,sans-serif;
 }
-* { box-sizing: border-box; margin: 0; padding: 0; }
-body {
-	font-family: 'Segoe UI', system-ui, sans-serif;
-	background: var(--bg); color: var(--text); line-height: 1.6;
-	padding: 20px; min-height: 100vh;
-}
-.container { max-width: 1100px; margin: 0 auto; }
-header { text-align: center; padding: 2rem 1rem; border-bottom: 1px solid #334155; margin-bottom: 2rem; }
-h1 { font-size: 1.8rem; margin-bottom: 0.5rem;
-	background: linear-gradient(135deg, #6366f1, #a855f7);
-	-webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-.subtitle { color: var(--text-dim); font-size: 0.95rem; }
-
-.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
-.card { background: var(--card); border-radius: 12px; padding: 1.5rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.3); border: 1px solid var(--border); }
-.card h3 { margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 0.5rem; color: var(--primary); }
-
-textarea, input, select {
-	width: 100%; padding: 0.75rem; border: 1px solid var(--border);
-	border-radius: 8px; background: var(--code-bg); color: var(--text);
-	font-size: 0.95rem; font-family: 'Consolas', monospace; resize: vertical;
-}
-textarea:focus, input:focus, select:focus {
-	outline: none; border-color: var(--primary);
-	box-shadow: 0 0 0 3px rgba(99,102,241,0.3);
-}
-textarea[readonly] {
-	cursor: default; opacity: 0.85; background: #0b1120; color: #cbd5e1;
-	font-size: 0.85rem; min-height: 60px; letter-spacing: 0.02em;
-}
-#rawOutput { min-height: 180px; }
-textarea { min-height: 120px; }
-/* Override for chat input */
-#chatInput { min-height: 60px !important; max-height: 150px; }
-
-.input-group { margin-bottom: 1rem; }
-label { display: block; margin-bottom: 0.4rem; font-size: 0.9rem; color: var(--text-dim); }
-.checkbox-group { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem; }
-.checkbox-group input[type="checkbox"] { width: auto; margin: 0; cursor: pointer; }
-.checkbox-group label { margin: 0; cursor: pointer; color: var(--text); font-size: 0.9rem; }
-
-.btn {
-	background: var(--primary); color: white; border: none;
-	padding: 0.75rem 1.5rem; border-radius: 8px; font-size: 1rem;
-	font-weight: 600; cursor: pointer; transition: all 0.2s;
-	display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
-}
-.btn:hover { background: var(--primary-hover); transform: translateY(-1px); }
-.btn:disabled { background: #475569; cursor: not-allowed; transform: none; opacity: 0.7; }
-.btn-row { display: flex; gap: 0.75rem; margin-top: 1rem; }
-.btn-row .btn { flex: 1; }
-
-.status { margin-top: 1rem; padding: 0.75rem; border-radius: 8px; font-size: 0.9rem; display: none; }
-.status.show { display: block; }
-.status.training { background: rgba(245,158,11,0.2); color: var(--warning); }
-.status.success { background: rgba(34,197,94,0.2); color: var(--success); }
-.status.error { background: rgba(239,68,68,0.2); color: var(--error); }
-
-.log-area {
-	background: var(--code-bg); border-radius: 8px; padding: 1rem;
-	font-family: monospace; font-size: 0.85rem; max-height: 180px;
-	overflow-y: auto; border: 1px solid var(--border); white-space: pre-wrap;
-}
-
-.loss-chart { height: 120px; background: var(--code-bg); border-radius: 8px; margin-top: 1rem; position: relative; overflow: hidden; border: 1px solid var(--border); }
-.loss-bar { position: absolute; bottom: 0; width: 3px; background: linear-gradient(to top, var(--primary), #a855f7); border-radius: 2px 2px 0 0; transition: height 0.1s; }
-
-.chat-area { margin-top: 1rem; }
-.chat-input-container { display: flex; gap: 0.5rem; margin-bottom: 0.5rem; align-items: flex-start; }
-.chat-input-container select { width: auto; min-width: 130px; flex-shrink: 0; }
-.chat-input-container textarea { flex: 1; }
-.chat-input-container .btn { width: auto; min-width: 120px; flex-shrink: 0; padding: 0.75rem; }
-
-.chat-output {
-	background: linear-gradient(135deg, var(--card), #334155);
-	border-radius: 12px; padding: 1.25rem; text-align: left;
-	border: 2px solid transparent; transition: border-color 0.3s;
-	min-height: 80px;
-}
-.chat-output.ready { border-color: var(--success); }
-.chat-output .role { font-weight: bold; color: var(--primary); margin-bottom: 0.25rem; }
-.chat-output .text { font-size: 1.1rem; color: var(--text); line-height: 1.5; }
-.chat-output .text span { color: var(--success); font-weight: 500; }
-
-.stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.75rem; margin-top: 1rem; }
-.stat-box { background: var(--code-bg); padding: 0.75rem; border-radius: 8px; text-align: center; }
-.stat-box .value { font-size: 1.4rem; font-weight: bold; color: var(--primary); }
-.stat-box .label { font-size: 0.8rem; color: var(--text-dim); }
-
-.tokenizer-status { display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: var(--text-dim); margin-top: 0.5rem; }
-.status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--warning); }
-.status-dot.success { background: var(--success); }
-.status-dot.error { background: var(--error); }
-
-.arch-info { font-size: 0.9rem; color: var(--text-dim); line-height: 1.8; }
-.arch-info code { background: var(--code-bg); padding: 2px 6px; border-radius: 4px; color: #a5b4fc; font-family: monospace; }
-
-/* ========== Prediction Panel ========== */
-.prediction-panel {
-    margin-top: 1rem;
-    background: var(--code-bg);
-    border-radius: 8px;
-    border: 2px solid var(--primary);
-    overflow: hidden;
-    display: none !important;
-    animation: slideDown 0.3s ease-out;
-}
-.prediction-panel.show { display: block !important; }
-@keyframes slideDown { 
-    from { opacity: 0; transform: translateY(-10px); max-height: 0; } 
-    to { opacity: 1; transform: translateY(0); max-height: 300px; } 
-}
-.prediction-header {
-    padding: 0.6rem 0.85rem;
-    background: rgba(99,102,241,0.2);
-    border-bottom: 1px solid var(--border);
-    font-size: 0.9rem;
-    font-weight: 600;
-    color: var(--primary);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-.prediction-list {
-    max-height: 180px;
-    overflow-y: auto;
-    font-family: 'Consolas', monospace;
-    font-size: 0.85rem;
-}
-.prediction-item {
-    padding: 0.5rem 0.85rem;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    border-bottom: 1px solid rgba(51,65,85,0.5);
-    cursor: pointer;
-    transition: background 0.15s;
-}
-.prediction-item:hover { background: rgba(99,102,241,0.15); }
-.prediction-item:last-child { border-bottom: none; }
-.prediction-token {
-    color: var(--text);
-    font-weight: 500;
-    white-space: pre-wrap;
-    word-break: break-all;
-    max-width: 70%;
-}
-.prediction-prob {
-    color: var(--success);
-    font-size: 0.85rem;
-    min-width: 55px;
-    text-align: right;
-    font-weight: 600;
-}
-.prediction-bar {
-    height: 6px;
-    background: linear-gradient(90deg, var(--primary), transparent);
-    border-radius: 3px;
-    margin-left: 0.75rem;
-    flex: 1;
-    max-width: 90px;
-}
-
-@keyframes spin { 
-  from { transform: rotate(0deg); } 
-  to { transform: rotate(360deg); } 
-}
-
-footer { text-align: center; padding: 2rem; color: var(--text-dim); font-size: 0.9rem; border-top: 1px solid var(--border); margin-top: 2rem; }
-footer a { color: var(--primary); text-decoration: none; }
-footer a:hover { text-decoration: underline; }
-
-@media (max-width: 768px) {
-	.grid { grid-template-columns: 1fr; }
-	.chat-input-container { flex-direction: column; }
-	.chat-input-container select, .chat-input-container textarea, .chat-input-container .btn { width: 100%; min-width: 0; }
-	.stats-grid { grid-template-columns: 1fr 1fr; }
-}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:calc(var(--nav) + 18px)}
+body{background:var(--sub);color:var(--bone);font-family:var(--disp);line-height:1.55;
+-webkit-font-smoothing:antialiased;overflow-x:hidden;font-size:15px}
+body.compact{--pad:12px;font-size:14px}
+body.blocked{--nav:112px}
+.bg{position:fixed;inset:0;z-index:-3;pointer-events:none;
+background:
+radial-gradient(60vw 50vh at 12% -6%, rgba(124,92,255,.42), transparent 62%),
+radial-gradient(52vw 46vh at 92% 8%, rgba(34,211,238,.26), transparent 60%),
+radial-gradient(46vw 44vh at 74% 92%, rgba(255,61,240,.22), transparent 62%),
+radial-gradient(40vw 40vh at 22% 84%, rgba(163,230,53,.14), transparent 64%),
+linear-gradient(180deg,var(--sub),var(--sub2) 55%,#070412)}
+.bg::after{content:"";position:absolute;inset:-20%;
+background:conic-gradient(from 0deg at 50% 50%, rgba(124,92,255,.10),rgba(34,211,238,.08),rgba(255,61,240,.10),rgba(163,230,53,.06),rgba(124,92,255,.10));
+animation:spin 64s linear infinite;filter:blur(60px);opacity:.55}
+@keyframes spin{to{transform:rotate(360deg)}}
+.grain{position:fixed;inset:0;z-index:-2;pointer-events:none;opacity:.05;mix-blend-mode:overlay;
+background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E")}
+.scan{position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:.16;
+background:repeating-linear-gradient(0deg,rgba(124,92,255,.14) 0 1px,transparent 1px 4px)}
+body.reduce .bg::after,body.reduce .scan{animation:none}
+body.reduce *{transition:none!important;animation:none!important}
+*{scrollbar-width:thin;scrollbar-color:var(--line2) var(--sub2)}
+::-webkit-scrollbar{width:11px;height:11px}
+::-webkit-scrollbar-track{background:linear-gradient(180deg,var(--sub2),#0b0720);border-left:1px solid var(--line)}
+::-webkit-scrollbar-thumb{background:linear-gradient(180deg,var(--vio),var(--mag));border:2px solid var(--sub2);border-radius:8px}
+::-webkit-scrollbar-thumb:hover{background:linear-gradient(180deg,var(--cyan),var(--vio))}
+::-webkit-scrollbar-corner{background:var(--sub2)}
+nav{position:fixed;top:0;left:0;right:0;height:60px;z-index:70;display:flex;align-items:center;gap:14px;
+padding:0 16px;background:rgba(10,6,24,.86);backdrop-filter:blur(16px) saturate(150%);border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:9px;font-weight:700;letter-spacing:.14em;font-size:13px;white-space:nowrap}
+.die{width:22px;height:22px;border-radius:5px;flex:none;position:relative;
+background:linear-gradient(135deg,var(--vio),var(--mag) 55%,var(--cyan));box-shadow:0 0 16px rgba(124,92,255,.7)}
+.die::after{content:"";position:absolute;inset:5px;border:1.5px solid rgba(10,6,24,.85);border-radius:2px}
+.navlinks{display:flex;gap:2px;margin-left:6px;overflow-x:auto;scrollbar-width:none}
+.navlinks::-webkit-scrollbar{display:none}
+.navlinks a{color:var(--slate);text-decoration:none;font-size:12px;font-weight:600;letter-spacing:.08em;
+padding:7px 11px;border-radius:9px;white-space:nowrap;border:1px solid transparent;transition:.18s}
+.navlinks a:hover{color:var(--bone);background:var(--surf2);border-color:var(--line)}
+.navlinks a.on{color:var(--sub);background:linear-gradient(135deg,var(--cyan),var(--lime));border-color:transparent}
+.navsp{flex:1}
+.pill{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;padding:5px 9px;border-radius:999px;
+border:1px solid var(--line2);background:var(--surf);color:var(--slate);white-space:nowrap}
+.pill b{color:var(--cyan)}
+.pill.gpu{border-color:rgba(34,211,238,.5);box-shadow:0 0 12px rgba(34,211,238,.18) inset}
+.pill.cpu{border-color:rgba(251,191,36,.45)}
+.iconbtn{width:34px;height:34px;flex:none;border-radius:10px;border:1px solid var(--line2);background:var(--surf);
+color:var(--bone);cursor:pointer;font-size:15px;display:grid;place-items:center;transition:.18s}
+.iconbtn:hover{border-color:var(--cyan);color:var(--cyan);transform:translateY(-1px)}
+.iconbtn.off{color:var(--slate2);border-color:var(--line)}
+#mismatchBar{position:fixed;top:60px;left:0;right:0;z-index:65;display:none;
+background:linear-gradient(100deg,rgba(255,59,92,.94),rgba(255,61,240,.88));
+border-bottom:1px solid rgba(255,255,255,.22);padding:9px 16px;color:#fff}
+#mismatchBar.show{display:block}
+.mmrow{display:flex;align-items:center;gap:12px;flex-wrap:wrap;max-width:1420px;margin:0 auto}
+.mmrow .mt{font-weight:700;font-size:13px;display:flex;align-items:center;gap:8px}
+.mmrow .ms{font-family:var(--mono);font-size:11.5px;opacity:.95}
+.mmrow .sp{flex:1}
+#mismatchDetails{max-width:1420px;margin:8px auto 0;display:none;font-family:var(--mono);font-size:11.5px;
+background:rgba(10,6,24,.55);border:1px solid rgba(255,255,255,.2);border-radius:10px;padding:9px 11px;
+max-height:132px;overflow:auto;line-height:1.85}
+#mismatchDetails.show{display:block}
+.mmbtn{background:rgba(10,6,24,.6);border:1px solid rgba(255,255,255,.35);color:#fff;border-radius:9px;
+padding:6px 11px;font-size:12px;font-weight:600;cursor:pointer;font-family:var(--disp);white-space:nowrap}
+.mmbtn:hover{background:rgba(10,6,24,.85)}
+.btn{font-family:var(--disp);font-weight:600;font-size:13.5px;padding:10px 15px;border-radius:11px;
+border:1px solid var(--line2);cursor:pointer;background:var(--surf2);color:var(--bone);
+display:inline-flex;align-items:center;gap:7px;justify-content:center;white-space:nowrap;
+transition:transform .16s,box-shadow .16s,background .16s,border-color .16s}
+.btn:hover:not(:disabled){transform:translateY(-1px);border-color:var(--vio)}
+.btn:disabled{opacity:.42;cursor:not-allowed}
+.btn.pri{background:linear-gradient(135deg,var(--vio),var(--mag));border-color:transparent;color:#fff;box-shadow:0 6px 22px -8px rgba(255,61,240,.75)}
+.btn.go{background:linear-gradient(135deg,var(--cyan),var(--lime));border-color:transparent;color:#06121a;box-shadow:0 6px 22px -8px rgba(34,211,238,.7)}
+.btn.bad{background:linear-gradient(135deg,var(--red),#b91c4a);border-color:transparent;color:#fff}
+.btn.sm{padding:7px 11px;font-size:12px;border-radius:9px}
+.btn.gh{background:transparent}
+.btn.armed{background:linear-gradient(135deg,var(--amber),var(--red));border-color:transparent;color:#231402}
+.row{display:flex;gap:9px;flex-wrap:wrap}
+.row.eq>*{flex:1 1 0;min-width:120px}
+main{max-width:1420px;margin:0 auto;padding:calc(var(--nav) + 26px) 18px 90px}
+section{margin-bottom:34px;scroll-margin-top:calc(var(--nav) + 18px)}
+.sechead{display:flex;align-items:flex-end;gap:12px;margin-bottom:14px;flex-wrap:wrap}
+.sechead h2{font-size:20px;font-weight:700;display:flex;align-items:center;gap:9px}
+.sechead .num{font-family:var(--mono);font-size:11px;color:var(--mag);border:1px solid var(--line2);padding:2px 7px;border-radius:6px;background:var(--surf)}
+.sechead p{color:var(--slate);font-size:12.5px;max-width:64ch}
+.grid{display:grid;gap:16px}
+.g2{grid-template-columns:repeat(auto-fit,minmax(340px,1fr))}
+.g3{grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+.card{position:relative;background:linear-gradient(165deg,var(--surf),var(--surf2));border:1px solid var(--line);
+border-radius:var(--r);padding:var(--pad);box-shadow:0 20px 46px -30px #000, inset 0 1px 0 rgba(255,255,255,.04)}
+.card::before,.card::after{content:"";position:absolute;width:9px;height:9px;border:1.5px solid var(--line2);opacity:.85}
+.card::before{top:7px;left:7px;border-right:0;border-bottom:0;border-radius:3px 0 0 0}
+.card::after{bottom:7px;right:7px;border-left:0;border-top:0;border-radius:0 0 3px 0}
+.card h3{font-size:13px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--cyan);
+margin-bottom:12px;padding-bottom:9px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px}
+.card h3 .tag{margin-left:auto;font-family:var(--mono);font-size:10px;letter-spacing:.04em;color:var(--slate);text-transform:none}
+.hint{color:var(--slate);font-size:12px;margin-bottom:11px}
+code{font-family:var(--mono);font-size:.92em;background:#0c0722;border:1px solid var(--line);padding:1px 5px;border-radius:5px;color:#c9b8ff}
+.hero{display:grid;grid-template-columns:1.15fr .85fr;gap:16px}
+.heroline{font-size:clamp(26px,4.2vw,44px);font-weight:700;line-height:1.08;letter-spacing:-.025em;margin-bottom:10px}
+.heroline em{font-style:normal;background:linear-gradient(100deg,var(--cyan),var(--lime) 42%,var(--mag));
+-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.kicker{font-family:var(--mono);font-size:11px;letter-spacing:.24em;color:var(--mag);margin-bottom:12px}
+.metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:9px;margin-top:14px}
+.metric{background:#0c0722;border:1px solid var(--line);border-radius:11px;padding:10px 11px}
+.metric .v{font-family:var(--mono);font-size:19px;font-weight:700;line-height:1.2}
+.metric .k{font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--slate2);margin-top:3px}
+.metric.c1 .v{color:var(--cyan)}.metric.c2 .v{color:var(--lime)}.metric.c3 .v{color:var(--mag)}
+.metric.c4 .v{color:var(--amber)}.metric.c5 .v{color:var(--vio)}
+.ringwrap{display:flex;align-items:center;gap:16px}
+.ring{width:112px;height:112px;flex:none;position:relative}
+.ring svg{transform:rotate(-90deg)}
+.ring .lab{position:absolute;inset:0;display:grid;place-items:center;font-family:var(--mono);font-weight:700;font-size:20px}
+.statline{font-family:var(--mono);font-size:12px;color:var(--slate);min-height:38px}
+.statline b{color:var(--bone)}
+.badge{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10.5px;padding:3px 8px;
+border-radius:999px;border:1px solid var(--line2);background:var(--surf)}
+.badge.ok{color:var(--lime);border-color:rgba(163,230,53,.45);background:rgba(163,230,53,.09)}
+.badge.bad{color:var(--red);border-color:rgba(255,59,92,.45);background:rgba(255,59,92,.09)}
+.badge.warn{color:var(--amber);border-color:rgba(251,191,36,.45);background:rgba(251,191,36,.09)}
+.badge.info{color:var(--cyan);border-color:rgba(34,211,238,.45);background:rgba(34,211,238,.09)}
+.ctrl{margin-bottom:13px}
+.ctrl>label{display:flex;align-items:center;gap:8px;font-size:11.5px;letter-spacing:.07em;text-transform:uppercase;
+color:var(--slate);margin-bottom:6px;font-weight:600}
+.ctrl>label .val{margin-left:auto;font-family:var(--mono);font-size:12px;color:var(--cyan);background:#0c0722;
+border:1px solid var(--line);padding:1px 7px;border-radius:6px;text-transform:none;letter-spacing:0}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:22px;background:transparent;cursor:pointer}
+input[type=range]::-webkit-slider-runnable-track{height:6px;border-radius:99px;
+background:linear-gradient(90deg,var(--vio),var(--mag) 55%,var(--cyan));border:1px solid var(--line)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:17px;height:17px;margin-top:-6.5px;border-radius:50%;
+background:var(--bone);border:2px solid var(--vio);box-shadow:0 0 10px rgba(124,92,255,.85);transition:.15s}
+input[type=range]::-webkit-slider-thumb:hover{border-color:var(--cyan);box-shadow:0 0 14px rgba(34,211,238,.95);transform:scale(1.12)}
+input[type=range]::-moz-range-track{height:6px;border-radius:99px;background:linear-gradient(90deg,var(--vio),var(--mag),var(--cyan));border:1px solid var(--line)}
+input[type=range]::-moz-range-thumb{width:15px;height:15px;border-radius:50%;background:var(--bone);border:2px solid var(--vio)}
+select,input[type=number],input[type=text],textarea{width:100%;font-family:var(--mono);font-size:13px;background:#0c0722;
+color:var(--bone);border:1px solid var(--line);border-radius:10px;padding:9px 11px;transition:.16s}
+select:focus,input:focus,textarea:focus{outline:none;border-color:var(--cyan);box-shadow:0 0 0 3px rgba(34,211,238,.16)}
+select{cursor:pointer;appearance:none;
+background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='11' height='7'%3E%3Cpath d='M1 1l4.5 4.5L10 1' stroke='%2322d3ee' stroke-width='1.7' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+background-repeat:no-repeat;background-position:right 11px center;padding-right:30px}
+textarea{resize:vertical;line-height:1.6;min-height:120px}
+textarea[readonly]{background:#08051a;color:#ded6f5}
+.tog{display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none;padding:6px 0}
+.tog input{position:absolute;opacity:0;pointer-events:none}
+.tog .sw{width:40px;height:22px;border-radius:99px;background:#0c0722;border:1px solid var(--line2);position:relative;flex:none;transition:.2s}
+.tog .sw::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:var(--slate2);transition:.2s}
+.tog input:checked+.sw{background:linear-gradient(90deg,var(--cyan),var(--lime));border-color:transparent}
+.tog input:checked+.sw::after{left:20px;background:#06121a}
+.tog span.t{font-size:12.5px}
+.tog small{display:block;color:var(--slate2);font-size:10.5px}
+.stepper{display:flex;align-items:center;gap:7px}
+.stepper button{width:32px;height:32px;flex:none;border-radius:9px;border:1px solid var(--line2);background:var(--surf2);
+color:var(--cyan);font-size:16px;cursor:pointer;font-family:var(--mono);transition:.15s}
+.stepper button:hover{border-color:var(--cyan);background:var(--over)}
+.stepper .sv{flex:1;text-align:center;font-family:var(--mono);font-size:14px;font-weight:700;background:#0c0722;
+border:1px solid var(--line);border-radius:9px;padding:6px}
+.ctrgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px 16px}
+@media(max-width:560px){.ctrgrid{grid-template-columns:1fr}}
+.tbl{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12px}
+.tbl th{text-align:left;font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--slate2);padding:7px 9px;
+border-bottom:1px solid var(--line2);position:sticky;top:0;background:var(--surf);z-index:2}
+.tbl td{padding:7px 9px;border-bottom:1px solid rgba(51,33,112,.5);vertical-align:middle}
+.tbl tr:hover td{background:rgba(124,92,255,.07)}
+.scroll{max-height:290px;overflow:auto;border:1px solid var(--line);border-radius:11px;background:#0a0620}
+.chip{display:inline-block;padding:1px 7px;border-radius:6px;font-size:11px;border:1px solid var(--line2);background:var(--surf2)}
+.chip.c{color:var(--cyan);border-color:rgba(34,211,238,.4)}
+.chip.t{color:var(--mag);border-color:rgba(255,61,240,.4)}
+.chip.n{color:var(--lime);border-color:rgba(163,230,53,.4)}
+.chip.bad{color:var(--red);border-color:rgba(255,59,92,.45);background:rgba(255,59,92,.1)}
+.verdict{display:flex;align-items:center;gap:12px;padding:13px 15px;border-radius:12px;border:1px solid var(--line2);background:#0c0722;margin-bottom:12px}
+.verdict.ok{border-color:rgba(163,230,53,.55);background:linear-gradient(100deg,rgba(163,230,53,.13),rgba(34,211,238,.07))}
+.verdict.bad{border-color:rgba(255,59,92,.55);background:linear-gradient(100deg,rgba(255,59,92,.13),rgba(255,61,240,.07))}
+.verdict.idle{opacity:.75}
+.verdict .big{font-size:26px;line-height:1}
+.verdict .txt{font-weight:700;font-size:15px}
+.verdict .sub{font-size:11.5px;color:var(--slate);font-family:var(--mono)}
+.slots{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:9px;margin-bottom:12px}
+.slot{border:1px solid var(--line);border-radius:11px;padding:10px;background:#0c0722;position:relative;overflow:hidden}
+.slot .sk{font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--slate2)}
+.slot .sv{font-family:var(--mono);font-size:13px;margin-top:4px;word-break:break-word}
+.slot .ex{font-family:var(--mono);font-size:11px;color:var(--slate);margin-top:3px;word-break:break-word}
+.slot.pass{border-color:rgba(163,230,53,.5)}.slot.pass::after{content:"✓";position:absolute;top:7px;right:9px;color:var(--lime);font-weight:700}
+.slot.fail{border-color:rgba(255,59,92,.5)}.slot.fail::after{content:"✗";position:absolute;top:7px;right:9px;color:var(--red);font-weight:700}
+.slot.pass .sv{color:var(--lime)}.slot.fail .sv{color:var(--red)}
+.diff{font-family:var(--mono);font-size:13px;line-height:2;background:#08051a;border:1px solid var(--line);border-radius:11px;padding:12px;word-break:break-word}
+.diff .eq{color:#cdc4ea}
+.diff .del{color:var(--red);text-decoration:line-through;background:rgba(255,59,92,.13);border-radius:4px;padding:1px 3px}
+.diff .ins{color:var(--lime);background:rgba(163,230,53,.15);border-radius:4px;padding:1px 3px;font-weight:700}
+.diag{list-style:none;display:flex;flex-direction:column;gap:6px;margin-top:11px}
+.diag li{font-size:12.5px;font-family:var(--mono);padding:8px 11px;border-radius:9px;border-left:3px solid var(--amber);background:rgba(251,191,36,.08);color:#ffe9b8}
+.diag li.good{border-left-color:var(--lime);background:rgba(163,230,53,.08);color:#e6ffbf}
+.diag li.err{border-left-color:var(--red);background:rgba(255,59,92,.08);color:#ffd3dc}
+.kv{font-family:var(--mono);font-size:12px;display:grid;grid-template-columns:auto 1fr;gap:5px 12px}
+.kv dt{color:var(--slate2)}.kv dd{color:var(--bone);word-break:break-word}
+.chartbox{position:relative;height:210px;background:#08051a;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.chartbox canvas{display:block;width:100%;height:100%}
+.chartempty{position:absolute;inset:0;display:grid;place-items:center;color:var(--slate2);font-family:var(--mono);font-size:12px;text-align:center;padding:16px}
+.legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:9px;font-family:var(--mono);font-size:10.5px;color:var(--slate)}
+.legend i{display:inline-block;width:16px;height:3px;border-radius:2px;margin-right:5px;vertical-align:middle}
+.strip{display:flex;gap:2px;height:44px;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#08051a}
+.strip .cell{flex:1;position:relative;min-width:0}
+.strip .cell:hover{outline:1px solid var(--bone);z-index:2}
+.spark{height:56px;background:#08051a;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.spark canvas{display:block;width:100%;height:100%}
+.bars{display:flex;flex-direction:column;gap:8px}
+.bar{display:grid;grid-template-columns:104px 1fr 52px;align-items:center;gap:9px;font-family:var(--mono);font-size:11.5px}
+.bar .tr{height:9px;border-radius:99px;background:#0c0722;border:1px solid var(--line);overflow:hidden}
+.bar .fi{height:100%;border-radius:99px;transition:width .45s cubic-bezier(.2,.8,.2,1)}
+.bar .pc{text-align:right;font-weight:700}
+.prog{height:7px;border-radius:99px;background:#0c0722;border:1px solid var(--line);overflow:hidden;margin:10px 0}
+.prog i{display:block;height:100%;background:linear-gradient(90deg,var(--cyan),var(--lime));width:0;transition:width .25s}
+.log{font-family:var(--mono);font-size:11.5px;line-height:1.75;background:#08051a;border:1px solid var(--line);border-radius:11px;
+padding:11px;max-height:190px;overflow:auto;white-space:pre-wrap;color:#c9c0e8}
+.log .t{color:var(--slate2)}.log .e{color:var(--red)}.log .w{color:var(--amber)}.log .s{color:var(--lime)}.log .i{color:var(--cyan)}
+#toastHost{position:fixed;right:16px;bottom:16px;z-index:90;display:flex;flex-direction:column;gap:9px;max-width:min(94vw,380px)}
+.toast{background:rgba(21,14,46,.97);border:1px solid var(--line2);border-left:3px solid var(--cyan);border-radius:11px;
+padding:11px 13px;font-size:12.5px;box-shadow:0 18px 40px -18px #000;display:flex;align-items:center;gap:10px;animation:tin .28s cubic-bezier(.2,.9,.2,1)}
+.toast.ok{border-left-color:var(--lime)}.toast.bad{border-left-color:var(--red)}.toast.warn{border-left-color:var(--amber)}
+.toast button{margin-left:auto;background:transparent;border:1px solid var(--line2);color:var(--cyan);border-radius:8px;
+padding:4px 9px;font-size:11px;cursor:pointer;font-family:var(--mono)}
+@keyframes tin{from{opacity:0;transform:translateX(24px)}to{opacity:1;transform:none}}
+footer{border-top:1px solid var(--line);padding:22px 18px;text-align:center;color:var(--slate2);font-size:11.5px;font-family:var(--mono)}
+.reveal{opacity:0;transform:translateY(18px)}
+.reveal.in{opacity:1;transform:none;transition:opacity .6s ease,transform .6s cubic-bezier(.2,.8,.2,1)}
+body.reduce .reveal{opacity:1;transform:none}
+@media(max-width:900px){.hero{grid-template-columns:1fr}.navlinks{display:none}}
+@media(max-width:620px){main{padding-left:12px;padding-right:12px}.ringwrap{flex-direction:column;align-items:flex-start}}
 </style>
 </head>
 <body>
-<div class="container">
-<header>
-<h1>🧠 Chat-Ready Browser LLM <span style="font-size:0.7em;vertical-align:super;color:var(--warning)">SwiGLU + RoPE</span></h1>
-<p class="subtitle">Train a conversational model in-browser • Segment-aware training • Autoregressive generation</p>
-</header>
-
-<div class="grid">
-<!-- Training Data -->
-<div class="card">
-<h3>📚 Chat Training Data</h3>
-<p style="color:var(--text-dim);margin-bottom:1rem;font-size:0.9rem">Use `<|user|>`, `<|assistant|>`, `<|system|>`, and `<|stop|>` tokens. Each `<|stop|>` isolates a training segment.</p>
-<textarea id="sampleText" placeholder="Enter chat examples..."><|user|>Hello, how are you?<|assistant|>I'm running smoothly in your browser! How can I help?<|stop|>
-<|user|>What is SwiGLU?<|assistant|>A gated activation that splits the feedforward layer into gate and value paths, then multiplies them.<|stop|>
-<|system|>Be concise.<|user|>Explain RoPE simply.<|assistant|>Rotary Positional Embedding rotates token vectors to encode position without adding fixed embeddings.<|stop|>
-<|user|>Can you run offline?<|assistant|>Yes! Everything happens locally. No data leaves your machine.<|stop|>
-<|user|>Thanks!<|assistant|>You're welcome! Ask me anything else.<|stop|></textarea>
-<div class="stats-grid">
-<div class="stat-box"><div class="value" id="sampleCount">5</div><div class="label">Examples</div></div>
-<div class="stat-box"><div class="value" id="vocabSize">—</div><div class="label">Vocab Size</div></div>
+<div class="bg"></div><div class="grain"></div><div class="scan"></div>
+<nav>
+<div class="brand"><span class="die"></span>TENSOR&nbsp;LAB</div>
+<div class="navlinks">
+<a href="#console" data-sec="console" class="on">CONSOLE</a>
+<a href="#corpus" data-sec="corpus">CORPUS</a>
+<a href="#train" data-sec="train">TRAIN</a>
+<a href="#inspect" data-sec="inspect">INSPECT</a>
+<a href="#beliefs" data-sec="beliefs">BELIEFS</a>
+<a href="#suite" data-sec="suite">GENERALIZE</a>
+<a href="#engine" data-sec="engine">ENGINE</a>
 </div>
-<div class="tokenizer-status">
-<span class="status-dot" id="tokDot"></span>
-<span id="tokStatus">Building tokenizer...</span>
+<div class="navsp"></div>
+<span class="pill" id="pillWorker">TRAIN <b>…</b></span>
+<span class="pill" id="pillRun">RUN <b>…</b></span>
+<button class="iconbtn" id="muteBtn" title="Sound: on — click to mute">🔊</button>
+<button class="btn pri sm" id="navTrain">▶ Train</button>
+<button class="btn bad sm" id="navCancel" disabled>■ Stop</button>
+</nav>
+<div id="mismatchBar">
+<div class="mmrow">
+<span class="mt">⛔ MODEL / CORPUS MISMATCH</span>
+<span class="ms" id="mismatchText">—</span>
+<span class="sp"></span>
+<button class="mmbtn" id="btnShowDiff">Show differences</button>
+<button class="mmbtn" id="btnRetrainNow">▶ Retrain on this corpus</button>
 </div>
-<div class="btn-row" style="margin-top: 0.75rem;">
-  <button class="btn" id="rebuildTokenBtn" style="background:#475569; padding: 0.5rem 1rem; font-size: 0.9rem;" disabled>
-    🔄 Rebuild Tokenizer
-  </button>
+<div id="mismatchDetails"></div>
 </div>
+<main>
+<section id="console">
+<div class="hero">
+<div class="card reveal">
+<div class="kicker">SCHEMA-BOUND · WEBGPU PARITY-GATED · SPAN-MASKED LOSS</div>
+<h1 class="heroline">Train a copy rule.<br><em>Know exactly what it learned.</em></h1>
+<p class="hint" style="max-width:58ch">Seeded with your 40-entity corpus. The live model is fingerprinted to the corpus it trained on, so a model trained on other data can never be graded against this schema. Probe the model to read back what it believes each entity is.</p>
+<div class="metrics">
+<div class="metric c1"><div class="v" id="statEpoch">0</div><div class="k">Epoch</div></div>
+<div class="metric c2"><div class="v" id="statLoss">—</div><div class="k">Loss</div></div>
+<div class="metric c3"><div class="v" id="statBest">—</div><div class="k">Best</div></div>
+<div class="metric c4"><div class="v" id="statVocab">—</div><div class="k">Vocab</div></div>
+<div class="metric c5"><div class="v" id="statSeq">—</div><div class="k">Context</div></div>
+<div class="metric"><div class="v" id="statParams">—</div><div class="k">Params</div></div>
 </div>
-
-<!-- Training Controls -->
-<div class="card">
-<h3>⚙️ Train Model</h3>
-<div class="input-group">
-<label for="epochs">Epochs</label>
-<input type="number" id="epochs" value="40" min="10" max="150" step="10">
-</div>
-<div class="input-group">
-<label for="learningRate">Learning Rate</label>
-<select id="learningRate">
-<option value="0.01">0.01 (Stable)</option>
-<option value="0.005" selected>0.005 (Balanced)</option>
-<option value="0.001">0.001 (Precise)</option>
-</select>
-</div>
-<div class="input-group">
-<label for="seqLength">Context Window</label>
-<select id="seqLength">
-<option value="8">8 tokens (Fast)</option>
-<option value="16">16 tokens (Balanced)</option>
-<option value="32">32 tokens (Deep)</option>
-<option value="64">64 tokens (Long)</option>
-<option value="128">128 tokens (Extended)</option>
-<option value="300" selected>300 tokens (⚠️ GPU Recommended)</option>
-</select>
-</div>
-<div class="checkbox-group">
-<input type="checkbox" id="enableRoPE" checked />
-<label for="enableRoPE">Enable RoPE</label>
-</div>
-<button class="btn" id="trainBtn" disabled>🔄 Building tokenizer...</button>
-<div id="trainStatus" class="status"></div>
-<div class="loss-chart" id="lossChart"></div>
-<div class="log-area" id="trainLog">Waiting for tokenizer...</div>
-<!-- Backend Status Display (injected by JS) -->
-</div>
-
-<!-- Architecture -->
-<div class="card">
-<h3>🏗️ Model Architecture</h3>
-<div class="arch-info">
-<strong>Input:</strong> Token IDs via chat-aware tokenizer<br>
-<strong>Special Tokens:</strong> <code>&lt;|user|&gt;</code>, <code>&lt;|assistant|&gt;</code>, <code>&lt;|system|&gt;</code>, <code>&lt;|stop|&gt;</code><br>
-<strong>Embedding:</strong> <code>Embedding(vocab+1, hidden_dim)</code> (+1 for &lt;unk&gt;)<br>
-<strong>RoPE:</strong> <span id="ropeStatus">Enabled</span><br>
-<strong>SwiGLU Blocks ×2:</strong> Residual gated MLP<br>
-<strong>Output Head:</strong> <code>Dense(vocab+1)</code> + softmax<br>
-<strong>Generation:</strong> Autoregressive loop with temperature sampling<br>
-<strong>Optimizer:</strong> Adam | <strong>Max Seq:</strong> <span id="archSeq">300</span><br>
-<strong style="color:var(--success);">Training Mode:</strong> Segment-Aware (`<|stop|>` boundaries)
+<div class="row" style="margin-top:14px">
+<button class="btn go" id="btnQuickInspect">🔬 Inspect ball1 + door2</button>
+<button class="btn gh sm" id="btnQuickProbe">🧠 Probe beliefs</button>
 </div>
 </div>
-
-<!-- Chat Interface -->
-<div class="card">
-<h3>💬 Raw Prompt Input</h3>
-<div class="chat-area">
-<div class="chat-input-container">
-<select id="tagSelector">
-<option value="">+ Insert Tag</option>
-<option value="<|user|>"><|user|></option>
-<option value="<|assistant|>"><|assistant|></option>
-<option value="<|system|>"><|system|></option>
-<option value="<|stop|>"><|stop|></option>
-</select>
-<textarea id="chatInput" placeholder="Type your prompt here... (Press Ctrl+Enter to generate)" rows="3" disabled></textarea>
-<button class="btn" id="generateBtn" disabled>🤖 Generate</button>
+<div class="card reveal">
+<h3>◈ Run state <span class="tag" id="heroTag">idle</span></h3>
+<div class="ringwrap">
+<div class="ring">
+<svg width="112" height="112" viewBox="0 0 112 112">
+<circle cx="56" cy="56" r="48" fill="none" stroke="#241852" stroke-width="9"/>
+<circle id="progressRing" cx="56" cy="56" r="48" fill="none" stroke="url(#rg)" stroke-width="9"
+stroke-linecap="round" stroke-dasharray="301.6" stroke-dashoffset="301.6"/>
+<defs><linearGradient id="rg" x1="0" y1="0" x2="1" y2="1">
+<stop offset="0" stop-color="#22d3ee"/><stop offset="0.55" stop-color="#a3e635"/><stop offset="1" stop-color="#ff3df0"/>
+</linearGradient></defs>
+</svg>
+<div class="lab" id="progressPct">0%</div>
 </div>
-
-<div class="prediction-panel" id="predictionPanel">
-    <div class="prediction-header">
-        <span>🔮 Next Token Predictions</span>
-        <span style="font-size:0.75rem;color:var(--text-dim)" id="predictionCount">Top 5</span>
-    </div>
-    <div class="prediction-list" id="predictionList"></div>
-</div>
-
-<p style="color:var(--text-dim);font-size:0.8rem;margin-bottom:0.75rem">Predictions appear automatically after Generate. Click any token to insert it.</p>
-<div class="chat-output" id="chatOutput">
-<div class="role">🤖 Raw Output</div>
-<div class="text" id="responseText">Train the model first, then start prompting!</div>
-</div>
-<div class="input-group" style="margin-top: 1rem;">
-<label>📜 Model Generation Output (Decoded Tokens)</label>
-<textarea id="rawOutput" readonly placeholder="AI output will appear here..."></textarea>
-</div>
-<div class="btn-row">
-<button class="btn" style="background:#475569" onclick="clearChat()">🧹 Clear</button>
-<button class="btn" style="background:var(--success)" onclick="exportModel()" id="exportBtn" disabled>💾 Export</button>
-</div>
-</div>
-<div id="chatStatus" class="status"></div>
-</div>
-
-<!-- Generation Controls -->
-<div class="card">
-<h3>🎛️ Generation Settings</h3>
-<div class="input-group">
-<label for="temperature">Temperature</label>
-<input type="number" id="temperature" value="0.8" min="0.1" max="2.0" step="0.1">
-</div>
-<div class="input-group">
-<label for="maxGenTokens">Max New Tokens</label>
-<input type="number" id="maxGenTokens" value="25" min="5" max="50" step="5">
-</div>
-<div class="input-group">
-    <label for="topK">Top-K Predictions</label>
-    <select id="topK">
-        <option value="3">Top 3</option>
-        <option value="5" selected>Top 5</option>
-        <option value="10">Top 10</option>
-        <option value="20">Top 20</option>
-    </select>
-</div>
-<p style="color:var(--text-dim);font-size:0.85rem;margin-top:0.5rem">Lower temp = deterministic. Higher temp = creative.</p>
-<!-- Backend Details Button -->
-<div class="btn-row" style="margin-top: 0.5rem;">
-  <button class="btn" style="background:#334155;font-size:0.85rem;padding:0.5rem 1rem;" onclick="showBackendDetails()">
-    ℹ️ Backend Details
-  </button>
+<div style="flex:1;min-width:0">
+<div class="statline" id="heroStatus">Engine probing…</div>
+<div class="row" style="gap:6px;margin-top:8px">
+<span class="badge info" id="badgeBackend">backend …</span>
+<span class="badge" id="badgeModel">no model</span>
+<span class="badge" id="badgeSplit">split …</span>
 </div>
 </div>
 </div>
-
-<footer>
-<p>Built with ❤️ using <a href="https://www.tensorflow.org/js" target="_blank">TensorFlow.js</a></p>
-</footer>
+<div class="prog"><i id="heroProg"></i></div>
+<div style="display:flex;justify-content:space-between;align-items:center;margin:8px 0 6px">
+  <span style="font-size:11px;color:var(--slate);font-family:var(--mono)">Run log</span>
+  <button class="btn gh sm" id="btnCopyLog">⧉ Copy</button>
 </div>
-
-<script>
-// ========== CONFIG ==========
-const HIDDEN_DIM = 64;
-const NUM_LAYERS = 2;
-const SPECIAL_TOKENS = ['<|system|>', '<|user|>', '<|assistant|>', '<|stop|>'];
-// 🔄 WORKER: Add worker configuration
-const WORKER_BACKEND = 'webgl'; // Match your preferred backend for training
-// ============================
-
-let customTokenizer = null, model = null, vocab = null, idToToken = [];
-let isTraining = false, lossHistory = [], useRoPE = true, stopTokenId = null;
-const ropeCache = {};
-
-// 🔄 WORKER: Add worker references
-let trainingWorker = null;
-let workerBackendReady = false;
-let trainingCancelled = false;
-
-const els = {};
-
-document.addEventListener('DOMContentLoaded', async () => {
-	Object.assign(els, {
-		sampleText: document.getElementById('sampleText'), epochs: document.getElementById('epochs'),
-		lr: document.getElementById('learningRate'), seqLen: document.getElementById('seqLength'),
-		enableRoPE: document.getElementById('enableRoPE'), trainBtn: document.getElementById('trainBtn'),
-		trainStatus: document.getElementById('trainStatus'), trainLog: document.getElementById('trainLog'),
-		lossChart: document.getElementById('lossChart'), chatInput: document.getElementById('chatInput'),
-		generateBtn: document.getElementById('generateBtn'), chatOutput: document.getElementById('chatOutput'),
-		responseText: document.getElementById('responseText'), rawOutput: document.getElementById('rawOutput'),
-		chatStatus: document.getElementById('chatStatus'), temp: document.getElementById('temperature'),
-		maxGen: document.getElementById('maxGenTokens'), tokDot: document.getElementById('tokDot'),
-		tokStatus: document.getElementById('tokStatus'), sampleCount: document.getElementById('sampleCount'),
-		vocabSize: document.getElementById('vocabSize'), archSeq: document.getElementById('archSeq'),
-		exportBtn: document.getElementById('exportBtn'), ropeStatus: document.getElementById('ropeStatus'),
-		tagSelector: document.getElementById('tagSelector'),
-		predictionPanel: document.getElementById('predictionPanel'),
-		predictionList: document.getElementById('predictionList'),
-		predictionCount: document.getElementById('predictionCount'),
-		topK: document.getElementById('topK'),
-		rebuildTokenBtn: document.getElementById('rebuildTokenBtn')
-	});
-	
-	els.archSeq.textContent = parseInt(els.seqLen.value);
-	
-	// 🔄 WORKER: Initialize training worker instead of direct TF backend init
-	await initTrainingWorker();
-	await initTokenizer();
-	
-	// Events
-	els.trainBtn.addEventListener('click', trainModel);
-	els.generateBtn.addEventListener('click', generateResponse);
-	els.chatInput.addEventListener('keydown', e => { 
-    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && !els.generateBtn.disabled) { 
-      e.preventDefault(); 
-      generateResponse(); 
-    } 
-  });
-	els.enableRoPE.addEventListener('change', () => { 
-    useRoPE = els.enableRoPE.checked; 
-    els.ropeStatus.textContent = useRoPE ? 'Enabled' : 'Disabled'; 
-  });
-	els.seqLen.addEventListener('change', () => { 
-    const v = parseInt(els.seqLen.value); 
-    els.archSeq.textContent = v; 
-    showStatus(els.trainStatus, v >= 128 ? `⚠️ ${v} tokens: Training will take longer.` : '', 'warning'); 
-  });
-	els.tagSelector.addEventListener('change', () => { 
-    if (els.tagSelector.value) { 
-      els.chatInput.value += els.tagSelector.value; 
-      els.chatInput.focus(); 
-      els.tagSelector.value = ''; 
-    } 
-  });
-	els.topK?.addEventListener('change', () => { 
-    els.predictionCount.textContent = `Top ${els.topK.value}`; 
-  });
-	els.rebuildTokenBtn?.addEventListener('click', manualRebuildTokenizer);
-	
-	// Auto-rebuild tokenizer on text input (debounced)
-	els.sampleText?.addEventListener('input', () => { 
-	  els.rebuildTokenBtn.disabled = false;
-	  clearTimeout(window.vt); 
-	  window.vt = setTimeout(async () => {
-	    if (!isTraining) {
-	      els.tokStatus.textContent = 'Auto-updating...';
-	      await buildVocabulary();
-	      els.tokStatus.textContent = `✓ Ready • ${vocab.length}`;
-	      els.vocabSize.textContent = vocab.length;
-	      
-	      if (model) {
-	        log('⚠️ Vocabulary changed — model needs retraining', 'warn');
-	        els.generateBtn.disabled = true;
-	        els.exportBtn.disabled = true;
-	      }
-	      log('🔤 Tokenizer auto-updated');
-	    }
-	  }, 400); 
-	});
-	
-	els.sampleCount.textContent = els.sampleText.value.split('<|stop|>').filter(l=>l.trim()).length;
-	
-	// 🔄 WORKER: Display initial worker status
-	updateBackendDisplay('worker', { name: WORKER_BACKEND, status: 'initializing' });
-});
-
-// 🔄 WORKER: Initialize training worker
-async function initTrainingWorker() {
-  if (typeof Worker === 'undefined') {
-    log('❌ Web Workers not supported — falling back to main thread', 'error');
-    showStatus(els.trainStatus, '⚠️ Workers unsupported — UI may lag during training', 'warning');
-    return;
-  }
-  
-  try {
-    trainingWorker = new Worker('training-worker.js');
-    
-    trainingWorker.onmessage = (e) => handleWorkerMessage(e.data);
-    trainingWorker.onerror = (e) => {
-      log(`❌ Worker error: ${e.message}`, 'error');
-      showStatus(els.trainStatus, `Worker error: ${e.message}`, 'error');
-      isTraining = false;
-      els.trainBtn.disabled = false;
-    };
-    
-    // Initialize backend in worker
-    trainingWorker.postMessage({
-      type: 'INIT_BACKEND',
-      payload: { backend: WORKER_BACKEND }
-    });
-    
-    log('🔧 Training worker initialized');
-  } catch (err) {
-    log(`❌ Failed to create worker: ${err.message}`, 'error');
-    showStatus(els.trainStatus, '⚠️ Worker init failed — using main thread fallback', 'warning');
-  }
-}
-
-// 🔄 WORKER: Handle messages from training worker
-function handleWorkerMessage(data) {
-  const { type, epoch, totalEpochs, loss, memory, weights, config, backend, message, stack } = data;
-  
-  switch (type) {
-    case 'BACKEND_READY':
-      workerBackendReady = true;
-      log(`✅ Worker backend: ${backend.toUpperCase()}`);
-      updateBackendDisplay('worker', { name: backend, status: 'ready', memory });
-      // Enable train button now that worker is ready (if tokenizer is ready too)
-      if (vocab?.length && !isTraining) {
-        els.trainBtn.disabled = false;
-        els.trainBtn.innerHTML = '🚀 Train';
-      }
-      break;
-      
-    case 'PROGRESS':
-      lossHistory.push(loss);
-      updateLossChart();
-      const pct = Math.round((epoch + 1) / totalEpochs * 100);
-      showStatus(els.trainStatus, `${pct}% • Loss: ${loss.toFixed(4)}`, 'training');
-      log(`Epoch ${epoch + 1}/${totalEpochs} • Loss: ${loss.toFixed(4)}`);
-      
-      // Optional: log memory every 5 epochs
-      if (epoch % 5 === 0 && memory?.numBytes) {
-        const mb = (memory.numBytes / 1024 / 1024).toFixed(1);
-        log(`📊 Worker Mem: ${mb}MB • Tensors: ${memory.numTensors}`);
-      }
-      break;
-      
-    case 'TRAIN_COMPLETE':
-      // Skip if training was cancelled
-      if (trainingCancelled) {
-        trainingCancelled = false;
-        log('⏭️ Training result ignored (was cancelled)');
-        return;
-      }
-      
-      // Reconstruct model on main thread with received weights
-      reconstructModelFromWeights(weights, config);
-      
-      showStatus(els.trainStatus, '✅ Training complete!', 'success');
-      log('🎉 Model ready for generation!');
-      
-      els.generateBtn.disabled = false;
-      els.exportBtn.disabled = false;
-      isTraining = false;
-      els.trainBtn.disabled = false;
-      els.trainBtn.innerHTML = '🔄 Retrain';
-      break;
-      
-    case 'ERROR':
-      log(`❌ Worker error: ${message}`, 'error');
-      if (stack) console.error('[Worker Stack]', stack);
-      showStatus(els.trainStatus, `❌ ${message}`, 'error');
-      isTraining = false;
-      els.trainBtn.disabled = false;
-      break;
-      
-    case 'TRAIN_CANCELLED':
-      log('⏹️ Training cancelled');
-      showStatus(els.trainStatus, 'Training cancelled', 'warning');
-      isTraining = false;
-      els.trainBtn.disabled = false;
-      break;
-  }
-}
-
-// 🔄 WORKER: Reconstruct model on main thread from worker weights
-async function reconstructModelFromWeights(weightData, config) {
-  // Create fresh model architecture on main thread
-  model = createModel(config.vocabSize, 0.001, config.useRoPE, config.seqLen);
-  
-  // Load weights from worker data
-  const weights = [];
-  for (const wd of weightData) {
-    const tensor = tf.tensor(wd.data, wd.shape, wd.dtype);
-    weights.push(tensor);
-  }
-  
-  await model.setWeights(weights);
-  
-  // Cleanup temporary tensors
-  weights.forEach(w => w.dispose());
-  
-  log(`✓ Model reconstructed: ${config.vocabSize + 1} vocab, ${config.seqLen} seqLen`);
-}
-
-// ========== Logging & UI Helpers ==========
-function log(msg, type = 'info') {
-	const time = new Date().toLocaleTimeString();
-	const prefix = {error:'❌', success:'✅', warn:'⚠️'}[type] || 'ℹ️';
-	els.trainLog.innerHTML += `[${time}] ${prefix} ${msg}\n`;
-	els.trainLog.scrollTop = els.trainLog.scrollHeight;
-}
-
-function showStatus(el, msg, type) { 
-  if (!el) return; 
-  el.textContent = msg; 
-  el.className = `status show ${type}`; 
-}
-
-// ========== Tokenizer Functions ==========
-function buildChatTokenizer(corpus, specialTokens = []) {
-	const tokenRegex = /[a-zA-Z0-9]+|[^a-zA-Z0-9\s]/g;
-	const baseTokens = corpus.match(tokenRegex) || [];
-	const specialSet = new Set(specialTokens);
-	const uniqueBase = [...new Set(baseTokens)].filter(t => !specialSet.has(t));
-	uniqueBase.sort((a, b) => { 
-    for(let i=0; i<Math.max(a.length, b.length); i++) { 
-      const ca = i<a.length?a.charCodeAt(i):-1, cb = i<b.length?b.charCodeAt(i):-1; 
-      if(ca!==cb) return ca-cb; 
-    } 
-    return 0; 
-  });
-	const vocabulary = [...specialTokens, ...uniqueBase];
-	const decoder = {}; vocabulary.forEach((t, i) => decoder[t] = i + 1);
-	const encode = text => {
-		const ids = []; const escaped = specialTokens.map(t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
-		const parts = text.split(new RegExp(`(${escaped.join('|')})`, 'g')).filter(p => p.trim());
-		for (const p of parts) { 
-      if(specialSet.has(p)) ids.push(decoder[p]); 
-      else ids.push(...(p.match(tokenRegex)||[]).map(t=>decoder[t]||0)); 
-    }
-		return ids;
-	};
-	return { vocabulary, decoder, encode, decode: ids => ids.map(id => id===0?'':(vocabulary[id-1]||'')).join(''), specialTokens };
-}
-
-function restoreSpacing(decodedText, vocabulary, specialTokens) {
-	if (!decodedText) return '';
-	const escaped = specialTokens.map(t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
-	const segments = decodedText.split(new RegExp(`(${escaped.join('|')})`, 'g'));
-	const valid = new Set(vocabulary);
-	return segments.map(seg => {
-		if (specialTokens.includes(seg)) return seg;
-		let words = [], i = 0;
-		while (i < seg.length) { 
-      let m = null; 
-      for (let l = Math.min(30, seg.length - i); l > 0; l--) { 
-        if (valid.has(seg.slice(i, i+l))) { 
-          m = seg.slice(i, i+l); 
-          break; 
-        } 
-      } 
-      if (m) { words.push(m); i += m.length; } 
-      else { words.push(seg[i++]); } 
-    }
-		return words.join(' ').replace(/\s+([,.!?:;'"')\]])/g, '$1').trim();
-	}).join('').trim();
-}
-
-async function buildVocabulary() {
-	customTokenizer = buildChatTokenizer(els.sampleText.value, SPECIAL_TOKENS);
-	vocab = customTokenizer.vocabulary;
-	idToToken = ['<unk>', ...vocab.map(t => t.replace(/\n/g,'\\n'))];
-	stopTokenId = customTokenizer.decoder['<|stop|>'];
-	els.vocabSize.textContent = vocab.length; 
-  els.sampleCount.textContent = els.sampleText.value.split('<|stop|>').filter(l=>l.trim()).length;
-  log(`✓ Vocab: ${vocab.length} | Stop ID: ${stopTokenId}`);
-}
-
-async function initTokenizer() {
-	els.tokStatus.textContent = 'Building...'; els.tokDot.className = 'status-dot';
-	try { 
-    await buildVocabulary(); 
-    if(vocab.length===0) throw new Error('Empty'); 
-    els.tokDot.className = 'status-dot success'; 
-    els.tokStatus.textContent = `✓ Ready • ${vocab.length}`; 
-    
-    // 🔄 WORKER: Only enable train button when worker is also ready
-    if (workerBackendReady) {
-      els.trainBtn.disabled = false; 
-      els.trainBtn.innerHTML = '🚀 Train'; 
-    }
-    
-    els.chatInput.disabled = false; 
-    els.generateBtn.disabled = false;
-    els.rebuildTokenBtn.disabled = false;
-    log('🔤 Tokenizer ready'); 
-  } 
-	catch(e) { els.tokDot.className = 'status-dot error'; els.tokStatus.textContent = `Error: ${e.message.slice(0,20)}`; log(e.message, 'error'); }
-}
-
-function setTokenBtnState(enabled, loading = false) {
-  els.rebuildTokenBtn.disabled = !enabled || loading;
-  els.rebuildTokenBtn.innerHTML = loading 
-    ? '<span style="display:inline-block; animation: spin 1s linear infinite">🌀</span> Building...' 
-    : '🔄 Rebuild Tokenizer';
-}
-
-async function manualRebuildTokenizer() {
-  if (!els.sampleText.value.trim()) {
-    showStatus(els.trainStatus, '⚠️ Enter training data first', 'warning');
-    return;
-  }
-  setTokenBtnState(false, true);
-  els.tokStatus.textContent = 'Rebuilding...';
-  els.tokDot.className = 'status-dot';
-  try {
-    await buildVocabulary();
-    if (vocab.length === 0) throw new Error('Empty vocabulary');
-    els.tokDot.className = 'status-dot success';
-    els.tokStatus.textContent = `✓ Ready • ${vocab.length} tokens`;
-    els.vocabSize.textContent = vocab.length;
-    if (model) {
-      log('⚠️ Vocabulary changed — model needs retraining', 'warn');
-      els.generateBtn.disabled = true;
-      els.exportBtn.disabled = true;
-      showStatus(els.chatStatus, '🔁 Model needs retraining after vocab change', 'warning');
-    }
-    if (!isTraining && workerBackendReady) {
-      els.trainBtn.disabled = false;
-      els.trainBtn.innerHTML = '🚀 Train';
-    }
-    log('🔤 Tokenizer rebuilt manually');
-    showStatus(els.trainStatus, '✓ Tokenizer updated', 'success');
-  } catch (e) {
-    els.tokDot.className = 'status-dot error';
-    els.tokStatus.textContent = `Error: ${e.message.slice(0, 25)}`;
-    log(`❌ Rebuild failed: ${e.message}`, 'error');
-    showStatus(els.trainStatus, `❌ ${e.message}`, 'error');
-  } finally { setTokenBtnState(true, false); }
-}
-
-// ========== RoPE Implementation ==========
-function computeRoPEConstants(seqLen, hiddenDim, base=10000) {
-	const key = `${seqLen}_${hiddenDim}`; if(ropeCache[key]) return ropeCache[key];
-	const half = Math.floor(hiddenDim/2), freqs = Array.from({length:half}, (_,i)=>1/Math.pow(base, 2*i/hiddenDim));
-	const s=[], c=[]; for(let p=0;p<seqLen;p++){const sr=[],cr=[];for(let i=0;i<half;i++){sr.push(Math.sin(p*freqs[i]));cr.push(Math.cos(p*freqs[i]));}s.push(sr);c.push(cr);}
-	return ropeCache[key]={sinTable:s, cosTable:c, halfDim:half};
-}
-
-class RoPELayer extends tf.layers.Layer {
-	constructor(cfg){super(cfg);this.seqLen=cfg.seqLen;this.hiddenDim=cfg.hiddenDim;const{sinTable,cosTable,halfDim}=computeRoPEConstants(this.seqLen,this.hiddenDim);this.sinTable=sinTable;this.cosTable=cosTable;this.halfDim=halfDim;}
-	static className='RoPELayer'; computeOutputShape(s){return s;}
-	call(inputs){return tf.tidy(()=>{const x=inputs[0],s=tf.reshape(tf.tensor2d(this.sinTable,[this.seqLen,this.halfDim]),[1,this.seqLen,this.halfDim]),c=tf.reshape(tf.tensor2d(this.cosTable,[this.seqLen,this.halfDim]),[1,this.seqLen,this.halfDim]);const x1=tf.slice(x,[0,0,0],[-1,-1,this.halfDim]),x2=tf.slice(x,[0,0,this.halfDim],[-1,-1,this.halfDim]);return tf.concat([tf.sub(tf.mul(x1,c),tf.mul(x2,s)),tf.add(tf.mul(x1,s),tf.mul(x2,c))],-1);});}
-}
-tf.serialization.registerClass(RoPELayer);
-
-// ========== Segment-Aware Training Data Preparation ==========
-function prepareSegmentTrainingData() {
-  const raw = els.sampleText.value.trim();
-  const seqLen = parseInt(els.seqLen.value);
-  
-  // Split by <|stop|> to isolate conversation turns
-  const segments = raw.split('<|stop|>').map(s => s.trim()).filter(s => s.length > 0);
-  const seqs = [];
-  
-  for (const segment of segments) {
-    // Re-append <|stop|> so the model learns to predict the boundary
-    const ids = customTokenizer.encode(segment + '<|stop|>');
-    if (ids.length < 2) continue;
-    
-    // Create causal sliding window WITHIN this segment only
-    for (let i = 0; i < ids.length - 1; i++) {
-      const start = Math.max(0, i - seqLen + 1);
-      let inp = ids.slice(start, i + 1);
-      
-      // Left-pad to seqLen with zeros (<unk>)
-      if (inp.length < seqLen) {
-        inp = [...Array(seqLen - inp.length).fill(0), ...inp];
-      }
-      
-      seqs.push({ input: inp, target: ids[i + 1] });
-    }
-  }
-  
-  log(`📦 ${seqs.length} segment-aware sequences generated`);
-  return seqs;
-}
-
-// ========== Model Creation (Main Thread - for Inference) ==========
-function createModel(vsz, lr, rope=true, seqLen=300) {
-	const inp = tf.input({shape:[seqLen], dtype:'int32'});
-	let x = tf.layers.embedding({inputDim:vsz+1,outputDim:HIDDEN_DIM,inputLength:seqLen}).apply(inp);
-	
-	// Normalize embeddings before positional encoding
-	x = tf.layers.layerNormalization().apply(x);
-	
-	if(rope) x = new RoPELayer({seqLen:seqLen,hiddenDim:HIDDEN_DIM}).apply(x);
-	
-	for(let i=0;i<NUM_LAYERS;i++){
-		const r = x; // Store residual
-		const g = tf.layers.dense({units:HIDDEN_DIM}).apply(x);
-		const v = tf.layers.dense({units:HIDDEN_DIM}).apply(x);
-		x = tf.layers.multiply().apply([tf.layers.activation({activation:'swish'}).apply(g), v]);
-		x = tf.layers.add().apply([x, r]); // Add residual
-		
-		// Layer Norm after each SwiGLU block (Post-LN)
-		x = tf.layers.layerNormalization().apply(x);
-	}
-	
-	x = tf.layers.globalAveragePooling1d().apply(x);
-	const out = tf.layers.dense({units:vsz+1, activation:'softmax'}).apply(x);
-	const m = tf.model({inputs:inp, outputs:out}); 
-	m.compile({optimizer:tf.train.adam(lr), loss:'categoricalCrossentropy'}); 
-	return m;
-}
-
-// 🔄 WORKER: Updated trainModel() to use worker
-async function trainModel() {
-	if(isTraining || !vocab?.length) return;
-  
-  // 🔄 WORKER: Check if worker is ready
-  if (!trainingWorker || !workerBackendReady) {
-    showStatus(els.trainStatus, '⚠️ Worker not ready — please wait', 'warning');
-    log('⚠️ Training attempted before worker initialization');
-    return;
-  }
-  
-  // Reset cancellation flag
-  trainingCancelled = false;
-  
-	isTraining = true; 
-	els.trainBtn.disabled = true; 
-	els.generateBtn.disabled = true; 
-	lossHistory = []; 
-	els.trainLog.innerHTML = ''; 
-	showStatus(els.trainStatus, 'Preparing data...', 'training');
-	
-	try {
-    // 🔄 WORKER: Prepare data ON MAIN THREAD (tokenizer access)
-		const sequences = prepareSegmentTrainingData();
-    const seqLen = parseInt(els.seqLen.value);
-    
-		if(sequences.length === 0) throw new Error('No valid sequences. Check training data format.');
-		
-    log(`📦 Sending ${sequences.length} sequences to worker (seqLen: ${seqLen})`);
-    showStatus(els.trainStatus, 'Sending to worker...', 'training');
-    
-    // 🔄 WORKER: Calculate batch size based on sequence length
-    const batchSize = seqLen >= 128 ? Math.max(1, Math.floor(16 / (seqLen / 32))) : 8;
-    
-    // 🔄 WORKER: Send training job to worker
-    trainingWorker.postMessage({
-      type: 'TRAIN',
-      payload: {
-        vocabSize: vocab.length,
-        sequences: sequences, // Already encoded on main thread
-        config: {
-          lr: parseFloat(els.lr.value),
-          useRoPE: els.enableRoPE.checked,
-          seqLen: seqLen,
-          epochs: parseInt(els.epochs.value),
-          batchSize: batchSize
-        },
-        backend: WORKER_BACKEND
-      }
-    });
-    
-    log('🚀 Training started in worker thread');
-    
-	} catch(e){
-		showStatus(els.trainStatus, `❌ ${e.message}`, 'error');
-		log(e.message, 'error');
-    isTraining = false;
-    els.trainBtn.disabled = false;
-    els.generateBtn.disabled = false;
-	}
-}
-
-// ========== Generation Functions ==========
-function sampleFromProbs(p, t=1.0) { 
-  if(t===0) { 
-    let mx=0; 
-    for(let i=1;i<p.length;i++) if(p[i]>p[mx]) mx=i; 
-    return mx; 
-  } 
-  const sc=p.map(v=>Math.log(v+1e-10)/t), mx=Math.max(...sc), ex=sc.map(v=>Math.exp(v-mx)), sm=ex.reduce((a,b)=>a+b,0), nm=ex.map(v=>v/sm), r=Math.random(); 
-  let c=0; 
-  for(let i=0;i<nm.length;i++){c+=nm[i];if(r<=c)return i;} 
-  return nm.length-1; 
-}
-
-async function generateResponse() {
-	if(!model||!customTokenizer){showStatus(els.chatStatus,'⚠️ Train first!','error');return;}
-	const raw = els.chatInput.value.trim(); if(!raw){showStatus(els.chatStatus,'⚠️ Type a prompt!','error');return;}
-	showStatus(els.chatStatus,'Generating...','training'); els.chatOutput.classList.add('ready'); els.responseText.innerHTML='<span style="color:var(--text-dim)">Processing...</span>'; els.rawOutput.value='';
-	const seqLen = parseInt(els.seqLen.value), maxT = parseInt(els.maxGen.value), temp = parseFloat(els.temp.value);
-	let ctx = customTokenizer.encode(raw), gen = [], stopped = false;
-	try {
-		for(let i=0;i<maxT;i++){let inp=ctx.slice(-seqLen); if(inp.length<seqLen)inp=[...Array(seqLen-inp.length).fill(0),...inp];
-		const t=tf.tensor2d([inp],[1,seqLen],'int32'), p=model.predict(t), probs=await p.data(); t.dispose(); p.dispose();
-		const n=sampleFromProbs(probs,temp); if(n===stopTokenId||n===0){stopped=true;break;} gen.push(n); ctx.push(n);}
-		els.rawOutput.value = restoreSpacing(customTokenizer.decode(stopped?[...gen,stopTokenId]:gen), vocab, SPECIAL_TOKENS);
-		els.responseText.innerHTML = `<span style="color:var(--primary)">Input:</span> ${raw}<br><span style="color:var(--success)">Output:</span> ${restoreSpacing(customTokenizer.decode(gen),vocab,SPECIAL_TOKENS)||'Empty.'}`;
-		showStatus(els.chatStatus,'✓ Generated!','success');
-		await updatePredictions();
-	} catch(e){els.responseText.textContent=`Error: ${e.message}`; showStatus(els.chatStatus,`❌ ${e.message}`,'error'); console.error(e);}
-}
-
-async function getTopKPredictions(prompt, k) {
-	if(!model||!customTokenizer) return [];
-	const seqLen = parseInt(els.seqLen.value);
-	let inp = customTokenizer.encode(prompt).slice(-seqLen);
-	if(inp.length < seqLen) inp = [...Array(seqLen-inp.length).fill(0), ...inp];
-	const t = tf.tensor2d([inp], [1, seqLen], 'int32');
-	const p = model.predict(t);
-	const probs = Array.from(await p.data());
-	t.dispose(); p.dispose();
-
-	return probs.map((pr, i) => ({ 
-		token: idToToken[i] !== undefined ? idToToken[i] : (i === 0 ? '<unk>' : `[ID:${i}]`), 
-		prob: pr 
-	})).sort((a,b) => b.prob - a.prob)
-	  .slice(0, k)
-	  .map(item => ({ ...item, pct: (item.prob * 100).toFixed(2) }));
-}
-
-function renderPredictions(preds) {
-	const list = els.predictionList; list.innerHTML = '';
-	if(!preds || preds.length === 0) {
-		list.innerHTML = '<div style="padding:0.8rem;color:var(--text-dim);text-align:center">No predictions available</div>';
-		els.predictionPanel.classList.add('show');
-		els.predictionPanel.scrollIntoView({behavior:'smooth', block:'nearest'});
-		return;
-	}
-	const maxP = preds[0].prob || 0.001;
-	preds.forEach(p => {
-		if (!p || !p.token) return;
-		const el = document.createElement('div');
-		el.className = 'prediction-item';
-		const safeToken = String(p.token).replace(/\n/g,'↵').replace(/\s+/g,'·');
-		const barWidth = Math.min(100, (p.prob / maxP) * 100);
-		el.innerHTML = `<span class="prediction-token">${safeToken}</span><div style="display:flex;align-items:center;gap:0.6rem"><div class="prediction-bar" style="width:${barWidth}%"></div><span class="prediction-prob">${p.pct}%</span></div>`;
-		el.addEventListener('click', () => { els.chatInput.value += p.token; els.chatInput.focus(); });
-		list.appendChild(el);
-	});
-	els.predictionPanel.classList.add('show');
-	els.predictionPanel.scrollIntoView({behavior:'smooth', block:'nearest'});
-}
-
-async function updatePredictions() {
-	const prompt = els.chatInput.value.trim();
-	if(!prompt) { els.predictionPanel.classList.remove('show'); return; }
-	els.predictionCount.textContent = `Top ${els.topK.value}`;
-	try {
-		const preds = await getTopKPredictions(prompt, parseInt(els.topK.value));
-		renderPredictions(preds);
-	} catch(e) {
-		console.warn('Prediction error:', e);
-		els.predictionList.innerHTML = `<div style="padding:0.8rem;color:var(--error)">⚠️ Prediction failed: ${e.message?.slice(0,50) || 'Unknown error'}</div>`;
-		els.predictionPanel.classList.add('show');
-	}
-}
-
-function updateLossChart() {
-	const c=els.lossChart; c.innerHTML=''; if(!lossHistory.length)return;
-	const mx=Math.max(...lossHistory,0.001), bw=Math.max(2,Math.floor(c.clientWidth/Math.max(lossHistory.length,15)));
-	lossHistory.forEach((l,i)=>{const b=document.createElement('div');b.className='loss-bar';b.style.left=`${i*bw}px`;b.style.height=`${Math.min(100,l/mx*100)}%`;c.appendChild(b);});
-}
-
-function clearChat() { 
-  els.chatInput.value=''; 
-  els.responseText.innerHTML='<span style="color:var(--text-dim)">Cleared. Enter a raw prompt...</span>'; 
-  els.rawOutput.value=''; 
-  els.chatOutput.classList.remove('ready'); 
-  els.predictionPanel.classList.remove('show'); 
-  showStatus(els.chatStatus,'',''); 
-}
-
-async function exportModel() { 
-  if(!model)return; 
-  try{
-    showStatus(els.chatStatus,'Exporting...','training');
-    await model.save('downloads://chat-llm');
-    showStatus(els.chatStatus,'✅ Exported','success');
-  }catch(e){
-    showStatus(els.chatStatus,`❌ ${e.message}`,'error');
-  } 
-}
-
-// ========== Backend Display Functions ==========
-async function initTFBackend() {
-	// 🔄 WORKER: This function is now handled by the worker
-	// Kept for compatibility but not used
-	const backends = ['webgl', 'wasm', 'cpu'];
-	let selected = null;
-	
-	for (const b of backends) {
-		try {
-			await tf.setBackend(b);
-			await tf.ready();
-			selected = b;
-			log(`✅ Backend: ${b.toUpperCase()}`);
-			break;
-		} catch(e) {
-			log(`⚠️ ${b.toUpperCase()} unavailable: ${e.message?.slice(0,40) || 'init failed'}`, 'warn');
-		}
-	}
-	
-	if (selected) {
-		const info = await getBackendInfo(selected);
-		updateBackendDisplay(selected, info);
-	}
-}
-
-async function getBackendInfo(backend) {
-	const info = { name: backend, available: true };
-	
-	try {
-		if (backend === 'webgl') {
-			const conf = tf.ENV.get('WEBGL_VERSION');
-			const maxTex = tf.ENV.get('WEBGL_MAX_TEXTURE_SIZE');
-			info.webglVersion = conf;
-			info.maxTextureSize = maxTex;
-			info.memory = tf.memory();
-		} else if (backend === 'wasm') {
-			info.wasmPath = tf.ENV.get('WASM_PATH') || 'default';
-			info.simd = tf.ENV.get('WASM_HAS_SIMD') ?? 'unknown';
-		} else if (backend === 'webgpu') {
-			const adapter = await navigator.gpu?.requestAdapter();
-			info.gpuName = adapter?.name || 'Unknown GPU';
-		} else if (backend === 'cpu') {
-			info.memory = tf.memory();
-		}
-	} catch(e) {
-		info.error = e.message?.slice(0, 60);
-	}
-	
-	return info;
-}
-
-function updateBackendDisplay(backend, info) {
-	let statusEl = document.getElementById('backendStatus');
-	
-	if (!statusEl) {
-		const el = document.createElement('div');
-		el.id = 'backendStatus';
-		el.style.cssText = 'font-size:0.8rem;color:var(--text-dim);margin-top:0.5rem;padding:0.5rem;background:var(--code-bg);border-radius:6px;border:1px solid var(--border);';
-		if (els.trainLog?.parentNode) {
-			els.trainLog.parentNode.insertBefore(el, els.trainLog.nextSibling);
-		}
-		statusEl = el;
-	}
-	
-	const badge = {
-		webgl: '🎮',
-		wasm: '⚙️',
-		cpu: '🧠',
-		webgpu: '🚀',
-		worker: '🧵',
-		none: '❌'
-	}[backend] || '❓';
-	
-	let details = '';
-	if (info.webglVersion) details += ` • WebGL ${info.webglVersion}`;
-	if (info.maxTextureSize) details += ` • MaxTex: ${info.maxTextureSize}px`;
-	if (info.simd !== undefined) details += ` • SIMD: ${info.simd}`;
-	if (info.gpuName) details += ` • ${info.gpuName}`;
-	if (info.memory?.numBytes) {
-		const mb = (info.memory.numBytes / 1024 / 1024).toFixed(1);
-		details += ` • Mem: ${mb}MB`;
-	}
-	if (info.error) details += ` • ⚠️ ${info.error}`;
-	if (info.status) details += ` • ${info.status}`;
-	
-	statusEl.innerHTML = 
-		`<strong>${badge} Backend:</strong> <code style="color:var(--primary)">${backend.toUpperCase()}</code>${details}`;
-}
-
-async function showBackendDetails() {
-	const backend = tf.getBackend();
-	const available = tf.listBackends();
-	const mem = tf.memory();
-	
-	const details = [
-		`🔹 Active: ${backend.toUpperCase()}`,
-		`🔹 Available: ${available.join(', ')}`,
-		`🔹 Tensors: ${mem.numTensors}`,
-		`🔹 Memory: ${(mem.numBytes/1024/1024).toFixed(2)} MB`,
-		`🔹 Unreliable: ${mem.unreliable ? '⚠️ Yes' : '✅ No'}`,
-		`🔹 Worker: ${trainingWorker ? '✅ Active' : '❌ Inactive'}`,
-		`🔹 Worker Ready: ${workerBackendReady ? '✅ Yes' : '❌ No'}`
-	].join('\n');
-	
-	alert(`🧠 TensorFlow.js Backend Info\n\n${details}`);
-	log(`📋 Backend details: ${details.replace(/\n/g, ' | ')}`);
-}
-
-// 🔄 WORKER: Cleanup worker on page unload
-window.addEventListener('beforeunload', () => {
-  if (trainingWorker) {
-    trainingWorker.postMessage({ type: 'CANCEL' });
-    trainingWorker.terminate();
-    log('🔧 Training worker terminated');
-  }
-});
-
-// Expose functions to global scope for HTML onclick handlers
-window.clearChat = clearChat; 
-window.exportModel = exportModel; 
-window.showBackendDetails = showBackendDetails;
-
-log('🚀 Initializing with Web Worker support...');
-</script>
+<div class="log" id="runLog"></div>
+</div>
+</div>
+</section>
+<section id="corpus">
+<div class="sechead"><span class="num">01</span><h2>Corpus &amp; ground truth</h2>
+<p>This schema is the authority. Editing it immediately invalidates any model trained on a different one.</p></div>
+<div class="grid g2">
+<div class="card reveal">
+<h3>▤ Training segments <span class="tag" id="corpusStats">—</span></h3>
+<p class="hint">One segment per line. <code>&lt;|stop|&gt;</code> isolates segments; loss applies only to assistant spans.</p>
+<textarea id="corpus" spellcheck="false" style="min-height:230px"></textarea>
+<div class="ctrgrid" style="margin-top:13px">
+<div class="ctrl"><label>Pairs to generate <span class="val" id="genCountV">240</span></label>
+<input type="range" id="genCount" min="20" max="800" step="10" value="240"></div>
+<div class="ctrl"><label>Reserve as held-out <span class="val" id="genReserveV">40</span></label>
+<input type="range" id="genReserve" min="0" max="200" step="4" value="40"></div>
+</div>
+<label class="tog"><input type="checkbox" id="genBalance" checked><span class="sw"></span>
+<span class="t">Dense both-slot coverage<small>every entity pairs with many distinct partners in each position</small></span></label>
+<div class="row eq" style="margin-top:11px">
+<button class="btn" id="btnGenPairs">🎲 Generate dense pairs</button>
+<button class="btn gh" id="btnUndoCorpus" disabled>↶ Undo</button>
+<button class="btn gh" id="btnRestoreSeed">⟲ Your corpus</button>
+</div>
+</div>
+<div class="card reveal">
+<h3>◉ Entity schema <span class="tag" id="schemaCount">—</span></h3>
+<p class="hint">Colour and texture are graded separately — this is what exposes attribute bleed between slots.</p>
+<div class="scroll" style="max-height:262px">
+<table class="tbl"><thead><tr><th>Entity</th><th>Colour</th><th>Texture</th><th>Slot 1</th><th>Slot 2</th></tr></thead>
+<tbody id="schemaBody"></tbody></table>
+</div>
+<div class="row" style="margin-top:12px;gap:6px">
+<span class="badge ok" id="badgeSeen">seen —</span>
+<span class="badge warn" id="badgeHeld">held-out —</span>
+<span class="badge info" id="badgeCover">coverage —</span>
+</div>
+</div>
+</div>
+</section>
+<section id="train">
+<div class="sechead"><span class="num">02</span><h2>Training &amp; architecture</h2>
+<p>Every control applies to the next run and is stamped into the model's provenance fingerprint.</p></div>
+<div class="grid g2">
+<div class="card reveal">
+<h3>⚙ Optimizer &amp; schedule <span class="tag">live</span></h3>
+<div class="ctrgrid">
+<div class="ctrl"><label>Epochs <span class="val" id="cEpochsV">300</span></label>
+<input type="range" id="cEpochs" min="20" max="800" step="10" value="300"></div>
+<div class="ctrl"><label>Learning rate</label>
+<select id="cLR">
+<option value="0.0005">0.0005 · gentle</option>
+<option value="0.001" selected>0.001 · recommended</option>
+<option value="0.002">0.002 · brisk</option>
+<option value="0.005">0.005 · aggressive</option>
+</select></div>
+<div class="ctrl"><label>LR warmup <span class="val" id="cWarmupV">8</span></label>
+<input type="range" id="cWarmup" min="0" max="40" step="1" value="8"></div>
+<div class="ctrl"><label>Grad clip <span class="val" id="cClipV">1.0</span></label>
+<input type="range" id="cClip" min="0" max="5" step="0.1" value="1"></div>
+<div class="ctrl"><label>Attention soft-cap <span class="val" id="cSoftCapV">10</span></label>
+<input type="range" id="cSoftCap" min="0" max="40" step="1" value="10"></div>
+<div class="ctrl"><label>Batch size</label>
+<select id="cBatch"><option>8</option><option>16</option><option selected>32</option><option>64</option></select></div>
+<div class="ctrl"><label>Context window</label>
+<select id="cSeq"><option value="16">16</option><option value="24">24</option><option value="32" selected>32</option><option value="48">48</option><option value="64">64</option><option value="128">128</option><option value="300">300 · auto-cap</option></select></div>
+<div class="ctrl"><label>Init seed</label>
+<div class="stepper"><button id="seedMinus">−</button><div class="sv" id="cSeedV">1337</div><button id="seedPlus">+</button></div></div>
+</div>
+<div class="ctrgrid" style="margin-top:4px">
+<div class="ctrl"><label>Hidden dim</label>
+<select id="cHidden"><option value="32">32</option><option value="64" selected>64</option><option value="96">96</option><option value="128">128</option></select></div>
+<div class="ctrl"><label>Blocks</label>
+<div class="stepper"><button id="layMinus">−</button><div class="sv" id="cLayersV">2</div><button id="layPlus">+</button></div></div>
+</div>
+<label class="tog"><input type="checkbox" id="cRoPE" checked><span class="sw"></span>
+<span class="t">Rotary position embeddings<small>RoPE on Q/K — required for position-aware copying</small></span></label>
+<div class="row eq" style="margin-top:12px">
+<button class="btn pri" id="btnTrain">▶ Train model</button>
+<button class="btn bad" id="btnCancel" disabled>■ Stop</button>
+</div>
+<div class="row eq" style="margin-top:9px">
+<button class="btn gh sm" id="btnRandomize">🎲 Randomize</button>
+<button class="btn gh sm" id="btnResetCfg">⟲ Defaults</button>
+</div>
+</div>
+<div class="card reveal">
+<h3>📉 Loss &amp; schedule <span class="tag" id="chartTag">no run yet</span></h3>
+<div class="chartbox"><canvas id="lossCanvas"></canvas><div class="chartempty" id="chartEmpty">Train to plot loss, EMA and the warmup schedule</div></div>
+<div class="legend">
+<span><i style="background:#7c5cff"></i>loss</span>
+<span><i style="background:#22d3ee"></i>EMA(0.9)</span>
+<span><i style="background:#fbbf24"></i>lr (right axis)</span>
+<span><i style="background:#a3e635"></i>best</span>
+<span><i style="background:#ff3b5c"></i>divergence band</span>
+</div>
+<label class="tog" style="margin-top:6px"><input type="checkbox" id="chartLog"><span class="sw"></span>
+<span class="t">Logarithmic loss axis<small>reveals late-stage convergence</small></span></label>
+<div class="kv" style="margin-top:10px">
+<dt>initial</dt><dd id="mInit">—</dd><dt>final</dt><dd id="mFinal">—</dd>
+<dt>reduction</dt><dd id="mDrop">—</dd><dt>uniform ln V</dt><dd id="mUnif">—</dd>
+</div>
+</div>
+</div>
+</section>
+<section id="inspect">
+<div class="sechead"><span class="num">03</span><h2>Generation inspector</h2>
+<p>Output is parsed back into slots and graded against this corpus — and against what the model believes.</p></div>
+<div class="grid g2">
+<div class="card reveal">
+<h3>⌁ Prompt <span class="tag" id="pairStatus">—</span></h3>
+<div class="ctrgrid">
+<div class="ctrl"><label>Entity A (slot 1)</label><select id="pairA"></select></div>
+<div class="ctrl"><label>Entity B (slot 2)</label><select id="pairB"></select></div>
+</div>
+<div class="ctrl"><label>Raw prompt
+<select id="tagSel" style="width:auto;padding:3px 26px 3px 8px;font-size:11px;margin-left:auto">
+<option value="">+ tag</option><option>&lt;|user|&gt;</option><option>&lt;|assistant|&gt;</option><option>&lt;|system|&gt;</option><option>&lt;|stop|&gt;</option>
+</select></label>
+<textarea id="prompt" spellcheck="false" style="min-height:74px"></textarea></div>
+<div class="ctrgrid">
+<div class="ctrl"><label>Temperature <span class="val" id="tempV">0.00</span></label>
+<input type="range" id="tempC" min="0" max="1.6" step="0.05" value="0"></div>
+<div class="ctrl"><label>Max new tokens <span class="val" id="maxTokV">40</span></label>
+<input type="range" id="maxTokC" min="6" max="80" step="2" value="40"></div>
+<div class="ctrl"><label>Top-K shown</label>
+<select id="topKC"><option>5</option><option selected>10</option><option>20</option><option>40</option></select></div>
+<div class="ctrl"><label>Decoding</label>
+<select id="sampleMode"><option value="greedy" selected>greedy (argmax)</option><option value="temp">temperature sampling</option></select></div>
+</div>
+<label class="tog"><input type="checkbox" id="stopOnStop" checked><span class="sw"></span>
+<span class="t">Halt on <code>&lt;|stop|&gt;</code></span></label>
+<div class="row eq" style="margin-top:11px">
+<button class="btn go" id="btnGenerate" disabled>🤖 Generate &amp; grade</button>
+<button class="btn gh" id="btnCopyResult" disabled>⧉ Copy</button>
+</div>
+<div class="ctrl" style="margin-top:13px"><label>Top-K next-token distribution</label><div class="strip" id="probStrip"></div></div>
+<div class="ctrl"><label>Per-token top-1 confidence</label><div class="spark"><canvas id="confCanvas"></canvas></div></div>
+</div>
+<div class="card reveal">
+<h3>✓ Verdict <span class="tag" id="inspTag">awaiting generation</span></h3>
+<div class="verdict idle" id="inspVerdict">
+<div class="big">◌</div><div><div class="txt">No generation yet</div><div class="sub">train a model, then Generate &amp; grade</div></div>
+</div>
+<div class="slots" id="inspSlots"></div>
+<div class="ctrl"><label>Word-level alignment <span class="val">expected → got</span></label><div class="diff" id="inspDiff">—</div></div>
+<ul class="diag" id="inspDiag"></ul>
+<div class="ctrl" style="margin-top:13px"><label>Model belief for this pair</label><div class="diff" id="inspBelief" style="font-size:12px">Probe beliefs to see what the model thinks these entities are.</div></div>
+<div class="ctrl"><label>Decoded output</label><textarea id="inspGot" readonly style="min-height:64px"></textarea></div>
+<div class="ctrl"><label>Corpus expectation</label><textarea id="inspExpected" readonly style="min-height:64px"></textarea></div>
+</div>
+</div>
+</section>
+<section id="beliefs">
+<div class="sechead"><span class="num">04</span><h2>Learned-schema probe</h2>
+<p>Decodes each entity in both slots and reads back the description the model actually holds. This is how a stale or foreign model is caught.</p></div>
+<div class="grid g2">
+<div class="card reveal">
+<h3>🧠 Probe controls <span class="tag" id="beliefTag">not probed</span></h3>
+<p class="hint">Each entity is decoded twice — once in slot 1, once in slot 2 — against a fixed anchor entity.</p>
+<div class="ctrgrid">
+<div class="ctrl"><label>Anchor entity</label><select id="probeAnchor"></select></div>
+<div class="ctrl"><label>Scope</label>
+<select id="probeScope"><option value="all" selected>all entities</option><option value="12">first 12</option><option value="suspect">suspect only</option></select></div>
+</div>
+<div class="row eq">
+<button class="btn go" id="btnProbe" disabled>🧠 Probe model beliefs</button>
+<button class="btn bad" id="btnStopProbe" disabled>■ Stop</button>
+</div>
+<div class="prog"><i id="probeProg"></i></div>
+<div class="row" style="gap:6px">
+<span class="badge" id="beliefMatch">learned —</span>
+<span class="badge" id="beliefWrong">wrong —</span>
+<span class="badge" id="beliefUnknown">unreadable —</span>
+</div>
+<div class="hint" id="beliefNote" style="margin-top:12px">Train a model, then probe. Any row where the model's description differs from the corpus explains a wrong generation exactly.</div>
+<div class="row eq" style="margin-top:10px">
+<button class="btn gh sm" id="btnCopyBeliefs" disabled>⧉ Copy report</button>
+<button class="btn gh sm" id="btnPurgeModel" disabled>🗑 Purge model</button>
+</div>
+</div>
+<div class="card reveal">
+<h3>▦ Belief table <span class="tag" id="beliefCount">—</span></h3>
+<div class="scroll" style="max-height:420px">
+<table class="tbl"><thead><tr><th>Entity</th><th>Corpus</th><th>Model slot 1</th><th>Model slot 2</th><th>State</th></tr></thead>
+<tbody id="beliefBody"><tr><td colspan="5" style="color:var(--slate2);padding:16px">No probe yet.</td></tr></tbody></table>
+</div>
+</div>
+</div>
+</section>
+<section id="suite">
+<div class="sechead"><span class="num">05</span><h2>Generalization suite</h2>
+<p>Greedy-decodes many pairs and reports accuracy per slot, separating memorization from a learned rule.</p></div>
+<div class="grid g2">
+<div class="card reveal">
+<h3>🧪 Suite controls <span class="tag" id="suiteAvail">—</span></h3>
+<div class="ctrgrid">
+<div class="ctrl"><label>Test set</label>
+<select id="suiteSet"><option value="heldout" selected>held-out pairs</option><option value="seen">seen pairs</option><option value="all">all ordered pairs</option></select></div>
+<div class="ctrl"><label>Pairs to test <span class="val" id="suiteCountV">24</span></label>
+<input type="range" id="suiteCount" min="4" max="120" step="2" value="24"></div>
+</div>
+<div class="row eq">
+<button class="btn go" id="btnRunSuite" disabled>🧪 Run suite</button>
+<button class="btn bad" id="btnStopSuite" disabled>■ Stop</button>
+</div>
+<div class="prog"><i id="suiteProg"></i></div>
+<div class="bars" id="suiteAgg"></div>
+<div class="hint" id="suiteNote" style="margin-top:12px">Held-out accuracy is the only number that proves the copy rule.</div>
+<div class="row" style="gap:6px;margin-top:10px">
+<span class="badge" id="suiteExact">exact —</span>
+<span class="badge" id="suiteBleed">bleed —</span>
+<span class="badge" id="suiteEcho">echo —</span>
+</div>
+</div>
+<div class="card reveal">
+<h3>▦ Per-pair results <span class="tag" id="suiteTag">idle</span></h3>
+<div class="scroll" style="max-height:420px">
+<table class="tbl"><thead><tr><th>Pair</th><th>Set</th><th>E1</th><th>A1</th><th>E2</th><th>A2</th><th>Exact</th></tr></thead>
+<tbody id="suiteBody"><tr><td colspan="7" style="color:var(--slate2);padding:16px">No results yet.</td></tr></tbody></table>
+</div>
+<div class="diff" id="suiteDetail" style="margin-top:12px;display:none"></div>
+</div>
+</div>
+</section>
+<section id="engine">
+<div class="sechead"><span class="num">06</span><h2>Engine, provenance &amp; verification</h2>
+<p>GPU is used only after on-device parity passes. The model carries the fingerprint of the corpus it trained on.</p></div>
+<div class="grid g3">
+<div class="card reveal">
+<h3>🔬 Gradient parity</h3>
+<p class="hint">Identical batch through GPU and CPU with lr=0; compares loss and every parameter gradient.</p>
+<button class="btn go" id="btnParity" style="width:100%">Verify GPU ↔ CPU</button>
+<div class="diff" id="parityOut" style="margin-top:12px;font-size:12px">Not run.</div>
+</div>
+<div class="card reveal">
+<h3>🧾 Model provenance</h3>
+<div class="kv" id="provList"></div>
+<div class="row" style="gap:6px;margin-top:11px"><span class="badge" id="provState">no model</span></div>
+<div class="diff" id="provDiff" style="margin-top:11px;font-size:11.5px;display:none"></div>
+</div>
+<div class="card reveal">
+<h3>💾 Model I/O &amp; view</h3>
+<div class="row eq">
+<button class="btn" id="btnExport" disabled>⭳ Export</button>
+<button class="btn gh" id="btnImport">⭱ Import</button>
+</div>
+<input type="file" id="fileImport" accept="application/json" style="display:none">
+<div class="ctrl" style="margin-top:12px"><label>Density</label>
+<select id="densitySel"><option value="comfortable" selected>comfortable</option><option value="compact">compact</option></select></div>
+<label class="tog"><input type="checkbox" id="reduceMotion"><span class="sw"></span>
+<span class="t">Reduce motion</span></label>
+<label class="tog"><input type="checkbox" id="soundOn" checked><span class="sw"></span>
+<span class="t">Sonify training<small>epoch pitch tracks loss</small></span></label>
+<div class="kv" id="engineFacts" style="margin-top:10px"></div>
+<div class="hint" style="margin-top:8px">Shortcuts: <b>T</b> train · <b>G</b> generate · <b>P</b> probe · <b>S</b> suite · <b>Esc</b> stop.</div>
+</div>
+</div>
+</section>
+</main>
+<footer>TENSOR LAB · from-scratch nn.js · parity-gated WebGPU · schema-bound provenance · all computation local to this tab</footer>
+<div id="toastHost"></div>
+<script src="tensorindex_worker.js"></script>
 </body>
 </html>

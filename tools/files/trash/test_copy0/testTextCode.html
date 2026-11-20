@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="default"/>
+  <title>textCode iOS Test</title>
+  <style>
+    :root {
+      --mi-primary: #007aff;
+      --mi-primary-dark: #0056b3;
+      --mi-bg: #ffffff;
+      --mi-bg-alt: #f2f2f7;
+      --mi-text: #000000;
+      --mi-text-secondary: #8e8e93;
+      --mi-border: #c6c6c8;
+      --mi-safe-top: env(safe-area-inset-top, 0px);
+      --mi-safe-bottom: env(safe-area-inset-bottom, 0px);
+      --toolbar-height: 48px;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --mi-bg: #1c1c1e;
+        --mi-bg-alt: #000000;
+        --mi-text: #ffffff;
+        --mi-text-secondary: #98989d;
+        --mi-border: #38383a;
+        --mi-primary: #0a84ff;
+        --mi-primary-dark: #0066cc;
+      }
+    }
+
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body {
+      margin: 0; padding: 0; height: 100%; overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--mi-bg-alt); color: var(--mi-text);
+    }
+
+    #app {
+      display: flex; flex-direction: column;
+      height: 100dvh; width: 100%;
+      background: var(--mi-bg-alt);
+    }
+
+    /* Toolbars */
+    .toolbar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 16px; height: var(--toolbar-height); flex-shrink: 0;
+      background: var(--mi-bg); border-bottom: 1px solid var(--mi-border);
+      padding-top: var(--mi-safe-top);
+    }
+    .toolbar.bottom {
+      border-top: 1px solid var(--mi-border); border-bottom: none;
+      padding-bottom: var(--mi-safe-bottom); gap: 8px; overflow-x: auto;
+      -webkit-overflow-scrolling: touch; scrollbar-width: none;
+    }
+    .toolbar.bottom::-webkit-scrollbar { display: none; }
+
+    .toolbar h1 { margin: 0; font-size: 17px; font-weight: 600; }
+    .toolbar .actions { display: flex; gap: 8px; }
+
+    /* Buttons */
+    button {
+      min-height: 44px; min-width: 44px; padding: 0 12px;
+      background: var(--mi-primary); color: #fff;
+      border: none; border-radius: 10px; font-size: 15px; font-weight: 500;
+      display: inline-flex; align-items: center; justify-content: center;
+      white-space: nowrap; flex-shrink: 0;
+    }
+    button:active { opacity: 0.7; transform: scale(0.96); }
+    button.secondary { background: var(--mi-bg-alt); color: var(--mi-text); border: 1px solid var(--mi-border); }
+    button.icon-only { padding: 0; min-width: 44px; }
+
+    /* Editor Container */
+    .editor-container {
+      flex: 1; min-height: 0; position: relative; overflow: hidden;
+      background: var(--mi-bg);
+    }
+    /* Force component to fill container */
+    .code-editor-container-wrapper {
+      height: 100% !important; width: 100% !important;
+      border: none !important; border-radius: 0 !important;
+    }
+
+    /* Log Drawer */
+    .log-drawer {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      background: var(--mi-bg); border-top: 1px solid var(--mi-border);
+      max-height: 50vh; overflow: hidden;
+      transform: translateY(100%); transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      z-index: 100; display: flex; flex-direction: column;
+    }
+    .log-drawer.open { transform: translateY(0); padding-bottom: var(--mi-safe-bottom); }
+    .log-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 16px; border-bottom: 1px solid var(--mi-border);
+      font-weight: 600; font-size: 15px; background: var(--mi-bg-alt);
+    }
+    #logContent {
+      flex: 1; margin: 0; padding: 12px; overflow-y: auto;
+      font-family: "SF Mono", Menlo, monospace; font-size: 12px;
+      line-height: 1.4; white-space: pre-wrap; word-break: break-all;
+      color: var(--mi-text-secondary); -webkit-overflow-scrolling: touch;
+    }
+
+    /* iOS Zoom Prevention */
+    .code-editor-content { font-size: 16px !important; }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <header class="toolbar top">
+      <h1>textCode</h1>
+      <div class="actions">
+        <button id="themeToggle" class="secondary icon-only" title="Toggle Theme">🌓</button>
+        <button id="resetBtn" class="secondary icon-only" title="Reset">♻️</button>
+      </div>
+    </header>
+
+    <main class="editor-container">
+      <textcode id="mainEditor" title="demo.js"></textcode>
+    </main>
+
+    <footer class="toolbar bottom">
+      <button id="getBtn">📥 Get</button>
+      <button id="setBtn">📤 Set</button>
+      <button id="saveBtn">💾</button>
+      <button id="runBtn">▶️</button>
+      <button id="pageBtn">📄 Pages</button>
+      <button id="logBtn" class="secondary icon-only">📜</button>
+    </footer>
+  </div>
+
+  <div id="logDrawer" class="log-drawer">
+    <div class="log-header">
+      <span>Event Log</span>
+      <button id="closeLog" class="secondary" style="min-height:28px;padding:4px 8px;">✕</button>
+    </div>
+    <pre id="logContent"></pre>
+  </div>
+
+  <script type="module">
+    import { createTexCode } from './system/ux/textCode_workon.js';
+    window.createTexCode = createTexCode;
+
+    const editor = document.getElementById('mainEditor');
+    const logContent = document.getElementById('logContent');
+    const logDrawer = document.getElementById('logDrawer');
+    let isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+    // Initialize Editor
+    document.addEventListener('DOMContentLoaded', () => {
+      const container = document.getElementById('mainEditor');
+      const newEditor = createTexCode([
+        {
+          title: 'main.js',
+          content: `// 👋 Tap to edit on iPhone\nfunction greet(name) {\n  return \`Hello, \${name}! 🎉\`;\n}\n\nconsole.log(greet('iOS'));\n\n// Try:\n// • Enter after { for smart indent\n// • ★ to beautify\n// • Ctrl+F to search\n// • Bottom buttons to test API`
+        },
+        {
+          title: 'styles.css',
+          content: `/* Theme Variables */\n:root {\n  --primary: #007aff;\n  --bg: #fff;\n}\n\nbody {\n  font-family: system-ui;\n  background: var(--bg);\n}`
+        }
+      ]);
+
+      newEditor.id = 'mainEditor';
+      newEditor.style.height = '100%';
+      newEditor.style.width = '100%';
+
+      // Replace original placeholder
+      container.parentNode.replaceChild(newEditor, container);
+
+      // Attach handlers
+      newEditor.oninput = (e, v) => log(`📝 input: ${v.length} chars`);
+      newEditor.onchange = () => log('✏️ changed (blur)');
+      newEditor.onsave = (e, vals) => {
+        log(`💾 save: ${vals.length} page(s)`);
+        haptic(15);
+      };
+      newEditor.onrun = () => {
+        log('▶️ run triggered');
+        haptic(20);
+      };
+      newEditor.onpagechange = (d) => {
+        log(`📄 page: "${d.title}" (index ${d.valuesIndex})`);
+        haptic(10);
+      };
+
+      window.testEditor = newEditor;
+      log('✅ Ready');
+    });
+
+    // UI Controls
+    document.getElementById('getBtn').addEventListener('click', () => {
+      const val = window.testEditor?.value;
+      log(`📥 value: ${val?.length || 0} chars`);
+      console.log(val);
+      haptic(5);
+    });
+
+    document.getElementById('setBtn').addEventListener('click', () => {
+      if (window.testEditor) {
+        window.testEditor.value = `// 📱 Set via JS\nconsole.log("Updated at ${new Date().toLocaleTimeString()}");\n`;
+        log('📤 value set');
+        haptic(15);
+      }
+    });
+
+    document.getElementById('saveBtn').addEventListener('click', () => {
+      const btn = window.testEditor?.querySelector('.save-btn');
+      if (btn && !btn.disabled) { btn.click(); haptic(10); }
+      else log('⚠️ Add .onsave = fn first');
+    });
+
+    document.getElementById('runBtn').addEventListener('click', () => {
+      const btn = window.testEditor?.querySelector('.run-btn');
+      if (btn && !btn.disabled) { btn.click(); }
+      else log('⚠️ Add .onrun = fn first');
+    });
+
+    document.getElementById('pageBtn').addEventListener('click', () => {
+      const ed = window.testEditor;
+      if (!ed) return;
+      const next = (ed.valuesIndex + 1) % ed.values.length;
+      ed.valuesIndex = next;
+    });
+
+    // Theme Toggle
+    document.getElementById('themeToggle').addEventListener('click', () => {
+      isDark = !isDark;
+      const root = document.documentElement;
+      if (isDark) {
+        root.style.setProperty('--mi-bg', '#1c1c1e');
+        root.style.setProperty('--mi-bg-alt', '#000000');
+        root.style.setProperty('--mi-text', '#ffffff');
+        root.style.setProperty('--mi-text-secondary', '#98989d');
+        root.style.setProperty('--mi-border', '#38383a');
+        root.style.setProperty('--mi-primary', '#0a84ff');
+      } else {
+        root.style.setProperty('--mi-bg', '#ffffff');
+        root.style.setProperty('--mi-bg-alt', '#f2f2f7');
+        root.style.setProperty('--mi-text', '#000000');
+        root.style.setProperty('--mi-text-secondary', '#8e8e93');
+        root.style.setProperty('--mi-border', '#c6c6c8');
+        root.style.setProperty('--mi-primary', '#007aff');
+      }
+      log(`🌓 ${isDark ? 'Dark' : 'Light'} mode`);
+      haptic(5);
+    });
+
+    // Reset
+    document.getElementById('resetBtn').addEventListener('click', () => {
+      if (confirm('Reset editor?')) location.reload();
+    });
+
+    // Log Drawer
+    document.getElementById('logBtn').addEventListener('click', () => logDrawer.classList.add('open'));
+    document.getElementById('closeLog').addEventListener('click', () => logDrawer.classList.remove('open'));
+
+    // Logger
+    function log(msg) {
+      const ts = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+      logContent.textContent = `[${ts}] ${msg}\n` + logContent.textContent;
+      if (logContent.textContent.length > 2000) {
+        logContent.textContent = logContent.textContent.slice(0, 1800) + '\n…';
+      }
+    }
+
+    // Haptic Feedback (iOS)
+    function haptic(pattern = 10) {
+      if (navigator.vibrate) navigator.vibrate(pattern);
+    }
+
+    // Prevent iOS auto-zoom on editor focus
+    document.addEventListener('focusin', (e) => {
+      if (e.target.closest('.code-editor-content')) {
+        document.querySelector('meta[name="viewport"]')?.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
+      }
+    });
+    document.addEventListener('focusout', (e) => {
+      if (e.target.closest('.code-editor-content')) {
+        document.querySelector('meta[name="viewport"]')?.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover');
+      }
+    });
+  </script>
+</body>
+</html>

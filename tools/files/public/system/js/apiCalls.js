@@ -11,10 +11,12 @@ location is at ./system/js/apiCalls.js
  * @property {number} modifiedTimeMs - The last modified timestamp in milliseconds.
  */
 
+const API_ENDPOINT = '/system/js/x-cmd.api.js';
+
 /**
  * Makes an API call to the server with custom headers.
  * @param {string} method - The HTTP method (GET, POST, PUT, DELETE).
- * @param {string} endpoint - The path to the endpoint on the server (e.g., '/').
+ * @param {string} endpoint - The path to the endpoint on the server (e.g., '/system/js/x-cmd.api.js').
  * @param {Object} [headers={}] - Custom headers for the request.
  * @param {string} [body=null] - The request body for POST/PUT requests.
  * @returns {Promise<string | Object>} - The response text or parsed JSON.
@@ -126,7 +128,7 @@ const api = {
         if (!path) {
             throw new Error('LS: Path is required.')
         }
-        return makeApiCall('GET', '/', { 'X-CMD': 'ls', 'X-SRC': path })
+        return makeApiCall('GET', API_ENDPOINT, { 'X-CMD': 'ls', 'X-SRC': path })
     },
 
     /**
@@ -138,7 +140,7 @@ const api = {
         if (!filePath) {
             throw new Error('ReadFile: File path is required.')
         }
-        return makeApiCall('GET', '/', { 'X-CMD': 'fread', 'X-SRC': filePath })
+        return makeApiCall('GET', API_ENDPOINT, { 'X-CMD': 'fread', 'X-SRC': filePath })
     },
 
     /**
@@ -151,7 +153,7 @@ const api = {
             throw new Error('ReadFileBinary: File path is required.')
         }
 		
-		const response = await fetch('/', {
+		const response = await fetch(API_ENDPOINT, {
             method: 'GET',
             headers: {
 				'X-CMD': 'freadb',
@@ -180,7 +182,7 @@ const api = {
 
         return makeApiCall(
             'POST',
-            '/',
+            API_ENDPOINT,
             { 'X-CMD': 'fwrite', 'X-SRC': filePath },
             content
         )
@@ -195,7 +197,7 @@ const api = {
         if (!mkPath) {
             throw new Error('MkPath: Path to create is required.')
         }
-        return makeApiCall('POST', '/', { 'X-CMD': 'mkdir', 'X-SRC': mkPath })
+        return makeApiCall('POST', API_ENDPOINT, { 'X-CMD': 'mkdir', 'X-SRC': mkPath })
     },
 
     /**
@@ -208,7 +210,7 @@ const api = {
         if (!sourcePath || !destinationPath) {
             throw new Error('MV: Source and destination paths are required.')
         }
-        return makeApiCall('POST', '/', {
+        return makeApiCall('POST', API_ENDPOINT, {
             'X-CMD': 'mv',
             'X-SRC': sourcePath,
             'X-DST': destinationPath
@@ -225,7 +227,7 @@ const api = {
         if (!sourcePath || !destinationPath) {
             throw new Error('COPY: Source and destination paths are required.')
         }
-        return makeApiCall('POST', '/', {
+        return makeApiCall('POST', API_ENDPOINT, {
             'X-CMD': 'cp',
             'X-SRC': sourcePath,
             'X-DST': destinationPath
@@ -242,7 +244,7 @@ const api = {
         if (!sourcePath || !newPath) {
             throw new Error('RN: Source and destination paths are required.')
         }
-        return makeApiCall('POST', '/', {
+        return makeApiCall('POST', API_ENDPOINT, {
             'X-CMD': 'rn',
             'X-SRC': sourcePath,
             'X-DST': newPath
@@ -258,7 +260,7 @@ const api = {
         if (!delPath) {
             throw new Error('DEL: Path to delete is required.')
         }
-        return makeApiCall('DELETE', '/', { 'X-CMD': 'rm', 'X-SRC': delPath })
+        return makeApiCall('DELETE', API_ENDPOINT, { 'X-CMD': 'rm', 'X-SRC': delPath })
     }
 }
 
@@ -270,7 +272,7 @@ const apiSync = {
      */
     ls: (path) => {
         if (!path) throw new Error('LS: Path is required.');
-        return makeApiCallSync('GET', '/', { 'X-CMD': 'ls', 'X-SRC': path });
+        return makeApiCallSync('GET', API_ENDPOINT, { 'X-CMD': 'ls', 'X-SRC': path });
     },
 
     /**
@@ -280,7 +282,7 @@ const apiSync = {
      */
     readFile: (filePath) => {
         if (!filePath) throw new Error('ReadFile: File path is required.');
-        return makeApiCallSync('GET', '/', { 'X-CMD': 'fread', 'X-SRC': filePath });
+        return makeApiCallSync('GET', API_ENDPOINT, { 'X-CMD': 'fread', 'X-SRC': filePath });
     },
 
     /**
@@ -290,7 +292,7 @@ const apiSync = {
      */
     readFileBinary: (filePath) => {
         if (!filePath) throw new Error('ReadFileBinary: File path is required.');
-        return makeApiCallSync('GET', '/', { 'X-CMD': 'freadb', 'X-SRC': filePath }, null, 'arraybuffer');
+        return makeApiCallSync('GET', API_ENDPOINT, { 'X-CMD': 'freadb', 'X-SRC': filePath }, null, 'arraybuffer');
     },
 
     /**
@@ -301,7 +303,7 @@ const apiSync = {
      */
     saveFile: (filePath, content) => {
         if (!filePath || content === undefined) throw new Error('SaveFile: File path and content are required.');
-        return makeApiCallSync('POST', '/', { 'X-CMD': 'fwrite', 'X-SRC': filePath }, content);
+        return makeApiCallSync('POST', API_ENDPOINT, { 'X-CMD': 'fwrite', 'X-SRC': filePath }, content);
     },
 
     /**
@@ -311,7 +313,7 @@ const apiSync = {
      */
     mkPath: (mkPath) => {
         if (!mkPath) throw new Error('MkPath: Path to create is required.');
-        return makeApiCallSync('POST', '/', { 'X-CMD': 'mkdir', 'X-SRC': mkPath });
+        return makeApiCallSync('POST', API_ENDPOINT, { 'X-CMD': 'mkdir', 'X-SRC': mkPath });
     },
 
     /**
@@ -322,7 +324,7 @@ const apiSync = {
      */
     mv: (sourcePath, destinationPath) => {
         if (!sourcePath || !destinationPath) throw new Error('MV: Source and destination paths are required.');
-        return makeApiCallSync('POST', '/', { 'X-CMD': 'mv', 'X-SRC': sourcePath, 'X-DST': destinationPath });
+        return makeApiCallSync('POST', API_ENDPOINT, { 'X-CMD': 'mv', 'X-SRC': sourcePath, 'X-DST': destinationPath });
     },
 
     /**
@@ -333,7 +335,7 @@ const apiSync = {
      */
     copy: (sourcePath, destinationPath) => {
         if (!sourcePath || !destinationPath) throw new Error('COPY: Source and destination paths are required.');
-        return makeApiCallSync('POST', '/', { 'X-CMD': 'cp', 'X-SRC': sourcePath, 'X-DST': destinationPath });
+        return makeApiCallSync('POST', API_ENDPOINT, { 'X-CMD': 'cp', 'X-SRC': sourcePath, 'X-DST': destinationPath });
     },
 
     /**
@@ -344,7 +346,7 @@ const apiSync = {
      */
     rn: (sourcePath, newPath) => {
         if (!sourcePath || !newPath) throw new Error('RN: Source and destination paths are required.');
-        return makeApiCallSync('POST', '/', { 'X-CMD': 'rn', 'X-SRC': sourcePath, 'X-DST': newPath });
+        return makeApiCallSync('POST', API_ENDPOINT, { 'X-CMD': 'rn', 'X-SRC': sourcePath, 'X-DST': newPath });
     },
 
     /**
@@ -354,7 +356,7 @@ const apiSync = {
      */
     del: (delPath) => {
         if (!delPath) throw new Error('DEL: Path to delete is required.');
-        return makeApiCallSync('DELETE', '/', { 'X-CMD': 'rm', 'X-SRC': delPath });
+        return makeApiCallSync('DELETE', API_ENDPOINT, { 'X-CMD': 'rm', 'X-SRC': delPath });
     }
 };
 

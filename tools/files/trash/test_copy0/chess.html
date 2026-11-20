@@ -1,0 +1,671 @@
+<!--chess.html-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>3D Chess vs Computer</title>
+<style>
+  body { margin: 0; overflow: hidden; background: #111; font-family: sans-serif; color: #eee; }
+  #info {
+    position: absolute; top: 10px; left: 10px; z-index: 10;
+    background: rgba(0,0,0,0.7); padding: 12px 16px; border-radius: 8px;
+    max-width: 280px;
+  }
+  #info h1 { margin: 0 0 8px; font-size: 18px; }
+  #status { font-size: 14px; margin-top: 6px; }
+  button {
+    margin-top: 8px; padding: 6px 12px; cursor: pointer;
+    background: #2a6; color: white; border: none; border-radius: 4px;
+    margin-right: 4px;
+  }
+  button:hover { background: #3b7; }
+  #help { font-size: 12px; opacity: 0.8; margin-top: 6px; line-height: 1.4; }
+</style>
+</head>
+<body>
+<div id="info">
+  <h1>♟ 3D Chess</h1>
+  <div>You play White. Click a piece, then a highlighted square.</div>
+  <div id="status">Your move.</div>
+  <div id="help">
+    <strong>Controls:</strong><br>
+    🖱️ Left-drag: Rotate board<br>
+    🖱️ Right-drag: Pan view<br>
+    🖱️ Scroll: Zoom in/out<br>
+    📱 Touch: Drag to rotate, pinch to zoom
+  </div>
+  <button id="newGame">New Game</button>
+  <button id="flipView">Flip View</button>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chess.js@0.10.3/chess.min.js"></script>
+<script>
+// ---------- Three.js scene ----------
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x1a1a1a);
+scene.fog = new THREE.Fog(0x1a1a1a, 20, 60);
+
+const camera = new THREE.PerspectiveCamera(45, innerWidth/innerHeight, 0.1, 200);
+let viewFromWhite = true;
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+
+// Lights
+const ambient = new THREE.AmbientLight(0xffffff, 0.5);
+scene.add(ambient);
+const dir = new THREE.DirectionalLight(0xffffff, 0.9);
+dir.position.set(10, 20, 10);
+dir.castShadow = true;
+dir.shadow.mapSize.set(2048, 2048);
+dir.shadow.camera.left = -15; dir.shadow.camera.right = 15;
+dir.shadow.camera.top = 15; dir.shadow.camera.bottom = -15;
+scene.add(dir);
+
+// ---------- Camera Controls ----------
+let isDragging = false, isPanning = false;
+let prevX = 0, prevY = 0;
+let spherical = { r: 18, theta: Math.PI/4, phi: Math.PI/4 };
+let target = new THREE.Vector3(0, 0, 0);
+let velocity = { theta: 0, phi: 0 };
+
+function updateCameraFromSpherical() {
+  camera.position.set(
+    target.x + spherical.r * Math.sin(spherical.phi) * Math.sin(spherical.theta),
+    target.y + spherical.r * Math.cos(spherical.phi),
+    target.z + spherical.r * Math.sin(spherical.phi) * Math.cos(spherical.theta)
+  );
+  camera.lookAt(target);
+}
+updateCameraFromSpherical();
+
+// Mouse controls
+renderer.domElement.addEventListener('mousedown', e => {
+  if (e.button === 0) isDragging = true;
+  if (e.button === 2) isPanning = true;
+  prevX = e.clientX; prevY = e.clientY;
+  velocity.theta = 0; velocity.phi = 0;
+});
+
+window.addEventListener('mouseup', () => { 
+  isDragging = false; 
+  isPanning = false; 
+});
+
+window.addEventListener('mousemove', e => {
+  const dx = e.clientX - prevX, dy = e.clientY - prevY;
+  prevX = e.clientX; prevY = e.clientY;
+  
+  if (isDragging) {
+    const thetaDelta = -dx * 0.01;
+    const phiDelta = dy * 0.01;
+    spherical.theta += thetaDelta;
+    spherical.phi = Math.max(0.15, Math.min(Math.PI/2 - 0.05, spherical.phi + phiDelta));
+    velocity.theta = thetaDelta;
+    velocity.phi = phiDelta;
+    updateCameraFromSpherical();
+  }
+  
+  if (isPanning) {
+    const right = new THREE.Vector3();
+    camera.getWorldDirection(right);
+    right.crossVectors(camera.up, new THREE.Vector3().subVectors(camera.position, target).normalize()).normalize();
+    target.add(right.multiplyScalar(-dx * 0.02));
+    target.y += dy * 0.02;
+    updateCameraFromSpherical();
+  }
+});
+
+renderer.domElement.addEventListener('wheel', e => {
+  spherical.r = Math.max(8, Math.min(40, spherical.r + e.deltaY * 0.015));
+  updateCameraFromSpherical();
+  e.preventDefault();
+}, { passive: false });
+
+renderer.domElement.addEventListener('contextmenu', e => e.preventDefault());
+
+// Touch controls
+let touchStartDist = 0;
+let touchStartR = 0;
+
+renderer.domElement.addEventListener('touchstart', e => {
+  if (e.touches.length === 1) {
+    isDragging = true;
+    prevX = e.touches[0].clientX;
+    prevY = e.touches[0].clientY;
+    velocity.theta = 0; velocity.phi = 0;
+  } else if (e.touches.length === 2) {
+    isDragging = false;
+    const dx = e.touches[0].clientX - e.touches[1].clientX;
+    const dy = e.touches[0].clientY - e.touches[1].clientY;
+    touchStartDist = Math.sqrt(dx*dx + dy*dy);
+    touchStartR = spherical.r;
+  }
+  e.preventDefault();
+}, { passive: false });
+
+renderer.domElement.addEventListener('touchmove', e => {
+  if (e.touches.length === 1 && isDragging) {
+    const dx = e.touches[0].clientX - prevX;
+    const dy = e.touches[0].clientY - prevY;
+    prevX = e.touches[0].clientX;
+    prevY = e.touches[0].clientY;
+    
+    const thetaDelta = -dx * 0.01;
+    const phiDelta = dy * 0.01;
+    spherical.theta += thetaDelta;
+    spherical.phi = Math.max(0.15, Math.min(Math.PI/2 - 0.05, spherical.phi + phiDelta));
+    velocity.theta = thetaDelta;
+    velocity.phi = phiDelta;
+    updateCameraFromSpherical();
+  } else if (e.touches.length === 2) {
+    const dx = e.touches[0].clientX - e.touches[1].clientX;
+    const dy = e.touches[0].clientY - e.touches[1].clientY;
+    const dist = Math.sqrt(dx*dx + dy*dy);
+    const scale = touchStartDist / dist;
+    spherical.r = Math.max(8, Math.min(40, touchStartR * scale));
+    updateCameraFromSpherical();
+  }
+  e.preventDefault();
+}, { passive: false });
+
+renderer.domElement.addEventListener('touchend', e => {
+  isDragging = false;
+  e.preventDefault();
+}, { passive: false });
+
+// ---------- Board ----------
+const SQ = 1;
+const BOARD_SIZE = 8 * SQ;
+const boardGroup = new THREE.Group();
+scene.add(boardGroup);
+
+// Base
+const baseMat = new THREE.MeshStandardMaterial({ color: 0x3a2418, roughness: 0.6 });
+const base = new THREE.Mesh(new THREE.BoxGeometry(BOARD_SIZE + 1.2, 0.3, BOARD_SIZE + 1.2), baseMat);
+base.position.y = -0.25;
+base.receiveShadow = true;
+boardGroup.add(base);
+
+// Squares
+const lightMat = new THREE.MeshStandardMaterial({ color: 0xe8c39e, roughness: 0.7 });
+const darkMat  = new THREE.MeshStandardMaterial({ color: 0x8b5a2b, roughness: 0.7 });
+const squares = [];
+for (let z = 0; z < 8; z++) {
+  squares[z] = [];
+  for (let x = 0; x < 8; x++) {
+    const isLight = (x + z) % 2 === 0;
+    const sq = new THREE.Mesh(
+      new THREE.BoxGeometry(SQ, 0.1, SQ),
+      (isLight ? lightMat : darkMat).clone()
+    );
+    sq.position.set((x - 3.5) * SQ, 0, (z - 3.5) * SQ);
+    sq.receiveShadow = true;
+    sq.userData = { type: 'square', x, z };
+    boardGroup.add(sq);
+    squares[z][x] = sq;
+  }
+}
+
+// Highlight overlay
+const highlightMat = new THREE.MeshBasicMaterial({ color: 0x00ff88, transparent: true, opacity: 0.4 });
+const selectedMat = new THREE.MeshBasicMaterial({ color: 0xffdd44, transparent: true, opacity: 0.5 });
+const captureMat = new THREE.MeshBasicMaterial({ color: 0xff4444, transparent: true, opacity: 0.5 });
+const highlightGeo = new THREE.BoxGeometry(SQ * 0.95, 0.12, SQ * 0.95);
+let highlights = [];
+
+function clearHighlights() {
+  highlights.forEach(h => boardGroup.remove(h));
+  highlights = [];
+}
+function addHighlight(x, z, mat) {
+  const h = new THREE.Mesh(highlightGeo, mat);
+  h.position.set((x - 3.5) * SQ, 0.06, (z - 3.5) * SQ);
+  boardGroup.add(h);
+  highlights.push(h);
+}
+
+// ---------- Pieces ----------
+const pieceMeshes = {};
+const whiteMat = new THREE.MeshStandardMaterial({ color: 0xf5f5f0, roughness: 0.35, metalness: 0.1 });
+const blackMat = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.35, metalness: 0.1 });
+
+function makePieceMesh(type, color) {
+  const mat = color === 'w' ? whiteMat : blackMat;
+  const group = new THREE.Group();
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.38, 0.12, 24), mat);
+  base.position.y = 0.06;
+  base.castShadow = true;
+  group.add(base);
+  
+  switch(type) {
+    case 'p': {
+      const body = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.28, 0.3, 20), mat);
+      body.position.y = 0.27; body.castShadow = true; group.add(body);
+      const top = new THREE.Mesh(new THREE.SphereGeometry(0.18, 20, 16), mat);
+      top.position.y = 0.52; top.castShadow = true; group.add(top);
+      break;
+    }
+    case 'r': {
+      const body = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.3, 0.45, 20), mat);
+      body.position.y = 0.34; body.castShadow = true; group.add(body);
+      const crown = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.28, 0.12, 20), mat);
+      crown.position.y = 0.62; crown.castShadow = true; group.add(crown);
+      break;
+    }
+    case 'n': {
+      const body = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.3, 0.35, 20), mat);
+      body.position.y = 0.29; body.castShadow = true; group.add(body);
+      const head = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.35, 0.4), mat);
+      head.position.set(0, 0.62, 0.05); head.rotation.x = -0.3; head.castShadow = true; group.add(head);
+      const snout = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.18, 0.25), mat);
+      snout.position.set(0, 0.55, 0.28); snout.castShadow = true; group.add(snout);
+      break;
+    }
+    case 'b': {
+      const body = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.3, 0.5, 20), mat);
+      body.position.y = 0.37; body.castShadow = true; group.add(body);
+      const top = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.35, 20), mat);
+      top.position.y = 0.78; top.castShadow = true; group.add(top);
+      const tip = new THREE.Mesh(new THREE.SphereGeometry(0.06, 12, 10), mat);
+      tip.position.y = 1.0; tip.castShadow = true; group.add(tip);
+      break;
+    }
+    case 'q': {
+      const body = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.32, 0.55, 20), mat);
+      body.position.y = 0.39; body.castShadow = true; group.add(body);
+      const top = new THREE.Mesh(new THREE.SphereGeometry(0.22, 20, 16), mat);
+      top.position.y = 0.82; top.castShadow = true; group.add(top);
+      for (let i = 0; i < 5; i++) {
+        const a = (i / 5) * Math.PI * 2;
+        const p = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.15, 8), mat);
+        p.position.set(Math.cos(a)*0.18, 1.05, Math.sin(a)*0.18);
+        p.castShadow = true; group.add(p);
+      }
+      break;
+    }
+    case 'k': {
+      const body = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.32, 0.55, 20), mat);
+      body.position.y = 0.39; body.castShadow = true; group.add(body);
+      const top = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.2, 0.15, 20), mat);
+      top.position.y = 0.78; top.castShadow = true; group.add(top);
+      const cv = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.28, 0.08), mat);
+      cv.position.y = 1.0; cv.castShadow = true; group.add(cv);
+      const ch = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.08, 0.08), mat);
+      ch.position.y = 1.05; ch.castShadow = true; group.add(ch);
+      break;
+    }
+  }
+  
+  group.userData.isPiece = true;
+  group.userData.pieceType = type;
+  group.userData.pieceColor = color;
+  return group;
+}
+
+function posFromSquare(sq) {
+  const file = sq.charCodeAt(0) - 97;
+  const rank = parseInt(sq[1]) - 1;
+  return { x: file, z: 7 - rank };
+}
+
+function syncPieces() {
+  Object.values(pieceMeshes).forEach(m => boardGroup.remove(m));
+  for (const k in pieceMeshes) delete pieceMeshes[k];
+
+  const board = chess.board();
+  for (let r = 0; r < 8; r++) {
+    for (let f = 0; f < 8; f++) {
+      const p = board[r][f];
+      if (p) {
+        const mesh = makePieceMesh(p.type, p.color);
+        const x = f, z = 7 - r;
+        mesh.position.set((x - 3.5) * SQ, 0.1, (z - 3.5) * SQ);
+        boardGroup.add(mesh);
+        pieceMeshes[`${x},${z}`] = mesh;
+      }
+    }
+  }
+}
+
+// ---------- Game logic ----------
+const chess = new Chess();
+const statusEl = document.getElementById('status');
+let selectedSquare = null;
+let playerTurn = true;
+
+function updateStatus() {
+  if (chess.in_checkmate()) {
+    statusEl.textContent = chess.turn() === 'w' ? 'Checkmate — Computer wins.' : 'Checkmate — You win!';
+  } else if (chess.in_draw()) {
+    statusEl.textContent = 'Draw.';
+  } else if (chess.in_check()) {
+    statusEl.textContent = (chess.turn() === 'w' ? 'You are' : 'Computer is') + ' in check.';
+  } else {
+    statusEl.textContent = chess.turn() === 'w' ? 'Your move.' : 'Computer is thinking...';
+  }
+}
+
+function showLegalMoves(fromSq) {
+  clearHighlights();
+  const moves = chess.moves({ square: fromSq, verbose: true });
+  const from = posFromSquare(fromSq);
+  addHighlight(from.x, from.z, selectedMat);
+  moves.forEach(m => {
+    const to = posFromSquare(m.to);
+    addHighlight(to.x, to.z, m.captured ? captureMat : highlightMat);
+  });
+}
+
+function tryMove(fromSq, toSq) {
+  const moves = chess.moves({ square: fromSq, verbose: true });
+  const match = moves.find(m => m.to === toSq);
+  if (!match) return false;
+  const moveObj = { from: fromSq, to: toSq };
+  if (match.promotion) moveObj.promotion = 'q';
+  const result = chess.move(moveObj);
+  return !!result;
+}
+
+// ---------- Click handling ----------
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+let clickStart = { x: 0, y: 0 };
+
+renderer.domElement.addEventListener('mousedown', e => {
+  clickStart.x = e.clientX;
+  clickStart.y = e.clientY;
+});
+
+renderer.domElement.addEventListener('click', e => {
+  // Only process click if mouse didn't move much (not a drag)
+  const dx = e.clientX - clickStart.x;
+  const dy = e.clientY - clickStart.y;
+  if (Math.sqrt(dx*dx + dy*dy) > 5) return;
+  
+  if (!playerTurn || chess.game_over()) return;
+  
+  const rect = renderer.domElement.getBoundingClientRect();
+  mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+  mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+  raycaster.setFromCamera(mouse, camera);
+  
+  // Get all meshes from piece groups
+  const allMeshes = [];
+  boardGroup.traverse(obj => {
+    if (obj.isMesh) allMeshes.push(obj);
+  });
+  
+  const intersects = raycaster.intersectObjects(allMeshes, false);
+  if (!intersects.length) return;
+
+  // Find the square or piece that was clicked
+  let clickedSquare = null;
+  
+  for (const intersect of intersects) {
+    const obj = intersect.object;
+    
+    // Check if it's a square
+    if (obj.userData.type === 'square') {
+      clickedSquare = obj.userData;
+      break;
+    }
+    
+    // Check if it's part of a piece
+    let parent = obj.parent;
+    while (parent && parent !== boardGroup) {
+      if (parent.userData.isPiece) {
+        // Get piece position and convert to square
+        const x = Math.round(parent.position.x / SQ + 3.5);
+        const z = Math.round(parent.position.z / SQ + 3.5);
+        if (x >= 0 && x < 8 && z >= 0 && z < 8) {
+          clickedSquare = { x, z };
+          break;
+        }
+      }
+      parent = parent.parent;
+    }
+    if (clickedSquare) break;
+  }
+  
+  if (!clickedSquare) return;
+  
+  const { x, z } = clickedSquare;
+  const file = String.fromCharCode(97 + x);
+  const rank = 8 - z;
+  const sq = file + rank;
+
+  const piece = chess.get(sq);
+  
+  if (selectedSquare) {
+    if (sq === selectedSquare) {
+      selectedSquare = null; 
+      clearHighlights(); 
+      return;
+    }
+    
+    // If clicking own piece, reselect
+    if (piece && piece.color === chess.turn()) {
+      selectedSquare = sq;
+      showLegalMoves(sq);
+      return;
+    }
+    
+    // Try move
+    if (tryMove(selectedSquare, sq)) {
+      selectedSquare = null;
+      clearHighlights();
+      syncPieces();
+      updateStatus();
+      playerTurn = false;
+      setTimeout(computerMove, 400);
+    } else {
+      // Invalid move
+      if (piece && piece.color === chess.turn()) {
+        selectedSquare = sq;
+        showLegalMoves(sq);
+      } else {
+        selectedSquare = null; 
+        clearHighlights();
+      }
+    }
+  } else {
+    if (piece && piece.color === 'w') {
+      selectedSquare = sq;
+      showLegalMoves(sq);
+    }
+  }
+});
+
+// ---------- AI ----------
+const PIECE_VALUES = { p: 100, n: 320, b: 330, r: 500, q: 900, k: 20000 };
+const PST = {
+  p: [
+     0,  0,  0,  0,  0,  0,  0,  0,
+    50, 50, 50, 50, 50, 50, 50, 50,
+    10, 10, 20, 30, 30, 20, 10, 10,
+     5,  5, 10, 25, 25, 10,  5,  5,
+     0,  0,  0, 20, 20,  0,  0,  0,
+     5, -5,-10,  0,  0,-10, -5,  5,
+     5, 10, 10,-20,-20, 10, 10,  5,
+     0,  0,  0,  0,  0,  0,  0,  0
+  ],
+  n: [
+    -50,-40,-30,-30,-30,-30,-40,-50,
+    -40,-20,  0,  0,  0,  0,-20,-40,
+    -30,  0, 10, 15, 15, 10,  0,-30,
+    -30,  5, 15, 20, 20, 15,  5,-30,
+    -30,  0, 15, 20, 20, 15,  0,-30,
+    -30,  5, 10, 15, 15, 10,  5,-30,
+    -40,-20,  0,  5,  5,  0,-20,-40,
+    -50,-40,-30,-30,-30,-30,-40,-50
+  ],
+  b: [
+    -20,-10,-10,-10,-10,-10,-10,-20,
+    -10,  0,  0,  0,  0,  0,  0,-10,
+    -10,  0,  5, 10, 10,  5,  0,-10,
+    -10,  5,  5, 10, 10,  5,  5,-10,
+    -10,  0, 10, 10, 10, 10,  0,-10,
+    -10, 10, 10, 10, 10, 10, 10,-10,
+    -10,  5,  0,  0,  0,  0,  5,-10,
+    -20,-10,-10,-10,-10,-10,-10,-20
+  ],
+  r: [
+     0,  0,  0,  0,  0,  0,  0,  0,
+     5, 10, 10, 10, 10, 10, 10,  5,
+    -5,  0,  0,  0,  0,  0,  0, -5,
+    -5,  0,  0,  0,  0,  0,  0, -5,
+    -5,  0,  0,  0,  0,  0,  0, -5,
+    -5,  0,  0,  0,  0,  0,  0, -5,
+    -5,  0,  0,  0,  0,  0,  0, -5,
+     0,  0,  0,  5,  5,  0,  0,  0
+  ],
+  q: [
+    -20,-10,-10, -5, -5,-10,-10,-20,
+    -10,  0,  0,  0,  0,  0,  0,-10,
+    -10,  0,  5,  5,  5,  5,  0,-10,
+     -5,  0,  5,  5,  5,  5,  0, -5,
+      0,  0,  5,  5,  5,  5,  0, -5,
+    -10,  5,  5,  5,  5,  5,  0,-10,
+    -10,  0,  5,  0,  0,  0,  0,-10,
+    -20,-10,-10, -5, -5,-10,-10,-20
+  ],
+  k: [
+    -30,-40,-40,-50,-50,-40,-40,-30,
+    -30,-40,-40,-50,-50,-40,-40,-30,
+    -30,-40,-40,-50,-50,-40,-40,-30,
+    -30,-40,-40,-50,-50,-40,-40,-30,
+    -20,-30,-30,-40,-40,-30,-30,-20,
+    -10,-20,-20,-20,-20,-20,-20,-10,
+     20, 20,  0,  0,  0,  0, 20, 20,
+     20, 30, 10,  0,  0, 10, 30, 20
+  ]
+};
+
+function evaluate() {
+  if (chess.in_checkmate()) return chess.turn() === 'w' ? -100000 : 100000;
+  if (chess.in_draw()) return 0;
+  let score = 0;
+  const board = chess.board();
+  for (let r = 0; r < 8; r++) {
+    for (let f = 0; f < 8; f++) {
+      const p = board[r][f];
+      if (!p) continue;
+      const val = PIECE_VALUES[p.type];
+      const pstRow = p.color === 'w' ? r : 7 - r;
+      const pst = PST[p.type][pstRow * 8 + f];
+      const total = val + pst;
+      score += p.color === 'w' ? total : -total;
+    }
+  }
+  return score;
+}
+
+function minimax(depth, alpha, beta, maximizing) {
+  if (depth === 0 || chess.game_over()) return evaluate();
+  const moves = chess.moves();
+  if (maximizing) {
+    let best = -Infinity;
+    for (const m of moves) {
+      chess.move(m);
+      const val = minimax(depth - 1, alpha, beta, false);
+      chess.undo();
+      if (val > best) best = val;
+      if (best > alpha) alpha = best;
+      if (alpha >= beta) return beta;
+    }
+    return best;
+  } else {
+    let best = Infinity;
+    for (const m of moves) {
+      chess.move(m);
+      const val = minimax(depth - 1, alpha, beta, true);
+      chess.undo();
+      if (val < best) best = val;
+      if (best < beta) beta = best;
+      if (alpha >= beta) return alpha;
+    }
+    return best;
+  }
+}
+
+function computerMove() {
+  if (chess.game_over()) { updateStatus(); return; }
+  const moves = chess.moves({ verbose: true });
+  let bestMove = null, bestVal = Infinity;
+  const depth = 3;
+  
+  for (let i = moves.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [moves[i], moves[j]] = [moves[j], moves[i]];
+  }
+  
+  for (const m of moves) {
+    chess.move(m);
+    const val = minimax(depth - 1, -Infinity, Infinity, true);
+    chess.undo();
+    if (val < bestVal) { bestVal = val; bestMove = m; }
+  }
+  
+  if (bestMove) {
+    const moveObj = { from: bestMove.from, to: bestMove.to };
+    if (bestMove.promotion) moveObj.promotion = 'q';
+    chess.move(moveObj);
+  }
+  
+  syncPieces();
+  updateStatus();
+  playerTurn = true;
+}
+
+// ---------- Buttons ----------
+document.getElementById('newGame').onclick = () => {
+  chess.reset();
+  selectedSquare = null;
+  clearHighlights();
+  syncPieces();
+  playerTurn = true;
+  updateStatus();
+};
+
+document.getElementById('flipView').onclick = () => {
+  viewFromWhite = !viewFromWhite;
+  spherical.theta += Math.PI;
+  updateCameraFromSpherical();
+};
+
+// ---------- Resize ----------
+window.addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+// ---------- Animation loop ----------
+syncPieces();
+updateStatus();
+
+function animate() {
+  requestAnimationFrame(animate);
+  
+  // Apply inertia when not dragging
+  if (!isDragging && !isPanning) {
+    if (Math.abs(velocity.theta) > 0.0001 || Math.abs(velocity.phi) > 0.0001) {
+      spherical.theta += velocity.theta;
+      spherical.phi = Math.max(0.15, Math.min(Math.PI/2 - 0.05, spherical.phi + velocity.phi));
+      velocity.theta *= 0.95;
+      velocity.phi *= 0.95;
+      updateCameraFromSpherical();
+    }
+  }
+  
+  renderer.render(scene, camera);
+}
+animate();
+</script>
+</body>
+</html>

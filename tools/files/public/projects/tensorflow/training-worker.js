@@ -1,306 +1,263 @@
-// training-worker.js
-// TensorFlow.js training worker for Chat-Ready Browser LLM
-// Handles all training operations off the main thread to keep UI responsive
+// ./training-worker.js
+/* TENSOR LAB training worker — WebGPU gated by on-device parity, CPU fallback.
+ * Protocol: INIT_BACKEND / TRAIN / CANCEL.
+ *
+ * IMPORTANT: WebGPU is only used after an identical batch is run through both
+ * the GPU and CPU engines and their loss + every parameter gradient agree.
+ * A device that fails parity trains on the verified CPU engine instead. */
+importScripts('nn.js');
 
-importScripts('https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.17.0/dist/tf.min.js');
+let gpuCtx = null, backendName = 'nnjs-cpu', gpuVerified = false, gpuReport = null;
+let cpuModel = null, opt = null, gpuModel = null;
+let training = false, cancelled = false;
 
-// ========== CONFIG (must match main thread exactly) ==========
-const HIDDEN_DIM = 64;
-const NUM_LAYERS = 2;
-// =============================================================
-
-// ========== RoPE Cache & Utilities ==========
-const ropeCache = {};
-
-function computeRoPEConstants(seqLen, hiddenDim, base = 10000) {
-  const key = `${seqLen}_${hiddenDim}`;
-  if (ropeCache[key]) return ropeCache[key];
-  
-  const half = Math.floor(hiddenDim / 2);
-  const freqs = Array.from({ length: half }, (_, i) => 
-    1 / Math.pow(base, (2 * i) / hiddenDim)
-  );
-  
-  const sinTable = [], cosTable = [];
-  
-  for (let pos = 0; pos < seqLen; pos++) {
-    const sinRow = [], cosRow = [];
-    for (let i = 0; i < half; i++) {
-      sinRow.push(Math.sin(pos * freqs[i]));
-      cosRow.push(Math.cos(pos * freqs[i]));
-    }
-    sinTable.push(sinRow);
-    cosTable.push(cosRow);
-  }
-  
-  return ropeCache[key] = { sinTable, cosTable, halfDim: half };
-}
-
-// ========== RoPE Layer (must be registered in worker context) ==========
-class RoPELayer extends tf.layers.Layer {
-  constructor(config) {
-    super(config);
-    this.seqLen = config.seqLen;
-    this.hiddenDim = config.hiddenDim;
-    // Pre-compute tables during construction
-    const { sinTable, cosTable, halfDim } = computeRoPEConstants(
-      this.seqLen, 
-      this.hiddenDim
-    );
-    this.sinTable = sinTable;
-    this.cosTable = cosTable;
-    this.halfDim = halfDim;
-  }
-  
-  static get className() { return 'RoPELayer'; }
-  
-  computeOutputShape(inputShape) { return inputShape; }
-  
-  call(inputs) {
-    return tf.tidy(() => {
-      const x = inputs[0];
-      
-      // Reshape precomputed tables for broadcasting
-      // Note: We create these tensors every call. For optimization, 
-      // they could be stored as class properties if memory allows, 
-      // but tidy handles cleanup here.
-      const s = tf.reshape(
-        tf.tensor2d(this.sinTable, [this.seqLen, this.halfDim]),
-        [1, this.seqLen, this.halfDim]
-      );
-      const c = tf.reshape(
-        tf.tensor2d(this.cosTable, [this.seqLen, this.halfDim]),
-        [1, this.seqLen, this.halfDim]
-      );
-      
-      // Split input into two halves
-      const x1 = tf.slice(x, [0, 0, 0], [-1, -1, this.halfDim]);
-      const x2 = tf.slice(x, [0, 0, this.halfDim], [-1, -1, this.halfDim]);
-      
-      // Apply rotary transformation
-      const rotated1 = tf.sub(tf.mul(x1, c), tf.mul(x2, s));
-      const rotated2 = tf.add(tf.mul(x1, s), tf.mul(x2, c));
-      
-      return tf.concat([rotated1, rotated2], -1);
-    });
-  }
-}
-tf.serialization.registerClass(RoPELayer);
-
-// ========== Model Architecture (Worker-Side) ==========
-function createModel(vocabSize, learningRate, useRoPE, seqLen) {
-  const input = tf.input({ shape: [seqLen], dtype: 'int32' });
-  
-  // Embedding layer (+1 for <unk> token)
-  let x = tf.layers.embedding({
-    inputDim: vocabSize + 1,
-    outputDim: HIDDEN_DIM,
-    inputLength: seqLen
-  }).apply(input);
-  
-  // Normalize embeddings before positional encoding
-  x = tf.layers.layerNormalization().apply(x);
-  
-  // Apply RoPE if enabled
-  if (useRoPE) {
-    x = new RoPELayer({ 
-      seqLen: seqLen, 
-      hiddenDim: HIDDEN_DIM 
-    }).apply(x);
-  }
-  
-  // SwiGLU blocks with residual connections + LayerNorm
-  for (let i = 0; i < NUM_LAYERS; i++) {
-    const residual = x;
-    
-    // Parallel projections for SwiGLU
-    const gate = tf.layers.dense({ units: HIDDEN_DIM }).apply(x);
-    const value = tf.layers.dense({ units: HIDDEN_DIM }).apply(x);
-    
-    // Gated activation: Swish(gate) * value
-    x = tf.layers.multiply().apply([
-      tf.layers.activation({ activation: 'swish' }).apply(gate),
-      value
-    ]);
-    
-    // Residual connection
-    x = tf.layers.add().apply([x, residual]);
-    
-    // Post-LN for stability
-    x = tf.layers.layerNormalization().apply(x);
-  }
-  
-  // Global average pooling over sequence dimension
-  x = tf.layers.globalAveragePooling1d().apply(x);
-  
-  // Output head: predict next token
-  const output = tf.layers.dense({
-    units: vocabSize + 1,
-    activation: 'softmax'
-  }).apply(x);
-  
-  // Compile model
-  const model = tf.model({ inputs: input, outputs: output });
-  model.compile({
-    optimizer: tf.train.adam(learningRate),
-    loss: 'categoricalCrossentropy'
-  });
-  
-  return model;
-}
-
-// ========== Worker Message Handler ==========
-self.addEventListener('message', async (event) => {
-  const { type, payload } = event.data;
-  
-  try {
-    // --- Backend Initialization ---
-    if (type === 'INIT_BACKEND') {
-      const requestedBackend = payload.backend || 'webgl';
-      const fallbacks = [requestedBackend, 'webgl', 'wasm', 'cpu'];
-      let selectedBackend = null;
-      
-      for (const b of fallbacks) {
-        try {
-          await tf.setBackend(b);
-          await tf.ready();
-          selectedBackend = b;
-          break;
-        } catch (e) {
-          console.warn(`[Worker] Backend ${b} failed:`, e.message);
-        }
-      }
-      
-      if (!selectedBackend) {
-        throw new Error('No compatible backend found');
-      }
-      
-      self.postMessage({ 
-        type: 'BACKEND_READY', 
-        backend: selectedBackend,
-        memory: {
-          numBytes: tf.memory().numBytes,
-          numTensors: tf.memory().numTensors
-        }
-      });
-    }
-    
-    // --- Training Job ---
-    else if (type === 'TRAIN') {
-      const { 
-        vocabSize, 
-        sequences, 
-        config,
-        backend 
-      } = payload;
-      
-      console.log(`[Worker] Starting training: ${sequences.length} sequences`);
-      
-      // Ensure backend is set
-      if (tf.getBackend() !== backend) {
-        try {
-          await tf.setBackend(backend);
-          await tf.ready();
-        } catch (e) {
-          console.warn(`[Worker] Backend switch failed, using current: ${tf.getBackend()}`);
-        }
-      }
-      
-      // Create model
-      const model = createModel(vocabSize, config.lr, config.useRoPE, config.seqLen);
-      
-      // Prepare training tensors
-      const xs = tf.tensor2d(
-        sequences.map(s => s.input), 
-        [sequences.length, config.seqLen], 
-        'int32'
-      );
-      const ys = tf.oneHot(
-        tf.tensor1d(sequences.map(s => s.target), 'int32'), 
-        vocabSize + 1
-      );
-      
-      // Train
-      await model.fit(xs, ys, {
-        epochs: config.epochs,
-        batchSize: config.batchSize,
-        shuffle: true,
-        callbacks: {
-          onEpochEnd: async (epoch, logs) => {
-            self.postMessage({
-              type: 'PROGRESS',
-              epoch,
-              totalEpochs: config.epochs,
-              loss: logs.loss,
-              memory: {
-                numBytes: tf.memory().numBytes,
-                numTensors: tf.memory().numTensors
-              }
-            });
-            // Yield to keep worker responsive
-            await new Promise(r => setTimeout(r, 0));
-          }
-        }
-      });
-      
-      console.log(`[Worker] Training complete. Extracting weights...`);
-      
-      // 1. Get weights
-      const weights = model.getWeights();
-      const weightData = [];
-      
-      // 2. Serialize weights BEFORE disposing model
-      for (let i = 0; i < weights.length; i++) {
-        const w = weights[i];
-        // Await data() to ensure we have the values before disposal
-        const data = await w.data(); 
-        weightData.push({
-          shape: w.shape,
-          dtype: w.dtype,
-          data: Array.from(data) // Convert TypedArray to normal Array for transfer
-        });
-      }
-      
-      // 3. NOW dispose model and training tensors
-      model.dispose();
-      xs.dispose();
-      ys.dispose();
-      // Dispose original weight tensors too (they are part of model, but good practice)
-      weights.forEach(w => w.dispose());
-      
-      console.log(`[Worker] Weights extracted and memory cleaned.`);
-      
-      // 4. Send to main thread
-      self.postMessage({
-        type: 'TRAIN_COMPLETE',
-        weights: weightData,
-        config: {
-          vocabSize,
-          seqLen: config.seqLen,
-          useRoPE: config.useRoPE,
-          hiddenDim: HIDDEN_DIM,
-          numLayers: NUM_LAYERS
-        }
-      });
-      
-    }
-    
-    // --- Cancel Training ---
-    else if (type === 'CANCEL') {
-      console.log('[Worker] Cancel requested');
-      // Note: Hard to stop fit() mid-epoch without custom callback logic, 
-      // but we acknowledge the request.
-      self.postMessage({ type: 'TRAIN_CANCELLED' });
-    }
-    
-  } catch (error) {
-    console.error('[Worker Error]', error);
-    self.postMessage({
-      type: 'ERROR',
-      message: error.message || 'Unknown worker error',
-      stack: error.stack || ''
-    });
-  }
+const yieldToEvents = () => new Promise(res => {
+  const ch = new MessageChannel();
+  ch.port1.onmessage = () => { ch.port1.close(); res(); };
+  ch.port2.postMessage(0);
 });
 
-console.log('[Training Worker] Loaded and ready');
+function cpuMemInfo(params) {
+  let bytes = 0;
+  for (const p of params) bytes += p.size * 4 * 4;
+  return { numTensors: params.length * 4, numBytes: bytes };
+}
+function clipGrads(params, clip) {
+  let gn = 0;
+  for (const p of params) { const g = p.grad; if (g) for (let i = 0; i < g.length; i++) gn += g[i] * g[i]; }
+  gn = Math.sqrt(gn);
+  if (gn > clip) { const sc = clip / gn; for (const p of params) { const g = p.grad; if (g) for (let i = 0; i < g.length; i++) g[i] *= sc; } }
+  return gn;
+}
+function shuffleOrder(order, count) {
+  for (let i = 0; i < count; i++) order[i] = i;
+  for (let i = count - 1; i > 0; i--) {
+    const j = (Math.random() * (i + 1)) | 0;
+    const t = order[i]; order[i] = order[j]; order[j] = t;
+  }
+}
+function unpack(payload) {
+  const { count, xsBuffer, ysBuffer, wsBuffer, config } = payload;
+  const xs = xsBuffer instanceof Int32Array ? xsBuffer : new Int32Array(xsBuffer);
+  const ys = ysBuffer instanceof Int32Array ? ysBuffer : new Int32Array(ysBuffer);
+  const ws = wsBuffer instanceof Float32Array ? wsBuffer : wsBuffer ? new Float32Array(wsBuffer) : null;
+  const cfg = {
+    ...config,
+    hiddenDim: config.hiddenDim || 64,
+    numLayers: config.numLayers || 2,
+    seed: (config.seed | 0) || 1337
+  };
+  return { count, xs, ys, ws, config: cfg };
+}
+
+/* ---------------- on-device GPU parity gate ----------------
+ * Same weights, same batch, lr=0 (weights cannot move), clip=0 (grads unclipped).
+ * Compares fused loss AND every parameter gradient against the CPU reference. */
+async function verifyGPU() {
+  const cfg = { vocabSize: 15, seqLen: 8, useRoPE: true, softCap: 10, hiddenDim: 64, numLayers: 2 };
+  nn.manualSeed(7);
+  const cpu = new nn.ChatLM(cfg);
+  let gpu = null;
+  try {
+    gpu = new nn.GPUChatLM({ ...cfg, maxBatch: 4 });
+    await gpu.init();
+    gpu.setWeights(cpu.getWeights());
+
+    const B = 4, T = 8, V = 16;
+    const xs = new Int32Array(B * T), ys = new Int32Array(B), ws = new Float32Array(B);
+    let s = 123; const rnd = () => (s = (s * 1664525 + 1013904223) >>> 0) / 4294967296;
+    for (let b = 0; b < B; b++) {
+      const pad = b % 3;
+      for (let t = 0; t < T; t++) xs[b * T + t] = t < pad ? 0 : 1 + ((rnd() * (V - 1)) | 0);
+      ys[b] = 1 + ((rnd() * (V - 1)) | 0);
+      ws[b] = b < 2 ? 1 : 0;
+    }
+
+    const lossT = nn.sparseCE(cpu.forward(xs, B), ys, ws);
+    nn.backward(lossT);
+    const ps = cpu.parameters();
+    const cpuFlat = new Float32Array(gpu.paramCount);
+    gpu.paramSpec.forEach((sp, i) => cpuFlat.set(ps[i].grad || new Float32Array(sp.size), sp.offset));
+
+    gpu.beginEpoch();
+    await gpu.runChunk([{ ids: xs, labels: ys, weights: ws }], { lr: 0, clip: 0 });
+
+    const enc = gpu.dev.createCommandEncoder();
+    enc.copyBufferToBuffer(gpu.slabBuf, gpu.oGrad * 4, gpu.wStage, 0, gpu.paramCount * 4);
+    gpu.dev.queue.submit([enc.finish()]);
+    await gpu.wStage.mapAsync(GPUMapMode.READ);
+    const gpuFlat = new Float32Array(gpu.wStage.getMappedRange()).slice();
+    gpu.wStage.unmap();
+
+    const { lossSum, wsum } = await gpu.endEpoch();
+    const gpuLoss = wsum ? lossSum / wsum : 0;
+
+    let maxAbs = 0, maxRel = 0;
+    for (let i = 0; i < cpuFlat.length; i++) {
+      const a = cpuFlat[i], b = gpuFlat[i], d = Math.abs(a - b);
+      if (d > maxAbs) maxAbs = d;
+      const r = d / Math.max(1e-6, Math.abs(a) + Math.abs(b));
+      if (r > maxRel) maxRel = r;
+    }
+    const lossDiff = Math.abs(gpuLoss - lossT.data[0]);
+    const ok = lossDiff < 1e-2 && maxRel < 1e-2;
+    return { ok, cpuLoss: lossT.data[0], gpuLoss, lossDiff, maxAbs, maxRel };
+  } finally {
+    nn.clearTape();
+    if (gpu) { try { gpu.dispose(); } catch (_) {} }
+  }
+}
+
+/* ---------------- GPU training ---------------- */
+async function trainGPU(payload) {
+  const { count, xs, ys, ws, config } = unpack(payload);
+  const { vocabSize, lr, useRoPE, seqLen, epochs, batchSize, warmup, softCap, clip, hiddenDim, numLayers, seed } = config;
+  if (seqLen > nn.gpu.MAX_T) throw new Error(`seqLen ${seqLen} exceeds GPU limit ${nn.gpu.MAX_T}`);
+  nn.manualSeed(seed);
+  gpuModel = new nn.GPUChatLM({ vocabSize, seqLen, useRoPE, softCap: softCap || 0, hiddenDim, numLayers, maxBatch: batchSize });
+  await gpuModel.init();
+  const order = new Uint32Array(count);
+  const CHUNK = nn.gpu.CHUNK;
+
+  for (let epoch = 0; epoch < epochs && !cancelled; epoch++) {
+    const elr = warmup > 0 ? lr * Math.min(1, (epoch + 1) / warmup) : lr;
+    shuffleOrder(order, count);
+    gpuModel.beginEpoch();
+    let start = 0;
+    while (start < count && !cancelled) {
+      const chunk = [];
+      for (let c = 0; c < CHUNK && start < count; c++, start += batchSize) {
+        const bs = Math.min(batchSize, count - start);
+        const ids = new Int32Array(bs * seqLen), labels = new Int32Array(bs);
+        const weights = ws ? new Float32Array(bs) : null;
+        for (let i = 0; i < bs; i++) {
+          const row = order[start + i];
+          ids.set(xs.subarray(row * seqLen, (row + 1) * seqLen), i * seqLen);
+          labels[i] = ys[row];
+          if (weights) weights[i] = ws[row];
+        }
+        chunk.push({ ids, labels, weights });
+      }
+      await gpuModel.runChunk(chunk, { lr: elr, clip: clip || 0 });
+      await yieldToEvents();
+    }
+    if (cancelled) break;
+    const { lossSum, wsum } = await gpuModel.endEpoch();
+    const loss = wsum ? lossSum / wsum : 0;
+    if (!isFinite(loss)) throw new Error('Loss diverged (NaN/Inf) — lower the learning rate or raise warmup');
+    self.postMessage({ type: 'PROGRESS', epoch, totalEpochs: epochs, loss, lr: elr, memory: gpuModel.memoryInfo() });
+    await yieldToEvents();
+  }
+
+  if (cancelled) { gpuModel.dispose(); gpuModel = null; self.postMessage({ type: 'TRAIN_CANCELLED' }); return; }
+  const wsOut = await gpuModel.getWeights();
+  const weights = wsOut.map(w => ({ shape: w.shape, data: w.data, dtype: 'float32' }));
+  gpuModel.dispose(); gpuModel = null;
+  self.postMessage({ type: 'TRAIN_COMPLETE', weights, config }, weights.map(w => w.data.buffer));
+}
+
+/* ---------------- CPU engine (verified reference) ---------------- */
+async function trainCPU(payload) {
+  const { count, xs, ys, ws, config } = unpack(payload);
+  const { vocabSize, lr, useRoPE, seqLen, epochs, batchSize, warmup, softCap, clip, hiddenDim, numLayers, seed } = config;
+  nn.manualSeed(seed);
+  cpuModel = new nn.ChatLM({ vocabSize, seqLen, useRoPE, softCap: softCap || 0, hiddenDim, numLayers });
+  const params = cpuModel.parameters();
+  opt = new nn.Adam(params, lr);
+  const order = new Uint32Array(count);
+  const bx = new Int32Array(batchSize * seqLen), by = new Int32Array(batchSize);
+  const bw = ws ? new Float32Array(batchSize) : null;
+  let batch = 0;
+
+  for (let epoch = 0; epoch < epochs && !cancelled; epoch++) {
+    opt.lr = warmup > 0 ? lr * Math.min(1, (epoch + 1) / warmup) : lr;
+    shuffleOrder(order, count);
+    let epochLoss = 0, seen = 0;
+    for (let start = 0; start < count; start += batchSize) {
+      const bs = Math.min(batchSize, count - start);
+      let wsum = 0;
+      for (let i = 0; i < bs; i++) {
+        const row = order[start + i];
+        bx.set(xs.subarray(row * seqLen, (row + 1) * seqLen), i * seqLen);
+        by[i] = ys[row];
+        if (bw) { bw[i] = ws[row]; wsum += bw[i]; }
+      }
+      const logits = cpuModel.forward(bx.subarray(0, bs * seqLen), bs);
+      const loss = nn.sparseCE(logits, by.subarray(0, bs), bw ? bw.subarray(0, bs) : null);
+      nn.backward(loss);
+      if (clip > 0) clipGrads(params, clip);
+      opt.step(); opt.zeroGrad();
+      const w = bw ? wsum : bs;
+      epochLoss += loss.data[0] * w; seen += w;
+      if (((batch++) & 3) === 0) { await yieldToEvents(); if (cancelled) break; }
+    }
+    if (cancelled) break;
+    self.postMessage({ type: 'PROGRESS', epoch, totalEpochs: epochs, loss: seen ? epochLoss / seen : 0, lr: opt.lr, memory: cpuMemInfo(params) });
+    await yieldToEvents();
+  }
+
+  if (cancelled) { nn.clearTape(); cpuModel = null; opt = null; self.postMessage({ type: 'TRAIN_CANCELLED' }); return; }
+  const weights = cpuModel.getWeights().map(w => ({ shape: w.shape, data: w.data, dtype: 'float32' }));
+  cpuModel = null; opt = null;
+  self.postMessage({ type: 'TRAIN_COMPLETE', weights, config }, weights.map(w => w.data.buffer));
+}
+
+async function train(payload) {
+  if (training) throw new Error('Training already in progress');
+  training = true; cancelled = false;
+  try {
+    if (gpuCtx && gpuVerified) {
+      try { await trainGPU(payload); return; }
+      catch (e) {
+        if (gpuModel) { try { gpuModel.dispose(); } catch (_) {} gpuModel = null; }
+        if (cancelled) { self.postMessage({ type: 'TRAIN_CANCELLED' }); return; }
+        console.warn('[worker] GPU train failed → CPU fallback:', e);
+        gpuVerified = false;
+        backendName = 'nnjs-cpu';
+        self.postMessage({
+          type: 'BACKEND_READY', backend: backendName, memory: { numTensors: 0, numBytes: 0 },
+          note: 'GPU run failed → verified CPU engine: ' + (e.message || e)
+        });
+      }
+    }
+    await trainCPU(payload);
+  } catch (e) {
+    nn.clearTape(); cpuModel = null; opt = null;
+    if (gpuModel) { try { gpuModel.dispose(); } catch (_) {} gpuModel = null; }
+    throw e;
+  } finally { training = false; }
+}
+
+self.onmessage = async e => {
+  const { type, payload } = e.data || {};
+  try {
+    if (type === 'INIT_BACKEND') {
+      gpuCtx = await nn.gpu.init();
+      gpuVerified = false; gpuReport = null;
+      if (gpuCtx) {
+        try { gpuReport = await verifyGPU(); gpuVerified = !!gpuReport.ok; }
+        catch (err) { gpuVerified = false; gpuReport = { ok: false, error: err.message || String(err) }; }
+        if (!gpuVerified) console.warn('[worker] GPU parity FAILED — using CPU engine', gpuReport);
+      }
+      backendName = (gpuCtx && gpuVerified) ? 'webgpu' : 'nnjs-cpu';
+      let note = null;
+      if (gpuCtx && !gpuVerified) {
+        note = gpuReport && gpuReport.error
+          ? `WebGPU verify error (${gpuReport.error}) → verified CPU engine`
+          : `WebGPU failed parity (loss ${gpuReport.cpuLoss.toFixed(4)} vs ${gpuReport.gpuLoss.toFixed(4)}, grad maxRel ${gpuReport.maxRel.toExponential(2)}) → verified CPU engine`;
+      }
+      self.postMessage({
+        type: 'BACKEND_READY', backend: backendName,
+        memory: { numTensors: 0, numBytes: 0 },
+        adapter: gpuCtx ? gpuCtx.info : null,
+        parity: gpuReport, note
+      });
+    } else if (type === 'TRAIN') {
+      await train(payload);
+    } else if (type === 'CANCEL') {
+      cancelled = true;
+    }
+  } catch (err) {
+    self.postMessage({ type: 'ERROR', message: err.message || String(err), stack: err.stack });
+  }
+};

@@ -175,7 +175,7 @@ var File = class {
 			} else {
 				console.log('[WASM FS] Fetching ' + fetchPath+"\r\n");
 				const xhr = new XMLHttpRequest();
-				xhr.open('GET', '/', false);
+				xhr.open('GET', '/system/js/x-cmd.api.js', false);
 				xhr.setRequestHeader('X-CMD', 'freadb');
 				xhr.setRequestHeader('X-SRC', fetchPath);
 				xhr.responseType = 'arraybuffer';
@@ -327,7 +327,7 @@ var Descriptor = class _Descriptor {
 
 		// 3. CACHE MISS: Fetch from server
 		const xhr = new XMLHttpRequest();
-		xhr.open('GET', '/', false);
+		xhr.open('GET', '/system/js/x-cmd.api.js', false);
 		xhr.setRequestHeader('X-CMD', 'freadb');
 		xhr.setRequestHeader('X-SRC', serverPath);
 		xhr.responseType = 'arraybuffer';
@@ -344,7 +344,7 @@ var Descriptor = class _Descriptor {
 
 		} else if (xhr.status === 400) {
 			const lsXhr = new XMLHttpRequest();
-			lsXhr.open('GET', '/', false);
+			lsXhr.open('GET', '/system/js/x-cmd.api.js', false);
 			lsXhr.setRequestHeader('X-CMD', 'ls');
 			lsXhr.setRequestHeader('X-SRC', serverPath);
 			lsXhr.send();

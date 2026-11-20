@@ -1,0 +1,10 @@
+<|user|>hello<|assistant|>Hi there! How can I help you today?<|stop|>
+<|user|>hello<|assistant|>Hello. I'm ready to assist you with any questions or tasks you might have.<|stop|>
+<|user|>hello<|assistant|>Hey! Great to see you. What's on your mind?<|stop|>
+<|user|>hello<|assistant|>Hello! What can I do for you?<|stop|>
+<|user|>hello<|assistant|>Greetings! Ready to dive into whatever you need. What shall we tackle first?<|stop|>
+<|user|>hello<|assistant|>Hi! Are you looking for help with something specific, or just saying hi?<|stop|>
+<|user|>hello<|assistant|>Hello! I'm here and ready to help. Let me know what you'd like to work on.<|stop|>
+<|user|>hello<|assistant|>Hello! System online and ready. Input your query and I'll process it right away.<|stop|>
+<|user|>hello<|assistant|>Hey there! Hope you're having a good day. How can I support you?<|stop|>
+<|user|>hello<|assistant|>Hello! Hi! How can I assist you today? Feel free to ask me anything.<|stop|>

@@ -7,6 +7,13 @@ const { promisify } = require('util');
 const crypto = require('crypto');
 
 // ==========================================================
+// ===== PATH CONSTANTS =====
+//const __dirname="/web/devApp/tools";
+
+const FILES_ROOT = path.join(__dirname, 'files');
+const TRASH_DIR = path.join(FILES_ROOT, 'trash');
+
+// ==========================================================
 // 🚨 ENHANCED ERROR HANDLING
 // Global catch-alls for uncaught syntax/runtime errors
 process.on('uncaughtException', (err, origin) => {
@@ -77,7 +84,7 @@ const _mimetype = {
     '.png': 'image/png',
     '.mp3': 'audio/mpeg',
     '.mp4': 'video/mp4',
-	'.m3u': 'text/plain', 
+    '.m3u': 'text/plain', 
     '.svg': 'image/svg+xml',
     '.gltf': 'model/gltf+json',
     '.bin': 'application/octet-stream',
@@ -130,8 +137,7 @@ const _mimetype = {
     '.webm': 'video/webm',
     '.wat': 'text/plain',
     '.pdf': 'application/pdf',
-	'.wasm': 'application/wasm',
-	".onnx": ' application/octet-stream'
+    '.wasm': 'application/wasm'
 };
 
 // ==========================================================
@@ -192,14 +198,22 @@ function computeAcceptKey(key) {
     return crypto.createHash('sha1').update(key + magic).digest('base64');
 }
 
+// ✅ FIX 1: Handle Control Frames (Ping/Pong/Close) to prevent buffer stalling
 function parseWebSocketFrame(buffer) {
     if (buffer.length < 2) return null;
+    const isFin = (buffer[0] & 0x80) !== 0;
     const opcode = buffer[0] & 0x0F;
-    if (opcode !== 1) return null; // Only handling text frames (opcode 1) for simplicity
+    
+    // Handle Text (1), Close (8), Ping (9), and Pong (10)
+    if (![1, 8, 9, 10].includes(opcode)) {
+        console.warn(`[WS] Unsupported opcode: ${opcode}`);
+        return null; 
+    }
+
     const isMasked = (buffer[1] & 0x80) === 0x80;
-    if (!isMasked) return null;
     let payloadLen = buffer[1] & 0x7F;
     let dataStart = 2;
+    
     if (payloadLen === 126) {
         if (buffer.length < 4) return null;
         payloadLen = buffer.readUInt16BE(2);
@@ -209,13 +223,25 @@ function parseWebSocketFrame(buffer) {
         payloadLen = Number(buffer.readBigUInt64BE(2));
         dataStart = 10;
     }
-    if (buffer.length < dataStart + 4 + payloadLen) return null;
-    const masks = buffer.slice(dataStart, dataStart + 4);
-    const payload = buffer.slice(dataStart + 4, dataStart + 4 + payloadLen);
-    for (let i = 0; i < payload.length; i++) {
-        payload[i] ^= masks[i % 4];
+    
+    const frameLength = dataStart + (isMasked ? 4 : 0) + payloadLen;
+    if (buffer.length < frameLength) return null; // Wait for more data
+    
+    let payload = buffer.slice(dataStart + (isMasked ? 4 : 0), frameLength);
+    
+    if (isMasked) {
+        const masks = buffer.slice(dataStart, dataStart + 4);
+        for (let i = 0; i < payload.length; i++) {
+            payload[i] ^= masks[i % 4];
+        }
     }
-    return payload.toString('utf8');
+    
+    return {
+        opcode,
+        isFin,
+        message: payload.toString('utf8'),
+        bytesConsumed: frameLength
+    };
 }
 
 function createWebSocketFrame(message) {
@@ -254,36 +280,17 @@ const serverOptions = {
     cert: './files/cert.crt',
     additionalMethods: []
 };
-/*
-const allowHead = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'OPTIONS, POST, GET, PUT, PATCH, DELETE',
-    'Access-Control-Max-Age': 2592000,
-    'Access-Control-Allow-Headers': 'Origin, X-Requested-With, Content-Type, Accept, Authorization, X-LS-Path, X-Read-File, X-Read-File-Binary, X-Save-File, X-File-Path, X-File-Content, X-MKPATH, X-MV-Source, X-MV-Destination, X-DEL-Path, X-COPY-Source, X-COPY-Destination, X-RN-Source, X-RN-Destination, X-CMD, X-SRC, X-DST',
-    // 👇 ADD THESE 3 HEADERS FOR WEB WORKER THREADING 👇
-    'Cross-Origin-Opener-Policy': 'same-origin',
-    'Cross-Origin-Embedder-Policy': 'require-corp',
-    'Cross-Origin-Resource-Policy': 'cross-origin'
-};
-*/
-
-
 
 const allowHead = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'OPTIONS, POST, GET, PUT, PATCH, DELETE',
     'Access-Control-Max-Age': 2592000,
     'Access-Control-Allow-Headers': 'Origin, X-Requested-With, Content-Type, Accept, Authorization, X-LS-Path, X-Read-File, X-Read-File-Binary, X-Save-File, X-File-Path, X-File-Content, X-MKPATH, X-MV-Source, X-MV-Destination, X-DEL-Path, X-COPY-Source, X-COPY-Destination, X-RN-Source, X-RN-Destination, X-CMD, X-SRC, X-DST',
-    
     'Access-Control-Expose-Headers': 'Content-Length, Content-Range, Accept-Ranges',
-    
     'Cross-Origin-Opener-Policy': 'same-origin',
     'Cross-Origin-Embedder-Policy': 'require-corp',
     'Cross-Origin-Resource-Policy': 'cross-origin'
 };
-
-
-
 
 // ==========================================================
 // ===== RESPONSE HELPERS =====
@@ -411,12 +418,16 @@ async function handleApiRequest(req, res, relativePath) {
 // ===== MULTIPART FORM PARSER =====
 const MAX_UPLOAD_SIZE = 500 * 1024 * 1024;
 
+// ✅ FIX 2: Manual buffer splitting to ensure 100% compatibility with Node v18.x / iOS environments
 function parseMultipartForm(req) {
     return new Promise((resolve, reject) => {
         const contentType = req.headers['content-type'] || '';
-        const boundaryMatch = contentType.match(/boundary=(?:"([^"]+)"|([^;]+))/i);
+        const boundaryMatch = contentType.match(/boundary=(?:"([^"]+)"|([^;]+))/i);//"
         if (!boundaryMatch) return reject(new Error('Missing boundary in Content-Type'));
-        const boundary = '--' + (boundaryMatch[1] || boundaryMatch[2]).trim();
+        
+        const boundaryStr = (boundaryMatch[1] || boundaryMatch[2]).trim();
+        const boundary = Buffer.from('--' + boundaryStr);
+        
         let bodyChunks = [];
         let totalSize = 0;
         req.on('data', (chunk) => {
@@ -428,39 +439,78 @@ function parseMultipartForm(req) {
             }
             bodyChunks.push(chunk);
         });
+        
         req.on('end', () => {
             try {
                 const buffer = Buffer.concat(bodyChunks);
-                const bodyStr = buffer.toString('binary');
-                const parts = bodyStr.split(boundary);
                 const result = { fields: {}, files: [] };
-                for (let i = 1; i < parts.length - 1; i++) {
-                    const part = parts[i].trim();
-                    if (!part) continue;
-                    const headerEnd = part.indexOf('\r\n\r\n');
-                    if (headerEnd === -1) continue;
-                    const headersRaw = part.substring(0, headerEnd);
-                    const content = part.substring(headerEnd + 4);
-                    const dispMatch = headersRaw.match(/Content-Disposition:\s*form-data;\s*name="([^"]+)"/i);
-                    if (!dispMatch) continue;
-                    const fieldName = dispMatch[1];
-                    const filenameMatch = headersRaw.match(/filename="([^"]+)"/i);
-                    if (filenameMatch) {
-                        const filename = filenameMatch[1];
-                        const contentTypeMatch = headersRaw.match(/Content-Type:\s*([^\r\n]+)/i);
-                        const contentType = contentTypeMatch ? contentTypeMatch[1].trim() : 'application/octet-stream';
-                        let fileContent = content;
-                        if (fileContent.endsWith('\r\n')) fileContent = fileContent.substring(0, fileContent.length - 2);
-                        const isBinary = !contentType.startsWith('text/');
-                        result.files.push({ field: fieldName, name: filename, type: contentType, content: fileContent, isBinary });
-                    } else {
-                        let fieldValue = content;
-                        if (fieldValue.endsWith('\r\n')) fieldValue = fieldValue.substring(0, fieldValue.length - 2);
-                        result.fields[fieldName] = fieldValue;
+                
+                // Manual split to avoid Buffer.split compatibility issues
+                let offset = 0;
+                while (true) {
+                    const boundaryIndex = buffer.indexOf(boundary, offset);
+                    if (boundaryIndex === -1) break;
+                    
+                    // Check if this is the final boundary (--boundary--)
+                    const nextChars = buffer.slice(boundaryIndex + boundary.length, boundaryIndex + boundary.length + 4).toString('ascii');
+                    if (nextChars.startsWith('--')) {
+                        break; // End of multipart
                     }
+                    
+                    offset = boundaryIndex + boundary.length;
+                    
+                    // Skip leading \r\n
+                    if (buffer[offset] === 0x0D && buffer[offset + 1] === 0x0A) {
+                        offset += 2;
+                    }
+                    
+                    const headerEndIdx = buffer.indexOf('\r\n\r\n', offset);
+                    if (headerEndIdx === -1) break;
+                    
+                    const headersRaw = buffer.slice(offset, headerEndIdx).toString('utf8');
+                    offset = headerEndIdx + 4;
+                    
+                    // Find the start of the next boundary to determine content end
+                    let contentEndIdx = buffer.indexOf(boundary, offset);
+                    if (contentEndIdx === -1) {
+                        contentEndIdx = buffer.length;
+                    } else {
+                        // Strip trailing \r\n before the next boundary
+                        if (contentEndIdx >= 2 && buffer[contentEndIdx - 2] === 0x0D && buffer[contentEndIdx - 1] === 0x0A) {
+                            contentEndIdx -= 2;
+                        }
+                    }
+                    
+                    const content = buffer.slice(offset, contentEndIdx);
+                    
+                    const dispMatch = headersRaw.match(/Content-Disposition:\s*form-data;\s*name="([^"]+)"/i);//"
+                    if (dispMatch) {
+                        const fieldName = dispMatch[1];
+                        const filenameMatch = headersRaw.match(/filename="([^"]+)"/i);//"
+                        
+                        if (filenameMatch) {
+                            const filename = filenameMatch[1];
+                            const contentTypeMatch = headersRaw.match(/Content-Type:\s*([^\r\n]+)/i);//"
+                            const contentType = contentTypeMatch ? contentTypeMatch[1].trim() : 'application/octet-stream';
+                            
+                            result.files.push({ 
+                                field: fieldName, 
+                                name: filename, 
+                                type: contentType, 
+                                content: content, // Safe, uncorrupted Buffer
+                                isBinary: true 
+                            });
+                        } else {
+                            result.fields[fieldName] = content.toString('utf8');
+                        }
+                    }
+                    
+                    offset = contentEndIdx;
                 }
                 resolve(result);
-            } catch (error) { reject(error); }
+            } catch (error) { 
+                reject(error); 
+            }
         });
         req.on('error', reject);
     });
@@ -479,8 +529,9 @@ async function handleFileUpload(req, res) {
         const fullPath = path.join(FILES_ROOT, filePathHeader);
         const dir = path.dirname(fullPath);
         await mkdir(dir, { recursive: true });
+        
         if (file.isBinary) {
-            await writeFile(fullPath, Buffer.from(file.content, 'binary'));
+            await writeFile(fullPath, file.content);
         } else {
             await writeFile(fullPath, file.content, 'utf8');
         }
@@ -491,7 +542,9 @@ async function handleFileUpload(req, res) {
         } else if (error.message.includes('Missing boundary')) {
             sendPlainTextResponse(res, 'Invalid request format', 400);
         } else {
-            logModuleError('UPLOAD', 'multipart-parser', error);
+            // ✅ FIX 2b: Direct console logging to prevent ENOENT crash from logModuleError
+            console.error(`\x1b[31m[UPLOAD] ❌ ERROR:\x1b[0m ${error.message}`);
+            if (error.stack) console.error(`\x1b[2mStack:\x1b[0m\n${error.stack}`);
             sendPlainTextResponse(res, 'Upload failed: ' + error.message, 500);
         }
     }
@@ -594,7 +647,6 @@ function handleWsUpgrade(serverType, req, socket, head) {
                 _socket: socket
             };
             
-            // [FIX] Execute handler ONCE immediately after successful handshake
             let wsInstance;
             try {
                 wsInstance = handlerMod.handler(ws, req);
@@ -602,27 +654,56 @@ function handleWsUpgrade(serverType, req, socket, head) {
             } catch (e) {
                 logModuleError('WS-OPEN', cacheKey, e);
                 ws.close(1011, 'Init failed');
-                return; // Stop execution to prevent attaching listeners to a failed connection
+                return;
             }
             
+            // ✅ FIX 1b: Properly handle Ping/Pong/Close and slice buffer to prevent memory leaks
             let frameBuffer = Buffer.alloc(0);
             socket.on('data', (chunk) => {
                 frameBuffer = Buffer.concat([frameBuffer, chunk]);
+                
                 while (frameBuffer.length >= 2) {
-                    const message = parseWebSocketFrame(frameBuffer);
-                    if (message === null) break;
-                    
-                    // Note: Clearing the buffer here is a pre-existing quirk in your parser. 
-                    // If multiple frames arrive in a single TCP chunk, this drops the subsequent frames.
-                    frameBuffer = Buffer.alloc(0); 
+                    const parsed = parseWebSocketFrame(frameBuffer);
+                    if (parsed === null) break; // Incomplete frame, wait for next chunk
                     
                     try {
-                        // [FIX] Use the stored instance instead of re-calling handler
-                        if (typeof wsInstance?.onMessage === 'function') wsInstance.onMessage(message);
+                        if (parsed.opcode === 8) {
+                            // Client requested close
+                            ws.close(1000, 'Closed by client');
+                            return; // Stop processing
+                        } else if (parsed.opcode === 9) {
+                            // Ping: respond with Pong (opcode 10)
+                            const pongPayload = Buffer.from(parsed.message, 'utf8');
+                            const pongLen = pongPayload.length;
+                            let pongFrame;
+                            if (pongLen <= 125) {
+                                pongFrame = Buffer.allocUnsafe(2 + pongLen);
+                                pongFrame[0] = 0x8A; // Pong opcode, FIN bit set
+                                pongFrame[1] = pongLen;
+                                pongPayload.copy(pongFrame, 2);
+                            } else {
+                                // Fallback for unusually large pings (rare)
+                                pongFrame = Buffer.allocUnsafe(4 + pongLen);
+                                pongFrame[0] = 0x8A;
+                                pongFrame[1] = 126;
+                                pongFrame.writeUInt16BE(pongLen, 2);
+                                pongPayload.copy(pongFrame, 4);
+                            }
+                            socket.write(pongFrame);
+                        } else if (parsed.opcode === 1) {
+                            // Text frame
+                            if (typeof wsInstance?.onMessage === 'function') {
+                                wsInstance.onMessage(parsed.message);
+                            }
+                        }
                     } catch (e) {
                         logModuleError('WS-MSG', cacheKey, e);
                         ws.close(1011, 'Handler error');
+                        return; // Stop processing further frames on error
                     }
+                    
+                    // Slice the buffer to remove the consumed frame, preserving remaining data
+                    frameBuffer = frameBuffer.slice(parsed.bytesConsumed);
                 }
             });
             
@@ -630,7 +711,6 @@ function handleWsUpgrade(serverType, req, socket, head) {
                 ws.readyState = 3;
                 if (wsCache.has(cacheKey)) wsCache.get(cacheKey).lastAccessed = Date.now();
                 try {
-                    // [FIX] Use the stored instance instead of re-calling handler
                     if (typeof wsInstance?.onClose === 'function') wsInstance.onClose();
                 } catch (e) { }
             });
@@ -639,8 +719,6 @@ function handleWsUpgrade(serverType, req, socket, head) {
                 console.error(`[WS] ${serverType} Socket error ${cacheKey}:`, err.message);
                 ws.close(1006, 'Socket error');
             });
-            
-            // [FIX] Removed the duplicate handler call that was previously located here
         });
     } catch (e) {
         logModuleError('WS-UPGRADE', req.url || 'unknown', e);
@@ -684,10 +762,6 @@ setInterval(() => {
     }
 }, 10 * 60 * 1000);
 
-// ==========================================================
-// ===== PATH CONSTANTS =====
-const FILES_ROOT = path.join(__dirname, 'files');
-const TRASH_DIR = path.join(FILES_ROOT, 'trash');
 
 // ==========================================================
 // ===== FILE SYSTEM HANDLERS =====
@@ -743,9 +817,7 @@ async function handleReadFile(res, filePathHeader) {
 }
 
 async function handleReadFileBinary(req, res, filePathHeader) {
-    //console.log("file:");
-	//console.log(JSON.stringify(filePathHeader));
-	if (!isPathInsideRoot(FILES_ROOT, filePathHeader)) return sendPlainTextResponse(res, 'Access Denied', 403);
+    if (!isPathInsideRoot(FILES_ROOT, filePathHeader)) return sendPlainTextResponse(res, 'Access Denied', 403);
     const fullPath = path.join(FILES_ROOT, filePathHeader);
     try {
         const stats = await stat(fullPath);
@@ -763,7 +835,6 @@ async function handleSaveFile(req, res, filePathHeader) {
     if (!isPathInsideRoot(FILES_ROOT, filePathHeader)) return sendPlainTextResponse(res, 'Access Denied', 403);
     const fullPath = path.join(FILES_ROOT, filePathHeader);
     
-    // ✅ FIX: Collect raw Buffer chunks, do NOT convert to string
     const chunks = [];
     let totalSize = 0;
     let sizeExceeded = false;
@@ -785,7 +856,6 @@ async function handleSaveFile(req, res, filePathHeader) {
             const dir = path.dirname(fullPath);
             await mkdir(dir, { recursive: true });
             
-            // ✅ FIX: Concatenate buffers and write as raw binary (no 'utf8' flag)
             const buffer = Buffer.concat(chunks);
             await writeFile(fullPath, buffer);
             
@@ -833,13 +903,10 @@ async function handleMv(res, mvSourceHeader, mvDestinationHeader) {
                             const hasSourceWildcard = mvSourceHeader.includes('*');
                             if (hasSourceWildcard) return sendPlainTextResponse(res, 'Cannot move multiple files to a file path', 400);
                             if (!isPathInsideRoot(FILES_ROOT, path.relative(FILES_ROOT, sourceFullPath))) return sendPlainTextResponse(res, 'Access Denied', 403);
-                            const sourceStats = await stat(sourceFullPath);
-                            if (sourceStats.isDirectory()) {
-                                actualDestinationDir = path.dirname(destinationFullPath);
-                            } else {
-                                await rename(sourceFullPath, destinationFullPath);
-                                return sendPlainTextResponse(res, `Moved: ${path.relative(FILES_ROOT, sourceFullPath)} to ${path.relative(FILES_ROOT, destinationFullPath)}`, 200);
-                            }
+                            
+                            // ✅ FIX: Directly rename to the new destination path instead of falling back to dirname
+                            await rename(sourceFullPath, destinationFullPath);
+                            return sendPlainTextResponse(res, `Moved: ${path.relative(FILES_ROOT, sourceFullPath)} to ${path.relative(FILES_ROOT, destinationFullPath)}`, 200);
                         }
                     } catch (parentErr) { }
                 }
@@ -920,8 +987,15 @@ async function handleCopy(res, copySourceHeader, copyDestinationHeader) {
                             if (hasSourceWildcard) return sendPlainTextResponse(res, 'Cannot copy multiple files to a file path', 400);
                             if (!isPathInsideRoot(FILES_ROOT, path.relative(FILES_ROOT, sourceFullPath))) return sendPlainTextResponse(res, 'Access Denied', 403);
                             const sourceStats = await stat(sourceFullPath);
-                            if (sourceStats.isDirectory()) { actualDestinationDir = path.dirname(destinationFullPath); }
-                            else { await copyFile(sourceFullPath, destinationFullPath); return sendPlainTextResponse(res, `Copied: ${path.relative(FILES_ROOT, sourceFullPath)} to ${path.relative(FILES_ROOT, destinationFullPath)}`, 200); }
+                            
+                            // ✅ FIX: Directly copy to the new destination path instead of falling back to dirname
+                            if (sourceStats.isDirectory()) {
+                                await copyDirectoryRecursive(sourceFullPath, destinationFullPath);
+                                return sendPlainTextResponse(res, `Copied directory: ${path.relative(FILES_ROOT, sourceFullPath)} to ${path.relative(FILES_ROOT, destinationFullPath)}`, 200);
+                            } else {
+                                await copyFile(sourceFullPath, destinationFullPath);
+                                return sendPlainTextResponse(res, `Copied: ${path.relative(FILES_ROOT, sourceFullPath)} to ${path.relative(FILES_ROOT, destinationFullPath)}`, 200);
+                            }
                         }
                     } catch (parentErr) { }
                 }
@@ -1007,7 +1081,6 @@ async function handleDel(res, delPathHeader) {
 // ==========================================================
 // ===== MAIN HTTP REQUEST HANDLER =====
 function webHandler(req, res) {
-	console.log("here1")
     const clientIP = req.socket?.remoteAddress || req.connection?.remoteAddress;
     if (!isLanIP(clientIP)) {
         console.warn(`[SECURITY] Blocked external request from ${clientIP} to ${req.url}`);
@@ -1016,20 +1089,10 @@ function webHandler(req, res) {
         return;
     }
 	
-	 
-	//res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');    
-	//res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');   
-	//res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');    
-	
-	// Inside function webHandler(req, res)
-	res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');    
-	res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');   
-	res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-
-// 👇 ADD THIS LINE HERE TOO 👇
-	res.setHeader('Access-Control-Expose-Headers', 'Content-Length, Content-Range, Accept-Ranges');
-	
-	
+    res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');    
+    res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');   
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    res.setHeader('Access-Control-Expose-Headers', 'Content-Length, Content-Range, Accept-Ranges');
     
     if (req.method === 'OPTIONS') { res.writeHead(204, allowHead); res.end(); return; }
     

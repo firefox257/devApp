@@ -1,4 +1,4 @@
-//webserver.js
+// webserver.js
 const http = require('http');
 const https = require('https');
 const fs = require('fs');
@@ -8,14 +8,12 @@ const crypto = require('crypto');
 
 // ==========================================================
 // ===== PATH CONSTANTS =====
-//const __dirname="/web/devApp/tools";
-
 const FILES_ROOT = path.join(__dirname, 'files');
+globalThis.FILES_ROOT = FILES_ROOT; // Expose globally for nested .api.js files
 const TRASH_DIR = path.join(FILES_ROOT, 'trash');
 
 // ==========================================================
 // 🚨 ENHANCED ERROR HANDLING
-// Global catch-alls for uncaught syntax/runtime errors
 process.on('uncaughtException', (err, origin) => {
   console.error(`\n\x1b[31m💥 UNCAUGHT EXCEPTION\x1b[0m`);
   console.error(`Origin: ${origin}`);
@@ -31,7 +29,6 @@ process.on('unhandledRejection', (reason, promise) => {
   console.error('\x1b[0m---\n');
 });
 
-// Helper: Dump full stacktrace + file context on module load/execution failure
 function logModuleError(context, filePath, error) {
   console.error(`\n\x1b[31m[${context}] ❌ LOAD/EXEC ERROR: ${filePath}\x1b[0m`);
   console.error(`\x1b[2mError:\x1b[0m ${error.message}`);
@@ -43,7 +40,6 @@ function logModuleError(context, filePath, error) {
   try {
     const content = fs.readFileSync(filePath, 'utf8');
     const lines = content.split('\n');
-    // Extract line number from Node.js stack trace
     const lineMatch = error.stack?.match(/:(\d+):\d+/);
     const errorLine = lineMatch ? parseInt(lineMatch[1]) : null;
     const start = Math.max(0, (errorLine || 1) - 5);
@@ -74,70 +70,23 @@ const copyFile = promisify(fs.copyFile);
 // ==========================================================
 // ===== MIME TYPE MAP =====
 const _mimetype = {
-    '.txt': 'text/plain',
-    '.html': 'text/html',
-    '.htm': 'text/html',
-    '.js': 'text/javascript',
-    '.jpg': 'image/jpeg',
-    '.JPG': 'image/jpeg',
-    '.jpeg': 'image/jpeg',
-    '.png': 'image/png',
-    '.mp3': 'audio/mpeg',
-    '.mp4': 'video/mp4',
-    '.m3u': 'text/plain', 
-    '.svg': 'image/svg+xml',
-    '.gltf': 'model/gltf+json',
-    '.bin': 'application/octet-stream',
-    '.onnx': 'application/octet-stream',
-    '.css': 'text/css',
-    '.hdr': 'application/octet-stream',
-    '.json': 'application/json',
-    '.stl': 'application/sla',
-    '.dxf': 'application/dxf',
-    '.gif': 'image/gif',
-    '.woff2': 'font/woff2',
-    '.ico': 'image/vnd.microsoft.icon',
-    '.glb': 'model/gltf-binary',
-    '.pvr': 'image/x-png',
-    '.usdz': 'vnd.usdz+zip',
-    '.mpd': 'application/dash+xml',
-    '.dae': 'model/vnd.collada+xml',
-    '.obj': 'multipart/form-data',
-    '.ply': 'model/mesh',
-    '.3dm': 'model/vnd.3dm',
-    '.3ds': 'application/x-3ds',
-    '.3mf': 'model/3mf',
-    '.amf': 'application/octet-stream',
-    '.bvh': 'animation/bvh',
-    '.drc': 'application/octet-stream',
-    '.fbx': 'application/octet-stream',
-    '.gcode': 'text/x-gcode',
-    '.kmz': 'application/vnd.google-earth.kmz+xml',
-    '.lwo': 'image/x-lwo',
-    '.md2': 'model/md2',
-    '.mdd': 'application/octet-stream',
-    '.nrrd': 'application/octet-stream',
-    '.mtl': 'text/plain',
-    '.pcd': 'application/vnd.pointcloud+json',
-    '.pdb': 'chemical/pdb',
-    '.vox': 'application/octet-stream',
-    '.wrl': 'model/x3d-vrl',
-    '.vtk': 'application/octet-stream',
-    '.dds': 'image/vnd.ms-dds',
-    '.exr': 'application/octet-stream',
-    '.ktx': 'application/octet-stream',
-    '.ktx2': 'application/octet-stream',
-    '.tga': 'image/x-tga',
-    '.tif': 'image/tiff',
-    '.tiff': 'image/tiff',
-    '.ttf': 'font/ttf',
-    '.vtp': 'application/vibrationview',
-    '.zip': 'application/zip',
-    '.xyz': 'application/octet-stream',
-    '.webm': 'video/webm',
-    '.wat': 'text/plain',
-    '.pdf': 'application/pdf',
-    '.wasm': 'application/wasm'
+    '.txt': 'text/plain', '.html': 'text/html', '.htm': 'text/html', '.js': 'text/javascript',
+    '.jpg': 'image/jpeg', '.JPG': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png',
+    '.mp3': 'audio/mpeg', '.mp4': 'video/mp4', '.m3u': 'text/plain', '.svg': 'image/svg+xml',
+    '.gltf': 'model/gltf+json', '.bin': 'application/octet-stream', '.onnx': 'application/octet-stream',
+    '.css': 'text/css', '.hdr': 'application/octet-stream', '.json': 'application/json',
+    '.stl': 'application/sla', '.dxf': 'application/dxf', '.gif': 'image/gif', '.woff2': 'font/woff2',
+    '.ico': 'image/vnd.microsoft.icon', '.glb': 'model/gltf-binary', '.pvr': 'image/x-png',
+    '.usdz': 'vnd.usdz+zip', '.mpd': 'application/dash+xml', '.dae': 'model/vnd.collada+xml',
+    '.obj': 'multipart/form-data', '.ply': 'model/mesh', '.3dm': 'model/vnd.3dm', '.3ds': 'application/x-3ds',
+    '.3mf': 'model/3mf', '.amf': 'application/octet-stream', '.bvh': 'animation/bvh', '.drc': 'application/octet-stream',
+    '.fbx': 'application/octet-stream', '.gcode': 'text/x-gcode', '.kmz': 'application/vnd.google-earth.kmz+xml',
+    '.lwo': 'image/x-lwo', '.md2': 'model/md2', '.mdd': 'application/octet-stream', '.nrrd': 'application/octet-stream',
+    '.mtl': 'text/plain', '.pcd': 'application/vnd.pointcloud+json', '.pdb': 'chemical/pdb', '.vox': 'application/octet-stream',
+    '.wrl': 'model/x3d-vrl', '.vtk': 'application/octet-stream', '.dds': 'image/vnd.ms-dds', '.exr': 'application/octet-stream',
+    '.ktx': 'application/octet-stream', '.ktx2': 'application/octet-stream', '.tga': 'image/x-tga', '.tif': 'image/tiff',
+    '.tiff': 'image/tiff', '.ttf': 'font/ttf', '.vtp': 'application/vibrationview', '.zip': 'application/zip',
+    '.xyz': 'application/octet-stream', '.webm': 'video/webm', '.wat': 'text/plain', '.pdf': 'application/pdf', '.wasm': 'application/wasm'
 };
 
 // ==========================================================
@@ -145,11 +94,7 @@ const _mimetype = {
 function decodePathSegments(pathname) {
     if (!pathname) return pathname;
     return pathname.split('/').map(segment => {
-        try {
-            return decodeURIComponent(segment);
-        } catch (e) {
-            return segment;
-        }
+        try { return decodeURIComponent(segment); } catch (e) { return segment; }
     }).join('/');
 }
 
@@ -198,22 +143,17 @@ function computeAcceptKey(key) {
     return crypto.createHash('sha1').update(key + magic).digest('base64');
 }
 
-// ✅ FIX 1: Handle Control Frames (Ping/Pong/Close) to prevent buffer stalling
 function parseWebSocketFrame(buffer) {
     if (buffer.length < 2) return null;
     const isFin = (buffer[0] & 0x80) !== 0;
     const opcode = buffer[0] & 0x0F;
-    
-    // Handle Text (1), Close (8), Ping (9), and Pong (10)
     if (![1, 8, 9, 10].includes(opcode)) {
         console.warn(`[WS] Unsupported opcode: ${opcode}`);
         return null; 
     }
-
     const isMasked = (buffer[1] & 0x80) === 0x80;
     let payloadLen = buffer[1] & 0x7F;
     let dataStart = 2;
-    
     if (payloadLen === 126) {
         if (buffer.length < 4) return null;
         payloadLen = buffer.readUInt16BE(2);
@@ -223,25 +163,16 @@ function parseWebSocketFrame(buffer) {
         payloadLen = Number(buffer.readBigUInt64BE(2));
         dataStart = 10;
     }
-    
     const frameLength = dataStart + (isMasked ? 4 : 0) + payloadLen;
-    if (buffer.length < frameLength) return null; // Wait for more data
-    
+    if (buffer.length < frameLength) return null;
     let payload = buffer.slice(dataStart + (isMasked ? 4 : 0), frameLength);
-    
     if (isMasked) {
         const masks = buffer.slice(dataStart, dataStart + 4);
         for (let i = 0; i < payload.length; i++) {
             payload[i] ^= masks[i % 4];
         }
     }
-    
-    return {
-        opcode,
-        isFin,
-        message: payload.toString('utf8'),
-        bytesConsumed: frameLength
-    };
+    return { opcode, isFin, message: payload.toString('utf8'), bytesConsumed: frameLength };
 }
 
 function createWebSocketFrame(message) {
@@ -251,7 +182,7 @@ function createWebSocketFrame(message) {
     if (len > 65535) headerLen += 8;
     else if (len > 125) headerLen += 2;
     const buffer = Buffer.allocUnsafe(headerLen + len);
-    buffer[0] = 0x81; // Text frame, FIN bit set
+    buffer[0] = 0x81;
     if (len <= 125) {
         buffer[1] = len;
     } else if (len <= 65535) {
@@ -314,12 +245,9 @@ globalThis.streamFile = function (req, res, filePath, contentType, statusCode = 
             }
             return;
         }
-		
-		// 🛡️ PREVENT EISDIR CRASH: Return 400 if targeting a directory
         if (stats.isDirectory()) {
             return sendPlainTextResponse(res, 'Cannot read a directory', 400);
         }
-		
         const fileSize = stats.size;
         const range = req.headers.range;
         if (range) {
@@ -338,11 +266,7 @@ globalThis.streamFile = function (req, res, filePath, contentType, statusCode = 
             const fileStream = fs.createReadStream(filePath, { start, end });
             fileStream.pipe(res);
         } else {
-            const streamHeaders = {
-                'Content-Length': fileSize,
-                'Content-Type': contentType,
-                ...headers
-            };
+            const streamHeaders = { 'Content-Length': fileSize, 'Content-Type': contentType, ...headers };
             res.writeHead(statusCode, streamHeaders);
             fs.createReadStream(filePath).pipe(res);
         }
@@ -361,12 +285,9 @@ function handleFileRequest(req, res, filePath) {
             }
             return;
         }
-		
-		// 🛡️ PREVENT EISDIR CRASH: Return 400 if targeting a directory
         if (stats.isDirectory()) {
             return sendPlainTextResponse(res, 'Cannot read a directory', 400);
         }
-		
         const ext = path.extname(filePath).toLowerCase();
         const contentType = _mimetype[ext] || 'application/octet-stream';
         streamFile(req, res, filePath, contentType);
@@ -374,14 +295,12 @@ function handleFileRequest(req, res, filePath) {
 }
 
 // ==========================================================
-// ===== API REQUEST HANDLER (supports nested paths) =====
+// ===== API REQUEST HANDLER =====
 async function handleApiRequest(req, res, relativePath) {
     const apiFilePath = path.join(FILES_ROOT, relativePath);
-    
     if (!isPathInsideRoot(FILES_ROOT, relativePath)) {
         return sendPlainTextResponse(res, 'Access Denied', 403);
     }
-    
     if (apiCache.has(relativePath)) {
         const cachedApi = apiCache.get(relativePath);
         cachedApi.lastAccessed = Date.now();
@@ -418,16 +337,13 @@ async function handleApiRequest(req, res, relativePath) {
 // ===== MULTIPART FORM PARSER =====
 const MAX_UPLOAD_SIZE = 500 * 1024 * 1024;
 
-// ✅ FIX 2: Manual buffer splitting to ensure 100% compatibility with Node v18.x / iOS environments
 function parseMultipartForm(req) {
     return new Promise((resolve, reject) => {
         const contentType = req.headers['content-type'] || '';
-        const boundaryMatch = contentType.match(/boundary=(?:"([^"]+)"|([^;]+))/i);
+        const boundaryMatch = contentType.match(/boundary=(?:"([^"]+)"|([^;]+))/i);//"
         if (!boundaryMatch) return reject(new Error('Missing boundary in Content-Type'));
-        
         const boundaryStr = (boundaryMatch[1] || boundaryMatch[2]).trim();
         const boundary = Buffer.from('--' + boundaryStr);
-        
         let bodyChunks = [];
         let totalSize = 0;
         req.on('data', (chunk) => {
@@ -439,78 +355,43 @@ function parseMultipartForm(req) {
             }
             bodyChunks.push(chunk);
         });
-        
         req.on('end', () => {
             try {
                 const buffer = Buffer.concat(bodyChunks);
                 const result = { fields: {}, files: [] };
-                
-                // Manual split to avoid Buffer.split compatibility issues
                 let offset = 0;
                 while (true) {
                     const boundaryIndex = buffer.indexOf(boundary, offset);
                     if (boundaryIndex === -1) break;
-                    
-                    // Check if this is the final boundary (--boundary--)
                     const nextChars = buffer.slice(boundaryIndex + boundary.length, boundaryIndex + boundary.length + 4).toString('ascii');
-                    if (nextChars.startsWith('--')) {
-                        break; // End of multipart
-                    }
-                    
+                    if (nextChars.startsWith('--')) break;
                     offset = boundaryIndex + boundary.length;
-                    
-                    // Skip leading \r\n
-                    if (buffer[offset] === 0x0D && buffer[offset + 1] === 0x0A) {
-                        offset += 2;
-                    }
-                    
+                    if (buffer[offset] === 0x0D && buffer[offset + 1] === 0x0A) offset += 2;
                     const headerEndIdx = buffer.indexOf('\r\n\r\n', offset);
                     if (headerEndIdx === -1) break;
-                    
                     const headersRaw = buffer.slice(offset, headerEndIdx).toString('utf8');
                     offset = headerEndIdx + 4;
-                    
-                    // Find the start of the next boundary to determine content end
                     let contentEndIdx = buffer.indexOf(boundary, offset);
-                    if (contentEndIdx === -1) {
-                        contentEndIdx = buffer.length;
-                    } else {
-                        // Strip trailing \r\n before the next boundary
-                        if (contentEndIdx >= 2 && buffer[contentEndIdx - 2] === 0x0D && buffer[contentEndIdx - 1] === 0x0A) {
-                            contentEndIdx -= 2;
-                        }
-                    }
-                    
+                    if (contentEndIdx === -1) contentEndIdx = buffer.length;
+                    else if (contentEndIdx >= 2 && buffer[contentEndIdx - 2] === 0x0D && buffer[contentEndIdx - 1] === 0x0A) contentEndIdx -= 2;
                     const content = buffer.slice(offset, contentEndIdx);
-                    
-                    const dispMatch = headersRaw.match(/Content-Disposition:\s*form-data;\s*name="([^"]+)"/i);
+                    const dispMatch = headersRaw.match(/Content-Disposition:\s*form-data;\s*name="([^"]+)"/i);//"
                     if (dispMatch) {
                         const fieldName = dispMatch[1];
-                        const filenameMatch = headersRaw.match(/filename="([^"]+)"/i);
-                        
+                        const filenameMatch = headersRaw.match(/filename="([^"]+)"/i);//"
                         if (filenameMatch) {
                             const filename = filenameMatch[1];
                             const contentTypeMatch = headersRaw.match(/Content-Type:\s*([^\r\n]+)/i);
                             const contentType = contentTypeMatch ? contentTypeMatch[1].trim() : 'application/octet-stream';
-                            
-                            result.files.push({ 
-                                field: fieldName, 
-                                name: filename, 
-                                type: contentType, 
-                                content: content, // Safe, uncorrupted Buffer
-                                isBinary: true 
-                            });
+                            result.files.push({ field: fieldName, name: filename, type: contentType, content: content, isBinary: true });
                         } else {
                             result.fields[fieldName] = content.toString('utf8');
                         }
                     }
-                    
                     offset = contentEndIdx;
                 }
                 resolve(result);
-            } catch (error) { 
-                reject(error); 
-            }
+            } catch (error) { reject(error); }
         });
         req.on('error', reject);
     });
@@ -529,20 +410,13 @@ async function handleFileUpload(req, res) {
         const fullPath = path.join(FILES_ROOT, filePathHeader);
         const dir = path.dirname(fullPath);
         await mkdir(dir, { recursive: true });
-        
-        if (file.isBinary) {
-            await writeFile(fullPath, file.content);
-        } else {
-            await writeFile(fullPath, file.content, 'utf8');
-        }
+        if (file.isBinary) await writeFile(fullPath, file.content);
+        else await writeFile(fullPath, file.content, 'utf8');
         sendPlainTextResponse(res, `File uploaded: ${filePathHeader}`, 200);
     } catch (error) {
-        if (error.message.includes('Payload too large')) {
-            sendPlainTextResponse(res, error.message, 413);
-        } else if (error.message.includes('Missing boundary')) {
-            sendPlainTextResponse(res, 'Invalid request format', 400);
-        } else {
-            // ✅ FIX 2b: Direct console logging to prevent ENOENT crash from logModuleError
+        if (error.message.includes('Payload too large')) sendPlainTextResponse(res, error.message, 413);
+        else if (error.message.includes('Missing boundary')) sendPlainTextResponse(res, 'Invalid request format', 400);
+        else {
             console.error(`\x1b[31m[UPLOAD] ❌ ERROR:\x1b[0m ${error.message}`);
             if (error.stack) console.error(`\x1b[2mStack:\x1b[0m\n${error.stack}`);
             sendPlainTextResponse(res, 'Upload failed: ' + error.message, 500);
@@ -551,7 +425,7 @@ async function handleFileUpload(req, res) {
 }
 
 // ==========================================================
-// ===== WEBSOCKET UPGRADE HANDLER (supports nested paths) =====
+// ===== WEBSOCKET UPGRADE HANDLER =====
 function handleWsUpgrade(serverType, req, socket, head) {
     try {
         const clientIP = req.socket?.remoteAddress || req.connection?.remoteAddress;
@@ -560,38 +434,31 @@ function handleWsUpgrade(serverType, req, socket, head) {
             socket.end('HTTP/1.1 403 Forbidden\r\n\r\n');
             return;
         }
-        
         const url = new URL(req.url, `http://${req.headers.host}`);
         const rawPathname = url.pathname;
         const decodedPathname = decodePathSegments(rawPathname);
-        
         if (!decodedPathname.endsWith('.ws.js')) {
             socket.end('HTTP/1.1 400 Bad Request\r\n\r\n');
             return;
         }
-        
         if (!isPathInsideRoot(FILES_ROOT, decodedPathname)) {
             console.warn(`[WS] Blocked path traversal: ${decodedPathname}`);
             socket.end('HTTP/1.1 403 Forbidden\r\n\r\n');
             return;
         }
-        
         const wsFilePath = path.join(FILES_ROOT, decodedPathname);
         const cacheKey = decodedPathname;
         const handlerBasename = path.basename(decodedPathname);
-        
         if (!handlerBasename || handlerBasename.includes('/') || handlerBasename.includes('\\') || handlerBasename.length > 100) {
             console.warn(`[WS] Blocked invalid handler name: ${handlerBasename}`);
             socket.end('HTTP/1.1 403 Forbidden\r\n\r\n');
             return;
         }
-        
         fs.access(wsFilePath, fs.constants.F_OK, (err) => {
             if (err) {
                 socket.end('HTTP/1.1 404 Not Found\r\n\r\n');
                 return;
             }
-            
             let handlerMod;
             if (wsCache.has(cacheKey)) {
                 const cached = wsCache.get(cacheKey);
@@ -601,9 +468,7 @@ function handleWsUpgrade(serverType, req, socket, head) {
                 try {
                     delete require.cache[require.resolve(wsFilePath)];
                     handlerMod = require(wsFilePath);
-                    if (typeof handlerMod.handler !== 'function') {
-                        throw new Error('Handler must export "handler" function');
-                    }
+                    if (typeof handlerMod.handler !== 'function') throw new Error('Handler must export "handler" function');
                     wsCache.set(cacheKey, { module: handlerMod, lastAccessed: Date.now() });
                 } catch (e) {
                     logModuleError('WS', cacheKey, e);
@@ -611,25 +476,16 @@ function handleWsUpgrade(serverType, req, socket, head) {
                     return;
                 }
             }
-            
             if (req.headers.upgrade?.toLowerCase() !== 'websocket' || !req.headers['sec-websocket-key']) {
                 socket.end('HTTP/1.1 400 Bad Request\r\n\r\n');
                 return;
             }
-            
             const acceptKey = computeAcceptKey(req.headers['sec-websocket-key']);
-            socket.write(
-                `HTTP/1.1 101 Switching Protocols\r\n` +
-                `Upgrade: websocket\r\n` +
-                `Connection: Upgrade\r\n` +
-                `Sec-WebSocket-Accept: ${acceptKey}\r\n\r\n`
-            );
-            
+            socket.write(`HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: ${acceptKey}\r\n\r\n`);
             const ws = {
                 send: (msg) => {
                     if (socket.writable && typeof msg === 'string') {
-                        try { socket.write(createWebSocketFrame(msg)); }
-                        catch (e) { console.error(`[WS] Send error:`, e.message); }
+                        try { socket.write(createWebSocketFrame(msg)); } catch (e) { console.error(`[WS] Send error:`, e.message); }
                     }
                 },
                 close: (code = 1000, reason = '') => {
@@ -646,7 +502,6 @@ function handleWsUpgrade(serverType, req, socket, head) {
                 readyState: 1,
                 _socket: socket
             };
-            
             let wsInstance;
             try {
                 wsInstance = handlerMod.handler(ws, req);
@@ -656,65 +511,45 @@ function handleWsUpgrade(serverType, req, socket, head) {
                 ws.close(1011, 'Init failed');
                 return;
             }
-            
-            // ✅ FIX 1b: Properly handle Ping/Pong/Close and slice buffer to prevent memory leaks
             let frameBuffer = Buffer.alloc(0);
             socket.on('data', (chunk) => {
                 frameBuffer = Buffer.concat([frameBuffer, chunk]);
-                
                 while (frameBuffer.length >= 2) {
                     const parsed = parseWebSocketFrame(frameBuffer);
-                    if (parsed === null) break; // Incomplete frame, wait for next chunk
-                    
+                    if (parsed === null) break;
                     try {
-                        if (parsed.opcode === 8) {
-                            // Client requested close
-                            ws.close(1000, 'Closed by client');
-                            return; // Stop processing
-                        } else if (parsed.opcode === 9) {
-                            // Ping: respond with Pong (opcode 10)
+                        if (parsed.opcode === 8) { ws.close(1000, 'Closed by client'); return; } 
+                        else if (parsed.opcode === 9) {
                             const pongPayload = Buffer.from(parsed.message, 'utf8');
                             const pongLen = pongPayload.length;
                             let pongFrame;
                             if (pongLen <= 125) {
                                 pongFrame = Buffer.allocUnsafe(2 + pongLen);
-                                pongFrame[0] = 0x8A; // Pong opcode, FIN bit set
-                                pongFrame[1] = pongLen;
+                                pongFrame[0] = 0x8A; pongFrame[1] = pongLen;
                                 pongPayload.copy(pongFrame, 2);
                             } else {
-                                // Fallback for unusually large pings (rare)
                                 pongFrame = Buffer.allocUnsafe(4 + pongLen);
-                                pongFrame[0] = 0x8A;
-                                pongFrame[1] = 126;
+                                pongFrame[0] = 0x8A; pongFrame[1] = 126;
                                 pongFrame.writeUInt16BE(pongLen, 2);
                                 pongPayload.copy(pongFrame, 4);
                             }
                             socket.write(pongFrame);
                         } else if (parsed.opcode === 1) {
-                            // Text frame
-                            if (typeof wsInstance?.onMessage === 'function') {
-                                wsInstance.onMessage(parsed.message);
-                            }
+                            if (typeof wsInstance?.onMessage === 'function') wsInstance.onMessage(parsed.message);
                         }
                     } catch (e) {
                         logModuleError('WS-MSG', cacheKey, e);
                         ws.close(1011, 'Handler error');
-                        return; // Stop processing further frames on error
+                        return;
                     }
-                    
-                    // Slice the buffer to remove the consumed frame, preserving remaining data
                     frameBuffer = frameBuffer.slice(parsed.bytesConsumed);
                 }
             });
-            
             socket.on('close', () => {
                 ws.readyState = 3;
                 if (wsCache.has(cacheKey)) wsCache.get(cacheKey).lastAccessed = Date.now();
-                try {
-                    if (typeof wsInstance?.onClose === 'function') wsInstance.onClose();
-                } catch (e) { }
+                try { if (typeof wsInstance?.onClose === 'function') wsInstance.onClose(); } catch (e) { }
             });
-            
             socket.on('error', (err) => {
                 console.error(`[WS] ${serverType} Socket error ${cacheKey}:`, err.message);
                 ws.close(1006, 'Socket error');
@@ -762,318 +597,6 @@ setInterval(() => {
     }
 }, 10 * 60 * 1000);
 
-
-// ==========================================================
-// ===== FILE SYSTEM HANDLERS =====
-async function handleLs(res, lsPath) {
-    if (!isPathInsideRoot(FILES_ROOT, lsPath)) return sendPlainTextResponse(res, 'Access Denied', 403);
-    const hasWildcard = lsPath.includes('*');
-    let targetDirectory, filesToProcess = [];
-    try {
-        if (hasWildcard) {
-            targetDirectory = path.join(FILES_ROOT, path.dirname(lsPath));
-            const pattern = path.basename(lsPath);
-            const safePattern = pattern.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*');
-            const regex = new RegExp('^' + safePattern + '$');
-            const allEntries = await readdir(targetDirectory);
-            filesToProcess = allEntries.filter(file => regex.test(file));
-        } else {
-            targetDirectory = path.join(FILES_ROOT, lsPath);
-            const stats = await stat(targetDirectory);
-            if (stats.isFile()) {
-                const fileInfo = { name: path.basename(targetDirectory), type: 'file', size: stats.size, modifiedTime: stats.mtime.toISOString(), modifiedTimeMs: stats.mtime.getTime() };
-                return sendJsonResponse(res, [fileInfo]);
-            } else if (stats.isDirectory()) {
-                filesToProcess = await readdir(targetDirectory);
-            }
-        }
-        const fileInfoList = [];
-        for (const file of filesToProcess) {
-            const filePath = path.join(targetDirectory, file);
-            try {
-                const fileStats = await stat(filePath);
-                fileInfoList.push({ name: file, type: fileStats.isDirectory() ? 'directory' : 'file', size: fileStats.size, modifiedTime: fileStats.mtime.toISOString(), modifiedTimeMs: fileStats.mtime.getTime() });
-            } catch (err) { console.warn(`Could not get stats for file: ${err.message}`); }
-        }
-        sendJsonResponse(res, fileInfoList);
-    } catch (error) {
-        if (error.code === 'ENOENT') sendPlainTextResponse(res, 'Path not found', 404);
-        else { console.error(`LS Error: ${error.message}`); sendPlainTextResponse(res, 'Internal Server Error', 500); }
-    }
-}
-
-async function handleReadFile(res, filePathHeader) {
-    if (!isPathInsideRoot(FILES_ROOT, filePathHeader)) return sendPlainTextResponse(res, 'Access Denied', 403);
-    const fullPath = path.join(FILES_ROOT, filePathHeader);
-    try {
-        const stats = await stat(fullPath);
-        if (stats.isDirectory()) return sendPlainTextResponse(res, 'Cannot read a directory', 400);
-        const content = await readFile(fullPath, 'utf8');
-        sendPlainTextResponse(res, content);
-    } catch (error) {
-        if (error.code === 'ENOENT') sendPlainTextResponse(res, 'File not found', 404);
-        else { console.error(`READFILE Error: ${error.message}`); sendPlainTextResponse(res, 'Internal Server Error', 500); }
-    }
-}
-
-async function handleReadFileBinary(req, res, filePathHeader) {
-    if (!isPathInsideRoot(FILES_ROOT, filePathHeader)) return sendPlainTextResponse(res, 'Access Denied', 403);
-    const fullPath = path.join(FILES_ROOT, filePathHeader);
-    try {
-        const stats = await stat(fullPath);
-        if (stats.isDirectory()) return sendPlainTextResponse(res, 'Cannot read a directory', 400);
-        const ext = path.extname(fullPath).toLowerCase();
-        const contentType = _mimetype[ext] || 'application/octet-stream';
-        streamFile(req, res, fullPath, contentType);
-    } catch (error) {
-        if (error.code === 'ENOENT') sendPlainTextResponse(res, 'File not found', 404);
-        else { console.error(`READFILEB Error: ${error.message}`); sendPlainTextResponse(res, 'Internal Server Error', 500); }
-    }
-}
-
-async function handleSaveFile(req, res, filePathHeader) {
-    if (!isPathInsideRoot(FILES_ROOT, filePathHeader)) return sendPlainTextResponse(res, 'Access Denied', 403);
-    const fullPath = path.join(FILES_ROOT, filePathHeader);
-    
-    const chunks = [];
-    let totalSize = 0;
-    let sizeExceeded = false;
-
-    req.on('data', chunk => {
-        if (sizeExceeded) return;
-        chunks.push(chunk);
-        totalSize += chunk.length;
-        if (totalSize > MAX_UPLOAD_SIZE) {
-            sizeExceeded = true;
-            req.destroy();
-            if (!res.headersSent) sendPlainTextResponse(res, 'Payload too large (max 500MB)', 413);
-        }
-    });
-
-    req.on('end', async () => {
-        if (sizeExceeded) return;
-        try {
-            const dir = path.dirname(fullPath);
-            await mkdir(dir, { recursive: true });
-            
-            const buffer = Buffer.concat(chunks);
-            await writeFile(fullPath, buffer);
-            
-            sendPlainTextResponse(res, `File saved: ${filePathHeader}`, 200);
-        } catch (error) { 
-            console.error(`SAVEFILE Error: ${error.message}`); 
-            sendPlainTextResponse(res, 'Internal Server Error', 500); 
-        }
-    });
-
-    req.on('error', (error) => { 
-        if (!res.headersSent) sendPlainTextResponse(res, 'Request Error', 500); 
-    });
-}
-
-async function handleMkpath(res, mkPathHeader) {
-    if (!isPathInsideRoot(FILES_ROOT, mkPathHeader)) return sendPlainTextResponse(res, 'Access Denied', 403);
-    const fullPath = path.join(FILES_ROOT, mkPathHeader);
-    try {
-        await mkdir(fullPath, { recursive: true });
-        sendPlainTextResponse(res, `Path created: ${mkPathHeader}`, 200);
-    } catch (error) {
-        if (error.code === 'EEXIST') sendPlainTextResponse(res, `Path exists: ${mkPathHeader}`, 200);
-        else { console.error(`MKPATH Error: ${error.message}`); sendPlainTextResponse(res, 'Internal Server Error', 500); }
-    }
-}
-
-async function handleMv(res, mvSourceHeader, mvDestinationHeader) {
-    if (!isPathInsideRoot(FILES_ROOT, mvSourceHeader) || !isPathInsideRoot(FILES_ROOT, mvDestinationHeader)) return sendPlainTextResponse(res, 'Access Denied', 403);
-    const sourceFullPath = path.join(FILES_ROOT, mvSourceHeader);
-    const destinationFullPath = path.join(FILES_ROOT, mvDestinationHeader);
-    try {
-        let actualDestinationDir = destinationFullPath;
-        try {
-            const destinationStats = await stat(destinationFullPath);
-            if (!destinationStats.isDirectory()) return sendPlainTextResponse(res, 'Destination must be directory', 400);
-        } catch (err) {
-            if (err.code === 'ENOENT') {
-                const hasWildcard = mvDestinationHeader.includes('*');
-                if (!hasWildcard && !mvDestinationHeader.endsWith('/') && !mvDestinationHeader.includes('*')) {
-                    const destParent = path.dirname(destinationFullPath);
-                    try {
-                        const parentStats = await stat(destParent);
-                        if (parentStats.isDirectory()) {
-                            const hasSourceWildcard = mvSourceHeader.includes('*');
-                            if (hasSourceWildcard) return sendPlainTextResponse(res, 'Cannot move multiple files to a file path', 400);
-                            if (!isPathInsideRoot(FILES_ROOT, path.relative(FILES_ROOT, sourceFullPath))) return sendPlainTextResponse(res, 'Access Denied', 403);
-                            const sourceStats = await stat(sourceFullPath);
-                            if (sourceStats.isDirectory()) {
-                                actualDestinationDir = path.dirname(destinationFullPath);
-                            } else {
-                                await rename(sourceFullPath, destinationFullPath);
-                                return sendPlainTextResponse(res, `Moved: ${path.relative(FILES_ROOT, sourceFullPath)} to ${path.relative(FILES_ROOT, destinationFullPath)}`, 200);
-                            }
-                        }
-                    } catch (parentErr) { }
-                }
-                await mkdir(destinationFullPath, { recursive: true });
-            } else throw err;
-        }
-        const hasWildcard = mvSourceHeader.includes('*');
-        let filesToMove = [], baseSourceDir = path.dirname(sourceFullPath), pattern = hasWildcard ? path.basename(sourceFullPath) : null;
-        if (hasWildcard) {
-            try {
-                const sourceFiles = await readdir(baseSourceDir);
-                const safePattern = pattern.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*');
-                const regex = new RegExp('^' + safePattern + '$');
-                filesToMove = sourceFiles.filter(file => regex.test(file)).map(file => path.join(baseSourceDir, file));
-            } catch (err) { if (err.code === 'ENOENT') return sendPlainTextResponse(res, 'Source directory not found', 404); throw err; }
-        } else {
-            try { await stat(sourceFullPath); filesToMove.push(sourceFullPath); }
-            catch (err) { if (err.code === 'ENOENT') return sendPlainTextResponse(res, 'Source not found', 404); throw err; }
-        }
-        if (filesToMove.length === 0) return sendPlainTextResponse(res, 'No files matched source', 200);
-        const results = [];
-        for (const fileToMove of filesToMove) {
-            if (!isPathInsideRoot(FILES_ROOT, path.relative(FILES_ROOT, fileToMove))) { results.push(`Skipped invalid path: ${path.relative(FILES_ROOT, fileToMove)}`); continue; }
-            const fileName = path.basename(fileToMove);
-            const finalDestinationPath = path.join(actualDestinationDir, fileName);
-            try {
-                await rename(fileToMove, finalDestinationPath);
-                results.push(`Moved: ${path.relative(FILES_ROOT, fileToMove)} to ${path.relative(FILES_ROOT, finalDestinationPath)}`);
-            } catch (moveError) { console.error(`Error moving ${fileToMove}: ${moveError.message}`); results.push(`Failed to move ${path.relative(FILES_ROOT, fileToMove)}: ${moveError.message}`); }
-        }
-        sendPlainTextResponse(res, `MV complete:\n${results.join('\n')}`, 200);
-    } catch (error) { console.error(`MV Error: ${error.message}`); sendPlainTextResponse(res, 'Internal Server Error', 500); }
-}
-
-async function handleRn(res, rnSourceHeader, rnDestinationHeader) {
-    if (!isPathInsideRoot(FILES_ROOT, rnSourceHeader) || !isPathInsideRoot(FILES_ROOT, rnDestinationHeader)) return sendPlainTextResponse(res, 'Access Denied', 403);
-    const sourceFullPath = path.join(FILES_ROOT, rnSourceHeader);
-    const destinationFullPath = path.join(FILES_ROOT, rnDestinationHeader);
-    if (path.dirname(sourceFullPath) !== path.dirname(destinationFullPath)) return sendPlainTextResponse(res, 'Destination must be in same directory', 400);
-    try {
-        await rename(sourceFullPath, destinationFullPath);
-        sendPlainTextResponse(res, `Renamed: ${rnSourceHeader} to ${rnDestinationHeader}`, 200);
-    } catch (error) {
-        if (error.code === 'ENOENT') sendPlainTextResponse(res, 'Source not found', 404);
-        else { console.error(`RN Error: ${error.message}`); sendPlainTextResponse(res, 'Internal Server Error', 500); }
-    }
-}
-
-async function copyDirectoryRecursive(src, dest) {
-    await mkdir(dest, { recursive: true });
-    const entries = await readdir(src, { withFileTypes: true });
-    for (const entry of entries) {
-        const srcPath = path.join(src, entry.name);
-        const destPath = path.join(dest, entry.name);
-        if (entry.isDirectory()) await copyDirectoryRecursive(srcPath, destPath);
-        else await copyFile(srcPath, destPath);
-    }
-}
-
-async function handleCopy(res, copySourceHeader, copyDestinationHeader) {
-    if (!isPathInsideRoot(FILES_ROOT, copySourceHeader) || !isPathInsideRoot(FILES_ROOT, copyDestinationHeader)) return sendPlainTextResponse(res, 'Access Denied', 403);
-    const sourceFullPath = path.join(FILES_ROOT, copySourceHeader);
-    const destinationFullPath = path.join(FILES_ROOT, copyDestinationHeader);
-    try {
-        let actualDestinationDir = destinationFullPath;
-        try {
-            const destStats = await stat(destinationFullPath);
-            if (!destStats.isDirectory()) return sendPlainTextResponse(res, 'Destination must be directory', 400);
-        } catch (err) {
-            if (err.code === 'ENOENT') {
-                const hasWildcard = copyDestinationHeader.includes('*');
-                if (!hasWildcard && !copyDestinationHeader.endsWith('/') && !copyDestinationHeader.includes('*')) {
-                    const destParent = path.dirname(destinationFullPath);
-                    try {
-                        const parentStats = await stat(destParent);
-                        if (parentStats.isDirectory()) {
-                            const hasSourceWildcard = copySourceHeader.includes('*');
-                            if (hasSourceWildcard) return sendPlainTextResponse(res, 'Cannot copy multiple files to a file path', 400);
-                            if (!isPathInsideRoot(FILES_ROOT, path.relative(FILES_ROOT, sourceFullPath))) return sendPlainTextResponse(res, 'Access Denied', 403);
-                            const sourceStats = await stat(sourceFullPath);
-                            if (sourceStats.isDirectory()) { actualDestinationDir = path.dirname(destinationFullPath); }
-                            else { await copyFile(sourceFullPath, destinationFullPath); return sendPlainTextResponse(res, `Copied: ${path.relative(FILES_ROOT, sourceFullPath)} to ${path.relative(FILES_ROOT, destinationFullPath)}`, 200); }
-                        }
-                    } catch (parentErr) { }
-                }
-                await mkdir(destinationFullPath, { recursive: true });
-            } else throw err;
-        }
-        const hasWildcard = copySourceHeader.includes('*');
-        let itemsToCopy = [], baseSourceDir = path.dirname(sourceFullPath), pattern = hasWildcard ? path.basename(sourceFullPath) : null;
-        if (hasWildcard) {
-            try {
-                const sourceEntries = await readdir(baseSourceDir);
-                const safePattern = pattern.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*');
-                const regex = new RegExp('^' + safePattern + '$');
-                itemsToCopy = sourceEntries.filter(entry => regex.test(entry)).map(entry => path.join(baseSourceDir, entry));
-            } catch (err) { if (err.code === 'ENOENT') return sendPlainTextResponse(res, 'Source directory not found', 404); throw err; }
-        } else {
-            try { await stat(sourceFullPath); itemsToCopy.push(sourceFullPath); }
-            catch (err) { if (err.code === 'ENOENT') return sendPlainTextResponse(res, 'Source not found', 404); throw err; }
-        }
-        if (itemsToCopy.length === 0) return sendPlainTextResponse(res, 'No files matched source', 200);
-        const results = [];
-        for (const itemToCopy of itemsToCopy) {
-            if (!isPathInsideRoot(FILES_ROOT, path.relative(FILES_ROOT, itemToCopy))) { results.push(`Skipped invalid path: ${path.relative(FILES_ROOT, itemToCopy)}`); continue; }
-            const itemName = path.basename(itemToCopy);
-            const finalDestinationPath = path.join(actualDestinationDir, itemName);
-            try {
-                const itemStats = await stat(itemToCopy);
-                if (itemStats.isDirectory()) {
-                    await copyDirectoryRecursive(itemToCopy, finalDestinationPath);
-                    results.push(`Copied directory: ${path.relative(FILES_ROOT, itemToCopy)} to ${path.relative(FILES_ROOT, finalDestinationPath)}`);
-                } else {
-                    const parentDirOfFile = path.dirname(finalDestinationPath);
-                    await mkdir(parentDirOfFile, { recursive: true });
-                    await copyFile(itemToCopy, finalDestinationPath);
-                    results.push(`Copied file: ${path.relative(FILES_ROOT, itemToCopy)} to ${path.relative(FILES_ROOT, finalDestinationPath)}`);
-                }
-            } catch (copyError) { console.error(`Error copying ${itemToCopy}: ${copyError.message}`); results.push(`Failed to copy ${path.relative(FILES_ROOT, itemToCopy)}: ${copyError.message}`); }
-        }
-        sendPlainTextResponse(res, `COPY complete:\n${results.join('\n')}`, 200);
-    } catch (error) { console.error(`COPY Error: ${error.message}`); sendPlainTextResponse(res, 'Internal Server Error', 500); }
-}
-
-async function handleDel(res, delPathHeader) {
-    if (!isPathInsideRoot(FILES_ROOT, delPathHeader)) return sendPlainTextResponse(res, 'Access Denied', 403);
-    const fullPathToDelete = path.join(FILES_ROOT, delPathHeader);
-    try {
-        const hasWildcard = delPathHeader.includes('*');
-        let itemsToDelete = [], baseDeleteDir = path.dirname(fullPathToDelete), pattern = hasWildcard ? path.basename(fullPathToDelete) : null;
-        if (hasWildcard) {
-            try {
-                const sourceFiles = await readdir(baseDeleteDir);
-                const safePattern = pattern.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*');
-                const regex = new RegExp('^' + safePattern + '$');
-                itemsToDelete = sourceFiles.filter(file => regex.test(file)).map(file => path.join(baseDeleteDir, file));
-            } catch (err) { if (err.code === 'ENOENT') return sendPlainTextResponse(res, 'Source directory not found', 404); throw err; }
-        } else {
-            try { await stat(fullPathToDelete); itemsToDelete.push(fullPathToDelete); }
-            catch (err) { if (err.code === 'ENOENT') return sendPlainTextResponse(res, 'Item not found', 404); throw err; }
-        }
-        if (itemsToDelete.length === 0) return sendPlainTextResponse(res, 'No files matched for deletion', 200);
-        const results = [];
-        for (const itemPath of itemsToDelete) {
-            if (!isPathInsideRoot(FILES_ROOT, path.relative(FILES_ROOT, itemPath))) { results.push(`Skipped invalid path: ${path.relative(FILES_ROOT, itemPath)}`); continue; }
-            const relativeItemPath = path.relative(FILES_ROOT, itemPath);
-            try {
-                const itemStats = await stat(itemPath);
-                const isDirectory = itemStats.isDirectory();
-                if (itemPath.startsWith(TRASH_DIR + path.sep) || itemPath === TRASH_DIR) {
-                    if (isDirectory) { await rm(itemPath, { recursive: true, force: true }); results.push(`Permanently deleted directory from trash: ${relativeItemPath}`); }
-                    else { await unlink(itemPath); results.push(`Permanently deleted file from trash: ${relativeItemPath}`); }
-                } else {
-                    await mkdir(TRASH_DIR, { recursive: true });
-                    const trashDestination = path.join(TRASH_DIR, path.basename(itemPath));
-                    await rename(itemPath, trashDestination);
-                    results.push(`Moved to trash: ${relativeItemPath}`);
-                }
-            } catch (deleteError) { console.error(`Error deleting/moving ${itemPath}: ${deleteError.message}`); results.push(`Failed to delete/move ${relativeItemPath}: ${deleteError.message}`); }
-        }
-        sendPlainTextResponse(res, `DEL complete:\n${results.join('\n')}`, 200);
-    } catch (error) { console.error(`DEL Error: ${error.message}`); sendPlainTextResponse(res, 'Internal Server Error', 500); }
-}
-
 // ==========================================================
 // ===== MAIN HTTP REQUEST HANDLER =====
 function webHandler(req, res) {
@@ -1084,7 +607,6 @@ function webHandler(req, res) {
         res.end('403 Forbidden: Local network access only');
         return;
     }
-	
     res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');    
     res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');   
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
@@ -1110,42 +632,6 @@ function webHandler(req, res) {
             return;
         }
         return;
-    }
-    
-    const xcmd = req.headers['x-cmd'];
-    if (xcmd) {
-        const xSrc = decodePathSegments(req.headers['x-src'] || '');
-        const xDst = decodePathSegments(req.headers['x-dst'] || '');
-        switch (xcmd) {
-            case "ls": handleLs(res, xSrc); return;
-            case "fread": handleReadFile(res, xSrc); return;
-            case "freadb": handleReadFileBinary(req, res, xSrc); return;
-            case "fwrite":
-                if (req.method === 'POST' || req.method === 'PUT') { handleSaveFile(req, res, xSrc); }
-                else { sendPlainTextResponse(res, 'SAVEFILE requires POST or PUT method.', 405); }
-                return;
-            case "mkdir":
-                if (req.method === 'POST' || req.method === 'PUT') { handleMkpath(res, xSrc); }
-                else { sendPlainTextResponse(res, 'MKPATH requires POST or PUT method.', 405); }
-                return;
-            case "mv":
-                if (req.method === 'POST' || req.method === 'PUT') { handleMv(res, xSrc, xDst); }
-                else { sendPlainTextResponse(res, 'MV requires POST or PUT method.', 405); }
-                return;
-            case "cp":
-                if (req.method === 'POST' || req.method === 'PUT') { handleCopy(res, xSrc, xDst); }
-                else { sendPlainTextResponse(res, 'COPY requires POST or PUT method.', 405); }
-                return;
-            case "rn":
-                if (req.method === 'POST' || req.method === 'PUT') { handleRn(res, xSrc, xDst); }
-                else { sendPlainTextResponse(res, 'RN requires POST or PUT method.', 405); }
-                return;
-            case "rm":
-                if (req.method === 'DELETE') { handleDel(res, xSrc); }
-                else { sendPlainTextResponse(res, 'DEL requires DELETE method.', 405); }
-                return;
-            default: sendPlainTextResponse(res, 'Command not found ' + xcmd, 405); return;
-        }
     }
     
     const filePath = path.join(__dirname, 'files', 'public', pathname === '/' ? 'index.html' : pathname);
@@ -1183,7 +669,6 @@ try {
         else if (err.code === 'ERR_SSL_KEY_FORMAT_INVALID') console.error('Invalid private key format.');
         httpsServer = null;
     });
-	
     httpsServer.listen(serverOptions.sslport, () => {
         if (typeof webAppReady === 'function') webAppReady();
     });

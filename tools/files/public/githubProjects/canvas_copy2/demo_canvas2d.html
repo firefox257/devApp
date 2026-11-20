@@ -1,0 +1,428 @@
+<!-- ./demo_canvas2d.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Canvas2D · Fantasy HUD</title>
+<style>
+:root {
+--bg: #0b0e17; --panel: rgba(22, 27, 44, 0.82); --line: #2a3352;
+--text: #d7def2; --dim: #8b94b8; --gold: #f0c758; --teal: #4ec9b0; --violet: #a78bfa;
+}
+* { box-sizing: border-box; }
+body {
+margin: 0; min-height: 100vh; color: var(--text);
+font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+background:
+radial-gradient(900px 500px at 15% -10%, rgba(120, 80, 255, .16), transparent 60%),
+radial-gradient(800px 500px at 90% 0%, rgba(78, 201, 176, .10), transparent 55%),
+var(--bg);
+padding: 18px;
+}
+header { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 16px; }
+h1 { font-size: 1.15rem; margin: 0; letter-spacing: .04em; }
+h1 span { color: var(--gold); }
+.pill {
+font-size: .72rem; padding: 5px 11px; border-radius: 999px;
+border: 1px solid var(--line); background: var(--panel); color: var(--dim);
+font-variant-numeric: tabular-nums;
+}
+.pill.ok { color: var(--teal); border-color: rgba(78,201,176,.4); }
+.pill.err { color: #f48771; border-color: rgba(244,135,113,.4); }
+button {
+padding: 8px 14px; background: #1b2340; color: var(--text); border: 1px solid var(--line);
+border-radius: 8px; cursor: pointer; font-weight: 600; font-size: .8rem;
+}
+button:hover:not(:disabled) { border-color: var(--violet); }
+button:disabled { opacity: .45; cursor: not-allowed; }
+button.primary { background: linear-gradient(180deg, #6d5ae0, #4c3fb0); border-color: #7c6cf0; }
+main { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-start; }
+.panel {
+background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+padding: 16px; backdrop-filter: blur(8px);
+}
+.panel h2 {
+margin: 0 0 12px; font-size: .78rem; text-transform: uppercase;
+letter-spacing: .14em; color: var(--dim);
+}
+#iconsPanel { flex: 1 1 560px; }
+#iconGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 10px; }
+.tile {
+background: rgba(10, 13, 24, .6); border: 1px solid var(--line); border-radius: 12px;
+padding: 8px 6px 7px; text-align: center; transition: transform .15s, border-color .15s;
+}
+.tile:hover { transform: translateY(-2px); border-color: #3d4a7a; }
+.tile canvas { width: 100%; max-width: 112px; height: auto; display: block; margin: 0 auto; }
+.tile .name { font-size: .68rem; color: var(--dim); letter-spacing: .08em; text-transform: uppercase; margin-top: 4px; }
+.tile .val { font-size: .78rem; color: var(--gold); font-variant-numeric: tabular-nums; min-height: 1em; }
+#sidePanel { flex: 0 1 320px; min-width: 290px; display: flex; flex-direction: column; gap: 16px; }
+#mapCanvas {
+width: 100%; max-width: 288px; height: auto; display: block; margin: 0 auto;
+border-radius: 50%; cursor: grab; touch-action: none;
+}
+#mapCanvas:active { cursor: grabbing; }
+.hint { font-size: .68rem; color: var(--dim); text-align: center; margin-top: 8px; }
+.row { display: flex; align-items: center; gap: 10px; margin-bottom: 9px; }
+.row label { flex: 0 0 74px; font-size: .72rem; color: var(--dim); text-transform: uppercase; letter-spacing: .06em; }
+.row output { flex: 0 0 44px; text-align: right; font-size: .75rem; color: var(--gold); font-variant-numeric: tabular-nums; }
+input[type=range] { flex: 1; appearance: none; height: 4px; border-radius: 2px; background: #232c4e; outline: none; }
+input[type=range]::-webkit-slider-thumb {
+appearance: none; width: 14px; height: 14px; border-radius: 50%;
+background: var(--violet); border: 2px solid #0b0e17; cursor: pointer;
+}
+select {
+background: #1b2340; color: var(--text); border: 1px solid var(--line);
+border-radius: 8px; padding: 7px 9px; font-size: .78rem;
+}
+.controls { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 4px; }
+details { margin-top: 16px; }
+summary { cursor: pointer; font-size: .75rem; color: var(--dim); letter-spacing: .1em; text-transform: uppercase; }
+#log {
+margin-top: 8px; background: #05070d; border: 1px solid var(--line); border-radius: 8px;
+padding: 10px; max-height: 220px; overflow-y: auto; font: 11px/1.5 'Courier New', monospace;
+white-space: pre-wrap; word-break: break-word;
+}
+.log-info { color: var(--teal); } .log-warn { color: #dcdcaa; } .log-err { color: #f48771; }
+</style>
+</head>
+<body>
+<header>
+<h1>Canvas2D <span>· Fantasy HUD</span></h1>
+<span id="status" class="pill">not initialized</span>
+<span id="fps" class="pill">— fps</span>
+<span id="rms" class="pill">— ms render</span>
+<button id="btnInit" class="primary">Initialize Runtime</button>
+</header>
+<main>
+<section id="iconsPanel" class="panel">
+<h2>HUD Icons — rendered in C++ / WASM</h2>
+<div id="iconGrid"></div>
+</section>
+<aside id="sidePanel">
+<div class="panel">
+<h2>Minimap</h2>
+<canvas id="mapCanvas" width="128" height="128"></canvas>
+<div class="hint">WASD move · Q/E turn · drag the map to look</div>
+</div>
+<div class="panel">
+<h2>World State</h2>
+<div class="row"><label>Health</label><input type="range" id="slHealth" min="0" max="100" value="100"><output id="ovHealth">100</output></div>
+<div class="row"><label>Mana</label><input type="range" id="slMana" min="0" max="100" value="100"><output id="ovMana">100</output></div>
+<div class="row"><label>Shield</label><input type="range" id="slShield" min="0" max="100" value="0"><output id="ovShield">0</output></div>
+<div class="row"><label>Unlock</label><input type="range" id="slUnlock" min="0" max="100" value="0"><output id="ovUnlock">0</output></div>
+<div class="row"><label>Complete</label><input type="range" id="slComplete" min="0" max="100" value="0"><output id="ovComplete">0</output></div>
+<div class="controls">
+<select id="selQuality">
+<option value="0">Fast</option>
+<option value="1" selected>Full</option>
+<option value="2">Ultra (bloom)</option>
+</select>
+<button id="btnPause">⏸ Pause</button>
+<button id="btnAuto">▶ Auto demo</button>
+</div>
+</div>
+</aside>
+</main>
+<details>
+<summary>Console</summary>
+<div id="log"></div>
+</details>
+<script src="/system/autogen/autogen.js"></script>
+<script>
+'use strict';
+// Match this to your autogen build output for demo_canvas2d.cpp.
+const WASM_URL = 'demo_canvas2d.wasm';
+// ---------------------------------------------------------------- console
+const logDiv = document.getElementById('log');
+function logLine(type, args) {
+const div = document.createElement('div');
+div.className = 'log-' + type;
+div.textContent = `[${new Date().toLocaleTimeString()}] ` + args.map(a =>
+a instanceof Error ? a.message : (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
+logDiv.appendChild(div);
+while (logDiv.childNodes.length > 200) logDiv.removeChild(logDiv.firstChild);
+logDiv.scrollTop = logDiv.scrollHeight;
+}
+const _log = console.log.bind(console), _warn = console.warn.bind(console), _err = console.error.bind(console);
+console.log   = (...a) => { _log(...a);  logLine('info', a); };
+console.warn  = (...a) => { _warn(...a); logLine('warn', a); };
+console.error = (...a) => { _err(...a);  logLine('err',  a); };
+window.onerror = (m, s, l) => console.error('Uncaught:', m, 'at', s + ':' + l);
+window.addEventListener('unhandledrejection', e => console.error('Unhandled rejection:', e.reason));
+// ---------------------------------------------------------------- helpers
+const clamp01 = v => v < 0 ? 0 : (v > 1 ? 1 : v);
+const rand = (a, b) => a + Math.random() * (b - a);
+const memBuf = () => runtime.sharedMemory ? runtime.sharedMemory.buffer
+: runtime.wasmInstance.exports.memory.buffer;
+// ---------------------------------------------------------------- state
+// Header indices must match demo_canvas2d.cpp
+const H = { HEALTH:0, MANA:1, UNLOCK:2, COMPLETE:3, SHIELD:4, COINS:5, COMBO:6,
+PX:7, PZ:8, YAW:9, EXTENT:10, ECOUNT:11, QUALITY:12, MAGIC:15, HDR:16 };
+const K = { GEAR:0, HEART:1, WISP:2, BRUTE:3, NPC:4, PORTAL:5, TREE:6,
+POTION:7, COIN:8, SHIELD:9, GATE:10, FIRE:11 };
+const S = { health:100, mana:100, unlock:0, complete:0, shield:0, coins:0, combo:0,
+px:0, pz:0, yaw:0, extent:26, quality:1 };
+const overrides = new Set();
+let manualMove = false, collected = 0;
+const ENT = [];
+function addEnt(x, z, k, extra) { ENT.push(Object.assign({ x, z, k }, extra)); }
+function buildWorld() {
+ENT.length = 0;
+for (let i = 0; i < 46; i++) {
+const a = rand(0, Math.PI * 2), r = rand(4, 24);
+addEnt(Math.cos(a) * r, Math.sin(a) * r, K.TREE);
+}
+for (let i = 0; i < 6; i++) {
+const a = i / 6 * Math.PI * 2 + 0.4;
+addEnt(Math.cos(a) * rand(8, 18), Math.sin(a) * rand(8, 18), K.GEAR);
+}
+addEnt(0, -20, K.PORTAL); addEnt(0, -24, K.GATE);
+for (let i = 0; i < 3; i++) addEnt(rand(-16, 16), rand(-16, 16), K.HEART);
+for (let i = 0; i < 3; i++) addEnt(rand(-16, 16), rand(-16, 16), K.POTION);
+for (let i = 0; i < 12; i++) addEnt(rand(-20, 20), rand(-20, 20), K.COIN);
+for (let i = 0; i < 4; i++) {
+const x = rand(-14, 14), z = rand(-14, 14);
+addEnt(x, z, K.WISP, { bx: x, bz: z, ph: rand(0, 6) });
+}
+for (let i = 0; i < 2; i++) {
+const x = rand(-12, 12), z = rand(-12, 12);
+addEnt(x, z, K.BRUTE, { bx: x, bz: z, ph: rand(0, 6) });
+}
+addEnt(6, 4, K.NPC); addEnt(-8, 7, K.NPC);
+addEnt(10, -6, K.SHIELD);
+for (let i = 0; i < 3; i++) addEnt(rand(-18, 18), rand(-18, 18), K.FIRE);
+}
+buildWorld();
+// ---------------------------------------------------------------- input
+const keys = new Set();
+window.addEventListener('keydown', e => {
+if (/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) return;
+const k = e.key.toLowerCase();
+if ('wasdqe'.includes(k)) { keys.add(k); manualMove = true; e.preventDefault(); }
+});
+window.addEventListener('keyup', e => keys.delete(e.key.toLowerCase()));
+const mapCanvas = document.getElementById('mapCanvas');
+let dragging = false, lastX = 0;
+mapCanvas.addEventListener('pointerdown', e => { dragging = true; lastX = e.clientX; mapCanvas.setPointerCapture(e.pointerId); });
+mapCanvas.addEventListener('pointermove', e => {
+if (!dragging) return;
+S.yaw += (e.clientX - lastX) * 0.008; lastX = e.clientX; manualMove = true;
+});
+mapCanvas.addEventListener('pointerup', () => dragging = false);
+// Cached element refs: no getElementById / DOM writes on the hot path.
+const sliderEls = [
+['Health', 'health', 1], ['Mana', 'mana', 1], ['Shield', 'shield', 100],
+['Unlock', 'unlock', 100], ['Complete', 'complete', 100]
+].map(([id, key, scale]) => {
+const el = document.getElementById('sl' + id);
+const out = document.getElementById('ov' + id);
+el.addEventListener('input', () => { S[key] = el.value / scale; overrides.add(key); });
+return { el, out, key, scale };
+});
+document.getElementById('selQuality').addEventListener('change', e => S.quality = +e.target.value);
+document.getElementById('btnAuto').addEventListener('click', () => {
+overrides.clear(); manualMove = false; collected = 0; console.log('Auto demo resumed.');
+});
+let paused = false;
+document.getElementById('btnPause').addEventListener('click', e => {
+paused = !paused; e.target.textContent = paused ? '▶ Resume' : '⏸ Pause';
+});
+// ---------------------------------------------------------------- sim
+function update(t, dt) {
+// scripted stats unless a slider claimed the value
+if (!overrides.has('health'))   S.health   = 55 + 45 * Math.sin(t * 0.21);
+if (!overrides.has('mana'))     S.mana     = 50 + 50 * Math.sin(t * 0.16 + 2);
+if (!overrides.has('shield'))   S.shield   = clamp01((Math.sin(t * 0.13) - 0.55) * 4);
+if (!overrides.has('unlock'))   S.unlock   = clamp01(t / 45);
+if (!overrides.has('complete')) S.complete = S.unlock >= 1 ? clamp01((t - 45) / 3) : 0;
+S.combo = 0.5 + 0.5 * Math.sin(t * 1.3);
+S.coins = Math.floor(t * 0.6) + collected;
+// player: auto orbit, or WASD/QE once the user takes over
+if (manualMove) {
+const sp = 6 * dt, rs = 1.8 * dt;
+if (keys.has('q')) S.yaw -= rs;
+if (keys.has('e')) S.yaw += rs;
+const fx = -Math.sin(S.yaw), fz = -Math.cos(S.yaw);
+const rx =  Math.cos(S.yaw), rz = -Math.sin(S.yaw);
+if (keys.has('w')) { S.px += fx * sp; S.pz += fz * sp; }
+if (keys.has('s')) { S.px -= fx * sp; S.pz -= fz * sp; }
+if (keys.has('d')) { S.px += rx * sp; S.pz += rz * sp; }
+if (keys.has('a')) { S.px -= rx * sp; S.pz -= rz * sp; }
+} else {
+S.px = Math.cos(t * 0.12) * 9;
+S.pz = Math.sin(t * 0.17) * 9;
+S.yaw = t * 0.22;
+}
+// wandering entities + coin pickup
+for (const e of ENT) {
+if (e.k === K.WISP) { e.x = e.bx + Math.sin(t * 0.7 + e.ph) * 2.5; e.z = e.bz + Math.cos(t * 0.5 + e.ph) * 2.5; }
+if (e.k === K.BRUTE) { e.x = e.bx + Math.cos(t * 0.35 + e.ph) * 3; e.z = e.bz + Math.sin(t * 0.35 + e.ph) * 3; }
+if (e.k === K.COIN) {
+const dx = e.x - S.px, dz = e.z - S.pz;
+if (dx * dx + dz * dz < 2.9) {
+collected++;
+const a = rand(0, Math.PI * 2), r = rand(6, 22);
+e.x = Math.cos(a) * r; e.z = Math.sin(a) * r;
+}
+}
+}
+}
+// Slider/output DOM writes are throttled to the label tick, not per frame.
+function reflectUI() {
+for (const s of sliderEls) {
+const v = Math.round(S[s.key] * s.scale);
+if (document.activeElement !== s.el) s.el.value = v;
+s.out.textContent = v;
+}
+}
+// ---------------------------------------------------------------- runtime
+let runtime = null, running = false, busy = false;
+let statePtr = 0, stateLen = 0, iconSize = 128;
+const iconPtrs = [];
+const tiles = [];   // { ctx, img, val, fmt }
+let mapTile = null;
+const ICON_META = [
+['Portal',    s => Math.round(s.unlock * 100) + '%'],
+['Health',    s => Math.round(s.health)],
+['Gear',      () => ''],
+['Lock',      s => s.unlock >= 1 ? 'OPEN' : Math.round(s.unlock * 100) + '%'],
+['Quest',     () => ''],
+['Fire',      () => ''],
+['Mana',      s => Math.round(s.mana)],
+['Objective', s => Math.round(s.complete * 100) + '%'],
+['Wisp',      () => ''],
+['Shield',    s => Math.round(s.shield * 100) + '%'],
+['Potion',    () => ''],
+['Coins',     s => String(s.coins)],
+['Danger',    () => ''],
+];
+function makeTile(canvas, name, fmt) {
+canvas.width = canvas.height = iconSize;
+const ctx = canvas.getContext('2d');
+const img = ctx.createImageData(iconSize, iconSize);
+let val = null;
+if (name) {
+const wrap = document.createElement('div'); wrap.className = 'tile';
+const nm = document.createElement('div'); nm.className = 'name'; nm.textContent = name;
+val = document.createElement('div'); val.className = 'val'; val.textContent = '\u00a0';
+wrap.append(canvas, nm, val);
+document.getElementById('iconGrid').appendChild(wrap);
+}
+return { ctx, img, val, fmt };
+}
+async function init() {
+const btn = document.getElementById('btnInit');
+const status = document.getElementById('status');
+btn.disabled = true;
+if (!crossOriginIsolated) {
+status.textContent = 'missing COOP/COEP headers'; status.className = 'pill err';
+console.error('crossOriginIsolated is false — SharedArrayBuffer unavailable.');
+btn.disabled = false; return;
+}
+try {
+status.textContent = 'loading wasm…';
+runtime = new AutogenRuntime();
+await runtime.initialize(WASM_URL);
+const count = Number(await runtime.callExport(0, 'init_icons'));
+iconSize = Number(await runtime.callExport(0, 'get_icon_size'));
+statePtr = Number(await runtime.callExport(0, 'get_state_ptr'));
+stateLen = Number(await runtime.callExport(0, 'get_state_len'));
+for (let i = 0; i < count; i++)
+iconPtrs[i] = Number(await runtime.callExport(0, 'get_icon_ptr', i));
+for (let i = 0; i < ICON_META.length; i++)
+tiles[i] = makeTile(document.createElement('canvas'), ICON_META[i][0], ICON_META[i][1]);
+mapTile = makeTile(mapCanvas, null, null);
+status.textContent = 'live'; status.className = 'pill ok';
+console.log(`Runtime ready: ${count} icons @ ${iconSize}px, state = ${stateLen} floats.`);
+running = true;
+requestAnimationFrame(loop);
+} catch (err) {
+status.textContent = 'init failed'; status.className = 'pill err';
+console.error('Init failed:', err);
+btn.disabled = false;
+}
+}
+document.getElementById('btnInit').addEventListener('click', init);
+// ---------------------------------------------------------------- frame loop
+let last = 0, msEma = 0, labelClock = 0;
+let fpsEma = 0, fpsFrames = 0, fpsStart = 0;
+// Typed-array views are cached and rebuilt only when the SAB grows
+// (growth detaches the old buffer; logical addresses stay valid).
+let viewBuf = null, stateView = null;
+const tileViews = [];
+function ensureViews() {
+const b = memBuf();
+if (b === viewBuf) return;
+viewBuf = b;
+stateView = new Float32Array(b, statePtr, stateLen);
+const n = iconSize * iconSize * 4;
+for (let i = 0; i < iconPtrs.length; i++)
+tileViews[i] = new Uint8ClampedArray(b, iconPtrs[i], n);
+}
+function writeState() {
+ensureViews();
+const F = stateView;
+F[H.HEALTH] = S.health;   F[H.MANA] = S.mana;     F[H.UNLOCK] = S.unlock;
+F[H.COMPLETE] = S.complete; F[H.SHIELD] = S.shield; F[H.COINS] = S.coins;
+F[H.COMBO] = S.combo;     F[H.PX] = S.px;         F[H.PZ] = S.pz;
+F[H.YAW] = S.yaw;         F[H.EXTENT] = S.extent; F[H.ECOUNT] = ENT.length;
+F[H.QUALITY] = S.quality; F[H.MAGIC] = 1;
+for (let i = 0; i < ENT.length; i++) {
+F[H.HDR + i * 3] = ENT[i].x;
+F[H.HDR + i * 3 + 1] = ENT[i].z;
+F[H.HDR + i * 3 + 2] = ENT[i].k;
+}
+}
+function blit(tile, idx) {
+ensureViews();
+tile.img.data.set(tileViews[idx]);
+tile.ctx.putImageData(tile.img, 0, 0);
+}
+async function loop(ts) {
+if (!running) return;
+requestAnimationFrame(loop);
+if (busy) return;                 // keep 'last' so sim dt covers skipped frames
+if (paused) { last = ts; return; }
+busy = true;
+try {
+const t = ts * 0.001;
+const dt = Math.min(0.05, (ts - last) * 0.001 || 0.016);
+last = ts;
+update(t, dt);
+writeState();
+const t0 = performance.now();
+// Batched fan-out: all icons dispatched at once, one ag_await_all.
+const futurePtr = await runtime.callExport(0, 'render_all_batch', ts >>> 0, 0);
+const future = runtime.wrapFuture(futurePtr);
+const result = await future.awaitResult('uint32');
+if (result !== 123) console.error('render_all_batch returned', result);
+msEma = msEma * 0.9 + (performance.now() - t0) * 0.1;
+for (let i = 0; i < tiles.length; i++) blit(tiles[i], i);
+blit(mapTile, 13);
+// True rendered-frame rate (not the rAF rate, which counts skipped frames).
+if (!fpsStart) fpsStart = ts;
+fpsFrames++;
+if (ts - labelClock > 150) {
+labelClock = ts;
+const span = ts - fpsStart;
+if (span > 0) {
+const inst = fpsFrames * 1000 / span;
+fpsEma = fpsEma ? fpsEma * 0.6 + inst * 0.4 : inst;
+}
+fpsFrames = 0; fpsStart = ts;
+reflectUI();
+for (const tile of tiles) if (tile.val) tile.val.textContent = tile.fmt(S) || '\u00a0';
+document.getElementById('fps').textContent = Math.round(fpsEma) + ' fps';
+document.getElementById('rms').textContent = msEma.toFixed(1) + ' ms render';
+}
+} catch (err) {
+console.error('Frame failed:', err);
+running = false;
+}
+busy = false;
+}
+console.log('Page loaded. Click "Initialize Runtime" to start.');
+</script>
+</body>
+</html>
