@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>KittenTTS · Library Demo</title>
+
+<!-- BULLETPROOF CONSOLE INTERCEPTOR -->
+<script>
+(function() {
+  const style = document.createElement('style');
+  style.textContent = `
+    .console-wrap{margin-top:16px;border:1px solid rgba(255,178,120,.16);border-radius:12px;background:rgba(0,0,0,.4);overflow:hidden}
+    .console-header{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:rgba(255,255,255,.03);border-bottom:1px solid rgba(255,178,120,.16)}
+    .console-header span{font-size:12px;color:#B7A498;font-weight:600;text-transform:uppercase;letter-spacing:0.5px}
+    .console-header button{padding:4px 10px;font-size:11px;border-radius:6px;border:1px solid rgba(255,178,120,.16);background:rgba(255,255,255,.08);color:#FCEFE4;cursor:pointer}
+    #inpage-console{height:200px;overflow-y:auto;padding:10px 12px;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:12px;line-height:1.4;white-space:pre-wrap;word-break:break-word}
+    #inpage-console .log{color:#FCEFE4}
+    #inpage-console .warn{color:#FFC24B;background:rgba(255,194,75,0.08);margin:2px -12px;padding:2px 12px}
+    #inpage-console .error{color:#ff6b6b;background:rgba(255,107,107,0.08);margin:2px -12px;padding:2px 12px}
+    #inpage-console .timestamp{color:#B7A498;margin-right:8px;user-select:none}
+  `;
+  document.head.appendChild(style);
+
+  const wrap = document.createElement('div');
+  wrap.className = 'console-wrap';
+  wrap.innerHTML = `
+    <div class="console-header">
+      <span>In-Page Console (Proxy Interceptor)</span>
+      <div>
+        <button id="testConsoleBtn" style="margin-right:6px">Test Logs</button>
+        <button id="clearConsoleBtn">Clear</button>
+      </div>
+    </div>
+    <div id="inpage-console"></div>
+  `;
+  
+  document.addEventListener('DOMContentLoaded', () => {
+    const target = document.querySelector('.wrap') || document.body;
+    target.appendChild(wrap);
+  });
+
+  const originalConsole = { log: console.log, warn: console.warn, error: console.error };
+
+  function escapeHtml(text) {
+    return String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+
+  function getConsoleEl() { return document.getElementById('inpage-console'); }
+
+  function appendConsole(type, args) {
+    const el = getConsoleEl();
+    if (!el) return;
+    const time = new Date().toLocaleTimeString();
+    const msg = Array.from(args).map(arg => {
+      if (typeof arg === 'object' && arg !== null) {
+        try { return JSON.stringify(arg, null, 2); } catch (e) { return String(arg); }
+      }
+      return String(arg);
+    }).join(' ');
+    
+    const div = document.createElement('div');
+    div.className = type;
+    div.innerHTML = `<span class="timestamp">[${time}]</span><span class="message">${escapeHtml(msg)}</span>`;
+    el.appendChild(div);
+    el.scrollTop = el.scrollHeight;
+  }
+
+  const consoleProxy = new Proxy(console, {
+    get(target, prop) {
+      if (prop === 'log' || prop === 'warn' || prop === 'error' || prop === 'info') {
+        return function(...args) {
+          originalConsole[prop].apply(target, args);
+          setTimeout(() => appendConsole(prop, args), 0);
+        };
+      }
+      return target[prop];
+    }
+  });
+
+  window.console = consoleProxy;
+
+  window.addEventListener('error', (e) => console.error(`[Global Error] ${e.message} at ${e.filename}:${e.lineno}:${e.colno}`));
+  window.addEventListener('unhandledrejection', (e) => console.error(`[Unhandled Rejection] ${e.reason}`));
+
+  document.addEventListener('click', (e) => {
+    if (e.target.id === 'clearConsoleBtn') {
+      const el = getConsoleEl();
+      if (el) el.innerHTML = '';
+    }
+    if (e.target.id === 'testConsoleBtn') {
+      console.log("✅ Test Log: Proxy interceptor is successfully capturing logs!");
+      console.warn("⚠️ Test Warning: This proves warnings are caught.");
+      console.error("❌ Test Error: This proves errors are caught.");
+    }
+  });
+
+  setTimeout(() => {
+    console.log("🚀 In-page console proxy initialized and active.");
+  }, 500);
+})();
+</script>
+
+<style>
+:root{--ginger:#FF8F3C;--amber:#FFC24B;--bg:#171019;--surface:#241B30;--line:rgba(255,178,120,.16);--text:#FCEFE4;--muted:#B7A498}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,sans-serif;font-size:15px;line-height:1.55;padding:24px}
+.wrap{max-width:760px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+h1{font-size:22px;margin:0}
+p.note{color:var(--muted);font-size:13px;margin:0}
+textarea{width:100%;min-height:110px;padding:12px;border-radius:12px;border:1px solid var(--line);background:rgba(0,0,0,.28);color:var(--text);font-size:15px;resize:vertical}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+button{padding:10px 18px;border:none;border-radius:12px;cursor:pointer;font-weight:600;color:#2A1408;background:linear-gradient(135deg,var(--amber),var(--ginger))}
+button.alt{background:rgba(255,255,255,.08);color:var(--text);border:1px solid var(--line)}
+button:disabled{opacity:.4;cursor:not-allowed}
+canvas{display:block;width:100%;height:96px;background:rgba(0,0,0,.3);border:1px solid var(--line);border-radius:12px}
+label{font-size:12px;color:var(--muted);display:inline-flex;align-items:center;gap:6px}
+input[type=range]{width:120px;accent-color:var(--ginger);cursor:pointer}
+input[type=range]#seekSlider{width:100%;margin:4px 0}
+select{padding:6px 10px;border-radius:8px;background:var(--surface);color:var(--text);border:1px solid var(--line)}
+#status{font-size:13px;color:var(--amber);min-height:18px}
+.bar{height:4px;background:rgba(255,255,255,.08);border-radius:99px;overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--amber),var(--ginger));transition:width .1s linear}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>KittenTTS · JS Library Demo</h1>
+  <p class="note">This page contains <b>no TTS logic</b>. All speech synthesis is delegated to the <code>kittentts.js</code> ES-module.</p>
+
+  <textarea id="text">Hello! I am a small speech model running inside your browser. Type any English sentence and press Play.</textarea>
+
+  <div class="row">
+    <button id="playPauseBtn">Play</button>
+    <button id="dlBtn" class="alt" disabled>Download WAV</button>
+    <span id="status">loading engine…</span>
+  </div>
+
+  <canvas id="wave"></canvas>
+  <input type="range" id="seekSlider" min="0" max="1000" value="0">
+  <div class="bar"><i id="bar"></i></div>
+
+  <div class="row">
+    <label>Voice <select id="voiceSel"></select></label>
+    <label>Speed <input type="range" id="speed" min="50" max="180" value="100"></label>
+    <label>Volume <input type="range" id="vol" min="0" max="100" value="85"></label>
+    <label><input type="checkbox" id="mute"> Mute</label>
+  </div>
+</div>
+
+<script type="module">
+import KittenTTS from './kittentts.js';
+
+console.log("✅ KittenTTS module successfully imported.");
+
+const $ = s => document.querySelector(s);
+const tts = new KittenTTS({ 
+  phonEngine: 'espeak', 
+  tokenMode: 'phonemes',
+  misakiStress: true,
+  misakiVersion: '1.0',
+});
+
+console.log("✅ KittenTTS instance created.");
+
+tts.on('status', m => {
+  $('#status').textContent = m;
+  console.log(`[TTS Status] ${m}`);
+});
+tts.on('progress', f => {
+  $('#bar').style.width = (f*100)+'%';
+});
+tts.on('ready', async ({voices}) => {
+  const sel = $('#voiceSel'); sel.innerHTML = '';
+  voices.forEach(v => { const o=document.createElement('option'); o.value=v.index; o.textContent=v.name; sel.appendChild(o); });
+  $('#status').textContent = 'Ready — '+voices.length+' voices.';
+  console.log(`✅ TTS Ready with ${voices.length} voices.`);
+  
+  // Debug: verify Misaki normalization pipeline
+  console.log("=== MISAKI PIPELINE VERIFICATION ===");
+  const testWords = ['south','mouth','about','sky','water','better','bottle','go','boy','day','fire'];
+  for (const w of testWords) {
+    try {
+      const raw = await tts.phon(w);
+      const m = tts.mapPhonemes(raw, !!tts._lastPhonWasGold);
+      console.log(
+        w.padEnd(8),
+        JSON.stringify(raw),
+        '→',
+        JSON.stringify(m.out),
+        'ids:', m.ids.join(','),
+        m.ok ? 'OK' : 'BROKEN'
+      );
+    } catch (e) {
+      console.error(`Error processing ${w}:`, e);
+    }
+  }
+  console.log("====================================");
+});
+tts.on('error', e => {
+  $('#status').textContent = 'Error: '+(e.message||e);
+  console.error("❌ TTS Error Event:", e);
+});
+
+const cv=$('#wave'), cx=cv.getContext('2d');
+function size(){ const d=Math.min(2,devicePixelRatio||1); cv.width=cv.clientWidth*d; cv.height=cv.clientHeight*d; cx.setTransform(d,0,0,d,0,0); }
+addEventListener('resize',size); size();
+
+let isSeeking = false;
+const seekSlider = $('#seekSlider');
+
+seekSlider.addEventListener('input', (e) => {
+  isSeeking = true;
+  const frac = e.target.value / 1000;
+  if (tts.duration > 0) {
+    tts.seek(frac * tts.duration);
+  }
+});
+
+seekSlider.addEventListener('change', () => {
+  isSeeking = false;
+});
+
+function invalidateTTS() {
+  tts._lastText = null; // Force re-synthesis on next play
+  $('#playPauseBtn').textContent = 'Play';
+}
+
+$('#text').addEventListener('input', invalidateTTS);
+
+$('#playPauseBtn').addEventListener('click', async () => {
+  const btn = $('#playPauseBtn');
+  const currentText = $('#text').value;
+  
+  // If text/voice changed or no audio exists, force re-synthesis
+  if (tts._lastText !== currentText || !tts._master) {
+    btn.disabled = true;
+    btn.textContent = 'Working…';
+    try {
+      console.log("▶️ Starting TTS synthesis & playback for:", currentText.substring(0, 30) + "...");
+      await tts.play(currentText);
+      btn.textContent = 'Pause';
+    } catch (e) {
+      $('#status').textContent = 'Failed: ' + (e.message || e);
+      console.error("❌ Playback failed:", e);
+      btn.textContent = 'Play';
+    } finally {
+      btn.disabled = false;
+    }
+  } else if (tts._speaking) {
+    tts.pause();
+    btn.textContent = 'Resume';
+    console.log("⏸️ TTS paused.");
+  } else {
+    tts.resume();
+    btn.textContent = 'Pause';
+    console.log("▶️ TTS resumed.");
+  }
+});
+
+$('#dlBtn').addEventListener('click', () => {
+  if (!tts._master) return;
+  const blob = tts.exportWavBlob(), url = URL.createObjectURL(blob), a = document.createElement('a');
+  a.href = url; a.download = 'speech.wav'; a.click(); setTimeout(() => URL.revokeObjectURL(url), 4000);
+  console.log("💾 WAV download triggered.");
+});
+
+$('#voiceSel').addEventListener('change', e => { 
+  tts.opts.voice = +e.target.value; 
+  invalidateTTS();
+  console.log("🎤 Voice changed to index:", e.target.value); 
+});
+
+$('#speed').addEventListener('input', e => { 
+  tts.opts.speed = e.target.value / 100; 
+  invalidateTTS(); // Speed changes require re-synthesis in this model
+});
+
+$('#vol').addEventListener('input', e => { tts.setVolume(e.target.value / 100); });
+$('#mute').addEventListener('change', e => { tts.setMuted(e.target.checked); });
+
+setInterval(() => { $('#dlBtn').disabled = !tts._master; }, 300);
+
+function draw(){
+  requestAnimationFrame(draw);
+  const W = cv.clientWidth, H = cv.clientHeight; 
+  cx.clearRect(0, 0, W, H);
+  const peaks = tts.getPeaks(Math.max(40, Math.floor(W / 3)));
+  const n = peaks ? peaks.length / 2 : 0, mid = H / 2, amp = H / 2 - 8;
+  
+  if (peaks) {
+    cx.fillStyle = 'rgba(255,143,60,.55)';
+    for (let i = 0; i < n; i++) { 
+      const x = i * (W / n), mn = peaks[i * 2], mx = peaks[i * 2 + 1];
+      cx.fillRect(x, mid - mx * amp, Math.max(1, W / n - 1.2), Math.max(1.4, (mx - mn) * amp)); 
+    }
+  } else {
+    cx.strokeStyle = 'rgba(183,164,152,.25)'; 
+    cx.beginPath(); cx.moveTo(0, mid); cx.lineTo(W, mid); cx.stroke();
+  }
+  
+  const dur = tts.duration || 0, pos = tts.position || 0, frac = dur ? Math.min(1, pos / dur) : 0;
+  
+  // Update seek slider without causing jitter during user drag
+  if (!isSeeking && dur > 0) {
+    seekSlider.value = Math.round(frac * 1000);
+  }
+  
+  if (frac > 0) { 
+    cx.strokeStyle = '#FFF'; 
+    cx.beginPath(); 
+    cx.moveTo(frac * W, 4); 
+    cx.lineTo(frac * W, H - 4); 
+    cx.stroke(); 
+  }
+  $('#bar').style.width = (frac * 100) + '%';
+}
+draw();
+
+console.log("⚙️ Calling tts.load()...");
+tts.load().catch(e => {
+  console.error("❌ Failed to load TTS:", e);
+});
+</script>
+</body>
+</html>

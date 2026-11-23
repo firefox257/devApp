@@ -3,11 +3,10 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>TENSOR LAB — Copy-Rule Trainer · Schema Provenance · Belief Probe</title>
+<title>TENSOR LAB — General Text Trainer · ES Modules · Parity-Gated WebGPU</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
-<script src="nn.js"></script>
 <style>
 :root{
 --sub:#0a0618; --sub2:#0e0a22; --surf:#150e2e; --surf2:#1b1240; --over:#241852;
@@ -95,7 +94,6 @@ transition:transform .16s,box-shadow .16s,background .16s,border-color .16s}
 .btn.bad{background:linear-gradient(135deg,var(--red),#b91c4a);border-color:transparent;color:#fff}
 .btn.sm{padding:7px 11px;font-size:12px;border-radius:9px}
 .btn.gh{background:transparent}
-.btn.armed{background:linear-gradient(135deg,var(--amber),var(--red));border-color:transparent;color:#231402}
 .row{display:flex;gap:9px;flex-wrap:wrap}
 .row.eq>*{flex:1 1 0;min-width:120px}
 main{max-width:1420px;margin:0 auto;padding:calc(var(--nav) + 26px) 18px 90px}
@@ -183,34 +181,11 @@ border-bottom:1px solid var(--line2);position:sticky;top:0;background:var(--surf
 .tbl td{padding:7px 9px;border-bottom:1px solid rgba(51,33,112,.5);vertical-align:middle}
 .tbl tr:hover td{background:rgba(124,92,255,.07)}
 .scroll{max-height:290px;overflow:auto;border:1px solid var(--line);border-radius:11px;background:#0a0620}
-.chip{display:inline-block;padding:1px 7px;border-radius:6px;font-size:11px;border:1px solid var(--line2);background:var(--surf2)}
-.chip.c{color:var(--cyan);border-color:rgba(34,211,238,.4)}
-.chip.t{color:var(--mag);border-color:rgba(255,61,240,.4)}
-.chip.n{color:var(--lime);border-color:rgba(163,230,53,.4)}
-.chip.bad{color:var(--red);border-color:rgba(255,59,92,.45);background:rgba(255,59,92,.1)}
-.verdict{display:flex;align-items:center;gap:12px;padding:13px 15px;border-radius:12px;border:1px solid var(--line2);background:#0c0722;margin-bottom:12px}
-.verdict.ok{border-color:rgba(163,230,53,.55);background:linear-gradient(100deg,rgba(163,230,53,.13),rgba(34,211,238,.07))}
-.verdict.bad{border-color:rgba(255,59,92,.55);background:linear-gradient(100deg,rgba(255,59,92,.13),rgba(255,61,240,.07))}
-.verdict.idle{opacity:.75}
-.verdict .big{font-size:26px;line-height:1}
-.verdict .txt{font-weight:700;font-size:15px}
-.verdict .sub{font-size:11.5px;color:var(--slate);font-family:var(--mono)}
 .slots{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:9px;margin-bottom:12px}
-.slot{border:1px solid var(--line);border-radius:11px;padding:10px;background:#0c0722;position:relative;overflow:hidden}
-.slot .sk{font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--slate2)}
-.slot .sv{font-family:var(--mono);font-size:13px;margin-top:4px;word-break:break-word}
-.slot .ex{font-family:var(--mono);font-size:11px;color:var(--slate);margin-top:3px;word-break:break-word}
-.slot.pass{border-color:rgba(163,230,53,.5)}.slot.pass::after{content:"✓";position:absolute;top:7px;right:9px;color:var(--lime);font-weight:700}
-.slot.fail{border-color:rgba(255,59,92,.5)}.slot.fail::after{content:"✗";position:absolute;top:7px;right:9px;color:var(--red);font-weight:700}
-.slot.pass .sv{color:var(--lime)}.slot.fail .sv{color:var(--red)}
 .diff{font-family:var(--mono);font-size:13px;line-height:2;background:#08051a;border:1px solid var(--line);border-radius:11px;padding:12px;word-break:break-word}
 .diff .eq{color:#cdc4ea}
 .diff .del{color:var(--red);text-decoration:line-through;background:rgba(255,59,92,.13);border-radius:4px;padding:1px 3px}
 .diff .ins{color:var(--lime);background:rgba(163,230,53,.15);border-radius:4px;padding:1px 3px;font-weight:700}
-.diag{list-style:none;display:flex;flex-direction:column;gap:6px;margin-top:11px}
-.diag li{font-size:12.5px;font-family:var(--mono);padding:8px 11px;border-radius:9px;border-left:3px solid var(--amber);background:rgba(251,191,36,.08);color:#ffe9b8}
-.diag li.good{border-left-color:var(--lime);background:rgba(163,230,53,.08);color:#e6ffbf}
-.diag li.err{border-left-color:var(--red);background:rgba(255,59,92,.08);color:#ffd3dc}
 .kv{font-family:var(--mono);font-size:12px;display:grid;grid-template-columns:auto 1fr;gap:5px 12px}
 .kv dt{color:var(--slate2)}.kv dd{color:var(--bone);word-break:break-word}
 .chartbox{position:relative;height:210px;background:#08051a;border:1px solid var(--line);border-radius:12px;overflow:hidden}
@@ -244,6 +219,12 @@ footer{border-top:1px solid var(--line);padding:22px 18px;text-align:center;colo
 .reveal{opacity:0;transform:translateY(18px)}
 .reveal.in{opacity:1;transform:none;transition:opacity .6s ease,transform .6s cubic-bezier(.2,.8,.2,1)}
 body.reduce .reveal{opacity:1;transform:none}
+/* ---- tokenizer inspector chips ---- */
+.tokout{display:flex;flex-wrap:wrap;gap:6px;background:#08051a;border:1px solid var(--line);border-radius:11px;padding:12px;min-height:52px;max-height:240px;overflow:auto}
+.tokchip{display:inline-flex;align-items:center;gap:7px;font-family:var(--mono);font-size:12.5px;padding:4px 9px;border-radius:8px;border:1px solid rgba(163,230,53,.45);background:rgba(163,230,53,.09);color:var(--lime)}
+.tokchip b{font-size:10px;color:var(--slate);font-weight:400;background:#0c0722;border:1px solid var(--line);padding:1px 5px;border-radius:5px}
+.tokchip.bad{border-color:rgba(255,59,92,.5);background:rgba(255,59,92,.09);color:var(--red)}
+.tokchip.stop{border-color:rgba(124,92,255,.6);background:rgba(124,92,255,.13);color:#c9b8ff}
 @media(max-width:900px){.hero{grid-template-columns:1fr}.navlinks{display:none}}
 @media(max-width:620px){main{padding-left:12px;padding-right:12px}.ringwrap{flex-direction:column;align-items:flex-start}}
 </style>
@@ -257,7 +238,6 @@ body.reduce .reveal{opacity:1;transform:none}
 <a href="#corpus" data-sec="corpus">CORPUS</a>
 <a href="#train" data-sec="train">TRAIN</a>
 <a href="#inspect" data-sec="inspect">INSPECT</a>
-<a href="#beliefs" data-sec="beliefs">BELIEFS</a>
 <a href="#suite" data-sec="suite">GENERALIZE</a>
 <a href="#engine" data-sec="engine">ENGINE</a>
 </div>
@@ -282,9 +262,9 @@ body.reduce .reveal{opacity:1;transform:none}
 <section id="console">
 <div class="hero">
 <div class="card reveal">
-<div class="kicker">SCHEMA-BOUND · WEBGPU PARITY-GATED · SPAN-MASKED LOSS</div>
-<h1 class="heroline">Train a copy rule.<br><em>Know exactly what it learned.</em></h1>
-<p class="hint" style="max-width:58ch">Seeded with your 40-entity corpus. The live model is fingerprinted to the corpus it trained on, so a model trained on other data can never be graded against this schema. Probe the model to read back what it believes each entity is.</p>
+<div class="kicker">GENERAL TEXT · ES MODULES · PARITY-GATED WEBGPU</div>
+<h1 class="heroline">Train on any text.<br><em>Measure what it learned.</em></h1>
+<p class="hint" style="max-width:58ch">Paste any corpus. One segment per line (or separate with <code>&lt;|stop|&gt;</code>). <code>&lt;|stop|&gt;</code> is the only reserved tag — any other <code>&lt;|tag|&gt;</code> is just one generic token. The live model is fingerprinted to the exact corpus it trained on.</p>
 <div class="metrics">
 <div class="metric c1"><div class="v" id="statEpoch">0</div><div class="k">Epoch</div></div>
 <div class="metric c2"><div class="v" id="statLoss">—</div><div class="k">Loss</div></div>
@@ -294,8 +274,8 @@ body.reduce .reveal{opacity:1;transform:none}
 <div class="metric"><div class="v" id="statParams">—</div><div class="k">Params</div></div>
 </div>
 <div class="row" style="margin-top:14px">
-<button class="btn go" id="btnQuickInspect">🔬 Inspect ball1 + door2</button>
-<button class="btn gh sm" id="btnQuickProbe">🧠 Probe beliefs</button>
+<button class="btn go" id="btnQuickInspect">🔬 Inspect generation</button>
+<button class="btn gh sm" id="btnQuickSuite">🧪 Run held-out test</button>
 </div>
 </div>
 <div class="card reveal">
@@ -323,48 +303,46 @@ stroke-linecap="round" stroke-dasharray="301.6" stroke-dashoffset="301.6"/>
 </div>
 <div class="prog"><i id="heroProg"></i></div>
 <div style="display:flex;justify-content:space-between;align-items:center;margin:8px 0 6px">
-  <span style="font-size:11px;color:var(--slate);font-family:var(--mono)">Run log</span>
-  <button class="btn gh sm" id="btnCopyLog">⧉ Copy</button>
+<span style="font-size:11px;color:var(--slate);font-family:var(--mono)">Run log</span>
+<button class="btn gh sm" id="btnCopyLog">⧉ Copy</button>
 </div>
 <div class="log" id="runLog"></div>
 </div>
 </div>
 </section>
 <section id="corpus">
-<div class="sechead"><span class="num">01</span><h2>Corpus &amp; ground truth</h2>
-<p>This schema is the authority. Editing it immediately invalidates any model trained on a different one.</p></div>
+<div class="sechead"><span class="num">01</span><h2>Corpus — any text</h2>
+<p>The corpus is the only authority. Editing it immediately invalidates any model trained on a different one.</p></div>
 <div class="grid g2">
 <div class="card reveal">
-<h3>▤ Training segments <span class="tag" id="corpusStats">—</span></h3>
-<p class="hint">One segment per line. <code>&lt;|stop|&gt;</code> isolates segments; loss applies only to assistant spans.</p>
-<textarea id="corpus" spellcheck="false" style="min-height:230px"></textarea>
-<div class="ctrgrid" style="margin-top:13px">
-<div class="ctrl"><label>Pairs to generate <span class="val" id="genCountV">240</span></label>
-<input type="range" id="genCount" min="20" max="800" step="10" value="240"></div>
-<div class="ctrl"><label>Reserve as held-out <span class="val" id="genReserveV">40</span></label>
-<input type="range" id="genReserve" min="0" max="200" step="4" value="40"></div>
-</div>
-<label class="tog"><input type="checkbox" id="genBalance" checked><span class="sw"></span>
-<span class="t">Dense both-slot coverage<small>every entity pairs with many distinct partners in each position</small></span></label>
-<div class="row eq" style="margin-top:11px">
-<button class="btn" id="btnGenPairs">🎲 Generate dense pairs</button>
+<h3>▤ Training text <span class="tag" id="corpusStats">—</span></h3>
+<p class="hint">One segment per line, or use <code>&lt;|stop|&gt;</code> as the separator. The model learns to continue each segment and emit <code>&lt;|stop|&gt;</code>. Whatever is in this box IS the corpus and the tokenizer's vocabulary.</p>
+<textarea id="corpus" spellcheck="false" style="min-height:250px"></textarea>
+<div class="ctrl" style="margin-top:13px"><label>Reserve last N segments as held-out <span class="val" id="reserveV">9</span></label>
+<input type="range" id="reserveC" min="0" max="20" step="1" value="9"></div>
+<div class="row eq">
+<button class="btn" id="btnMakeVocab">🔤 Make Vocab</button>
 <button class="btn gh" id="btnUndoCorpus" disabled>↶ Undo</button>
-<button class="btn gh" id="btnRestoreSeed">⟲ Your corpus</button>
 </div>
 </div>
 <div class="card reveal">
-<h3>◉ Entity schema <span class="tag" id="schemaCount">—</span></h3>
-<p class="hint">Colour and texture are graded separately — this is what exposes attribute bleed between slots.</p>
-<div class="scroll" style="max-height:262px">
-<table class="tbl"><thead><tr><th>Entity</th><th>Colour</th><th>Texture</th><th>Slot 1</th><th>Slot 2</th></tr></thead>
-<tbody id="schemaBody"></tbody></table>
+<h3>◉ Corpus facts <span class="tag">live</span></h3>
+<div class="kv">
+<dt>segments</dt><dd id="csSegments">—</dd>
+<dt>tokens</dt><dd id="csTokens">—</dd>
+<dt>vocabulary</dt><dd id="csVocab">—</dd>
+<dt>train split</dt><dd id="csTrain">—</dd>
+<dt>held-out split</dt><dd id="csHeld">—</dd>
+<dt>fingerprint</dt><dd id="csHash">—</dd>
 </div>
-<div class="row" style="margin-top:12px;gap:6px">
-<span class="badge ok" id="badgeSeen">seen —</span>
-<span class="badge warn" id="badgeHeld">held-out —</span>
-<span class="badge info" id="badgeCover">coverage —</span>
+<p class="hint" style="margin-top:14px">Tokenizer contract (module <code>tokenizer.js</code>): words, single punctuation characters, and tags. <code>&lt;|stop|&gt;</code> is reserved (always id 1); every other <code>&lt;|…|&gt;</code> is one generic tag token. The vocabulary is built from exactly this text.</p>
 </div>
 </div>
+<div class="card reveal" style="margin-top:16px">
+<h3>🔤 Tokenizer inspector <span class="tag">tokenizer.js · live</span></h3>
+<p class="hint">Live view of how <code>tokenizer.js</code> tokenizes the <b>corpus box above</b> — it updates as you paste/type. <span style="color:var(--lime)">Green</span> = in vocabulary · <span style="color:#c9b8ff">purple</span> = reserved <code>&lt;|stop|&gt;</code>. Because the vocabulary is built from the corpus, corpus tokens are always known.</p>
+<div class="hint" id="tokStats">—</div>
+<div id="tokOut" class="tokout"></div>
 </div>
 </section>
 <section id="train">
@@ -403,7 +381,7 @@ stroke-linecap="round" stroke-dasharray="301.6" stroke-dashoffset="301.6"/>
 <div class="stepper"><button id="layMinus">−</button><div class="sv" id="cLayersV">2</div><button id="layPlus">+</button></div></div>
 </div>
 <label class="tog"><input type="checkbox" id="cRoPE" checked><span class="sw"></span>
-<span class="t">Rotary position embeddings<small>RoPE on Q/K — required for position-aware copying</small></span></label>
+<span class="t">Rotary position embeddings<small>RoPE on Q/K</small></span></label>
 <div class="row eq" style="margin-top:12px">
 <button class="btn pri" id="btnTrain">▶ Train model</button>
 <button class="btn bad" id="btnCancel" disabled>■ Stop</button>
@@ -434,19 +412,12 @@ stroke-linecap="round" stroke-dasharray="301.6" stroke-dashoffset="301.6"/>
 </section>
 <section id="inspect">
 <div class="sechead"><span class="num">03</span><h2>Generation inspector</h2>
-<p>Output is parsed back into slots and graded against this corpus — and against what the model believes.</p></div>
+<p>Type anything, decode, and look at the distribution. Works on any text.</p></div>
 <div class="grid g2">
 <div class="card reveal">
-<h3>⌁ Prompt <span class="tag" id="pairStatus">—</span></h3>
-<div class="ctrgrid">
-<div class="ctrl"><label>Entity A (slot 1)</label><select id="pairA"></select></div>
-<div class="ctrl"><label>Entity B (slot 2)</label><select id="pairB"></select></div>
-</div>
-<div class="ctrl"><label>Raw prompt
-<select id="tagSel" style="width:auto;padding:3px 26px 3px 8px;font-size:11px;margin-left:auto">
-<option value="">+ tag</option><option>&lt;|user|&gt;</option><option>&lt;|assistant|&gt;</option><option>&lt;|system|&gt;</option><option>&lt;|stop|&gt;</option>
-</select></label>
-<textarea id="prompt" spellcheck="false" style="min-height:74px"></textarea></div>
+<h3>⌁ Prompt <span class="tag">free text</span></h3>
+<div class="ctrl"><label>Prompt</label>
+<textarea id="prompt" spellcheck="false" style="min-height:90px"></textarea></div>
 <div class="ctrgrid">
 <div class="ctrl"><label>Temperature <span class="val" id="tempV">0.00</span></label>
 <input type="range" id="tempC" min="0" max="1.6" step="0.05" value="0"></div>
@@ -460,100 +431,72 @@ stroke-linecap="round" stroke-dasharray="301.6" stroke-dashoffset="301.6"/>
 <label class="tog"><input type="checkbox" id="stopOnStop" checked><span class="sw"></span>
 <span class="t">Halt on <code>&lt;|stop|&gt;</code></span></label>
 <div class="row eq" style="margin-top:11px">
-<button class="btn go" id="btnGenerate" disabled>🤖 Generate &amp; grade</button>
-<button class="btn gh" id="btnCopyResult" disabled>⧉ Copy</button>
+<button class="btn go" id="btnGenerate" disabled>🤖 Generate</button>
 </div>
-<div class="ctrl" style="margin-top:13px"><label>Top-K next-token distribution</label><div class="strip" id="probStrip"></div></div>
+</div>
+<div class="card reveal">
+<h3>✓ Output <span class="tag" id="inspTag">awaiting generation</span></h3>
+<div class="ctrl"><label>Decoded text</label><textarea id="inspGot" readonly style="min-height:110px"></textarea></div>
+<div class="ctrl"><label>Top-K next-token distribution (first step)</label><div class="strip" id="probStrip"></div></div>
 <div class="ctrl"><label>Per-token top-1 confidence</label><div class="spark"><canvas id="confCanvas"></canvas></div></div>
-</div>
-<div class="card reveal">
-<h3>✓ Verdict <span class="tag" id="inspTag">awaiting generation</span></h3>
-<div class="verdict idle" id="inspVerdict">
-<div class="big">◌</div><div><div class="txt">No generation yet</div><div class="sub">train a model, then Generate &amp; grade</div></div>
-</div>
-<div class="slots" id="inspSlots"></div>
-<div class="ctrl"><label>Word-level alignment <span class="val">expected → got</span></label><div class="diff" id="inspDiff">—</div></div>
-<ul class="diag" id="inspDiag"></ul>
-<div class="ctrl" style="margin-top:13px"><label>Model belief for this pair</label><div class="diff" id="inspBelief" style="font-size:12px">Probe beliefs to see what the model thinks these entities are.</div></div>
-<div class="ctrl"><label>Decoded output</label><textarea id="inspGot" readonly style="min-height:64px"></textarea></div>
-<div class="ctrl"><label>Corpus expectation</label><textarea id="inspExpected" readonly style="min-height:64px"></textarea></div>
+<div class="row eq"><button class="btn gh" id="btnCopyResult" disabled>⧉ Copy result</button></div>
 </div>
 </div>
-</section>
-<section id="beliefs">
-<div class="sechead"><span class="num">04</span><h2>Learned-schema probe</h2>
-<p>Decodes each entity in both slots and reads back the description the model actually holds. This is how a stale or foreign model is caught.</p></div>
-<div class="grid g2">
-<div class="card reveal">
-<h3>🧠 Probe controls <span class="tag" id="beliefTag">not probed</span></h3>
-<p class="hint">Each entity is decoded twice — once in slot 1, once in slot 2 — against a fixed anchor entity.</p>
-<div class="ctrgrid">
-<div class="ctrl"><label>Anchor entity</label><select id="probeAnchor"></select></div>
-<div class="ctrl"><label>Scope</label>
-<select id="probeScope"><option value="all" selected>all entities</option><option value="12">first 12</option><option value="suspect">suspect only</option></select></div>
-</div>
-<div class="row eq">
-<button class="btn go" id="btnProbe" disabled>🧠 Probe model beliefs</button>
-<button class="btn bad" id="btnStopProbe" disabled>■ Stop</button>
-</div>
-<div class="prog"><i id="probeProg"></i></div>
-<div class="row" style="gap:6px">
-<span class="badge" id="beliefMatch">learned —</span>
-<span class="badge" id="beliefWrong">wrong —</span>
-<span class="badge" id="beliefUnknown">unreadable —</span>
-</div>
-<div class="hint" id="beliefNote" style="margin-top:12px">Train a model, then probe. Any row where the model's description differs from the corpus explains a wrong generation exactly.</div>
-<div class="row eq" style="margin-top:10px">
-<button class="btn gh sm" id="btnCopyBeliefs" disabled>⧉ Copy report</button>
-<button class="btn gh sm" id="btnPurgeModel" disabled>🗑 Purge model</button>
-</div>
-</div>
-<div class="card reveal">
-<h3>▦ Belief table <span class="tag" id="beliefCount">—</span></h3>
-<div class="scroll" style="max-height:420px">
-<table class="tbl"><thead><tr><th>Entity</th><th>Corpus</th><th>Model slot 1</th><th>Model slot 2</th><th>State</th></tr></thead>
-<tbody id="beliefBody"><tr><td colspan="5" style="color:var(--slate2);padding:16px">No probe yet.</td></tr></tbody></table>
-</div>
-</div>
+
+<div class="card reveal" style="margin-top:16px">
+  <h3>🔮 Next-Word Step-by-Step <span class="tag">interactive</span></h3>
+  <p class="hint">Build the sequence one token at a time. See the exact probabilities for the next token.</p>
+  <div class="ctrl">
+    <label>Current Context</label>
+    <textarea id="stepCtx" spellcheck="false" style="min-height:70px" readonly></textarea>
+  </div>
+  <div class="ctrl">
+    <label>Top-K Next Tokens</label>
+    <div id="stepList" class="bars" style="max-height:300px;overflow:auto"></div>
+  </div>
+  <div class="row eq" style="margin-top:12px">
+    <button class="btn go" id="btnStepAccept" disabled>✓ Accept Top-1 & Predict Next</button>
+    <button class="btn" id="btnStepPredict" disabled>🔮 Predict (No Accept)</button>
+    <button class="btn gh" id="btnStepReset">⟲ Reset to Prompt</button>
+  </div>
 </div>
 </section>
 <section id="suite">
-<div class="sechead"><span class="num">05</span><h2>Generalization suite</h2>
-<p>Greedy-decodes many pairs and reports accuracy per slot, separating memorization from a learned rule.</p></div>
+<div class="sechead"><span class="num">04</span><h2>Generalization test — any text</h2>
+<p>Continuation test: the model is shown the first half of each segment and must generate the rest, greedy. No memorized answers for held-out segments.</p></div>
 <div class="grid g2">
 <div class="card reveal">
-<h3>🧪 Suite controls <span class="tag" id="suiteAvail">—</span></h3>
+<h3>🧪 Test controls <span class="tag" id="suiteAvail">—</span></h3>
 <div class="ctrgrid">
 <div class="ctrl"><label>Test set</label>
-<select id="suiteSet"><option value="heldout" selected>held-out pairs</option><option value="seen">seen pairs</option><option value="all">all ordered pairs</option></select></div>
-<div class="ctrl"><label>Pairs to test <span class="val" id="suiteCountV">24</span></label>
+<select id="suiteSet"><option value="heldout" selected>held-out segments</option><option value="train">training segments</option></select></div>
+<div class="ctrl"><label>Segments to test <span class="val" id="suiteCountV">24</span></label>
 <input type="range" id="suiteCount" min="4" max="120" step="2" value="24"></div>
 </div>
 <div class="row eq">
-<button class="btn go" id="btnRunSuite" disabled>🧪 Run suite</button>
+<button class="btn go" id="btnRunSuite" disabled>🧪 Run test</button>
 <button class="btn bad" id="btnStopSuite" disabled>■ Stop</button>
 </div>
 <div class="prog"><i id="suiteProg"></i></div>
 <div class="bars" id="suiteAgg"></div>
-<div class="hint" id="suiteNote" style="margin-top:12px">Held-out accuracy is the only number that proves the copy rule.</div>
+<div class="hint" id="suiteNote" style="margin-top:12px">Held-out continuation accuracy is the number that proves generalization.</div>
 <div class="row" style="gap:6px;margin-top:10px">
 <span class="badge" id="suiteExact">exact —</span>
-<span class="badge" id="suiteBleed">bleed —</span>
-<span class="badge" id="suiteEcho">echo —</span>
+<span class="badge" id="suiteTok">token acc —</span>
 </div>
 </div>
 <div class="card reveal">
-<h3>▦ Per-pair results <span class="tag" id="suiteTag">idle</span></h3>
+<h3>▦ Per-segment results <span class="tag" id="suiteTag">idle</span></h3>
 <div class="scroll" style="max-height:420px">
-<table class="tbl"><thead><tr><th>Pair</th><th>Set</th><th>E1</th><th>A1</th><th>E2</th><th>A2</th><th>Exact</th></tr></thead>
-<tbody id="suiteBody"><tr><td colspan="7" style="color:var(--slate2);padding:16px">No results yet.</td></tr></tbody></table>
+<table class="tbl"><thead><tr><th>Segment</th><th>Set</th><th>Token acc</th><th>Exact</th></tr></thead>
+<tbody id="suiteBody"><tr><td colspan="4" style="color:var(--slate2);padding:16px">No results yet.</td></tr></tbody></table>
 </div>
 <div class="diff" id="suiteDetail" style="margin-top:12px;display:none"></div>
 </div>
 </div>
 </section>
 <section id="engine">
-<div class="sechead"><span class="num">06</span><h2>Engine, provenance &amp; verification</h2>
+<div class="sechead"><span class="num">05</span><h2>Engine, provenance &amp; verification</h2>
 <p>GPU is used only after on-device parity passes. The model carries the fingerprint of the corpus it trained on.</p></div>
 <div class="grid g3">
 <div class="card reveal">
@@ -582,13 +525,39 @@ stroke-linecap="round" stroke-dasharray="301.6" stroke-dashoffset="301.6"/>
 <label class="tog"><input type="checkbox" id="soundOn" checked><span class="sw"></span>
 <span class="t">Sonify training<small>epoch pitch tracks loss</small></span></label>
 <div class="kv" id="engineFacts" style="margin-top:10px"></div>
-<div class="hint" style="margin-top:8px">Shortcuts: <b>T</b> train · <b>G</b> generate · <b>P</b> probe · <b>S</b> suite · <b>Esc</b> stop.</div>
+<div class="hint" style="margin-top:8px">Shortcuts: <b>T</b> train · <b>G</b> generate · <b>S</b> suite · <b>Esc</b> stop.<br>ES modules need http(s) — serve the folder, don't open via file://.</div>
 </div>
 </div>
 </section>
 </main>
-<footer>TENSOR LAB · from-scratch nn.js · parity-gated WebGPU · schema-bound provenance · all computation local to this tab</footer>
+<footer>TENSOR LAB · nn.js + tokenizer.js ES modules · parity-gated WebGPU · corpus-bound provenance · all computation local to this tab</footer>
 <div id="toastHost"></div>
-<script src="tensorindex_worker.js"></script>
+<script type="module" src="tensorindex_worker.js"></script>
+<script>
+/* Watchdog: ES modules + module workers are blocked on file://, which would
+otherwise leave every .reveal card at opacity:0 (blank page). If the module
+app hasn't booted in 1.5s, force-reveal and explain how to run it. */
+window.__tensorBoot = window.__tensorBoot || false;
+setTimeout(function () {
+if (window.__tensorBoot) return;
+var cards = document.querySelectorAll('.reveal');
+for (var i = 0; i < cards.length; i++) cards[i].classList.add('in');
+var nav = document.querySelector('nav'); if (nav) nav.style.display = 'none';
+var err = document.createElement('div');
+err.style.cssText = 'position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;background:rgba(10,6,24,.94);padding:24px';
+err.innerHTML =
+'<div style="max-width:660px;background:#150e2e;border:1px solid #ff3b5c;border-radius:14px;padding:24px;' +
+'font-family:JetBrains Mono,monospace;color:#f6f1e9;line-height:1.7;font-size:13px">' +
+'<div style="color:#ff3b5c;font-weight:700;font-size:15px;margin-bottom:10px">⚠ App script did not load — opened via file://?</div>' +
+'This build uses <b>ES modules</b> and a <b>module Web Worker</b>. Browsers block both on the ' +
+'<code style="color:#ff3df0">file://</code> protocol, so the page renders blank.<br><br>' +
+'<b style="color:#22d3ee">Fix — serve the folder over http, then open the http URL:</b><br><br>' +
+'<code style="color:#a3e635">python -m http.server 8000</code><br>' +
+'then open <code style="color:#a3e635">http://localhost:8000/tensorindex_worker.html</code><br><br>' +
+'<span style="color:#9b8fc4">(or: <code>npx serve</code>, VS Code “Live Server”, any static server)</span>' +
+'</div>';
+document.body.appendChild(err);
+}, 1500);
+</script>
 </body>
 </html>

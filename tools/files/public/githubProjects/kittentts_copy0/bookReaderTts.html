@@ -1,0 +1,944 @@
+<!-- ./reader.html -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>KittenTTS · Book Reader</title>
+
+<!-- BULLETPROOF CONSOLE INTERCEPTOR -->
+<script>
+(function() {
+  const style = document.createElement('style');
+  style.textContent = `
+    .console-wrap{position:fixed;bottom:0;left:0;right:0;z-index:9999;border-top:1px solid rgba(255,178,120,.16);background:rgba(0,0,0,.95);transition:transform .3s}
+    .console-wrap.hidden{transform:translateY(calc(100% - 40px))}
+    .console-header{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:rgba(255,255,255,.03);border-bottom:1px solid rgba(255,178,120,.16);cursor:pointer;user-select:none}
+    .console-header span{font-size:12px;color:#B7A498;font-weight:600;text-transform:uppercase;letter-spacing:0.5px}
+    .console-header .btn-group{display:flex;gap:6px}
+    .console-header button{padding:4px 10px;font-size:11px;border-radius:6px;border:1px solid rgba(255,178,120,.16);background:rgba(255,255,255,.08);color:#FCEFE4;cursor:pointer;transition:all .15s}
+    .console-header button:hover{background:rgba(255,255,255,.12);border-color:rgba(255,178,120,.3)}
+    .console-header button:active{transform:scale(0.95)}
+    #inpage-console{height:200px;overflow-y:auto;padding:10px 12px;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:12px;line-height:1.4;white-space:pre-wrap;word-break:break-word}
+    #inpage-console .log{color:#FCEFE4}
+    #inpage-console .warn{color:#FFC24B;background:rgba(255,194,75,0.08);margin:2px -12px;padding:2px 12px}
+    #inpage-console .error{color:#ff6b6b;background:rgba(255,107,107,0.08);margin:2px -12px;padding:2px 12px}
+    #inpage-console .info{color:#4B9FFF;background:rgba(75,159,255,0.08);margin:2px -12px;padding:2px 12px}
+    #inpage-console .timestamp{color:#B7A498;margin-right:8px;user-select:none}
+    #inpage-console .source{color:#9d7bd6;margin-left:8px;font-size:10px;opacity:0.7}
+  `;
+  document.head.appendChild(style);
+
+  const wrap = document.createElement('div');
+  wrap.className = 'console-wrap hidden';
+  wrap.innerHTML = `
+    <div class="console-header">
+      <span>In-Page Console</span>
+      <div class="btn-group">
+        <button id="copyConsoleBtn" title="Copy all logs to clipboard">📋 Copy All</button>
+        <button id="clearConsoleBtn" title="Clear all logs">🗑 Clear</button>
+        <button id="toggleConsoleBtn" title="Toggle console visibility">▼ Hide</button>
+      </div>
+    </div>
+    <div id="inpage-console"></div>
+  `;
+
+  function updateControlsBarPosition() {
+    const controlsBar = document.getElementById('controls-bar');
+    if (controlsBar) {
+      if (wrap.classList.contains('hidden')) {
+        controlsBar.classList.add('console-hidden');
+      } else {
+        controlsBar.classList.remove('console-hidden');
+      }
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    document.body.appendChild(wrap);
+    updateControlsBarPosition();
+  });
+
+  const originalConsole = {
+    log: console.log,
+    warn: console.warn,
+    error: console.error,
+    info: console.info
+  };
+  const logHistory = [];
+
+  function escapeHtml(text) {
+    return String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+
+  function getConsoleEl() { return document.getElementById('inpage-console'); }
+
+  function appendConsole(type, args, source = 'main') {
+    const el = getConsoleEl();
+    if (!el) return;
+    const time = new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit', fractionalSecondDigits: 3 });
+    const msg = Array.from(args).map(arg => {
+      if (typeof arg === 'object' && arg !== null) {
+        try { return JSON.stringify(arg, null, 2); } catch (e) { return String(arg); }
+      }
+      return String(arg);
+    }).join(' ');
+
+    logHistory.push({ type, time, msg, source });
+
+    const div = document.createElement('div');
+    div.className = type;
+    div.innerHTML = `<span class="timestamp">[${time}]</span><span class="message">${escapeHtml(msg)}</span><span class="source">[${source}]</span>`;
+    el.appendChild(div);
+    el.scrollTop = el.scrollHeight;
+  }
+
+  const consoleProxy = new Proxy(console, {
+    get(target, prop) {
+      if (prop === 'log' || prop === 'warn' || prop === 'error' || prop === 'info') {
+        return function(...args) {
+          originalConsole[prop].apply(target, args);
+          setTimeout(() => appendConsole(prop, args, 'main'), 0);
+        };
+      }
+      return target[prop];
+    }
+  });
+
+  window.console = consoleProxy;
+
+  window.addEventListener('error', (e) => console.error(`[Global Error] ${e.message} at ${e.filename}:${e.lineno}:${e.colno}`));
+  window.addEventListener('unhandledrejection', (e) => console.error(`[Unhandled Rejection] ${e.reason}`));
+
+  document.addEventListener('click', (e) => {
+    if (e.target.id === 'clearConsoleBtn') {
+      const el = getConsoleEl();
+      if (el) el.innerHTML = '';
+      logHistory.length = 0;
+    }
+    if (e.target.id === 'copyConsoleBtn') {
+      const text = logHistory.map(log => {
+        const sourceTag = log.source === 'worker' ? '[WORKER] ' : '';
+        return `[${log.time}] ${sourceTag}[${log.type.toUpperCase()}] ${log.msg}`;
+      }).join('\n');
+
+      navigator.clipboard.writeText(text).then(() => {
+        const btn = document.getElementById('copyConsoleBtn');
+        const original = btn.textContent;
+        btn.textContent = '✅ Copied!';
+        setTimeout(() => btn.textContent = original, 2000);
+      }).catch(err => {
+        alert('Failed to copy: ' + err.message);
+      });
+    }
+    if (e.target.id === 'toggleConsoleBtn') {
+      wrap.classList.toggle('hidden');
+      e.target.textContent = wrap.classList.contains('hidden') ? '▲ Show' : '▼ Hide';
+      updateControlsBarPosition();
+    }
+  });
+
+  document.addEventListener('click', (e) => {
+    if (e.target.classList.contains('console-header') || (e.target.closest('.console-header') && !e.target.closest('button'))) {
+      wrap.classList.toggle('hidden');
+      const btn = document.getElementById('toggleConsoleBtn');
+      if (btn) btn.textContent = wrap.classList.contains('hidden') ? '▲ Show' : '▼ Hide';
+      updateControlsBarPosition();
+    }
+  });
+
+  window.__appendWorkerLog = (type, args) => appendConsole(type, args, 'worker');
+
+  setTimeout(() => {
+    console.log("🚀 In-page console initialized. Click header to expand.");
+  }, 100);
+})();
+</script>
+
+<style>
+:root{--ginger:#FF8F3C;--amber:#FFC24B;--bg:#171019;--surface:#241B30;--line:rgba(255,178,120,.16);--text:#FCEFE4;--muted:#B7A498;--accent:#9d7bd6;--active:#3d2a52}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,sans-serif;font-size:15px;line-height:1.55;padding-bottom:240px}
+.wrap{max-width:780px;margin:0 auto;padding:20px}
+h1{font-size:22px;margin:0 0 4px}
+h2{font-size:18px;margin:0 0 12px}
+p.note{color:var(--muted);font-size:13px;margin:0 0 16px}
+button{padding:9px 16px;border:none;border-radius:10px;cursor:pointer;font-weight:600;color:#2A1408;background:linear-gradient(135deg,var(--amber),var(--ginger));font-size:13px;transition:opacity .15s}
+button:disabled{opacity:.4;cursor:not-allowed}
+button.alt{background:rgba(255,255,255,.08);color:var(--text);border:1px solid var(--line)}
+button.danger{background:#5a2030;color:#ffd0d8;border:1px solid rgba(255,100,120,.3)}
+button.small{padding:5px 10px;font-size:11px;border-radius:7px}
+select,input[type=file]{padding:7px 10px;border-radius:8px;background:var(--surface);color:var(--text);border:1px solid var(--line);font-size:13px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.spacer{flex:1}
+
+#library-view .upload-zone{border:2px dashed var(--line);border-radius:14px;padding:28px;text-align:center;margin-bottom:20px;cursor:pointer;transition:all .2s;background:rgba(255,255,255,.02)}
+#library-view .upload-zone:hover,#library-view .upload-zone.drag{border-color:var(--ginger);background:rgba(255,143,60,.06)}
+#library-view .upload-zone p{margin:0;color:var(--muted);font-size:13px}
+#library-view .upload-zone strong{color:var(--text);font-size:15px}
+#book-list{display:flex;flex-direction:column;gap:10px}
+.book-card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;display:flex;gap:12px;align-items:center}
+.book-card .info{flex:1;min-width:0}
+.book-card .title{font-weight:600;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.book-card .meta{font-size:12px;color:var(--muted)}
+.book-card .progress{font-size:11px;color:var(--amber)}
+.book-card .actions{display:flex;gap:6px;flex-shrink:0}
+
+#reader-view{display:none}
+#reader-header{position:sticky;top:0;background:var(--bg);padding-bottom:12px;border-bottom:1px solid var(--line);margin-bottom:16px;z-index:10}
+#reader-header h2{margin:0;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#reader-header .meta{font-size:12px;color:var(--muted);margin-top:2px}
+
+#book-content{font-size:17px;line-height:1.7;padding:8px 4px 80px;font-family:'Iowan Old Style','Palatino Linotype',Palatino,Georgia,serif}
+#book-content .sentence{display:inline;cursor:pointer;padding:1px 0;border-radius:3px;transition:background .15s}
+#book-content .sentence:hover{background:rgba(255,255,255,.04)}
+#book-content .sentence.active{background:var(--active);box-shadow:0 0 0 2px rgba(157,123,214,.4)}
+#book-content .sentence.playing{color:var(--amber)}
+
+#controls-bar{position:fixed;bottom:240px;left:0;right:0;background:linear-gradient(to top,var(--bg) 70%,transparent);padding:12px 16px 16px;display:flex;flex-direction:column;gap:10px;z-index:20;transition:bottom .3s}
+#controls-bar.console-hidden{bottom:40px}
+#controls-bar .inner{max-width:780px;margin:0 auto;width:100%;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px}
+#controls-bar .row{justify-content:center}
+#controls-bar select{font-size:12px;padding:5px 8px}
+#progress-bar{height:3px;background:rgba(255,255,255,.08);border-radius:99px;overflow:hidden;margin-top:6px}
+#progress-bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--amber),var(--ginger));transition:width .2s}
+#status-line{font-size:11px;color:var(--muted);text-align:center;min-height:14px;margin-top:4px}
+
+#toast{position:fixed;bottom:280px;left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid var(--line);padding:10px 16px;border-radius:10px;font-size:13px;opacity:0;transition:opacity .3s;pointer-events:none;z-index:100}
+#toast.show{opacity:1}
+
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:100}
+.modal{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:20px;max-width:400px;width:90%}
+.modal h3{margin:0 0 12px}
+.modal .row{margin-top:14px;justify-content:flex-end}
+
+.loading{text-align:center;padding:30px;color:var(--muted)}
+.loading::after{content:'';display:inline-block;width:14px;height:14px;border:2px solid var(--muted);border-top-color:var(--ginger);border-radius:50%;animation:spin 1s linear infinite;margin-left:8px;vertical-align:middle}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+@media (max-width:600px){
+  .wrap{padding:14px}
+  #book-content{font-size:16px}
+  #controls-bar .inner{padding:10px}
+  .book-card{padding:12px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div id="library-view">
+    <h1>📚 KittenTTS Reader</h1>
+    <p class="note">Upload text or PDF books. Your library and reading progress are saved locally.</p>
+    <div id="upload-zone" class="upload-zone">
+      <strong>Drop files here or click to upload</strong>
+      <p>Supports .txt, .md, .pdf</p>
+      <input type="file" id="file-input" accept=".txt,.md,.pdf,text/plain,application/pdf" multiple style="display:none">
+    </div>
+    <h2>Your Library</h2>
+    <div id="book-list"><div class="loading">Loading library…</div></div>
+  </div>
+
+  <div id="reader-view">
+    <div id="reader-header">
+      <div class="row">
+        <button id="back-btn" class="alt small">← Library</button>
+        <div class="spacer"></div>
+        <button id="jump-start" class="alt small" title="Go to start">⏮ Start</button>
+        <button id="jump-end" class="alt small" title="Go to end">End ⏭</button>
+      </div>
+      <h2 id="book-title">Book Title</h2>
+      <div class="meta" id="book-meta"></div>
+    </div>
+    <div id="book-content"><div class="loading">Loading book…</div></div>
+
+    <div id="controls-bar">
+      <div class="inner">
+        <div class="row">
+          <button id="prev-btn" class="alt small">◀ Prev</button>
+          <button id="play-btn">▶ Play</button>
+          <button id="next-btn" class="alt small">Next ▶</button>
+          <span class="spacer"></span>
+          <select id="voice-sel"></select>
+          <select id="speed-sel">
+            <option value="0.75">0.75×</option>
+            <option value="1" selected>1×</option>
+            <option value="1.25">1.25×</option>
+            <option value="1.5">1.5×</option>
+            <option value="1.75">1.75×</option>
+          </select>
+        </div>
+        <div id="progress-bar"><i></i></div>
+        <div id="status-line">Initializing TTS engine…</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script type="module">
+const $ = s => document.querySelector(s);
+const $$ = s => Array.from(document.querySelectorAll(s));
+const toast = (msg, ms = 2400) => {
+  const el = $('#toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => el.classList.remove('show'), ms);
+};
+const fmtSize = n => n < 1024 ? n + ' B' : n < 1024*1024 ? (n/1024).toFixed(1) + ' KB' : (n/1024/1024).toFixed(2) + ' MB';
+const fmtDate = d => new Date(d).toLocaleDateString(undefined, { year:'numeric', month:'short', day:'numeric' });
+const escapeHtml = s => String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+
+class BookDB {
+  constructor() { this.dbName = 'kittentts_reader_v1'; this.dbVersion = 1; this.db = null; }
+  open() {
+    if (this.db) return Promise.resolve(this.db);
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open(this.dbName, this.dbVersion);
+      req.onerror = () => reject(req.error);
+      req.onsuccess = () => { this.db = req.result; resolve(this.db); };
+      req.onupgradeneeded = (e) => {
+        const db = e.target.result;
+        if (!db.objectStoreNames.contains('books')) { const bs = db.createObjectStore('books', { keyPath: 'id', autoIncrement: true }); bs.createIndex('title', 'title'); }
+        if (!db.objectStoreNames.contains('state')) { db.createObjectStore('state', { keyPath: 'bookId' }); }
+      };
+    });
+  }
+  async _tx(store, mode = 'readonly') { await this.open(); return this.db.transaction(store, mode).objectStore(store); }
+  async listBooks() { const store = await this._tx('books'); return new Promise((resolve, reject) => { const req = store.getAll(); req.onsuccess = () => resolve((req.result || []).sort((a,b) => b.added - a.added)); req.onerror = () => reject(req.error); }); }
+  async getBook(id) { const store = await this._tx('books'); return new Promise((resolve, reject) => { const req = store.get(id); req.onsuccess = () => resolve(req.result); req.onerror = () => reject(req.error); }); }
+  async saveBook(book) { const store = await this._tx('books', 'readwrite'); return new Promise((resolve, reject) => { const req = book.id ? store.put(book) : store.add(book); req.onsuccess = () => resolve(req.result); req.onerror = () => reject(req.error); }); }
+  async deleteBook(id) { await this.open(); const tx = this.db.transaction(['books', 'state'], 'readwrite'); tx.objectStore('books').delete(id); tx.objectStore('state').delete(id); return new Promise((resolve, reject) => { tx.oncomplete = () => resolve(); tx.onerror = () => reject(tx.error); }); }
+  async getState(bookId) { const store = await this._tx('state'); return new Promise((resolve, reject) => { const req = store.get(bookId); req.onsuccess = () => resolve(req.result || null); req.onerror = () => reject(req.error); }); }
+  async saveState(state) { const store = await this._tx('state', 'readwrite'); return new Promise((resolve, reject) => { const req = store.put(state); req.onsuccess = () => resolve(req.result); req.onerror = () => reject(req.error); }); }
+}
+const db = new BookDB();
+
+function splitSentences(text) {
+  if (!text) return [];
+  text = text.replace(/\r\n?/g, '\n').replace(/[ \t]+/g, ' ').replace(/\n{2,}/g, ' ¶ ').replace(/\n/g, ' ').replace(/¶/g, ' ');
+  const ABBR_RE = /\b(mr|mrs|ms|miss|dr|prof|sr|jr|st|ave|blvd|dept|vol|vs|etc|inc|ltd|corp|co|approx|appt|est|gen|gov|sgt|cpl|pvt|capt|lt|col|maj|cmdr|adm|rev|hon|pres|dir|sen|rep|atty|supt|det|insp|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec|mon|tue|wed|thu|fri|sat|sun|fig|eq|figs|eqs|no|nos|op|opp|pp|pg|pgs|ch|sec|pt|vol|v|ed|al|ca|cf|viz|ibid|id|loc)\./gi;
+  const abbrTokens = [];
+  let work = text.replace(ABBR_RE, (m) => { abbrTokens.push(m); return `\x00${abbrTokens.length - 1}\x00`; });
+  work = work.replace(/\.{3,}/g, '…').replace(/…+/g, '… ');
+  const parts = work.split(/(?<=[.!?][)"'’”]*)\s+(?=[A-Z"‘(\[]|\d{1,2}[:\/]|\d{4})/);
+  return parts.map(s => {
+    let restored = s.replace(/\x00(\d+)\x00/g, (_, i) => abbrTokens[+i] || '').trim();
+    return (!restored || !/[a-zA-Z0-9]/.test(restored)) ? null : restored;
+  }).filter(Boolean);
+}
+
+async function readTextFile(file) { return await file.text(); }
+
+let pdfjsLib = null;
+async function getPdfJs() {
+  if (!pdfjsLib) {
+    pdfjsLib = await import('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs');
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs';
+  }
+  return pdfjsLib;
+}
+async function readPdfFile(file) {
+  const pdfjs = await getPdfJs();
+  const buf = await file.arrayBuffer();
+  const pdf = await pdfjs.getDocument({ data: buf }).promise;
+  const pages = [];
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    let lastY = null, pageText = '';
+    for (const item of content.items) {
+      if (lastY !== null && Math.abs(lastY - item.transform[5]) > 2) pageText += '\n';
+      else if (pageText && !pageText.endsWith(' ') && !pageText.endsWith('\n')) pageText += ' ';
+      pageText += item.str;
+      lastY = item.transform[5];
+    }
+    pages.push(pageText);
+  }
+  return pages.join('\n\n');
+}
+async function readFile(file) { return file.name.toLowerCase().endsWith('.pdf') ? await readPdfFile(file) : await readTextFile(file); }
+
+class AudioPlayer {
+  constructor(sampleRate) {
+    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+    this.sampleRate = sampleRate;
+    this.gain = this.ctx.createGain();
+    this.gain.connect(this.ctx.destination);
+    this.source = null;
+    this.buffer = null;
+    this.playbackRate = 1.0;
+    this.volume = 1.0;
+    this.startTime = 0;
+    this.pauseOffset = 0;
+    this.isPlaying = false;
+    this.onended = null;
+  }
+
+  play(samples, sampleRate, volume = 1.0, rate = 1.0, offset = 0) {
+    this.stop();
+    this.sampleRate = sampleRate || this.sampleRate;
+    this.buffer = this.ctx.createBuffer(1, samples.length, this.sampleRate);
+    this.buffer.copyToChannel(samples, 0);
+    this.playbackRate = rate;   // keep 1: speed is already baked into the samples by the model
+    this.volume = volume;
+    this.pauseOffset = offset;
+    this._startSource();
+  }
+
+  _startSource() {
+    this.source = this.ctx.createBufferSource();
+    this.source.buffer = this.buffer;
+    this.source.playbackRate.value = this.playbackRate;
+    this.gain.gain.value = this.volume;
+    this.source.connect(this.gain);
+    this.source.onended = () => {
+      if (this.isPlaying) {
+        this.isPlaying = false;
+        this.pauseOffset = 0;
+        if (this.onended) this.onended();
+      }
+    };
+    this.isPlaying = true;
+    this.startTime = this.ctx.currentTime;
+    this.source.start(0, this.pauseOffset);
+  }
+
+  pause() {
+    if (this.source && this.isPlaying) {
+      const elapsed = (this.ctx.currentTime - this.startTime) * this.playbackRate;
+      this.pauseOffset = this.pauseOffset + elapsed;
+      this.source.onended = null;
+      this.source.stop();
+      this.source.disconnect();
+      this.source = null;
+      this.isPlaying = false;
+    }
+  }
+
+  resume() {
+    if (this.buffer && !this.isPlaying) this._startSource();
+  }
+
+  stop() {
+    if (this.source) {
+      this.source.onended = null;
+      try { this.source.stop(); } catch(e){}
+      this.source.disconnect();
+      this.source = null;
+    }
+    this.isPlaying = false;
+    this.pauseOffset = 0;
+  }
+
+  setVolume(v) {
+    this.volume = v;
+    if (this.gain) this.gain.gain.value = v;
+  }
+}
+
+const app = {
+  currentBook: null,
+  currentSentIdx: 0,
+  currentVoice: 0,
+  currentSpeed: 1,
+  currentVolume: 0.85,
+  isPlaying: false,
+  isPaused: false,
+  voices: [],
+  preSynthesized: new Map(),
+  audioPlayer: null,
+  stateSaveTimer: null,
+  worker: null,
+  ttsReady: false,
+  initStatus: 'idle',
+  useWorker: true,
+  gen: 0,                 // cache epoch: bumped on voice/speed/book change
+  pending: new Set(),     // idxs currently being synthesized
+  bootSeen: false,
+  watchdog: null
+};
+
+function updateInitStatus(status, message) {
+  app.initStatus = status;
+  $('#status-line').textContent = message;
+  console.log('[Main] Init status:', status, '-', message);
+}
+
+async function initWorker() {
+  if (location.protocol === 'file:') {
+    updateInitStatus('error', '❌ Serve over HTTP (not file://) — module workers require it.');
+    return false;
+  }
+  try {
+    app.worker = new Worker('./tts-worker.js', { type: 'module' });
+  } catch (err) {
+    updateInitStatus('error', '❌ Worker creation failed: ' + err.message);
+    return false;
+  }
+
+  const arm = (ms = 30000) => {
+    clearTimeout(app.watchdog);
+    app.watchdog = setTimeout(() => {
+      if (app.ttsReady) return;
+      updateInitStatus('error', app.bootSeen
+        ? '❌ TTS init stalled — check Network tab for vendor/*.wasm, model and voices files.'
+        : '❌ tts-worker.js never booted — 404 or wrong MIME type on tts-worker.js or its imports.');
+    }, ms);
+  };
+  arm();
+
+  app.worker.onmessage = (e) => {
+    const d = e.data || {};
+    if (d.type === 'boot')   { app.bootSeen = true; arm(); console.log('[Main] Worker script booted'); return; }
+    if (d.type === 'status') { arm(); updateInitStatus('initializing', '🔄 ' + d.message); return; }
+    if (d.type === 'progress') { arm(); return; }
+    if (d.type === 'log')    { if (window.__appendWorkerLog) window.__appendWorkerLog(d.message.level, d.message.args); return; }
+
+    if (d.type === 'ready') {
+      clearTimeout(app.watchdog);
+      app.voices = d.voices || [];
+      app.ttsReady = true;
+      populateVoices();
+      $('#play-btn').disabled = false;
+      updateInitStatus('ready', '✅ TTS ready — ' + app.voices.length + ' voices available');
+      return;
+    }
+
+    if (d.type === 'synthesized') {
+      app.pending.delete(d.idx);
+      if (d.gen != null && d.gen !== app.gen) return;   // stale voice/speed/book result
+      app.preSynthesized.set(d.idx, { samples: d.samples, sampleRate: d.sampleRate });
+      if (app.isPlaying && d.idx === app.currentSentIdx && app.audioPlayer && !app.audioPlayer.isPlaying) {
+        $('#status-line').textContent = `Reading sentence ${d.idx + 1} of ${app.currentBook.sentences.length}`;
+        app.audioPlayer.play(d.samples, d.sampleRate, app.currentVolume, 1);
+        requestPreSynthesis(d.idx + 1);
+      }
+      return;
+    }
+
+    if (d.type === 'stale') { app.pending.delete(d.idx); return; }
+
+    if (d.type === 'error') {
+      console.error('[Main] Worker error:', d.error, d.stack || '');
+      if (d.idx === undefined) {           // init-phase failure
+        clearTimeout(app.watchdog);
+        updateInitStatus('error', '❌ ' + d.error);
+      } else {
+        app.pending.delete(d.idx);
+        app.preSynthesized.delete(d.idx);
+        toast('TTS error: ' + d.error);
+        if (d.idx === app.currentSentIdx) stopPlayback();
+      }
+    }
+  };
+
+  app.worker.onerror = (ev) => {
+    console.error('[Main] Worker error event:', ev.message || '(no message)', ev.filename || '', ev.lineno || '');
+    if (!app.bootSeen) updateInitStatus('error',
+      '❌ Worker script failed to load. Check tts-worker.js / kittentts.js / vendor files exist and are served as text/javascript.');
+  };
+
+  updateInitStatus('initializing', '🔄 Initializing TTS engine…');
+  $('#play-btn').disabled = true;
+  app.worker.postMessage({
+    type: 'init',
+    opts: { phonEngine: 'espeak', tokenMode: 'phonemes', misakiStress: true, misakiVersion: '1.0' }
+  });
+  return true;
+}
+
+initWorker();
+
+function invalidateCache() {
+  app.gen++;
+  app.preSynthesized.clear();
+  app.pending.clear();
+}
+
+function requestPreSynthesis(nextIdx) {
+  if (!app.ttsReady || !app.currentBook) return;
+  if (nextIdx >= app.currentBook.sentences.length) return;
+  if (app.preSynthesized.has(nextIdx) || app.pending.has(nextIdx)) return;
+  if (app.preSynthesized.size >= 2) {
+    for (const k of app.preSynthesized.keys()) {
+      if (k !== app.currentSentIdx) { app.preSynthesized.delete(k); break; }
+    }
+  }
+  app.pending.add(nextIdx);
+  app.worker.postMessage({
+    type: 'synthesize', idx: nextIdx, gen: app.gen,
+    text: app.currentBook.sentences[nextIdx],
+    voice: app.currentVoice, speed: app.currentSpeed
+  });
+}
+
+function playSentence(idx) {
+  if (!app.ttsReady) { toast('TTS engine is still loading…'); return; }
+  if (!app.currentBook || idx < 0 || idx >= app.currentBook.sentences.length) { stopPlayback(); return; }
+
+  app.currentSentIdx = idx;
+  highlightSentence(idx);
+  updateProgress();
+  scheduleStateSave();
+  $('#play-btn').textContent = '⏸ Pause';
+
+  const cached = app.preSynthesized.get(idx);
+  if (cached) {
+    $('#status-line').textContent = `Reading sentence ${idx + 1} of ${app.currentBook.sentences.length}`;
+    app.audioPlayer.play(cached.samples, cached.sampleRate, app.currentVolume, 1);
+    requestPreSynthesis(idx + 1);
+  } else {
+    $('#status-line').textContent = `Synthesizing sentence ${idx + 1}…`;
+    if (!app.pending.has(idx)) {
+      app.pending.add(idx);
+      app.worker.postMessage({
+        type: 'synthesize', idx, gen: app.gen,
+        text: app.currentBook.sentences[idx],
+        voice: app.currentVoice, speed: app.currentSpeed
+      });
+    }
+  }
+}
+
+function startPlayback() {
+  if (!app.ttsReady) {
+    toast('TTS engine is still loading...');
+    return;
+  }
+  if (app.audioPlayer && app.audioPlayer.ctx && app.audioPlayer.ctx.state === 'suspended') app.audioPlayer.ctx.resume();
+  app.isPlaying = true;
+  app.isPaused = false;
+  playSentence(app.currentSentIdx);
+}
+
+function pausePlayback() {
+  app.audioPlayer.pause();
+  app.isPaused = true;
+  app.isPlaying = false;
+  $('#play-btn').textContent = '▶ Resume';
+  saveStateNow();
+}
+
+function resumePlayback() {
+  app.audioPlayer.resume();
+  app.isPaused = false;
+  app.isPlaying = true;
+  $('#play-btn').textContent = '⏸ Pause';
+}
+
+function stopPlayback() {
+  if (app.audioPlayer) app.audioPlayer.stop();
+  app.isPlaying = false;
+  app.isPaused = false;
+  $('#play-btn').textContent = '▶ Play';
+  saveStateNow();
+}
+
+function renderBookContent() {
+  if (!app.currentBook) return;
+  const container = $('#book-content');
+  container.innerHTML = '';
+  const frag = document.createDocumentFragment();
+  app.currentBook.sentences.forEach((sent, idx) => {
+    const span = document.createElement('span');
+    span.className = 'sentence';
+    span.dataset.idx = idx;
+    span.textContent = sent + ' ';
+    span.addEventListener('click', () => {
+      const wasPlaying = app.isPlaying;
+      if (wasPlaying) stopPlayback();
+      app.currentSentIdx = idx;
+      highlightSentence(idx);
+      updateProgress();
+      scheduleStateSave();
+      if (wasPlaying) setTimeout(() => startPlayback(), 50);
+    });
+    frag.appendChild(span);
+  });
+  container.appendChild(frag);
+  highlightSentence(app.currentSentIdx);
+  scrollToSentence(app.currentSentIdx);
+}
+
+function highlightSentence(idx) {
+  $$('#book-content .sentence').forEach(el => el.classList.remove('active', 'playing'));
+  const active = $(`#book-content .sentence[data-idx="${idx}"]`);
+  if (active) {
+    active.classList.add('active');
+    if (app.isPlaying) active.classList.add('playing');
+  }
+}
+
+function scrollToSentence(idx) {
+  const el = $(`#book-content .sentence[data-idx="${idx}"]`);
+  if (!el) return;
+  const rect = el.getBoundingClientRect();
+  const targetY = window.scrollY + rect.top - 120;
+  window.scrollTo({ top: Math.max(0, targetY), behavior: 'smooth' });
+}
+
+function updateProgress() {
+  if (!app.currentBook) return;
+  const total = app.currentBook.sentences.length;
+  const frac = total > 0 ? (app.currentSentIdx / total) * 100 : 0;
+  $('#progress-bar i').style.width = frac + '%';
+  $('#book-meta').textContent = `Sentence ${app.currentSentIdx + 1} of ${total} · ${total.toLocaleString()} sentences total`;
+}
+
+function populateVoices() {
+  const sel = $('#voice-sel');
+  sel.innerHTML = '';
+  app.voices.forEach((v, i) => {
+    const o = document.createElement('option');
+    o.value = i;
+    o.textContent = v.name;
+    sel.appendChild(o);
+  });
+  if (app.currentVoice < app.voices.length) sel.value = app.currentVoice;
+}
+
+function scheduleStateSave() {
+  clearTimeout(app.stateSaveTimer);
+  app.stateSaveTimer = setTimeout(saveStateNow, 500);
+}
+
+async function saveStateNow() {
+  if (!app.currentBook) return;
+  try {
+    await db.saveState({
+      bookId: app.currentBook.id,
+      sentenceIdx: app.currentSentIdx,
+      voice: app.currentVoice,
+      speed: app.currentSpeed,
+      lastOpened: Date.now(),
+    });
+  } catch (e) { console.warn('State save failed:', e); }
+}
+
+async function loadState(bookId) {
+  const state = await db.getState(bookId);
+  if (state) {
+    app.currentSentIdx = state.sentenceIdx || 0;
+    app.currentVoice = state.voice || 0;
+    app.currentSpeed = state.speed || 1;
+  } else {
+    app.currentSentIdx = 0;
+    app.currentVoice = 0;
+    app.currentSpeed = 1;
+  }
+}
+
+async function renderLibrary() {
+  const list = $('#book-list');
+  const books = await db.listBooks();
+  if (!books.length) {
+    list.innerHTML = '<p class="note" style="text-align:center;padding:20px">No books yet. Upload one above to get started.</p>';
+    return;
+  }
+  list.innerHTML = '';
+  for (const book of books) {
+    const state = await db.getState(book.id);
+    const progress = state ? Math.round(((state.sentenceIdx || 0) / book.sentCount) * 100) : 0;
+    const card = document.createElement('div');
+    card.className = 'book-card';
+    card.innerHTML = `
+      <div class="info">
+        <div class="title">${escapeHtml(book.title)}</div>
+        <div class="meta">${escapeHtml(book.filename)} · ${fmtSize(book.size)} · ${fmtDate(book.added)}</div>
+        <div class="meta">${book.sentCount.toLocaleString()} sentences${state ? ` · ${progress}% read` : ''}</div>
+      </div>
+      <div class="actions">
+        <button class="open-btn small">Open</button>
+        <button class="del-btn small danger" title="Delete">🗑</button>
+      </div>
+    `;
+    card.querySelector('.open-btn').addEventListener('click', () => openBook(book.id));
+    card.querySelector('.del-btn').addEventListener('click', (e) => { e.stopPropagation(); confirmDelete(book); });
+    list.appendChild(card);
+  }
+}
+
+function confirmDelete(book) {
+  const bg = document.createElement('div');
+  bg.className = 'modal-bg';
+  bg.innerHTML = `
+    <div class="modal">
+      <h3>Delete "${escapeHtml(book.title)}"?</h3>
+      <p class="note">This will remove the book and your reading progress. This cannot be undone.</p>
+      <div class="row">
+        <button class="cancel-btn alt">Cancel</button>
+        <button class="confirm-btn danger">Delete</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(bg);
+  bg.querySelector('.cancel-btn').addEventListener('click', () => bg.remove());
+  bg.querySelector('.confirm-btn').addEventListener('click', async () => {
+    await db.deleteBook(book.id);
+    bg.remove();
+    toast('Book deleted');
+    renderLibrary();
+  });
+  bg.addEventListener('click', (e) => { if (e.target === bg) bg.remove(); });
+}
+
+async function openBook(id) {
+  const book = await db.getBook(id);
+  if (!book) { toast('Book not found'); return; }
+
+  app.currentBook = book;
+  invalidateCache();   // cache is keyed by sentence idx — never reuse another book's audio
+  await loadState(id);
+
+  $('#library-view').style.display = 'none';
+  $('#reader-view').style.display = 'block';
+  $('#book-title').textContent = book.title;
+
+  renderBookContent();
+  updateProgress();
+
+  $('#voice-sel').value = app.currentVoice;
+  $('#speed-sel').value = app.currentSpeed;
+
+  // Reuse one AudioContext instead of leaking a new one per book open.
+  if (!app.audioPlayer) {
+    app.audioPlayer = new AudioPlayer(24000);
+    app.audioPlayer.onended = () => {
+      if (app.isPlaying) playSentence(app.currentSentIdx + 1);
+    };
+  }
+
+  if (!app.ttsReady) {
+    console.log('[Main] TTS not ready yet, waiting...');
+    $('#status-line').textContent = '⏳ Waiting for TTS engine to initialize...';
+  }
+
+  await saveStateNow();
+}
+
+function closeBook() {
+  stopPlayback();
+  saveStateNow();
+  invalidateCache();
+  app.currentBook = null;
+  $('#reader-view').style.display = 'none';
+  $('#library-view').style.display = 'block';
+  renderLibrary();
+}
+
+async function handleFiles(files) {
+  for (const file of files) {
+    try {
+      $('#status-line').textContent = `Processing ${file.name}…`;
+      const text = await readFile(file);
+      const sentences = splitSentences(text);
+      if (!sentences.length) { toast(`${file.name} has no readable text`); continue; }
+
+      let title = file.name.replace(/\.(txt|md|pdf)$/i, '').replace(/[-_]+/g, ' ');
+      title = title.replace(/\b\w/g, c => c.toUpperCase());
+
+      const book = { title, filename: file.name, size: file.size, added: Date.now(), sentCount: sentences.length, sentences };
+      const id = await db.saveBook(book);
+      book.id = id;
+      toast(`📚 Added: ${title} (${sentences.length} sentences)`);
+    } catch (e) {
+      console.error('Import failed:', e);
+      toast(`Failed to import ${file.name}: ${e.message}`);
+    }
+  }
+  renderLibrary();
+}
+
+function wireEvents() {
+  const zone = $('#upload-zone');
+  const input = $('#file-input');
+  zone.addEventListener('click', () => input.click());
+  input.addEventListener('change', (e) => handleFiles(Array.from(e.target.files)));
+  zone.addEventListener('dragover', (e) => { e.preventDefault(); zone.classList.add('drag'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('drag'));
+  zone.addEventListener('drop', (e) => { e.preventDefault(); zone.classList.remove('drag'); handleFiles(Array.from(e.dataTransfer.files)); });
+
+  $('#back-btn').addEventListener('click', closeBook);
+
+  $('#play-btn').addEventListener('click', () => {
+    if (!app.ttsReady) {
+      toast('TTS engine is still loading...');
+      return;
+    }
+    if (app.isPlaying) pausePlayback();
+    else if (app.isPaused) resumePlayback();
+    else startPlayback();
+  });
+
+  const jumpTo = (idx) => {
+    const wasPlaying = app.isPlaying;
+    if (wasPlaying) stopPlayback();
+    app.currentSentIdx = Math.max(0, Math.min(app.currentBook.sentences.length - 1, idx));
+    highlightSentence(app.currentSentIdx);
+    scrollToSentence(app.currentSentIdx);
+    updateProgress();
+    scheduleStateSave();
+    if (wasPlaying) setTimeout(startPlayback, 50);
+  };
+
+  $('#prev-btn').addEventListener('click', () => jumpTo(app.currentSentIdx - 1));
+  $('#next-btn').addEventListener('click', () => jumpTo(app.currentSentIdx + 1));
+  $('#jump-start').addEventListener('click', () => jumpTo(0));
+  $('#jump-end').addEventListener('click', () => jumpTo(app.currentBook.sentences.length - 1));
+
+  $('#voice-sel').addEventListener('change', (e) => {
+    app.currentVoice = +e.target.value;
+    invalidateCache();
+    if (app.worker) app.worker.postMessage({ type: 'setOpts', voice: app.currentVoice, speed: app.currentSpeed, gen: app.gen });
+    if (app.isPlaying || app.isPaused) {
+      const wasPlaying = app.isPlaying;
+      stopPlayback();
+      if (wasPlaying) setTimeout(startPlayback, 50);
+    }
+    scheduleStateSave();
+  });
+
+  $('#speed-sel').addEventListener('change', (e) => {
+    app.currentSpeed = +e.target.value;
+    invalidateCache();
+    if (app.worker) app.worker.postMessage({ type: 'setOpts', voice: app.currentVoice, speed: app.currentSpeed, gen: app.gen });
+    if (app.isPlaying || app.isPaused) {
+      const wasPlaying = app.isPlaying;
+      stopPlayback();
+      if (wasPlaying) setTimeout(startPlayback, 50);
+    }
+    scheduleStateSave();
+  });
+
+  window.addEventListener('beforeunload', saveStateNow);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') saveStateNow(); });
+
+  document.addEventListener('keydown', (e) => {
+    if ($('#reader-view').style.display === 'none') return;
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+    if (e.code === 'Space') { e.preventDefault(); $('#play-btn').click(); }
+    else if (e.code === 'ArrowLeft') { e.preventDefault(); $('#prev-btn').click(); }
+    else if (e.code === 'ArrowRight') { e.preventDefault(); $('#next-btn').click(); }
+    else if (e.code === 'Escape') { e.preventDefault(); closeBook(); }
+  });
+}
+
+async function init() {
+  try {
+    await db.open();
+    await renderLibrary();
+    wireEvents();
+    console.log('✅ Reader initialized with Web Worker TTS pipeline');
+  } catch (e) {
+    console.error('Init failed:', e);
+    $('#book-list').innerHTML = '<p class="note" style="color:#ff6b6b">Failed to initialize: ' + e.message + '</p>';
+  }
+}
+
+init();
+</script>
+</body>
+</html>

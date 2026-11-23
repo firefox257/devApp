@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>🧠 Browser AI Trainer</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.21.0/dist/tf.min.js"></script>
+  <style>
+    :root {
+      --primary: #6366f1;
+      --primary-hover: #4f46e5;
+      --bg: #0f172a;
+      --card: #1e293b;
+      --text: #f1f5f9;
+      --text-dim: #94a3b8;
+      --success: #22c55e;
+      --warning: #f59e0b;
+      --error: #ef4444;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      padding: 20px;
+      min-height: 100vh;
+    }
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    header {
+      text-align: center;
+      padding: 2rem 1rem;
+      border-bottom: 1px solid #334155;
+      margin-bottom: 2rem;
+    }
+    h1 {
+      font-size: 1.8rem;
+      margin-bottom: 0.5rem;
+      background: linear-gradient(135deg, #6366f1, #a855f7);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .subtitle { color: var(--text-dim); }
+    
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+    }
+    
+    .card {
+      background: var(--card);
+      border-radius: 12px;
+      padding: 1.5rem;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+    }
+    .card h3 {
+      margin-bottom: 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid #334155;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    
+    .input-group {
+      margin-bottom: 1rem;
+    }
+    label {
+      display: block;
+      margin-bottom: 0.4rem;
+      font-size: 0.9rem;
+      color: var(--text-dim);
+    }
+    input, select {
+      width: 100%;
+      padding: 0.75rem;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      background: #0f172a;
+      color: var(--text);
+      font-size: 1rem;
+    }
+    input:focus, select:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.3);
+    }
+    
+    .btn {
+      background: var(--primary);
+      color: white;
+      border: none;
+      padding: 0.75rem 1.5rem;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      width: 100%;
+      justify-content: center;
+    }
+    .btn:hover { background: var(--primary-hover); transform: translateY(-1px); }
+    .btn:disabled {
+      background: #475569;
+      cursor: not-allowed;
+      transform: none;
+    }
+    .btn-row {
+      display: flex;
+      gap: 0.75rem;
+      margin-top: 1rem;
+    }
+    .btn-row .btn { flex: 1; }
+    
+    .status {
+      margin-top: 1rem;
+      padding: 0.75rem;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      display: none;
+    }
+    .status.show { display: block; }
+    .status.training { background: rgba(245, 158, 11, 0.2); color: var(--warning); }
+    .status.success { background: rgba(34, 197, 94, 0.2); color: var(--success); }
+    .status.error { background: rgba(239, 68, 68, 0.2); color: var(--error); }
+    
+    .results {
+      margin-top: 1rem;
+      background: #0f172a;
+      border-radius: 8px;
+      padding: 1rem;
+      font-family: monospace;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    
+    .prediction-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 0.75rem;
+      margin-top: 1rem;
+    }
+    .prediction-item {
+      background: #0f172a;
+      padding: 0.75rem;
+      border-radius: 8px;
+      text-align: center;
+    }
+    .prediction-item .input {
+      font-size: 0.85rem;
+      color: var(--text-dim);
+      margin-bottom: 0.25rem;
+    }
+    .prediction-item .output {
+      font-size: 1.2rem;
+      font-weight: bold;
+      color: var(--primary);
+    }
+    
+    .loss-chart {
+      height: 150px;
+      background: #0f172a;
+      border-radius: 8px;
+      margin-top: 1rem;
+      position: relative;
+      overflow: hidden;
+    }
+    .loss-bar {
+      position: absolute;
+      bottom: 0;
+      width: 4px;
+      background: linear-gradient(to top, var(--primary), #a855f7);
+      border-radius: 2px 2px 0 0;
+      transition: height 0.1s;
+    }
+    
+    /* Custom tester styles */
+    .tester-inputs {
+      display: flex;
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+    .tester-inputs .input-group { flex: 1; }
+    
+    .result-box {
+      background: linear-gradient(135deg, #1e293b, #334155);
+      border-radius: 12px;
+      padding: 1.25rem;
+      text-align: center;
+      margin-top: 1rem;
+      border: 2px solid transparent;
+      transition: border-color 0.3s;
+    }
+    .result-box.ready { border-color: var(--primary); }
+    .result-box .label {
+      font-size: 0.9rem;
+      color: var(--text-dim);
+      margin-bottom: 0.5rem;
+    }
+    .result-box .value {
+      font-size: 2rem;
+      font-weight: bold;
+      font-family: monospace;
+    }
+    .result-box .binary {
+      font-size: 1rem;
+      margin-top: 0.25rem;
+      padding: 0.25rem 0.75rem;
+      border-radius: 20px;
+      display: inline-block;
+    }
+    .result-box .binary.zero { background: rgba(239, 68, 68, 0.3); color: #fca5a5; }
+    .result-box .binary.one { background: rgba(34, 197, 94, 0.3); color: #86efac; }
+    
+    .hint {
+      font-size: 0.8rem;
+      color: var(--text-dim);
+      margin-top: 0.5rem;
+      text-align: center;
+    }
+    
+    footer {
+      text-align: center;
+      padding: 2rem;
+      color: var(--text-dim);
+      font-size: 0.9rem;
+      border-top: 1px solid #334155;
+      margin-top: 2rem;
+    }
+    
+    @media (max-width: 600px) {
+      .grid { grid-template-columns: 1fr; }
+      .prediction-grid { grid-template-columns: 1fr 1fr; }
+      .tester-inputs { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>🧠 Browser AI Trainer</h1>
+      <p class="subtitle">Train and run neural networks with TensorFlow.js — no server required!</p>
+    </header>
+
+    <div class="grid">
+      <!-- Training Panel -->
+      <div class="card">
+        <h3>⚙️ Train Model</h3>
+        <p style="color:var(--text-dim);margin-bottom:1rem">
+          Training a simple XOR classifier. Adjust epochs and learning rate below.
+        </p>
+        
+        <div class="input-group">
+          <label for="epochs">Epochs</label>
+          <input type="number" id="epochs" value="100" min="10" max="1000" step="10">
+        </div>
+        
+        <div class="input-group">
+          <label for="learningRate">Learning Rate</label>
+          <select id="learningRate">
+            <option value="0.1">0.1 (Fast)</option>
+            <option value="0.05" selected>0.05 (Balanced)</option>
+            <option value="0.01">0.01 (Precise)</option>
+          </select>
+        </div>
+        
+        <button class="btn" id="trainBtn" onclick="trainModel()">
+          🚀 Start Training
+        </button>
+        
+        <div id="trainStatus" class="status"></div>
+        
+        <div class="loss-chart" id="lossChart"></div>
+        <div class="results" id="trainLog">Ready to train...</div>
+      </div>
+
+      <!-- Prediction Panel -->
+      <div class="card">
+        <h3>🔮 Run Predictions</h3>
+        <p style="color:var(--text-dim);margin-bottom:1rem">
+          Test the trained model with XOR inputs:
+        </p>
+        
+        <div class="prediction-grid">
+          <div class="prediction-item">
+            <div class="input">[0, 0]</div>
+            <div class="output" id="pred00">?</div>
+          </div>
+          <div class="prediction-item">
+            <div class="input">[0, 1]</div>
+            <div class="output" id="pred01">?</div>
+          </div>
+          <div class="prediction-item">
+            <div class="input">[1, 0]</div>
+            <div class="output" id="pred10">?</div>
+          </div>
+          <div class="prediction-item">
+            <div class="input">[1, 1]</div>
+            <div class="output" id="pred11">?</div>
+          </div>
+        </div>
+        
+        <div class="btn-row">
+          <button class="btn" id="predictBtn" onclick="runPredictions()" disabled>
+            ▶️ Run Predictions
+          </button>
+          <button class="btn" style="background:#475569" onclick="resetModel()">
+            🔄 Reset
+          </button>
+        </div>
+        
+        <div id="predictStatus" class="status"></div>
+      </div>
+    </div>
+
+    <!-- ✨ NEW: Custom Input Tester -->
+    <div class="card">
+      <h3>🎯 Test Custom Input</h3>
+      <p style="color:var(--text-dim);margin-bottom:1rem">
+        Enter your own values to test the trained model:
+      </p>
+      
+      <div class="tester-inputs">
+        <div class="input-group">
+          <label for="inputA">Input A (0 or 1)</label>
+          <input type="number" id="inputA" min="0" max="1" step="0.01" value="0">
+        </div>
+        <div class="input-group">
+          <label for="inputB">Input B (0 or 1)</label>
+          <input type="number" id="inputB" min="0" max="1" step="0.01" value="0">
+        </div>
+      </div>
+      
+      <button class="btn" id="testBtn" onclick="testCustomInput()" disabled>
+        🔍 Test Input
+      </button>
+      
+      <div class="result-box" id="resultBox">
+        <div class="label">Model Output</div>
+        <div class="value" id="customResult">--</div>
+        <div class="binary" id="binaryResult">Waiting for prediction...</div>
+      </div>
+      
+      <p class="hint">💡 Tip: Try values between 0 and 1 to see how the model interpolates!</p>
+      
+      <div id="testStatus" class="status"></div>
+    </div>
+
+    <div class="card">
+      <h3>📊 Model Architecture</h3>
+      <div class="results" style="max-height:none">
+        <strong>Input Layer:</strong> 2 neurons (XOR inputs)<br>
+        <strong>Hidden Layer:</strong> 4 neurons, sigmoid activation<br>
+        <strong>Output Layer:</strong> 1 neuron, sigmoid activation<br><br>
+        <strong>Optimizer:</strong> Adam<br>
+        <strong>Loss Function:</strong> Mean Squared Error (MSE)<br>
+        <strong>Task:</strong> Binary classification (XOR problem)
+      </div>
+    </div>
+
+    <footer>
+      <p>Built with ❤️ using <a href="https://www.tensorflow.org/js" target="_blank" style="color:var(--primary);text-decoration:none">TensorFlow.js</a></p>
+      <p style="margin-top:0.5rem;font-size:0.8rem">Tip: Training happens locally in your browser. No data leaves your device!</p>
+    </footer>
+  </div>
+
+  <script>
+    // Global variables
+    let model = null;
+    let isTraining = false;
+    const lossHistory = [];
+
+    // XOR training data
+    const xs = tf.tensor2d([[0, 0], [0, 1], [1, 0], [1, 1]]);
+    const ys = tf.tensor2d([[0], [1], [1], [0]]);
+
+    // Create the neural network model
+    function createModel(learningRate) {
+      const model = tf.sequential();
+      
+      // Hidden layer
+      model.add(tf.layers.dense({
+        inputShape: [2],
+        units: 4,
+        activation: 'sigmoid'
+      }));
+      
+      // Output layer
+      model.add(tf.layers.dense({
+        units: 1,
+        activation: 'sigmoid'
+      }));
+      
+      // Compile with optimizer and loss
+      model.compile({
+        optimizer: tf.train.adam(learningRate),
+        loss: 'meanSquaredError',
+        metrics: ['mse']
+      });
+      
+      return model;
+    }
+
+    // Update loss chart visualization
+    function updateLossChart() {
+      const chart = document.getElementById('lossChart');
+      chart.innerHTML = '';
+      
+      if (lossHistory.length === 0) return;
+      
+      const maxLoss = Math.max(...lossHistory);
+      const barWidth = Math.max(2, Math.floor(300 / Math.max(lossHistory.length, 50)));
+      
+      lossHistory.forEach((loss, index) => {
+        const bar = document.createElement('div');
+        bar.className = 'loss-bar';
+        bar.style.left = `${index * barWidth}px`;
+        bar.style.height = `${(loss / maxLoss) * 100}%`;
+        bar.title = `Epoch ${index + 1}: Loss ${loss.toFixed(4)}`;
+        chart.appendChild(bar);
+      });
+    }
+
+    // Log messages to UI
+    function log(message, type = 'info') {
+      const logEl = document.getElementById('trainLog');
+      const timestamp = new Date().toLocaleTimeString();
+      const prefix = type === 'error' ? '❌' : type === 'success' ? '✅' : 'ℹ️';
+      logEl.innerHTML += `<div>[${timestamp}] ${prefix} ${message}</div>`;
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    // Show status message
+    function showStatus(elementId, message, type) {
+      const el = document.getElementById(elementId);
+      el.textContent = message;
+      el.className = `status show ${type}`;
+    }
+
+    // Train the model
+    async function trainModel() {
+      if (isTraining) return;
+      
+      const epochs = parseInt(document.getElementById('epochs').value);
+      const learningRate = parseFloat(document.getElementById('learningRate').value);
+      const trainBtn = document.getElementById('trainBtn');
+      const predictBtn = document.getElementById('predictBtn');
+      const testBtn = document.getElementById('testBtn');
+      
+      isTraining = true;
+      trainBtn.disabled = true;
+      predictBtn.disabled = true;
+      testBtn.disabled = true;
+      lossHistory.length = 0;
+      document.getElementById('trainLog').innerHTML = '';
+      
+      showStatus('trainStatus', 'Initializing model...', 'training');
+      log(`Starting training: ${epochs} epochs, LR: ${learningRate}`);
+      
+      try {
+        // Create new model
+        model = createModel(learningRate);
+        
+        // Train
+        showStatus('trainStatus', 'Training in progress...', 'training');
+        
+        await model.fit(xs, ys, {
+          epochs: epochs,
+          callbacks: {
+            onEpochEnd: async (epoch, logs) => {
+              if (epoch % 10 === 0 || epoch === epochs - 1) {
+                lossHistory.push(logs.loss);
+                updateLossChart();
+                log(`Epoch ${epoch + 1}/${epochs} - Loss: ${logs.loss.toFixed(4)}`);
+                showStatus('trainStatus', `Training: ${Math.round((epoch + 1) / epochs * 100)}% complete`, 'training');
+              }
+              // Allow UI to update
+              await tf.nextFrame();
+            }
+          }
+        });
+        
+        showStatus('trainStatus', '✅ Training complete!', 'success');
+        log('🎉 Model training finished successfully!', 'success');
+        predictBtn.disabled = false;
+        testBtn.disabled = false;
+        
+        // Auto-run predictions
+        runPredictions();
+        
+      } catch (error) {
+        console.error(error);
+        showStatus('trainStatus', `❌ Error: ${error.message}`, 'error');
+        log(`Error during training: ${error.message}`, 'error');
+      } finally {
+        isTraining = false;
+        trainBtn.disabled = false;
+      }
+    }
+
+    // Run predictions on XOR inputs
+    async function runPredictions() {
+      if (!model) {
+        showStatus('predictStatus', '⚠️ Please train the model first!', 'error');
+        return;
+      }
+      
+      const predictBtn = document.getElementById('predictBtn');
+      predictBtn.disabled = true;
+      showStatus('predictStatus', 'Running predictions...', 'training');
+      
+      try {
+        const testInputs = [[0, 0], [0, 1], [1, 0], [1, 1]];
+        const ids = ['pred00', 'pred01', 'pred10', 'pred11'];
+        
+        for (let i = 0; i < testInputs.length; i++) {
+          const input = tf.tensor2d([testInputs[i]]);
+          const prediction = model.predict(input);
+          const value = (await prediction.data())[0];
+          const rounded = Math.round(value);
+          
+          document.getElementById(ids[i]).textContent = `${value.toFixed(3)} → ${rounded}`;
+          document.getElementById(ids[i]).style.color = value > 0.5 ? 'var(--success)' : 'var(--text-dim)';
+          
+          // Clean up tensors
+          input.dispose();
+          prediction.dispose();
+        }
+        
+        showStatus('predictStatus', '✅ Predictions complete!', 'success');
+        log('Predictions executed successfully', 'success');
+        
+      } catch (error) {
+        console.error(error);
+        showStatus('predictStatus', `❌ Error: ${error.message}`, 'error');
+      } finally {
+        document.getElementById('predictBtn').disabled = false;
+      }
+    }
+
+    // ✨ NEW: Test custom input
+    async function testCustomInput() {
+      if (!model) {
+        showStatus('testStatus', '⚠️ Please train the model first!', 'error');
+        return;
+      }
+      
+      const inputA = parseFloat(document.getElementById('inputA').value);
+      const inputB = parseFloat(document.getElementById('inputB').value);
+      const resultBox = document.getElementById('resultBox');
+      const customResult = document.getElementById('customResult');
+      const binaryResult = document.getElementById('binaryResult');
+      
+      // Validate inputs
+      if (isNaN(inputA) || isNaN(inputB) || inputA < 0 || inputA > 1 || inputB < 0 || inputB > 1) {
+        showStatus('testStatus', '⚠️ Please enter values between 0 and 1', 'error');
+        return;
+      }
+      
+      showStatus('testStatus', 'Processing...', 'training');
+      resultBox.classList.add('ready');
+      
+      try {
+        const input = tf.tensor2d([[inputA, inputB]]);
+        const prediction = model.predict(input);
+        const value = (await prediction.data())[0];
+        const binary = Math.round(value);
+        
+        // Update UI
+        customResult.textContent = value.toFixed(4);
+        binaryResult.textContent = `→ Classified as: ${binary}`;
+        binaryResult.className = `binary ${binary === 1 ? 'one' : 'zero'}`;
+        
+        // Color code the result
+        if (value > 0.7) {
+          customResult.style.color = 'var(--success)';
+        } else if (value < 0.3) {
+          customResult.style.color = 'var(--error)';
+        } else {
+          customResult.style.color = 'var(--warning)';
+        }
+        
+        showStatus('testStatus', '✅ Prediction complete!', 'success');
+        log(`Custom input [${inputA}, ${inputB}] → ${value.toFixed(4)} (${binary})`, 'success');
+        
+        // Clean up
+        input.dispose();
+        prediction.dispose();
+        
+      } catch (error) {
+        console.error(error);
+        showStatus('testStatus', `❌ Error: ${error.message}`, 'error');
+        customResult.textContent = 'Error';
+        binaryResult.textContent = 'Check console for details';
+        binaryResult.className = 'binary zero';
+      }
+    }
+
+    // Reset everything
+    function resetModel() {
+      if (model) {
+        model.dispose();
+        model = null;
+      }
+      
+      // Clear UI
+      ['pred00', 'pred01', 'pred10', 'pred11'].forEach(id => {
+        document.getElementById(id).textContent = '?';
+        document.getElementById(id).style.color = 'var(--primary)';
+      });
+      
+      document.getElementById('customResult').textContent = '--';
+      document.getElementById('binaryResult').textContent = 'Waiting for prediction...';
+      document.getElementById('binaryResult').className = 'binary';
+      document.getElementById('resultBox').classList.remove('ready');
+      document.getElementById('inputA').value = '0';
+      document.getElementById('inputB').value = '0';
+      
+      document.getElementById('lossChart').innerHTML = '';
+      document.getElementById('trainLog').innerHTML = 'Model reset. Ready to train...';
+      document.getElementById('trainStatus').className = 'status';
+      document.getElementById('predictStatus').className = 'status';
+      document.getElementById('testStatus').className = 'status';
+      document.getElementById('predictBtn').disabled = true;
+      document.getElementById('testBtn').disabled = true;
+      lossHistory.length = 0;
+      
+      log('🔄 Model and UI reset');
+    }
+
+    // Initialize
+    document.addEventListener('DOMContentLoaded', () => {
+      log('👋 TensorFlow.js loaded. Ready to train!');
+      
+      // Keyboard shortcuts
+      document.addEventListener('keydown', (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+          e.preventDefault();
+          if (!isTraining) trainModel();
+        }
+        // Enter key in custom inputs
+        if (e.key === 'Enter' && (e.target.id === 'inputA' || e.target.id === 'inputB')) {
+          e.preventDefault();
+          if (!document.getElementById('testBtn').disabled) {
+            testCustomInput();
+          }
+        }
+      });
+    });
+
+    // Cleanup on page unload
+    window.addEventListener('beforeunload', () => {
+      if (model) model.dispose();
+    });
+  </script>
+</body>
+</html>

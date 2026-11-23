@@ -70,7 +70,7 @@ const copyFile = promisify(fs.copyFile);
 // ==========================================================
 // ===== MIME TYPE MAP =====
 const _mimetype = {
-    '.txt': 'text/plain', '.html': 'text/html', '.htm': 'text/html', '.js': 'text/javascript',
+    '.txt': 'text/plain', '.html': 'text/html', '.htm': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript',
     '.jpg': 'image/jpeg', '.JPG': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png',
     '.mp3': 'audio/mpeg', '.mp4': 'video/mp4', '.m3u': 'text/plain', '.svg': 'image/svg+xml',
     '.gltf': 'model/gltf+json', '.bin': 'application/octet-stream', '.onnx': 'application/octet-stream',

@@ -1,0 +1,12 @@
+this is out right broken!!!!
+input in 
+<|user|>ball1 and ball2<|assistant|> 
+
+i inspect  to see
+ shows ball1 is green and rough and ball2 is blue and dull<|stop|>
+
+but i get 
+two three four
+
+
+the training is way to quick, looks like it is not training at all.

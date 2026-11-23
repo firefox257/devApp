@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>📝 Sentence Completion Trainer (SwiGLU)</title>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.21.0/dist/tf.min.js"></script>
+<style>
+:root {
+	--primary: #6366f1; --primary-hover: #4f46e5; --bg: #0f172a;
+	--card: #1e293b; --text: #f1f5f9; --text-dim: #94a3b8;
+	--success: #22c55e; --warning: #f59e0b; --error: #ef4444;
+	--code-bg: #020617; --border: #334155;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+	font-family: 'Segoe UI', system-ui, sans-serif;
+	background: var(--bg); color: var(--text); line-height: 1.6;
+	padding: 20px; min-height: 100vh;
+}
+.container { max-width: 1000px; margin: 0 auto; }
+header { text-align: center; padding: 2rem 1rem; border-bottom: 1px solid #334155; margin-bottom: 2rem; }
+h1 { font-size: 1.8rem; margin-bottom: 0.5rem;
+	background: linear-gradient(135deg, #6366f1, #a855f7);
+	-webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.subtitle { color: var(--text-dim); }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
+.card { background: var(--card); border-radius: 12px; padding: 1.5rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.3); border: 1px solid var(--border); }
+.card h3 { margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 1px solid #334155; display: flex; align-items: center; gap: 0.5rem; color: var(--primary); }
+
+.input-group { margin-bottom: 1rem; }
+label { display: block; margin-bottom: 0.4rem; font-size: 0.9rem; color: var(--text-dim); }
+input, select, textarea { width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px; background: var(--code-bg); color: var(--text); font-size: 1rem; font-family: 'Consolas', monospace; }
+input:focus, select:focus, textarea:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(99,102,241,0.3); }
+textarea { min-height: 100px; resize: vertical; }
+
+.btn { background: var(--primary); color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 8px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 0.5rem; width: 100%; justify-content: center; }
+.btn:hover { background: var(--primary-hover); transform: translateY(-1px); }
+.btn:disabled { background: #475569; cursor: not-allowed; transform: none; }
+.btn-row { display: flex; gap: 0.75rem; margin-top: 1rem; }
+.btn-row .btn { flex: 1; }
+
+.status { margin-top: 1rem; padding: 0.75rem; border-radius: 8px; font-size: 0.9rem; display: none; }
+.status.show { display: block; }
+.status.training { background: rgba(245,158,11,0.2); color: var(--warning); }
+.status.success { background: rgba(34,197,94,0.2); color: var(--success); }
+.status.error { background: rgba(239,68,68,0.2); color: var(--error); }
+
+.log-area { background: var(--code-bg); border-radius: 8px; padding: 1rem; font-family: monospace; max-height: 200px; overflow-y: auto; font-size: 0.85rem; margin-top: 1rem; border: 1px solid var(--border); }
+
+.loss-chart { height: 120px; background: var(--code-bg); border-radius: 8px; margin-top: 1rem; position: relative; overflow: hidden; border: 1px solid var(--border); }
+.loss-bar { position: absolute; bottom: 0; width: 3px; background: linear-gradient(to top, var(--primary), #a855f7); border-radius: 2px 2px 0 0; transition: height 0.1s; }
+
+.completion-area { margin-top: 1rem; }
+.completion-prompt { background: var(--code-bg); padding: 1rem; border-radius: 8px; margin-bottom: 1rem; border-left: 3px solid var(--primary); }
+.completion-result { background: linear-gradient(135deg, #1e293b, #334155); border-radius: 12px; padding: 1.25rem; margin-top: 1rem; border: 2px solid transparent; transition: border-color 0.3s; }
+.completion-result.ready { border-color: var(--primary); }
+.completion-result .label { font-size: 0.9rem; color: var(--text-dim); margin-bottom: 0.5rem; }
+.completion-result .text { font-size: 1.1rem; line-height: 1.8; }
+.completion-result .text .completed { color: var(--success); font-weight: 600; }
+.completion-result .confidence { font-size: 0.85rem; color: var(--text-dim); margin-top: 0.5rem; }
+
+.data-preview { background: var(--code-bg); border-radius: 8px; padding: 1rem; max-height: 150px; overflow-y: auto; font-size: 0.85rem; margin-top: 0.5rem; border: 1px solid var(--border); }
+.data-item { padding: 0.25rem 0; border-bottom: 1px dashed #334155; }
+.data-item:last-child { border-bottom: none; }
+
+.stats { display: flex; gap: 1rem; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border); color: var(--text-dim); font-size: 0.9rem; }
+.stat-item strong { color: var(--text); }
+
+footer { text-align: center; padding: 2rem; color: var(--text-dim); font-size: 0.9rem; border-top: 1px solid #334155; margin-top: 2rem; }
+@media (max-width: 768px) { .grid { grid-template-columns: 1fr; } .btn-row { flex-direction: column; } }
+</style>
+</head>
+<body>
+<div class="container">
+<header>
+<h1>📝 Sentence Completion <span style="font-size:0.7em;vertical-align:super;color:var(--warning)">SwiGLU</span></h1>
+<p class="subtitle">Train a browser-based model to complete sentences • TensorFlow.js + Character-level Tokenizer</p>
+</header>
+
+<div class="grid">
+<div class="card">
+<h3>📚 Training Data</h3>
+<p style="color:var(--text-dim);margin-bottom:1rem">Sample sentences for training (editable):</p>
+<textarea id="trainingData" spellcheck="false">The sky is blue and the grass is green.
+I love to learn new things every day.
+Machine learning is fascinating and powerful.
+The quick brown fox jumps over the lazy dog.
+Artificial intelligence will shape our future.
+Python is a great programming language for beginners.
+The sun rises in the east and sets in the west.
+Reading books expands your knowledge and imagination.
+Practice makes perfect when learning a new skill.
+Water boils at 100 degrees Celsius at sea level.</textarea>
+<div class="stats">
+<div class="stat-item">Samples: <strong id="sampleCount">0</strong></div>
+<div class="stat-item">Vocab: <strong id="vocabCount">0</strong></div>
+<div class="stat-item">Seq Len: <strong id="seqLen">20</strong></div>
+</div>
+<div class="data-preview" id="dataPreview"></div>
+<button class="btn" id="prepareBtn" onclick="prepareData()">🔄 Prepare Dataset</button>
+<div id="prepareStatus" class="status"></div>
+</div>
+
+<div class="card">
+<h3>⚙️ Train Model</h3>
+<p style="color:var(--text-dim);margin-bottom:1rem">SwiGLU architecture for next-character prediction:</p>
+<div class="input-group">
+<label for="epochs">Epochs</label>
+<input type="number" id="epochs" value="50" min="10" max="200" step="10">
+</div>
+<div class="input-group">
+<label for="learningRate">Learning Rate</label>
+<select id="learningRate">
+<option value="0.01">0.01 (Precise)</option>
+<option value="0.005" selected>0.005 (Balanced)</option>
+<option value="0.001">0.001 (Conservative)</option>
+</select>
+</div>
+<div class="input-group">
+<label for="seqLength">Sequence Length</label>
+<input type="number" id="seqLength" value="20" min="10" max="50">
+</div>
+<button class="btn" id="trainBtn" onclick="trainModel()" disabled>🚀 Start Training</button>
+<div id="trainStatus" class="status"></div>
+<div class="loss-chart" id="lossChart"></div>
+<div class="log-area" id="trainLog">Prepare data first...</div>
+</div>
+</div>
+
+<div class="card">
+<h3>✍️ Complete Sentence</h3>
+<p style="color:var(--text-dim);margin-bottom:1rem">Enter a prompt and let the model complete it:</p>
+<div class="input-group">
+<label for="prompt">Prompt (start typing...)</label>
+<input type="text" id="prompt" placeholder="The sky is..." value="The sky is">
+</div>
+<div class="input-group">
+<label for="generateLength">Generate Characters</label>
+<input type="number" id="generateLength" value="30" min="10" max="100">
+</div>
+<div class="input-group">
+<label for="temperature">Creativity (Temperature)</label>
+<input type="range" id="temperature" min="0.1" max="1.5" step="0.1" value="0.8">
+<span id="tempValue">0.8</span>
+</div>
+<button class="btn" id="completeBtn" onclick="completeSentence()" disabled>✨ Generate Completion</button>
+<div class="completion-area">
+<div class="completion-prompt" id="promptDisplay">Waiting for input...</div>
+<div class="completion-result" id="resultBox">
+<div class="label">Completed Sentence</div>
+<div class="text" id="completionText">Train the model first!</div>
+<div class="confidence" id="confidenceText"></div>
+</div>
+</div>
+<div id="completeStatus" class="status"></div>
+</div>
+
+<div class="card">
+<h3>📊 Model Info</h3>
+<div class="log-area" style="max-height:none">
+<strong>Architecture:</strong> SwiGLU Character LM<br><br>
+<strong>Input:</strong> <span id="inputSpec">--</span> characters (integer IDs)<br>
+<strong>Embedding:</strong> vocab → <span id="embedDim">32</span>-dim vectors<br>
+<strong>SwiGLU Block:</strong><br>
+&nbsp;&nbsp;├─ Gate: Dense(64) → Swish<br>
+&nbsp;&nbsp;├─ Value: Dense(64)<br>
+&nbsp;&nbsp;└─ Output: Swish(gate) ⊗ value<br>
+<strong>Output:</strong> Dense(<span id="vocabSize">--</span>) → softmax<br><br>
+<strong>Task:</strong> Next-character prediction<br>
+<strong>Optimizer:</strong> Adam | <strong>Loss:</strong> Sparse Categorical Cross-Entropy
+</div>
+<div class="stats">
+<div class="stat-item">Params: <strong id="paramCount">--</strong></div>
+<div class="stat-item">Status: <strong id="modelStatus">Not loaded</strong></div>
+</div>
+</div>
+
+<footer>
+<p>Built with ❤️ using <a href="https://www.tensorflow.org/js" target="_blank" style="color:var(--primary);text-decoration:none">TensorFlow.js</a></p>
+<p style="margin-top:0.5rem;font-size:0.8rem">SwiGLU + Character-level LM • All processing in-browser</p>
+</footer>
+</div>
+
+<script>
+// ========== GLOBAL STATE ==========
+let model = null;
+let tokenizer = null;
+let trainingData = null;
+let isTraining = false;
+let vocab = new Map();
+let ivocab = new Map();
+const lossHistory = [];
+const EMBED_DIM = 32;
+
+// DOM Elements
+const els = {
+	trainingData: document.getElementById('trainingData'),
+	dataPreview: document.getElementById('dataPreview'),
+	sampleCount: document.getElementById('sampleCount'),
+	vocabCount: document.getElementById('vocabCount'),
+	seqLen: document.getElementById('seqLen'),
+	inputSpec: document.getElementById('inputSpec'),
+	vocabSize: document.getElementById('vocabSize'),
+	embedDim: document.getElementById('embedDim'),
+	paramCount: document.getElementById('paramCount'),
+	modelStatus: document.getElementById('modelStatus'),
+	epochs: document.getElementById('epochs'),
+	learningRate: document.getElementById('learningRate'),
+	seqLength: document.getElementById('seqLength'),
+	trainBtn: document.getElementById('trainBtn'),
+	trainStatus: document.getElementById('trainStatus'),
+	trainLog: document.getElementById('trainLog'),
+	lossChart: document.getElementById('lossChart'),
+	prompt: document.getElementById('prompt'),
+	generateLength: document.getElementById('generateLength'),
+	temperature: document.getElementById('temperature'),
+	tempValue: document.getElementById('tempValue'),
+	completeBtn: document.getElementById('completeBtn'),
+	promptDisplay: document.getElementById('promptDisplay'),
+	resultBox: document.getElementById('resultBox'),
+	completionText: document.getElementById('completionText'),
+	confidenceText: document.getElementById('confidenceText'),
+	completeStatus: document.getElementById('completeStatus'),
+	prepareBtn: document.getElementById('prepareBtn'),
+	prepareStatus: document.getElementById('prepareStatus')
+};
+
+// ========== CHARACTER TOKENIZER ==========
+class CharTokenizer {
+	constructor() {
+		this.vocab = new Map();
+		this.ivocab = new Map();
+	}
+	
+	build(texts) {
+		const chars = new Set();
+		texts.forEach(t => {
+			for (const c of t) chars.add(c);
+		});
+		[' ', '\n', '.', ',', '!', '?', '-', "'", '"'].forEach(c => chars.add(c));
+		
+		let idx = 0;
+		for (const c of chars) {
+			this.vocab.set(c, idx);
+			this.ivocab.set(idx, c);
+			idx++;
+		}
+		return this.vocab.size;
+	}
+	
+	encode(text) {
+		return Array.from(text).map(c => this.vocab.get(c) ?? this.vocab.get(' '));
+	}
+	
+	decode(ids) {
+		return ids.map(id => this.ivocab.get(id) ?? '?').join('');
+	}
+	
+	get vocabSize() { return this.vocab.size; }
+}
+
+// ========== DATA PREPARATION ==========
+function prepareData() {
+	const raw = els.trainingData.value.trim().split('\n').filter(s => s.length > 10);
+	if (raw.length < 3) {
+		showStatus('prepareStatus', '⚠️ Need at least 3 sentences (10+ chars)', 'error');
+		return;
+	}
+	
+	tokenizer = new CharTokenizer();
+	const vocabSize = tokenizer.build(raw);
+	
+	els.sampleCount.textContent = raw.length;
+	els.vocabCount.textContent = vocabSize;
+	els.vocabSize.textContent = vocabSize;
+	els.inputSpec.textContent = els.seqLength.value;
+	els.embedDim.textContent = EMBED_DIM;
+	
+	els.dataPreview.innerHTML = raw.slice(0, 5).map(s => 
+		`<div class="data-item">"${s.slice(0, 40)}${s.length>40?'...':''}"</div>`
+	).join('') + (raw.length > 5 ? `<div class="data-item" style="color:var(--text-dim)">+${raw.length-5} more...</div>` : '');
+	
+	const seqLen = parseInt(els.seqLength.value);
+	trainingData = [];
+	
+	raw.forEach(text => {
+		const encoded = tokenizer.encode(text);
+		for (let i = 0; i < encoded.length - seqLen; i++) {
+			const input = encoded.slice(i, i + seqLen);
+			const target = encoded[i + seqLen];
+			trainingData.push({ input, target });
+		}
+	});
+	
+	log(`✅ Prepared ${trainingData.length} training sequences`);
+	showStatus('prepareStatus', `✓ Ready: ${trainingData.length} samples, vocab=${vocabSize}`, 'success');
+	
+	els.trainBtn.disabled = false;
+	els.modelStatus.textContent = 'Prepared';
+	els.paramCount.textContent = '~' + estimateParams(vocabSize).toLocaleString();
+	
+	updateModelInfo();
+}
+
+function estimateParams(vocabSize) {
+	const seqLen = parseInt(els.seqLength.value);
+	const embedding = vocabSize * EMBED_DIM;
+	const gate = seqLen * EMBED_DIM * 64 + 64;
+	const value = seqLen * EMBED_DIM * 64 + 64;
+	const output = 64 * vocabSize + vocabSize;
+	return Math.round(embedding + gate + value + output);
+}
+
+// ========== SWIGLU MODEL ==========
+function createModel(vocabSize, seqLen, learningRate) {
+	const input = tf.input({shape: [seqLen], dtype: 'int32'});
+	
+	const embedded = tf.layers.embedding({
+		inputDim: vocabSize,
+		outputDim: EMBED_DIM,
+		inputLength: seqLen
+	}).apply(input);
+	
+	const flattened = tf.layers.flatten().apply(embedded);
+	
+	const gate = tf.layers.dense({units: 64, useBias: true}).apply(flattened);
+	const value = tf.layers.dense({units: 64, useBias: true}).apply(flattened);
+	const swishGate = tf.layers.activation({activation: 'swish'}).apply(gate);
+	const swigluOutput = tf.layers.multiply().apply([swishGate, value]);
+	
+	const output = tf.layers.dense({units: vocabSize, activation: 'softmax'}).apply(swigluOutput);
+	
+	const model = tf.model({inputs: input, outputs: output});
+	
+	model.compile({
+		optimizer: tf.train.adam(learningRate),
+		loss: 'sparseCategoricalCrossentropy'
+	});
+	
+	return model;
+}
+
+// ========== TRAINING ==========
+async function trainModel() {
+	if (isTraining || !trainingData) return;
+	
+	const epochs = parseInt(els.epochs.value);
+	const learningRate = parseFloat(els.learningRate.value);
+	const seqLen = parseInt(els.seqLength.value);
+	const vocabSize = tokenizer.vocabSize;
+	
+	const trainBtn = els.trainBtn;
+	const completeBtn = els.completeBtn;
+	
+	isTraining = true;
+	trainBtn.disabled = true;
+	completeBtn.disabled = true;
+	lossHistory.length = 0;
+	els.trainLog.innerHTML = '';
+	
+	showStatus('trainStatus', 'Initializing SwiGLU model...', 'training');
+	log(`Training: ${epochs} epochs, LR=${learningRate}, vocab=${vocabSize}, embed=${EMBED_DIM}`);
+	
+	try {
+		model = createModel(vocabSize, seqLen, learningRate);
+		log(`Model created: ${model.countParams().toLocaleString()} params`);
+		
+		// ✅ FIXED: Input stays int32 for embedding lookup
+		const xs = tf.tensor2d(trainingData.map(d => d.input), [trainingData.length, seqLen], 'int32');
+		
+		// ✅ FIXED: Labels must be float32 for sparseCategoricalCrossentropy in TF.js 3.21.0
+		const ys = tf.tensor1d(trainingData.map(d => d.target), 'float32');
+		
+		showStatus('trainStatus', 'Training...', 'training');
+		
+		await model.fit(xs, ys, {
+			epochs: epochs,
+			batchSize: 32,
+			callbacks: {
+				onEpochEnd: async (epoch, logs) => {
+					if (epoch % 5 === 0 || epoch === epochs - 1) {
+						lossHistory.push(logs.loss);
+						updateLossChart();
+						log(`Epoch ${epoch+1}/${epochs} - Loss: ${logs.loss.toFixed(4)}`);
+						showStatus('trainStatus', `${Math.round((epoch+1)/epochs*100)}% complete`, 'training');
+					}
+					await tf.nextFrame();
+				}
+			}
+		});
+		
+		xs.dispose(); ys.dispose();
+		
+		showStatus('trainStatus', '✅ Training complete!', 'success');
+		log('🎉 Model trained successfully!');
+		
+		completeBtn.disabled = false;
+		els.modelStatus.textContent = 'Trained';
+		resultBox.classList.add('ready');
+		
+	} catch (error) {
+		console.error(error);
+		showStatus('trainStatus', `❌ Error: ${error.message}`, 'error');
+		log(`Error: ${error.message}`, 'error');
+	} finally {
+		isTraining = false;
+		trainBtn.disabled = false;
+	}
+}
+
+// ========== SENTENCE COMPLETION ==========
+async function completeSentence() {
+	if (!model || !tokenizer) {
+		showStatus('completeStatus', '⚠️ Train model first!', 'error');
+		return;
+	}
+	
+	const prompt = els.prompt.value;
+	const genLength = parseInt(els.generateLength.value);
+	const temperature = parseFloat(els.temperature.value);
+	const seqLen = parseInt(els.seqLength.value);
+	
+	els.promptDisplay.textContent = prompt;
+	els.completionText.innerHTML = '<span style="color:var(--text-dim)">Generating...</span>';
+	els.confidenceText.textContent = '';
+	showStatus('completeStatus', 'Generating...', 'training');
+	
+	try {
+		let current = prompt;
+		let totalLogProb = 0;
+		let tokenCount = 0;
+		
+		for (let i = 0; i < genLength; i++) {
+			const context = current.slice(-seqLen);
+			const encoded = tokenizer.encode(context);
+			
+			while (encoded.length < seqLen) encoded.unshift(0);
+			
+			const input = tf.tensor2d([encoded], [1, seqLen], 'int32');
+			const logits = model.predict(input);
+			const probs = await logits.data();
+			
+			const nextId = sampleFromProbs(Array.from(probs), temperature);
+			const nextChar = tokenizer.ivocab.get(nextId) || ' ';
+			
+			const prob = probs[nextId];
+			if (prob > 0.001) {
+				totalLogProb += Math.log(prob + 1e-10);
+				tokenCount++;
+			}
+			
+			current += nextChar;
+			
+			input.dispose(); logits.dispose();
+			
+			const completed = current.slice(prompt.length);
+			els.completionText.innerHTML = `<span style="color:var(--text-dim)">${prompt}</span><span class="completed">${completed}</span>`;
+			await tf.nextFrame();
+		}
+		
+		const avgConfidence = tokenCount > 0 ? Math.exp(totalLogProb / tokenCount) : 0;
+		els.confidenceText.textContent = `Avg confidence: ${(avgConfidence * 100).toFixed(1)}% | Temperature: ${temperature}`;
+		showStatus('completeStatus', '✅ Done!', 'success');
+		
+	} catch (error) {
+		console.error(error);
+		showStatus('completeStatus', `❌ Error: ${error.message}`, 'error');
+		els.completionText.textContent = 'Generation failed';
+	}
+}
+
+// ========== UTILITIES ==========
+function sampleFromProbs(probs, temperature) {
+	const scaled = probs.map(p => Math.pow(Math.max(p, 1e-10), 1/temperature));
+	const sum = scaled.reduce((a,b) => a+b, 0);
+	const normalized = scaled.map(p => p / sum);
+	
+	const rand = Math.random();
+	let cumsum = 0;
+	for (let i = 0; i < normalized.length; i++) {
+		cumsum += normalized[i];
+		if (rand < cumsum) return i;
+	}
+	return normalized.length - 1;
+}
+
+function updateLossChart() {
+	const chart = els.lossChart;
+	chart.innerHTML = '';
+	if (lossHistory.length === 0) return;
+	
+	const maxLoss = Math.max(...lossHistory, 0.001);
+	const barWidth = Math.max(2, Math.floor(300 / Math.max(lossHistory.length, 20)));
+	
+	lossHistory.forEach((loss, index) => {
+		const bar = document.createElement('div');
+		bar.className = 'loss-bar';
+		bar.style.left = `${index * barWidth}px`;
+		bar.style.height = `${Math.min(100, (loss / maxLoss) * 100)}%`;
+		bar.title = `Epoch ${index+1}: Loss ${loss.toFixed(4)}`;
+		chart.appendChild(bar);
+	});
+}
+
+function log(message, type = 'info') {
+	const timestamp = new Date().toLocaleTimeString();
+	const prefix = type === 'error' ? '❌' : type === 'success' ? '✅' : 'ℹ️';
+	els.trainLog.innerHTML += `<div>[${timestamp}] ${prefix} ${message}</div>`;
+	els.trainLog.scrollTop = els.trainLog.scrollHeight;
+	console.log(`[SentenceLM] ${message}`);
+}
+
+function showStatus(elementId, message, type) {
+	const el = document.getElementById(elementId);
+	el.textContent = message;
+	el.className = `status show ${type}`;
+}
+
+function updateModelInfo() {
+	const vocabSize = tokenizer?.vocabSize || 0;
+	const seqLen = parseInt(els.seqLength.value);
+	els.vocabSize.textContent = vocabSize;
+	els.inputSpec.textContent = seqLen;
+	els.embedDim.textContent = EMBED_DIM;
+	if (vocabSize > 0) {
+		els.paramCount.textContent = '~' + estimateParams(vocabSize).toLocaleString();
+	}
+}
+
+// ========== EVENT LISTENERS ==========
+els.temperature.addEventListener('input', () => {
+	els.tempValue.textContent = els.temperature.value;
+});
+
+els.seqLength.addEventListener('change', () => {
+	els.seqLen.textContent = els.seqLength.value;
+	updateModelInfo();
+	if (trainingData) prepareData();
+});
+
+els.trainingData.addEventListener('input', () => {
+	els.prepareBtn.disabled = false;
+});
+
+document.addEventListener('keydown', (e) => {
+	if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+		e.preventDefault();
+		if (!isTraining && els.trainBtn.disabled === false) trainModel();
+	}
+	if (e.key === 'Enter' && e.target.id === 'prompt') {
+		e.preventDefault();
+		if (!els.completeBtn.disabled) completeSentence();
+	}
+});
+
+window.addEventListener('beforeunload', () => {
+	if (model) model.dispose();
+	if (tokenizer) tokenizer = null;
+});
+
+log('👋 Sentence Completion Trainer ready!');
+updateModelInfo();
+els.embedDim.textContent = EMBED_DIM;
+</script>
+</body>
+</html>
