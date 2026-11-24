@@ -6,6 +6,15 @@ const path = require('path');
 const { promisify } = require('util');
 const crypto = require('crypto');
 
+const serverOptions = {
+    port: 80,
+    sslport: 443,
+    key: './files/key.pem',
+    cert: './files/cert.crt',
+    additionalMethods: []
+};
+
+
 // ==========================================================
 // ===== PATH CONSTANTS =====
 const FILES_ROOT = path.join(__dirname, 'files');
@@ -204,13 +213,6 @@ const webrtcRooms = {};
 
 // ==========================================================
 // ===== SERVER OPTIONS =====
-const serverOptions = {
-    port: 80,
-    sslport: 443,
-    key: './files/key.pem',
-    cert: './files/cert.crt',
-    additionalMethods: []
-};
 
 const allowHead = {
     'Access-Control-Allow-Origin': '*',

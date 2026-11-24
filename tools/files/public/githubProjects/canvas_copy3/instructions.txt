@@ -1,0 +1,6 @@
+
+missing miter clipping join.
+lets implement these. lets just update existing tests as well.
+
+show the full code only with the files that have changes.
+

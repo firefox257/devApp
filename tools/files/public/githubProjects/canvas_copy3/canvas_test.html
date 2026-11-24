@@ -1,0 +1,949 @@
+<!-- ./canvas_test.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Autogen Pure C++ Canvas Buffer Test</title>
+<style>
+body {
+font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace;
+background: #1e1e1e; color: #d4d4d4; margin: 0; padding: 10px;
+display: flex; flex-direction: column; align-items: center; min-height: 100vh;
+}
+.container {
+background: #252526; border: 1px solid #3e3e42; border-radius: 8px;
+padding: 15px; width: 100%; max-width: 800px; box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+}
+h1 { margin-top: 0; color: #569cd6; font-size: 1.3rem; }
+h2 { color: #4ec9b0; font-size: 1rem; margin-top: 15px; border-bottom: 1px solid #3e3e42; padding-bottom: 6px; }
+.status { padding: 10px; border-radius: 4px; margin-bottom: 15px; font-weight: bold; text-align: center; font-size: 0.9rem; }
+.status.ready { background: #1e5c2e; color: #4ec9b0; }
+.status.error { background: #5c1e1e; color: #f48771; }
+.status.waiting { background: #3c3c3c; color: #cccccc; }
+.control-group { margin-bottom: 12px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+button {
+padding: 10px 16px; background: #0e639c; color: #fff; border: none;
+border-radius: 4px; cursor: pointer; font-weight: bold; transition: background 0.2s;
+font-size: 0.9rem;
+}
+button:hover:not(:disabled) { background: #1177bb; }
+button:disabled { background: #3c3c3c; color: #888; cursor: not-allowed; }
+button.copy-btn {
+background: #4ec9b0; color: #1e1e1e; padding: 6px 12px; font-size: 0.8rem;
+}
+button.copy-btn:hover { background: #5fd9c0; }
+button.copy-btn.copied { background: #dcdcaa; color: #1e1e1e; }
+input[type="text"] {
+flex: 1 1 320px; min-width: 240px; padding: 8px 10px; background: #1e1e1e;
+color: #d4d4d4; border: 1px solid #3e3e42; border-radius: 4px; font-size: 0.8rem;
+font-family: 'Courier New', monospace;
+}
+canvas {
+background: #ffffff; border: 2px solid #3e3e42; border-radius: 4px;
+display: block; margin: 15px auto;
+image-rendering: auto;
+max-width: 100%;
+height: auto;
+}
+.badge { padding: 6px 12px; border-radius: 4px; font-size: 0.8rem; font-weight: bold; background: #3c3c3c; color: #cccccc; }
+.badge.pass { background: #1e5c2e; color: #4ec9b0; }
+.badge.fail { background: #5c1e1e; color: #f48771; }
+.legend { font-size: 0.78rem; color: #9cdcfe; line-height: 1.6; margin: 0 0 10px 0; }
+.console-header {
+display: flex; justify-content: space-between; align-items: center;
+margin-top: 15px; border-bottom: 1px solid #3e3e42; padding-bottom: 6px;
+}
+.console-header h2 { margin: 0; border: none; padding: 0; }
+#visibleConsole {
+margin-top: 10px; background: #000000; border: 2px solid #4ec9b0; border-radius: 4px;
+padding: 10px; height: 300px; overflow-y: auto; font-size: 11px; white-space: pre-wrap;
+word-wrap: break-word; font-family: 'Courier New', monospace;
+}
+.log-info { color: #4ec9b0; }
+.log-warn { color: #dcdcaa; font-weight: bold; }
+.log-err { color: #f48771; font-weight: bold; }
+.log-debug { color: #9cdcfe; }
+</style>
+</head>
+<body>
+<div class="container">
+<h1>Pure C++ Buffer Canvas Test</h1>
+<div id="status" class="status waiting">Status: Waiting for initialization...</div>
+<div class="control-group">
+<button id="btnInit" onclick="initRuntime()">Initialize Runtime</button>
+</div>
+<h2>Test 1: House &amp; Landscape</h2>
+<canvas id="houseCanvas" width="500" height="500"></canvas>
+<div class="control-group">
+<button id="btnRunHouse" onclick="runHouseTest()" disabled>Run House Test</button>
+</div>
+<h2>Test 2: Line &amp; Curve Widths</h2>
+<canvas id="linesCanvas" width="600" height="600"></canvas>
+<div class="control-group">
+<button id="btnRunLines" onclick="runLinesTest()" disabled>Run Lines Test</button>
+</div>
+<h2>Test 3: Paths (Mixed, Stroke &amp; Fill)</h2>
+<canvas id="pathCanvas" width="600" height="600"></canvas>
+<div class="control-group">
+<button id="btnRunPath" onclick="runPathTest()" disabled>Run Path Test</button>
+</div>
+<h2>Test 4: Alpha Transparency</h2>
+<canvas id="alphaCanvas" width="400" height="400"></canvas>
+<div class="control-group">
+<button id="btnRunAlpha" onclick="runAlphaTest()" disabled>Run Alpha Test</button>
+</div>
+<h2>Test 5: Paths with Holes</h2>
+<canvas id="holeCanvas" width="600" height="600"></canvas>
+<div class="control-group">
+<button id="btnRunHole" onclick="runHoleTest()" disabled>Run Hole Test</button>
+</div>
+<h2>Test 6: Crossing Paths &amp; Self-Intersections</h2>
+<canvas id="crossingCanvas" width="600" height="600"></canvas>
+<div class="control-group">
+<button id="btnRunCrossing" onclick="runCrossingTest()" disabled>Run Crossing Test</button>
+</div>
+<h2>Test 7: Image (draw_image &mdash; scale, alpha, clipping)</h2>
+<canvas id="imageCanvas" width="600" height="400"></canvas>
+<div class="control-group">
+<button id="btnPrefetchImagePng" onclick="prefetchImageTest('png')" disabled>Prefetch PNG</button>
+<button id="btnPrefetchImageJpg" onclick="prefetchImageTest('jpg')" disabled>Prefetch JPG</button>
+<button id="btnPrefetchImageGif" onclick="prefetchImageTest('gif')" disabled>Prefetch GIF</button>
+</div>
+<div class="control-group">
+<input type="text" id="imageUrl" placeholder="Custom image URL to prefetch">
+<button id="btnPrefetchImageCustom" onclick="prefetchImageTest('custom')" disabled>Prefetch Custom</button>
+</div>
+<div class="control-group">
+<button id="btnRunImage" onclick="runImageTest()" disabled>Run Image Test (Uses Prefetched)</button>
+</div>
+<h2>Test 8: Font (fill_text / stroke_text / measure_text)</h2>
+<canvas id="fontCanvas" width="600" height="560"></canvas>
+<div class="control-group">
+<input type="text" id="fontUrl" placeholder="Custom .ttf / .otf URL to prefetch (optional)">
+<button id="btnPrefetchFont" onclick="prefetchFontTest()" disabled>Prefetch Font</button>
+</div>
+<div class="control-group">
+<button id="btnRunFont" onclick="runFontTest()" disabled>Run Font Test (Uses Prefetched)</button>
+</div>
+<h2>Test 9: Line Caps &amp; Joins</h2>
+<canvas id="capjoinCanvas" width="700" height="700"></canvas>
+<div class="control-group">
+<button id="btnRunCapJoin" onclick="runCapJoinTest()" disabled>Run Cap/Join Test</button>
+</div>
+<h2>Test 10: Gradients (Linear, Radial, Conical)</h2>
+<canvas id="gradientCanvas" width="600" height="600"></canvas>
+<div class="control-group">
+<button id="btnRunGradient" onclick="runGradientTest()" disabled>Run Gradient Test</button>
+</div>
+<h2>Test 11: Text Drop Shadow &amp; Gradient</h2>
+<canvas id="textShadowCanvas" width="600" height="400"></canvas>
+<div class="control-group">
+<button id="btnRunTextShadow" onclick="runTextShadowTest()" disabled>Run Text Shadow Test (Requires Font)</button>
+</div>
+<h2>Test 12: Transformations (Translate, Rotate, Scale, Gradient, Text, Image)</h2>
+<canvas id="transformCanvas" width="700" height="700"></canvas>
+<div class="control-group">
+<button id="btnRunTransform" onclick="runTransformTest()" disabled>Run Transform Test</button>
+</div>
+<h2>Test 13: Blend Modes (SVG 2)</h2>
+<canvas id="blendCanvas" width="600" height="600"></canvas>
+<div class="control-group">
+<button id="btnRunBlend" onclick="runBlendTest()" disabled>Run Blend Test</button>
+</div>
+<h2>Test 14: Patterns (SVG 2 style)</h2>
+<canvas id="patternCanvas" width="600" height="700"></canvas>
+<div class="control-group">
+<button id="btnRunPattern" onclick="runPatternTest()" disabled>Run Pattern Test (Requires Prefetched Image)</button>
+</div>
+<h2>Test 15: Stroke Dash Patterns (SVG 2 dasharray / dashoffset)</h2>
+<canvas id="dashCanvas" width="700" height="860"></canvas>
+<div class="control-group">
+<button id="btnRunDash" onclick="runDashTest()" disabled>Run Dash Test</button>
+</div>
+<h2>Test 16: Masks (SVG 2 mask-type: luminance / alpha)</h2>
+<p class="legend">
+1 luminance ramps &amp; mask children &middot; 2 alpha mode &middot; 3 sRGB vs linearRGB &middot;
+4 objectBoundingBox content units &middot; 5 mask region &amp; transform &middot;
+6 dashed strokes, shadow, blend, save/restore &middot; 7 text, image, canvas-as-mask.
+Checkerboard shows through wherever the mask hides the element.
+Tiles 7a/7b use the prefetched font/image when available.
+</p>
+<canvas id="maskCanvas" width="700" height="1120"></canvas>
+<div class="control-group">
+<button id="btnRunMask" onclick="runMaskTest()" disabled>Run Mask Test</button>
+<button id="btnRunMaskSelfTest" onclick="runMaskSelfTest()" disabled>Run Mask Self-Test</button>
+<span id="maskBadge" class="badge">self-test: not run</span>
+</div>
+<h2>Test 17: Clip Paths (SVG 2 clip-path / clip-rule / clipPathUnits)</h2>
+<p class="legend">
+1 anti-aliased silhouettes (alpha clipping) &middot; 2 clip-rule nonzero vs evenodd &middot;
+3 objectBoundingBox units &middot; 4 clip transform rotate/scale/translate &middot;
+5 children union &amp; nested clip-path intersection &middot;
+6 clipped dashes, shadow, blend, save/restore &middot; 7 clip+mask, text, image.
+Checkerboard shows through wherever the clip hides the element.
+Tiles 7b/7c use the prefetched font/image when available.
+</p>
+<canvas id="clipCanvas" width="700" height="1120"></canvas>
+<div class="control-group">
+<button id="btnRunClip" onclick="runClipTest()" disabled>Run Clip Test</button>
+<button id="btnRunClipSelfTest" onclick="runClipSelfTest()" disabled>Run Clip Self-Test</button>
+<span id="clipBadge" class="badge">self-test: not run</span>
+</div>
+<h2>Test 18: Fill Rules (SVG 2 fill-rule: nonzero / evenodd)</h2>
+<p class="legend">
+1 subpath winding direction (nonzero solid vs evenodd ring, opposite-dir hole) &middot;
+2 self-intersecting pentagram &amp; bowtie &middot; 3 Shape2D set_fill_rule override /
+clear_fill_rule inheritance &middot; 4 gradients, shadow, stroke (strokes stay nonzero),
+save/restore &middot; 5 fill-rule under clip-path, mask and text &middot;
+6 CTM rotate / mirror / scale. Context default is NonZero (SVG 2 default).
+Tile 5c uses the prefetched font when available.
+</p>
+<canvas id="fillRuleCanvas" width="700" height="980"></canvas>
+<div class="control-group">
+<button id="btnRunFillRule" onclick="runFillRuleTest()" disabled>Run Fill Rule Test</button>
+<button id="btnRunFillRuleSelfTest" onclick="runFillRuleSelfTest()" disabled>Run Fill Rule Self-Test</button>
+<span id="fillRuleBadge" class="badge">self-test: not run</span>
+</div>
+<h2>Test 19: Composite Operations (SVG 2 Porter-Duff)</h2>
+<p class="legend">
+1 source-over / source-in / source-out / source-atop &middot;
+2 destination-over / destination-in / destination-out / destination-atop &middot;
+3 clear / copy / blend&times;op / gradient copy &middot;
+4 op + clip-path, mask, shadow, save/restore &middot;
+5 op + text, image, destination-out erase, CTM.
+Each tile: blue disc (destination) + orange rect (source) on a transparent
+layer, blitted over a checkerboard so cleared regions are obvious.
+Tile 5a uses the prefetched font when available.
+</p>
+<canvas id="compositeCanvas" width="700" height="820"></canvas>
+<div class="control-group">
+<button id="btnRunComposite" onclick="runCompositeTest()" disabled>Run Composite Test</button>
+<button id="btnRunCompositeSelfTest" onclick="runCompositeSelfTest()" disabled>Run Composite Self-Test</button>
+<span id="compositeBadge" class="badge">self-test: not run</span>
+</div>
+<h2>Test 20: Markers (SVG 2 marker-start / marker-mid / marker-end)</h2>
+<p class="legend">
+1 start/mid/end vertex placement, closed subpath, two subpaths &middot;
+2 orient auto / auto-start-reverse / fixed angle &middot;
+3 refX / refY anchoring (tip / centre / tail) &middot;
+4 markerUnits strokeWidth vs userSpaceOnUse + markerWidth/Height viewport clip &middot;
+5 viewBox + preserveAspectRatio (meet / slice) &middot;
+6 curve &amp; arc tangents, mask, context-stroke + clip-path.
+Markers paint on top of the stroke; tile 6c uses the prefetched font for labels.
+</p>
+<canvas id="markersCanvas" width="700" height="980"></canvas>
+<div class="control-group">
+<button id="btnRunMarkers" onclick="runMarkersTest()" disabled>Run Markers Test</button>
+<button id="btnRunMarkersSelfTest" onclick="runMarkersSelfTest()" disabled>Run Markers Self-Test</button>
+<span id="markersBadge" class="badge">self-test: not run</span>
+</div>
+<h2>Test 21: Filters (SVG 2 feGaussianBlur / feColorMatrix / feDropShadow)</h2>
+<p class="legend">
+1 feGaussianBlur stdDeviation 0/1/3/6/10 (premultiplied triple-box Gaussian) &middot;
+2 feColorMatrix saturate / hue-rotate / luminanceToAlpha &middot;
+3 feDropShadow offset / glow / coloured vs legacy drop_shadow &middot;
+4 filter chains (each primitive consumes the previous result) &middot;
+5 filter regions: default OBB crop / userSpaceOnUse / tiny crop &middot;
+6 filter + clip-path / mask / copy / CTM (SVG order: filter &rarr; clip &rarr; mask &rarr; op) &middot;
+7 off-screen buffer API: Filter::apply(raw pixels), Canvas2D::apply_filter(rect),
+sRGB vs linearRGB color-interpolation-filters.
+</p>
+<canvas id="filtersCanvas" width="700" height="1120"></canvas>
+<div class="control-group">
+<button id="btnRunFilters" onclick="runFiltersTest()" disabled>Run Filters Test</button>
+<button id="btnRunFiltersSelfTest" onclick="runFiltersSelfTest()" disabled>Run Filters Self-Test</button>
+<span id="filtersBadge" class="badge">self-test: not run</span>
+</div>
+<h2>Test 23: globalAlpha (Canvas2D state property)</h2>
+<p class="legend">
+1 fill ramp 1.0 / 0.5 / 0.0 &middot; 2 strokes, dashes, text &times; globalAlpha &middot;
+3 linear / radial / pattern paints &middot; 4 globalAlpha &times; mask (multiplicative),
+clip, shadow &middot; 5 globalAlpha &times; Porter-Duff (copy 0.5, destination-out 0.5,
+destination-in 0.0 clears) &middot; 6 nested save/restore, draw_pixels, CTM.
+globalAlpha scales the source alpha once (coverage &times; paint &times; ga); mask content
+renders at alpha 1; invalid setter values (NaN / &infin; / outside [0,1]) are ignored.
+Tile 2c uses the prefetched font when available.
+</p>
+<canvas id="globalAlphaCanvas" width="700" height="980"></canvas>
+<div class="control-group">
+<button id="btnRunGlobalAlpha" onclick="runGlobalAlphaTest()" disabled>Run globalAlpha Test</button>
+<button id="btnRunGlobalAlphaSelfTest" onclick="runGlobalAlphaSelfTest()" disabled>Run globalAlpha Self-Test</button>
+<span id="globalAlphaBadge" class="badge">self-test: not run</span>
+</div>
+<div class="console-header">
+<h2>Console Output</h2>
+<button id="btnCopyConsole" class="copy-btn" onclick="copyConsole()">Copy All</button>
+</div>
+<div id="visibleConsole"></div>
+</div>
+<script src="/system/autogen/autogen.js"></script>
+<script type="module">
+import { registerFetchExtension } from '/system/fetch/fetch_ext.js';
+window.registerFetchExtension = registerFetchExtension;
+</script>
+<script>
+const visibleConsoleDiv = document.getElementById('visibleConsole');
+const statusDiv  = document.getElementById('status');
+const copyBtn    = document.getElementById('btnCopyConsole');
+const maskBadge  = document.getElementById('maskBadge');
+const clipBadge  = document.getElementById('clipBadge');
+const fillRuleBadge = document.getElementById('fillRuleBadge');
+const compositeBadge = document.getElementById('compositeBadge');
+const markersBadge = document.getElementById('markersBadge');
+const filtersBadge = document.getElementById('filtersBadge');
+const globalAlphaBadge = document.getElementById('globalAlphaBadge');
+let runtime = null;
+let busy = false;
+const IMAGE_URLS = {
+png: "https://upload.wikimedia.org/wikipedia/commons/4/47/PNG_transparency_demonstration_1.png",
+jpg: "https://upload.wikimedia.org/wikipedia/commons/b/b6/Felis_catus-cat_on_snow.jpg",
+gif: "https://upload.wikimedia.org/wikipedia/commons/2/2c/Rotating_earth_%28large%29.gif"
+};
+const FONT_URLS = [
+"https://cdn.jsdelivr.net/gh/googlefonts/noto-fonts@main/hinted/ttf/NotoSans/NotoSans-Regular.ttf",
+"https://cdn.jsdelivr.net/gh/mozilla/Fira@master/ttf/FiraSans-Regular.ttf",
+"https://raw.githubusercontent.com/googlefonts/noto-fonts/main/hinted/ttf/NotoSans/NotoSans-Regular.ttf"
+];
+const originalConsoleLog = console.log;
+const originalConsoleWarn = console.warn;
+const originalConsoleError = console.error;
+function appendToVisibleConsole(type, args) {
+const div = document.createElement('div');
+div.className = `log-${type}`;
+let message = `[${new Date().toLocaleTimeString()}] [${type.toUpperCase()}] `;
+for (let i = 0; i < args.length; i++) {
+if (i > 0) message += ' ';
+const arg = args[i];
+if (arg instanceof Error) {
+message += arg.message + (arg.stack ? '\n' + arg.stack : '');
+} else if (typeof arg === 'object') {
+try { message += JSON.stringify(arg, null, 2); } catch (e) { message += String(arg); }
+} else { message += String(arg); }
+}
+div.textContent = message;
+visibleConsoleDiv.appendChild(div);
+visibleConsoleDiv.scrollTop = visibleConsoleDiv.scrollHeight;
+}
+console.log = function(...args) { originalConsoleLog.apply(console, args); appendToVisibleConsole('info', args); };
+console.warn = function(...args) { originalConsoleWarn.apply(console, args); appendToVisibleConsole('warn', args); };
+console.error = function(...args) { originalConsoleError.apply(console, args); appendToVisibleConsole('err', args); };
+window.onerror = function(message, source, lineno, colno, error) {
+console.error('Uncaught Error:', message, 'at', source, ':', lineno);
+if (error && error.stack) console.error('Stack:', error.stack);
+};
+window.addEventListener('unhandledrejection', function(event) {
+console.error('Unhandled Promise Rejection:', event.reason);
+});
+async function copyConsole() {
+const lines = visibleConsoleDiv.querySelectorAll('div');
+let text = '';
+lines.forEach(line => { text += line.textContent + '\n'; });
+if (!text.trim()) { flashCopyButton('Empty!', false); return; }
+try {
+if (navigator.clipboard && navigator.clipboard.writeText) {
+await navigator.clipboard.writeText(text);
+flashCopyButton('Copied!', true);
+} else { fallbackCopy(text); }
+} catch (err) {
+try { fallbackCopy(text); } catch (fallbackErr) { flashCopyButton('Failed!', false); }
+}
+}
+function fallbackCopy(text) {
+const textarea = document.createElement('textarea');
+textarea.value = text;
+textarea.style.position = 'fixed'; textarea.style.left = '-9999px'; textarea.style.top = '-9999px';
+textarea.setAttribute('readonly', '');
+document.body.appendChild(textarea); textarea.select();
+const success = document.execCommand('copy');
+document.body.removeChild(textarea);
+if (success) flashCopyButton('Copied!', true); else throw new Error('execCommand copy failed');
+}
+function flashCopyButton(message, success) {
+const originalText = copyBtn.textContent;
+copyBtn.textContent = message;
+copyBtn.classList.add('copied');
+if (!success) copyBtn.style.background = '#f48771';
+setTimeout(() => { copyBtn.textContent = originalText; copyBtn.classList.remove('copied'); copyBtn.style.background = ''; }, 1500);
+}
+async function renderToCanvas(canvasId, ptrFn, widthFn, heightFn) {
+const canvas = document.getElementById(canvasId);
+const ctx = canvas.getContext('2d', { willReadFrequently: true });
+const ptr = await runtime.callExport(0, ptrFn);
+const w = await runtime.callExport(0, widthFn);
+const h = await runtime.callExport(0, heightFn);
+const ptrNum = Number(ptr);
+const wNum = Number(w);
+const hNum = Number(h);
+if (!ptrNum || !wNum || !hNum) {
+console.error(`Failed to get buffer metadata for ${canvasId}`);
+return;
+}
+canvas.width = wNum;
+canvas.height = hNum;
+let sharedBuffer = runtime.sharedMemory ? runtime.sharedMemory.buffer : runtime.wasmInstance.exports.memory.buffer;
+const pixelDataView = new Uint8ClampedArray(sharedBuffer, ptrNum, wNum * hNum * 4);
+const pixelData = new Uint8ClampedArray(pixelDataView);
+const imageData = new ImageData(pixelData, wNum, hNum);
+ctx.putImageData(imageData, 0, 0);
+}
+function canvasSize(canvasId) {
+const rect = document.getElementById(canvasId).getBoundingClientRect();
+return { w: Math.round(rect.width), h: Math.round(rect.height) };
+}
+function setRunButtons(disabled) {
+document.querySelectorAll('button[id^="btnRun"], button[id^="btnPrefetch"]').forEach(b => b.disabled = disabled);
+}
+async function initRuntime() {
+const btn = document.getElementById('btnInit');
+btn.disabled = true;
+statusDiv.textContent = "Status: Checking environment...";
+console.log("Starting initialization...");
+if (typeof AutogenRuntime === 'undefined') {
+statusDiv.className = "status error";
+statusDiv.textContent = "Status: FAILED (autogen.js not loaded)";
+console.error("FATAL: AutogenRuntime is not defined. Check that /system/autogen/autogen.js loaded (Network tab).");
+btn.disabled = false;
+return;
+}
+if (!crossOriginIsolated) {
+statusDiv.className = "status error";
+statusDiv.textContent = "Status: FAILED (Missing COOP/COEP headers)";
+console.error("FATAL: crossOriginIsolated is false. Serve with 'Cross-Origin-Opener-Policy: same-origin' and 'Cross-Origin-Embedder-Policy: require-corp'.");
+btn.disabled = false;
+return;
+}
+try {
+runtime = new AutogenRuntime();
+await runtime.initialize('canvas_test.wasm');
+if (typeof window.registerFetchExtension === 'function') {
+window.registerFetchExtension(runtime);
+console.log("Fetch extension registered (tests 7 & 8 enabled).");
+} else {
+console.warn("Fetch extension not loaded yet - tests 7 & 8 may fail.");
+}
+statusDiv.className = "status ready";
+statusDiv.textContent = "Status: READY";
+console.log("Runtime initialized.");
+setRunButtons(false);
+} catch (err) {
+statusDiv.className = "status error";
+statusDiv.textContent = "Status: FAILED";
+console.error("Init failed:", err && err.message ? err.message : err);
+btn.disabled = false;
+}
+}
+async function runHouseTest() {
+try {
+console.log("1. Running House Test...");
+const { w, h } = canvasSize('houseCanvas');
+await runtime.callExport(0, 'run_house_demo', w, h);
+console.log("   -> C++ House drawing complete.");
+await renderToCanvas('houseCanvas', 'get_house_buffer_ptr', 'get_house_width', 'get_house_height');
+console.log("2. -> House Test rendered to canvas.");
+} catch (err) { console.error("House Test failed:", err.message); }
+}
+async function runLinesTest() {
+try {
+console.log("1. Running Lines Test...");
+const { w, h } = canvasSize('linesCanvas');
+await runtime.callExport(0, 'run_lines_demo', w, h);
+console.log("   -> C++ Lines drawing complete.");
+await renderToCanvas('linesCanvas', 'get_lines_buffer_ptr', 'get_lines_width', 'get_lines_height');
+console.log("2. -> Lines Test rendered to canvas.");
+} catch (err) { console.error("Lines Test failed:", err.message); }
+}
+async function runPathTest() {
+try {
+console.log("1. Running Path Test...");
+const { w, h } = canvasSize('pathCanvas');
+await runtime.callExport(0, 'run_path_demo', w, h);
+console.log("   -> C++ Path drawing complete.");
+await renderToCanvas('pathCanvas', 'get_path_buffer_ptr', 'get_path_width', 'get_path_height');
+console.log("2. -> Path Test rendered to canvas.");
+} catch (err) { console.error("Path Test failed:", err.message); }
+}
+async function runAlphaTest() {
+try {
+console.log("1. Running Alpha Test...");
+const { w, h } = canvasSize('alphaCanvas');
+await runtime.callExport(0, 'run_alpha_demo', w, h);
+console.log("   -> C++ Alpha drawing complete.");
+await renderToCanvas('alphaCanvas', 'get_alpha_buffer_ptr', 'get_alpha_width', 'get_alpha_height');
+console.log("2. -> Alpha Test rendered to canvas.");
+} catch (err) { console.error("Alpha Test failed:", err.message); }
+}
+async function runHoleTest() {
+try {
+console.log("1. Running Hole Test...");
+const { w, h } = canvasSize('holeCanvas');
+await runtime.callExport(0, 'run_hole_demo', w, h);
+console.log("   -> C++ Hole drawing complete.");
+await renderToCanvas('holeCanvas', 'get_hole_buffer_ptr', 'get_hole_width', 'get_hole_height');
+console.log("2. -> Hole Test rendered to canvas.");
+} catch (err) { console.error("Hole Test failed:", err.message); }
+}
+async function runCrossingTest() {
+try {
+console.log("1. Running Crossing Test...");
+const { w, h } = canvasSize('crossingCanvas');
+await runtime.callExport(0, 'run_crossing_demo', w, h);
+console.log("   -> C++ Crossing drawing complete.");
+await renderToCanvas('crossingCanvas', 'get_crossing_buffer_ptr', 'get_crossing_width', 'get_crossing_height');
+console.log("2. -> Crossing Test rendered to canvas.");
+} catch (err) { console.error("Crossing Test failed:", err.message); }
+}
+async function runCapJoinTest() {
+try {
+console.log("1. Running Cap/Join Test...");
+const { w, h } = canvasSize('capjoinCanvas');
+await runtime.callExport(0, 'run_capjoin_demo', w, h);
+console.log("   -> C++ Cap/Join drawing complete.");
+await renderToCanvas('capjoinCanvas', 'get_capjoin_buffer_ptr', 'get_capjoin_width', 'get_capjoin_height');
+console.log("2. -> Cap/Join Test rendered to canvas.");
+} catch (err) { console.error("Cap/Join Test failed:", err.message); }
+}
+async function runGradientTest() {
+try {
+console.log("1. Running Gradient Test...");
+const { w, h } = canvasSize('gradientCanvas');
+await runtime.callExport(0, 'run_gradient_demo', w, h);
+console.log("   -> C++ Gradient drawing complete.");
+await renderToCanvas('gradientCanvas', 'get_gradient_buffer_ptr', 'get_gradient_width', 'get_gradient_height');
+console.log("2. -> Gradient Test rendered to canvas.");
+} catch (err) { console.error("Gradient Test failed:", err.message); }
+}
+async function runTextShadowTest() {
+try {
+console.log("1. Running Text Shadow Test...");
+const { w, h } = canvasSize('textShadowCanvas');
+const ok = await runtime.callExport(0, 'run_text_shadow_demo', w, h);
+if (ok !== 1) { console.warn("Text Shadow Test skipped (Font not loaded). Run Font Test first!"); return; }
+console.log("   -> C++ Text Shadow drawing complete.");
+await renderToCanvas('textShadowCanvas', 'get_text_shadow_buffer_ptr', 'get_text_shadow_width', 'get_text_shadow_height');
+console.log("2. -> Text Shadow Test rendered to canvas.");
+} catch (err) { console.error("Text Shadow Test failed:", err.message); }
+}
+async function runTransformTest() {
+try {
+console.log("1. Running Transform Test...");
+const { w, h } = canvasSize('transformCanvas');
+await runtime.callExport(0, 'run_transform_demo', w, h);
+console.log("   -> C++ Transform drawing complete.");
+await renderToCanvas('transformCanvas', 'get_transform_buffer_ptr', 'get_transform_width', 'get_transform_height');
+console.log("2. -> Transform Test rendered to canvas.");
+} catch (err) { console.error("Transform Test failed:", err.message); }
+}
+async function runBlendTest() {
+try {
+console.log("1. Running Blend Test...");
+const { w, h } = canvasSize('blendCanvas');
+await runtime.callExport(0, 'run_blend_demo', w, h);
+console.log("   -> C++ Blend drawing complete.");
+await renderToCanvas('blendCanvas', 'get_blend_buffer_ptr', 'get_blend_width', 'get_blend_height');
+console.log("2. -> Blend Test rendered to canvas.");
+} catch (err) { console.error("Blend Test failed:", err.message); }
+}
+async function runPatternTest() {
+try {
+console.log("1. Running Pattern Test...");
+const { w, h } = canvasSize('patternCanvas');
+const ok = await runtime.callExport(0, 'run_pattern_demo', w, h);
+if (ok !== 1) { console.warn("Pattern Test skipped (Image not loaded). Run Image Prefetch first!"); return; }
+console.log("   -> C++ Pattern drawing complete.");
+await renderToCanvas('patternCanvas', 'get_pattern_buffer_ptr', 'get_pattern_width', 'get_pattern_height');
+console.log("2. -> Pattern Test rendered to canvas.");
+} catch (err) { console.error("Pattern Test failed:", err.message); }
+}
+async function callWithUrl(fnName, url, w, h) {
+const bytes = new TextEncoder().encode(url + '\0');
+const ptr = Number(await runtime.callExport(0, 'cppmalloc', bytes.length));
+if (!ptr) throw new Error('cppmalloc failed');
+new Uint8Array(runtime.sharedMemory.buffer).set(bytes, ptr);
+try {
+const futurePtr = await runtime.callExport(0, fnName, ptr, w, h);
+const fut = runtime.wrapFuture(futurePtr);
+return Number(await fut.awaitResult('int32'));
+} finally {
+await runtime.callExport(0, 'cppfree', ptr);
+}
+}
+async function prefetchImageTest(kind) {
+if (busy) return;
+busy = true; setRunButtons(true);
+try {
+const custom = document.getElementById('imageUrl').value.trim();
+const url = (kind === 'custom') ? custom : IMAGE_URLS[kind];
+if (!url) { console.warn("No image URL provided."); return; }
+console.log(`1. Prefetching Image [${kind}] ...`);
+const ok = await callWithUrl('prefetch_image', url, 0, 0);
+if (ok !== 1) { console.error("Prefetch Image failed."); return; }
+console.log("2. -> Image prefetched successfully.");
+} catch (err) {
+console.error("Prefetch Image failed:", err);
+} finally {
+busy = false; setRunButtons(false);
+}
+}
+async function runImageTest() {
+if (busy) return;
+busy = true; setRunButtons(true);
+try {
+console.log("1. Running Image Test (using prefetched data)...");
+const { w, h } = canvasSize('imageCanvas');
+const ok = await runtime.callExport(0, 'run_image_demo', w, h);
+if (ok !== 1) { console.error("Image Test failed (no prefetched data or decode failed)."); return; }
+console.log("   -> C++ draw_image compositing complete.");
+await renderToCanvas('imageCanvas', 'get_image_buffer_ptr', 'get_image_width', 'get_image_height');
+console.log("2. -> Image Test rendered to canvas.");
+} catch (err) {
+console.error("Image Test failed:", err);
+} finally {
+busy = false; setRunButtons(false);
+}
+}
+async function prefetchFontTest() {
+if (busy) return;
+busy = true; setRunButtons(true);
+try {
+console.log("1. Prefetching Font...");
+const custom = document.getElementById('fontUrl').value.trim();
+const candidates = custom ? [custom, ...FONT_URLS] : FONT_URLS;
+let ok = 0;
+for (const url of candidates) {
+console.log("   -> trying " + url);
+try {
+ok = await callWithUrl('prefetch_font', url, 0, 0);
+} catch (err) {
+console.warn("   -> request failed: " + err.message);
+ok = 0;
+}
+if (ok === 1) { console.log("   -> font prefetched: " + url); break; }
+console.warn("   -> unavailable or unsupported, trying next source.");
+}
+if (ok !== 1) { console.error("Prefetch Font failed: no usable TTF/OTF source."); return; }
+console.log("2. -> Font prefetched successfully.");
+} catch (err) {
+console.error("Prefetch Font failed:", err);
+} finally {
+busy = false; setRunButtons(false);
+}
+}
+async function runFontTest() {
+if (busy) return;
+busy = true; setRunButtons(true);
+try {
+console.log("1. Running Font Test (using prefetched data)...");
+const { w, h } = canvasSize('fontCanvas');
+const ok = await runtime.callExport(0, 'run_font_demo', w, h);
+if (ok !== 1) { console.error("Font Test failed (no prefetched data or parse failed)."); return; }
+console.log("   -> C++ fill_text / stroke_text complete.");
+await renderToCanvas('fontCanvas', 'get_font_buffer_ptr', 'get_font_width', 'get_font_height');
+console.log("2. -> Font Test rendered to canvas.");
+} catch (err) {
+console.error("Font Test failed:", err);
+} finally {
+busy = false; setRunButtons(false);
+}
+}
+async function runDashTest() {
+try {
+console.log("1. Running Dash Test...");
+const { w, h } = canvasSize('dashCanvas');
+await runtime.callExport(0, 'run_dash_demo', w, h);
+console.log("   -> C++ dashed stroke drawing complete.");
+await renderToCanvas('dashCanvas', 'get_dash_buffer_ptr', 'get_dash_width', 'get_dash_height');
+console.log("2. -> Dash Test rendered to canvas.");
+} catch (err) { console.error("Dash Test failed:", err.message); }
+}
+async function runMaskTest() {
+if (busy) return;
+busy = true; setRunButtons(true);
+try {
+console.log("1. Running Mask Test (SVG 2 luminance / alpha)...");
+const { w, h } = canvasSize('maskCanvas');
+const ok = Number(await runtime.callExport(0, 'run_mask_demo', w, h));
+if (ok !== 1) { console.error("Mask Test failed to render."); return; }
+console.log("   -> C++ mask compositing complete.");
+await renderToCanvas('maskCanvas', 'get_mask_buffer_ptr', 'get_mask_width', 'get_mask_height');
+console.log("2. -> Mask Test rendered to canvas.");
+} catch (err) {
+console.error("Mask Test failed:", err && err.message ? err.message : err);
+} finally {
+busy = false; setRunButtons(false);
+}
+}
+async function runMaskSelfTest() {
+if (busy) return;
+busy = true; setRunButtons(true);
+try {
+console.log("1. Running Mask Self-Test (numeric pixel assertions)...");
+const fails = Number(await runtime.callExport(0, 'run_mask_selftest'));
+const checks = Number(await runtime.callExport(0, 'get_mask_selftest_checks'));
+if (fails === 0) {
+maskBadge.className = 'badge pass';
+maskBadge.textContent = `self-test: PASS ${checks}/${checks}`;
+console.log(`2. -> Mask Self-Test PASSED (${checks}/${checks} checks).`);
+} else {
+maskBadge.className = 'badge fail';
+maskBadge.textContent = `self-test: FAIL ${fails}/${checks}`;
+console.error(`2. -> Mask Self-Test FAILED: ${fails} of ${checks} checks failed.`);
+}
+} catch (err) {
+maskBadge.className = 'badge fail';
+maskBadge.textContent = 'self-test: error';
+console.error("Mask Self-Test failed:", err && err.message ? err.message : err);
+} finally {
+busy = false; setRunButtons(false);
+}
+}
+async function runClipTest() {
+if (busy) return;
+busy = true; setRunButtons(true);
+try {
+console.log("1. Running Clip Test (SVG 2 clip-path / clip-rule / clipPathUnits)...");
+const { w, h } = canvasSize('clipCanvas');
+const ok = Number(await runtime.callExport(0, 'run_clip_demo', w, h));
+if (ok !== 1) { console.error("Clip Test failed to render."); return; }
+console.log("   -> C++ anti-aliased clip compositing complete.");
+await renderToCanvas('clipCanvas', 'get_clip_buffer_ptr', 'get_clip_width', 'get_clip_height');
+console.log("2. -> Clip Test rendered to canvas.");
+} catch (err) {
+console.error("Clip Test failed:", err && err.message ? err.message : err);
+} finally {
+busy = false; setRunButtons(false);
+}
+}
+async function runClipSelfTest() {
+if (busy) return;
+busy = true; setRunButtons(true);
+try {
+console.log("1. Running Clip Self-Test (numeric pixel assertions)...");
+const fails = Number(await runtime.callExport(0, 'run_clip_selftest'));
+const checks = Number(await runtime.callExport(0, 'get_clip_selftest_checks'));
+if (fails === 0) {
+clipBadge.className = 'badge pass';
+clipBadge.textContent = `self-test: PASS ${checks}/${checks}`;
+console.log(`2. -> Clip Self-Test PASSED (${checks}/${checks} checks).`);
+} else {
+clipBadge.className = 'badge fail';
+clipBadge.textContent = `self-test: FAIL ${fails}/${checks}`;
+console.error(`2. -> Clip Self-Test FAILED: ${fails} of ${checks} checks failed.`);
+}
+} catch (err) {
+clipBadge.className = 'badge fail';
+clipBadge.textContent = 'self-test: error';
+console.error("Clip Self-Test failed:", err && err.message ? err.message : err);
+} finally {
+busy = false; setRunButtons(false);
+}
+}
+async function runFillRuleTest() {
+if (busy) return;
+busy = true; setRunButtons(true);
+try {
+console.log("1. Running Fill Rule Test (SVG 2 fill-rule: nonzero / evenodd)...");
+const { w, h } = canvasSize('fillRuleCanvas');
+const ok = Number(await runtime.callExport(0, 'run_fillrule_demo', w, h));
+if (ok !== 1) { console.error("Fill Rule Test failed to render."); return; }
+console.log("   -> C++ fill-rule rasterization complete.");
+await renderToCanvas('fillRuleCanvas', 'get_fillrule_buffer_ptr', 'get_fillrule_width', 'get_fillrule_height');
+console.log("2. -> Fill Rule Test rendered to canvas.");
+} catch (err) {
+console.error("Fill Rule Test failed:", err && err.message ? err.message : err);
+} finally {
+busy = false; setRunButtons(false);
+}
+}
+async function runFillRuleSelfTest() {
+if (busy) return;
+busy = true; setRunButtons(true);
+try {
+console.log("1. Running Fill Rule Self-Test (numeric pixel assertions)...");
+const fails = Number(await runtime.callExport(0, 'run_fillrule_selftest'));
+const checks = Number(await runtime.callExport(0, 'get_fillrule_selftest_checks'));
+if (fails === 0) {
+fillRuleBadge.className = 'badge pass';
+fillRuleBadge.textContent = `self-test: PASS ${checks}/${checks}`;
+console.log(`2. -> Fill Rule Self-Test PASSED (${checks}/${checks} checks).`);
+} else {
+fillRuleBadge.className = 'badge fail';
+fillRuleBadge.textContent = `self-test: FAIL ${fails}/${checks}`;
+console.error(`2. -> Fill Rule Self-Test FAILED: ${fails} of ${checks} checks failed.`);
+}
+} catch (err) {
+fillRuleBadge.className = 'badge fail';
+fillRuleBadge.textContent = 'self-test: error';
+console.error("Fill Rule Self-Test failed:", err && err.message ? err.message : err);
+} finally {
+busy = false; setRunButtons(false);
+}
+}
+async function runCompositeTest() {
+if (busy) return;
+busy = true; setRunButtons(true);
+try {
+console.log("1. Running Composite Test (SVG 2 Porter-Duff)...");
+const { w, h } = canvasSize('compositeCanvas');
+const ok = Number(await runtime.callExport(0, 'run_composite_demo', w, h));
+if (ok !== 1) { console.error("Composite Test failed to render."); return; }
+console.log("   -> C++ Porter-Duff compositing complete.");
+await renderToCanvas('compositeCanvas', 'get_composite_buffer_ptr', 'get_composite_width', 'get_composite_height');
+console.log("2. -> Composite Test rendered to canvas.");
+} catch (err) {
+console.error("Composite Test failed:", err && err.message ? err.message : err);
+} finally {
+busy = false; setRunButtons(false);
+}
+}
+async function runCompositeSelfTest() {
+if (busy) return;
+busy = true; setRunButtons(true);
+try {
+console.log("1. Running Composite Self-Test (numeric pixel assertions)...");
+const fails = Number(await runtime.callExport(0, 'run_composite_selftest'));
+const checks = Number(await runtime.callExport(0, 'get_composite_selftest_checks'));
+if (fails === 0) {
+compositeBadge.className = 'badge pass';
+compositeBadge.textContent = `self-test: PASS ${checks}/${checks}`;
+console.log(`2. -> Composite Self-Test PASSED (${checks}/${checks} checks).`);
+} else {
+compositeBadge.className = 'badge fail';
+compositeBadge.textContent = `self-test: FAIL ${fails}/${checks}`;
+console.error(`2. -> Composite Self-Test FAILED: ${fails} of ${checks} checks failed.`);
+}
+} catch (err) {
+compositeBadge.className = 'badge fail';
+compositeBadge.textContent = 'self-test: error';
+console.error("Composite Self-Test failed:", err && err.message ? err.message : err);
+} finally {
+busy = false; setRunButtons(false);
+}
+}
+async function runMarkersTest() {
+if (busy) return;
+busy = true; setRunButtons(true);
+try {
+console.log("1. Running Markers Test (SVG 2 marker-start / marker-mid / marker-end)...");
+const { w, h } = canvasSize('markersCanvas');
+const ok = Number(await runtime.callExport(0, 'run_markers_demo', w, h));
+if (ok !== 1) { console.error("Markers Test failed to render."); return; }
+console.log("   -> C++ marker placement/orientation/scaling complete.");
+await renderToCanvas('markersCanvas', 'get_markers_buffer_ptr', 'get_markers_width', 'get_markers_height');
+console.log("2. -> Markers Test rendered to canvas.");
+} catch (err) {
+console.error("Markers Test failed:", err && err.message ? err.message : err);
+} finally {
+busy = false; setRunButtons(false);
+}
+}
+async function runMarkersSelfTest() {
+if (busy) return;
+busy = true; setRunButtons(true);
+try {
+console.log("1. Running Markers Self-Test (numeric pixel assertions)...");
+const fails = Number(await runtime.callExport(0, 'run_markers_selftest'));
+const checks = Number(await runtime.callExport(0, 'get_markers_selftest_checks'));
+if (fails === 0) {
+markersBadge.className = 'badge pass';
+markersBadge.textContent = `self-test: PASS ${checks}/${checks}`;
+console.log(`2. -> Markers Self-Test PASSED (${checks}/${checks} checks).`);
+} else {
+markersBadge.className = 'badge fail';
+markersBadge.textContent = `self-test: FAIL ${fails}/${checks}`;
+console.error(`2. -> Markers Self-Test FAILED: ${fails} of ${checks} checks failed.`);
+}
+} catch (err) {
+markersBadge.className = 'badge fail';
+markersBadge.textContent = 'self-test: error';
+console.error("Markers Self-Test failed:", err && err.message ? err.message : err);
+} finally {
+busy = false; setRunButtons(false);
+}
+}
+async function runFiltersTest() {
+if (busy) return;
+busy = true; setRunButtons(true);
+try {
+console.log("1. Running Filters Test (SVG 2 feGaussianBlur / feColorMatrix / feDropShadow)...");
+const { w, h } = canvasSize('filtersCanvas');
+const ok = Number(await runtime.callExport(0, 'run_filters_demo', w, h));
+if (ok !== 1) { console.error("Filters Test failed to render."); return; }
+console.log("   -> C++ filter chains / regions / off-screen buffers complete.");
+await renderToCanvas('filtersCanvas', 'get_filters_buffer_ptr', 'get_filters_width', 'get_filters_height');
+console.log("2. -> Filters Test rendered to canvas.");
+} catch (err) {
+console.error("Filters Test failed:", err && err.message ? err.message : err);
+} finally {
+busy = false; setRunButtons(false);
+}
+}
+async function runFiltersSelfTest() {
+if (busy) return;
+busy = true; setRunButtons(true);
+try {
+console.log("1. Running Filters Self-Test (numeric pixel assertions)...");
+const fails = Number(await runtime.callExport(0, 'run_filters_selftest'));
+const checks = Number(await runtime.callExport(0, 'get_filters_selftest_checks'));
+if (fails === 0) {
+filtersBadge.className = 'badge pass';
+filtersBadge.textContent = `self-test: PASS ${checks}/${checks}`;
+console.log(`2. -> Filters Self-Test PASSED (${checks}/${checks} checks).`);
+} else {
+filtersBadge.className = 'badge fail';
+filtersBadge.textContent = `self-test: FAIL ${fails}/${checks}`;
+console.error(`2. -> Filters Self-Test FAILED: ${fails} of ${checks} checks failed.`);
+}
+} catch (err) {
+filtersBadge.className = 'badge fail';
+filtersBadge.textContent = 'self-test: error';
+console.error("Filters Self-Test failed:", err && err.message ? err.message : err);
+} finally {
+busy = false; setRunButtons(false);
+}
+}
+async function runGlobalAlphaTest() {
+if (busy) return;
+busy = true; setRunButtons(true);
+try {
+console.log("1. Running globalAlpha Test (Canvas2D state property)...");
+const { w, h } = canvasSize('globalAlphaCanvas');
+const ok = Number(await runtime.callExport(0, 'run_globalalpha_demo', w, h));
+if (ok !== 1) { console.error("globalAlpha Test failed to render."); return; }
+console.log("   -> C++ globalAlpha source-alpha scaling complete.");
+await renderToCanvas('globalAlphaCanvas', 'get_globalalpha_buffer_ptr', 'get_globalalpha_width', 'get_globalalpha_height');
+console.log("2. -> globalAlpha Test rendered to canvas.");
+} catch (err) {
+console.error("globalAlpha Test failed:", err && err.message ? err.message : err);
+} finally {
+busy = false; setRunButtons(false);
+}
+}
+async function runGlobalAlphaSelfTest() {
+if (busy) return;
+busy = true; setRunButtons(true);
+try {
+console.log("1. Running globalAlpha Self-Test (numeric pixel assertions)...");
+const fails = Number(await runtime.callExport(0, 'run_globalalpha_selftest'));
+const checks = Number(await runtime.callExport(0, 'get_globalalpha_selftest_checks'));
+if (fails === 0) {
+globalAlphaBadge.className = 'badge pass';
+globalAlphaBadge.textContent = `self-test: PASS ${checks}/${checks}`;
+console.log(`2. -> globalAlpha Self-Test PASSED (${checks}/${checks} checks).`);
+} else {
+globalAlphaBadge.className = 'badge fail';
+globalAlphaBadge.textContent = `self-test: FAIL ${fails}/${checks}`;
+console.error(`2. -> globalAlpha Self-Test FAILED: ${fails} of ${checks} checks failed.`);
+}
+} catch (err) {
+globalAlphaBadge.className = 'badge fail';
+globalAlphaBadge.textContent = 'self-test: error';
+console.error("globalAlpha Self-Test failed:", err && err.message ? err.message : err);
+} finally {
+busy = false; setRunButtons(false);
+}
+}
+console.log("Page loaded. Click 'Initialize Runtime' to start.");
+</script>
+</body>
+</html>

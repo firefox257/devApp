@@ -1,0 +1,561 @@
+# Canvas2D C++ Library Developer Documentation
+Welcome to the developer documentation for the Pure C++ Canvas2D Software Rasterizer. 
+This library provides comprehensive, SVG 2.0-compliant 2D rendering capabilities, 
+specifically optimized for the Autogen WebAssembly runtime (shared memory, explicit 
+memory management, and multi-worker concurrency).
+
+================================================================================
+TABLE OF CONTENTS
+================================================================================
+1. Quick Start
+2. Core Path & Geometry Engine
+3. Transformation & State Management
+4. Fill & Paint Servers
+5. Advanced Stroke Rendering
+6. Clipping & Masking
+7. Compositing & Blend Modes
+8. Markers
+9. Filters & Effects
+10. Image Rendering
+11. Text & Typography (SVG 2.0)
+12. Autogen & WebAssembly Best Practices
+13. Browser Integration (HTML5 Canvas & SharedArrayBuffer)
+14. Advanced Autogen Patterns (ag_async / ag_await / ag_await_all)
+15. API Quick Reference
+
+================================================================================
+1. QUICK START
+================================================================================
+The Canvas2D class is the central drawing context. It manages a pixel buffer 
+and maintains the current drawing state (transforms, styles, clips, etc.).
+
+Example: Basic Setup and Drawing
+  #include <graphics/canvas2d.hpp>
+
+  // 1. Initialize an 800x600 canvas (allocates buffer via calloc in shared memory)
+  Canvas2D canvas(800, 600);
+
+  // 2. Clear the canvas with a solid color (RGBA)
+  canvas.clear(rgba(240, 240, 245, 255));
+
+  // 3. Define a shape (inherits from Path2D)
+  Shape2D rect;
+  rect.mt(100, 100)          // Move to (100, 100)
+      .lt(300, 100)          // Line to (300, 100)
+      .lt(300, 200)          // Line to (300, 200)
+      .lt(100, 200)          // Line to (100, 200)
+      .close()               // Close path
+      .set_line_width(4.0f); // Set stroke width
+
+  // 4. Set styles and draw
+  canvas.fill_style(rgba(0, 120, 255, 255))      // Solid blue fill
+        .stroke_style(rgba(0, 50, 100, 255))     // Dark blue stroke
+        .path(rect);                             // Render the shape
+
+  // 5. Access the raw pixel buffer for WebAssembly export
+  uint32_t* pixels = canvas.get_buffer();
+  int width = canvas.get_width();
+  int height = canvas.get_height();
+
+================================================================================
+2. CORE PATH & GEOMETRY ENGINE
+================================================================================
+Paths are built using Path2D or Shape2D. The engine automatically normalizes 
+relative commands and smooth curves into absolute cubic/quadratic curves, 
+ensuring the rasterizer only processes a standardized command set.
+
+Example: Complex Path with Relative and Elliptical Arc Commands
+  Shape2D complexPath;
+  complexPath.mt(50, 50)                     // M: Move to
+            .ltr(100, 0)                     // l: Relative line to
+            .qt(200, 50, 150, 100)           // Q: Quadratic curve
+            .ttr(50, 50)                     // T: Relative smooth quadratic
+            .ctr(0, 100, -100, 100, -50, 50) // C: Relative cubic curve
+            .str(-50, -50, -100, 0)          // S: Relative smooth cubic
+            .et(50, 50, 0, false, true, 50, 50) // A: Elliptical arc
+            .close();                        // Z: Close path
+
+Note: Degenerate elliptical arcs (e.g., rx=0 or coincident endpoints) 
+automatically fall back to straight lines without crashing, per SVG 2.0 spec.
+
+Example: Fill Rules (NonZero vs EvenOdd)
+  Shape2D donut;
+  // Outer circle (Counter-Clockwise)
+  donut.mt(150, 50).at(100, 100, 50, 0, 6.28f, false).close();
+  // Inner circle (Clockwise)
+  donut.mt(120, 80).at(100, 100, 20, 0, 6.28f, true).close();
+
+  // 'evenodd' creates a hole. 'nonzero' fills the whole shape.
+  canvas.fill_rule(FillRule::EvenOdd)
+        .fill_style(rgba(255, 0, 0, 255))
+        .path(donut);
+
+  // You can also override the rule per-shape:
+  donut.set_fill_rule(FillRule::NonZero);
+  donut.clear_fill_rule(); // Restores inheritance from canvas context
+
+================================================================================
+3. TRANSFORMATION & STATE MANAGEMENT
+================================================================================
+The canvas maintains an Affine Transformation Matrix (CTM) and a state stack 
+for hierarchical rendering.
+
+Example: Hierarchical Transformations
+  canvas.save(); // Pushes CTM, styles, clip, mask, etc.
+  canvas.translate(400, 300)
+        .rotate(0.785f)       // Rotate 45 degrees (radians)
+        .scale(1.5f, 1.5f)
+        .skewX(0.2f);
+
+  // Draw a shape; it will be transformed
+  canvas.fill_style(rgba(0, 255, 0, 255)).path(rect);
+  canvas.restore(); // Pops the state, reverting to the previous CTM and styles
+
+  // Example: setTransform (replaces current matrix instead of multiplying)
+  canvas.setTransform(1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f); // Reset to identity
+  canvas.transform(0.5f, 0.0f, 0.0f, 0.5f, 100.0f, 100.0f); // Multiply by new matrix
+
+================================================================================
+4. FILL & PAINT SERVERS
+================================================================================
+Paints can be solid colors, gradients, or patterns.
+
+Example: Gradients (Linear, Radial, Conical)
+  // Linear Gradient with Repeat spread
+  LinearGradient* linGrad = new LinearGradient(0, 0, 200, 0);
+  linGrad->add_stop(0.0f, rgba(255, 0, 0, 255))
+         ->add_stop(0.5f, rgba(0, 255, 0, 255))
+         ->add_stop(1.0f, rgba(0, 0, 255, 255))
+         ->set_spread(Gradient::Spread::Repeat);
+
+  // Radial Gradient with focal point offset (Cone effect)
+  RadialGradient* radGrad = new RadialGradient(100, 100, 80, 120, 120, 20);
+  radGrad->add_stop(0.0f, rgba(255, 255, 255, 255))
+         ->add_stop(1.0f, rgba(0, 0, 0, 255));
+
+  // Conical Gradient (Sweep)
+  ConicalGradient* conGrad = new ConicalGradient(100, 100, 0.0f); // cx, cy, startAngle
+  conGrad->add_stop(0.0f, rgba(255, 0, 0, 255))
+         ->add_stop(0.5f, rgba(0, 255, 0, 255))
+         ->add_stop(1.0f, rgba(255, 0, 0, 255));
+
+  canvas.fill_style(linGrad).path(rect);
+
+Example: Patterns (UserSpace and ObjectBoundingBox)
+  // Create a pattern from a shape
+  Shape2D star; /* ... build star path ... */
+  Pattern* pat = new Pattern(50, 50, Pattern::Units::UserSpaceOnUse,
+                             Pattern::ContentUnits::UserSpaceOnUse, true, true);
+  pat->add(star, Paint(rgba(255, 200, 0, 255)), Paint(rgba(200, 100, 0, 255)));
+
+  // Example: Object Bounding Box Pattern (scales to the shape being filled)
+  Pattern* obbPat = new Pattern(1.0f, 1.0f, Pattern::Units::ObjectBoundingBox,
+                                Pattern::ContentUnits::ObjectBoundingBox, true, true);
+  Shape2D unitCircle; 
+  unitCircle.mt(0.5, 0.5).at(0.5, 0.5, 0.5, 0, 6.28f, false).close();
+  obbPat->add(unitCircle, Paint(rgba(0, 255, 0, 255)));
+
+  // Apply pattern transform (e.g., rotate the tile grid)
+  pat->set_transform(std::cos(0.5f), std::sin(0.5f), -std::sin(0.5f), std::cos(0.5f), 0, 0);
+  canvas.fill_style(pat).path(largeRect);
+
+Memory Note: Gradient and Pattern objects must outlive the draw call. Manage their 
+lifecycle explicitly (e.g., via a shared ResourceRegistry or explicit delete).
+
+================================================================================
+5. ADVANCED STROKE RENDERING
+================================================================================
+Full SVG 2.0 stroke properties, including the advanced miter-clip join.
+
+Example: Dashed Stroke with Miter-Clip
+  Shape2D zigzag;
+  zigzag.mt(50, 100).lt(100, 50).lt(150, 100).lt(200, 50)
+        .set_line_width(12.0f)
+        .set_line_cap(Shape2D::CAP_ROUND)
+        .set_line_join(Shape2D::JOIN_MITER_CLIP) // SVG 2: Clips the spike
+        .set_miter_limit(1.5f)
+        .set_dash_array({15.0f, 10.0f, 5.0f, 0.0f})
+        .set_dash_offset(5.0f);
+
+  canvas.stroke_style(rgba(255, 100, 100, 255)).path(zigzag);
+
+- JOIN_MITER: Default. Collapses to bevel if miter_length / line_width > miter_limit.
+- JOIN_MITER_CLIP: Keeps the spike but clips it with a flat line perpendicular 
+  to the bisector at miter_limit * line_width / 2. Prevents visual "popping" 
+  during animations.
+- JOIN_ROUND / JOIN_BEVEL: Standard rounded or flat joins.
+
+================================================================================
+6. CLIPPING & MASKING
+================================================================================
+Clip Paths: Arbitrary Shape2D paths can be used as clipping regions. Supports 
+clip-rule and nested intersections.
+
+Example: Nested ClipPath (Intersection)
+  Shape2D circleClip;
+  circleClip.mt(200, 200).at(200, 200, 100, 0, 6.28f, false).close();
+  ClipPath* clip = new ClipPath();
+  clip->set_units(ClipPath::Units::UserSpaceOnUse)
+      ->add(circleClip, ClipPath::Rule::EvenOdd);
+
+  Shape2D rectClip; 
+  rectClip.mt(150, 150).lt(250, 150).lt(250, 250).lt(150, 250).close();
+  ClipPath* rectClipPath = new ClipPath();
+  rectClipPath->add(rectClip);
+  
+  // Only draws where BOTH circle and rect overlap
+  clip->set_clip_path(rectClipPath); 
+
+  canvas.set_clip(clip);
+  canvas.fill_style(rgba(0, 255, 0, 255)).path(largeRect); 
+  canvas.clear_clip(); // Remove clip
+
+Masks: Supports Alpha, Luminance, and MatchSource mask types, with objectBoundingBox 
+or userSpaceOnUse units.
+
+Example: Luminance Mask
+  Shape2D maskShape;
+  maskShape.mt(0, 0).lt(400, 0).lt(400, 400).lt(0, 400).close();
+  LinearGradient* maskGrad = new LinearGradient(0, 0, 400, 0);
+  maskGrad->add_stop(0.0f, rgba(0, 0, 0, 255))
+          ->add_stop(1.0f, rgba(255, 255, 255, 255));
+
+  Mask* mask = new Mask();
+  mask->set_type(Mask::Type::Luminance) // Or Mask::Type::Alpha
+        ->set_units(Mask::Units::UserSpaceOnUse)
+        ->add_shape(maskShape, Paint(maskGrad));
+
+  canvas.set_mask(mask);
+  canvas.fill_style(rgba(255, 0, 0, 255)).path(largeRect); // Fades in from left to right
+  canvas.clear_mask();
+
+================================================================================
+7. COMPOSITING & BLEND MODES
+================================================================================
+Full Porter-Duff compositing and CSS/SVG blend modes.
+
+Example: Source-Atop with Multiply Blend Mode
+  // Draw a blue circle (Destination)
+  Shape2D circle; 
+  circle.mt(150, 150).at(150, 150, 100, 0, 6.28f, false).close();
+  canvas.fill_style(rgba(0, 0, 255, 255)).path(circle);
+
+  // Draw an orange rectangle (Source)
+  Shape2D rect; 
+  rect.mt(100, 100).lt(300, 100).lt(300, 200).lt(100, 200).close();
+  canvas.composite_op(CompositeOp::SourceAtop)
+        .blend_mode(BlendMode::Multiply)
+        .fill_style(rgba(255, 150, 0, 255))
+        .path(rect);
+
+  // Reset to default
+  canvas.composite_op(CompositeOp::SourceOver).blend_mode(BlendMode::Normal);
+
+  // Global Alpha: Scales the source alpha of every draw (0.0 to 1.0)
+  canvas.global_alpha(0.5f);
+  canvas.fill_style(rgba(255, 0, 0, 255)).path(rect); // Renders at 50% opacity
+  canvas.global_alpha(1.0f); // Reset
+
+Warning: Unbounded operators like SourceOut or Copy rewrite the entire canvas, 
+clearing areas outside the source shape.
+
+================================================================================
+8. MARKERS
+================================================================================
+Attach predefined shapes to the vertices of a path (marker-start, marker-mid, marker-end).
+
+Example: Auto-Orienting Arrowhead Marker
+  // Define the marker content
+  Shape2D arrow;
+  arrow.mt(0, 0).lt(10, 5).lt(0, 10).close();
+
+  Marker* mkr = new Marker();
+  mkr->set_size(14, 14)
+     ->set_ref(10, 5)               // Tip of the arrow aligns with the vertex
+     ->set_orient_auto()            // Automatically rotates to match path tangent
+     ->set_units(Marker::Units::StrokeWidth) // Scales with the path's line width
+     ->add(arrow, Paint(rgba(255, 0, 0, 255)));
+
+  Shape2D path;
+  path.mt(50, 50).lt(150, 100).lt(250, 50).set_line_width(4.0f);
+
+  canvas.set_markers(mkr, nullptr, mkr) // Start and End markers
+        .stroke_style(rgba(0, 0, 0, 255))
+        .path(path);
+
+  canvas.clear_markers();
+
+================================================================================
+9. FILTERS & EFFECTS
+================================================================================
+Apply raster filters to the bounding box of an element. Filters chain sequentially.
+
+Example: Drop Shadow + Gaussian Blur Chain
+  Filter* filter = new Filter();
+  filter->drop_shadow(10.0f, 10.0f, 5.0f, rgba(0, 0, 0, 150)) // dx, dy, stdDev, color
+        ->gaussian_blur(2.0f)
+        ->color_matrix({
+            0.213f, 0.715f, 0.072f, 0, 0,
+            0.213f, 0.715f, 0.072f, 0, 0,
+            0.213f, 0.715f, 0.072f, 0, 0,
+            0,      0,      0,      1, 0  // Luminance to Alpha
+        });
+
+  // Example: Filter Regions (limits the off-screen buffer size for performance)
+  filter->set_region(0.0f, 0.0f, 400.0f, 400.0f)
+        ->set_units(Filter::Units::UserSpaceOnUse); // Default is ObjectBoundingBox
+
+  canvas.set_filter(filter);
+  canvas.fill_style(rgba(255, 0, 0, 255)).path(rect);
+  canvas.clear_filter();
+
+Performance: Filters allocate temporary off-screen buffers. Keep filter regions 
+tight using set_region(x, y, w, h) to minimize memory and compute overhead.
+
+================================================================================
+10. IMAGE RENDERING
+================================================================================
+Draw images with full SVG 2.0 preserveAspectRatio support and high-quality 
+minification/magnification.
+
+Example: Image Placement and Smoothing
+  Image img;
+  img.loadFromMemory(prefetched_data, data_size, 4); // 4 channels (RGBA)
+
+  // 1. Letterbox (Meet): Preserves aspect ratio, centers in viewport
+  canvas.draw_image(img, 10, 10, 200, 200, ImageAlign::xMidYMid, ImageFit::Meet);
+
+  // 2. Slice: Fills the viewport, cropping overflow (follows CTM)
+  canvas.draw_image(img, 220, 10, 200, 200, ImageAlign::xMidYMid, ImageFit::Slice);
+
+  // 3. Legacy Stretch (None): Independent X/Y scaling
+  canvas.draw_image(img, 430, 10, 200, 200, ImageAlign::None, ImageFit::Meet);
+
+  // 4. High-Quality Minification (Area-average)
+  canvas.image_smoothing_enabled(true)
+        .image_smoothing_quality(ImageSmoothingQuality::High)
+        .draw_image(img, 10, 220, 100, 100); // Downscaling uses exact box overlap
+
+  // 5. Nearest Neighbor (Pixel art style)
+  canvas.image_smoothing_enabled(false)
+        .draw_image(img, 120, 220, 100, 100);
+
+================================================================================
+11. TEXT & TYPOGRAPHY (SVG 2.0)
+================================================================================
+Text is rendered as vector paths, inheriting all gradients, strokes, masks, 
+and filters. It requires a loaded Font object.
+
+Example: Advanced Typography with Per-Character Overrides
+  // Load font (e.g., from prefetched TTF/OTF data)
+  Font* myFont = new Font();
+  myFont->load(font_data, font_size_bytes, 48.0f); // Set base pixel height
+  canvas.font(myFont);
+
+  // Define typography state
+  TextStyle style;
+  style.font_size = 48.0f;
+  style.font_weight = 700;                // Bold
+  style.font_style = FontStyle::Italic;
+  style.anchor = TextAnchor::Middle;      // Center horizontally on X
+  style.baseline = DominantBaseline::Central; // Center vertically on Y
+  style.letter_spacing = 2.0f;
+  style.text_length = 300.0f;             // Force width to 300px
+  style.length_adjust = LengthAdjust::SpacingAndGlyphs; // Stretch glyphs to fit
+
+  // Draw text with drop shadow
+  canvas.fill_style(rgba(255, 255, 255, 255))
+        .drop_shadow(4, 4, 3, rgba(0, 0, 0, 200))
+        .fill_text("TYPOGRAPHY", 400, 300, style);
+  canvas.clear_shadow();
+
+  // Per-Character Overrides: dx, dy, and rotate (in degrees)
+  // The last value in the array repeats for remaining characters.
+  style.dx = {0, 5, 10, 15};
+  style.rotate = {-10, -5, 0, 5, 10}; 
+  canvas.fill_text("WAVY TEXT", 100, 100, style);
+
+  // Extracting text as a Path (for custom manipulation/stroking)
+  Shape2D textPath = canvas.text_path("OUTLINE", 100, 100, style);
+  canvas.fill_style(rgba(0,0,0,0)).stroke_style(rgba(255,0,0,255)).path(textPath);
+
+================================================================================
+12. AUTOGEN & WEBASSEMBLY BEST PRACTICES
+================================================================================
+Because this library targets the Autogen runtime, strict memory and concurrency 
+rules apply:
+
+1. Shared Memory Allocation: All state objects (Gradient, Pattern, Mask, 
+   ClipPath, Marker, Filter) must be allocated on the heap (new/malloc) so 
+   they reside in the shared AtomicMalloc heap. Do not pass stack pointers 
+   to the canvas.
+2. Explicit Lifecycle Management: The Canvas2D destructor frees the primary 
+   pixel buffer, but you are responsible for freeing paint servers, masks, 
+   and clips. Use a ResourceRegistry or explicit delete to prevent shared 
+   heap leaks.
+   LinearGradient* grad = new LinearGradient(0, 0, 100, 100);
+   // ... use grad ...
+   delete grad; // Mandatory cleanup
+3. Single-Threaded Execution per Context: The library is designed for 
+   single-threaded execution *per Canvas2D instance* within the Autogen 
+   WebAssembly environment. Do not attempt to share a single Canvas2D 
+   context across multiple workers without explicit synchronization. 
+   Instead, partition work (e.g., tile-based rendering) or use separate 
+   Canvas2D instances per worker.
+4. Image Decoding Pipeline: Do not decode images synchronously in C++. 
+   Use the Autogen workflow:
+   - C++ triggers ag_ext_async to request image load.
+   - JS Main Thread fetches/decodes via createImageBitmap.
+   - JS extracts raw RGBA into a SharedArrayBuffer.
+   - JS returns the shared memory pointer to C++.
+   - C++ Canvas2D::draw_pixels performs high-quality sampling.
+
+================================================================================
+13. BROWSER INTEGRATION (HTML5 Canvas & SharedArrayBuffer)
+================================================================================
+To display the C++ rendered buffer in the browser, you must extract the raw 
+pixel data from the WebAssembly SharedArrayBuffer and push it to an HTML5 
+canvas element using ImageData.
+
+Prerequisites: Your server MUST serve the page with these headers for 
+SharedArrayBuffer to work:
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Embedder-Policy: require-corp
+
+JavaScript Integration Example:
+  // 1. Assume 'runtime' is your initialized AutogenRuntime instance
+  // 2. Assume C++ exports 'get_buffer_ptr', 'get_width', and 'get_height'
+
+  async function renderToBrowserCanvas(canvasId) {
+      const htmlCanvas = document.getElementById(canvasId);
+      const ctx = htmlCanvas.getContext('2d', { willReadFrequently: true });
+
+      // Fetch metadata from C++
+      const ptr = Number(await runtime.callExport(0, 'get_buffer_ptr'));
+      const w = Number(await runtime.callExport(0, 'get_width'));
+      const h = Number(await runtime.callExport(0, 'get_height'));
+
+      if (!ptr || !w || !h) {
+          console.error("Failed to get buffer metadata");
+          return;
+      }
+
+      // Resize HTML canvas to match C++ buffer
+      htmlCanvas.width = w;
+      htmlCanvas.height = h;
+
+      // 3. Create a view into the SharedArrayBuffer
+      const sharedBuffer = runtime.sharedMemory 
+          ? runtime.sharedMemory.buffer 
+          : runtime.wasmInstance.exports.memory.buffer;
+          
+      const pixelDataView = new Uint8ClampedArray(sharedBuffer, ptr, w * h * 4);
+      
+      // 4. Copy to a local ImageData object (avoids SAB detachment issues)
+      const pixelData = new Uint8ClampedArray(pixelDataView);
+      const imageData = new ImageData(pixelData, w, h);
+
+      // 5. Push to the HTML canvas
+      ctx.putImageData(imageData, 0, 0);
+  }
+
+Performance Tip: For high-framerate rendering (e.g., 60fps), avoid creating 
+new Uint8ClampedArray or ImageData objects every frame. Cache them and 
+only update the underlying buffer reference if the WebAssembly memory grows.
+
+================================================================================
+14. ADVANCED AUTOGEN PATTERNS (ag_async / ag_await / ag_await_all)
+================================================================================
+To achieve true parallelism, Autogen provides ag_async to dispatch work to 
+background workers. 
+
+Rules for ag_async targets:
+1. The function MUST be at global scope (NOT static or inside a class).
+2. The signature MUST be exactly: uint32_t function_name(uint32_t arg).
+3. Pass complex data (like structs) by packing a pointer into the uint32_t arg.
+
+Example: Parallel Icon Rendering
+  #include <autogen.hpp>
+  #include "canvas2d.hpp"
+
+  // Define thread counts at the top of your file
+  ag_dedicated_thread_count(1);
+  ag_undedicated_thread_count(4);
+
+  // 1. Define a job struct
+  struct RenderJob {
+      int icon_id;
+      float time;
+      uint32_t state_ptr; // Pointer to shared state in WASM memory
+  };
+
+  // 2. Global scope worker function (MUST be uint32_t(uint32_t))
+  uint32_t render_icon_task(uint32_t job_ptr) {
+      RenderJob* job = reinterpret_cast<RenderJob*>(static_cast<uintptr_t>(job_ptr));
+      if (!job) return 1u; // Error code
+
+      // 3. Create a local Canvas2D instance for this worker
+      Canvas2D canvas(128, 128);
+      canvas.clear(rgba(0, 0, 0, 0));
+
+      // 4. Read shared state and draw
+      float* state = reinterpret_cast<float*>(static_cast<uintptr_t>(job->state_ptr));
+      float health = state[0]; // Example state
+      
+      // ... draw icon based on job->icon_id, job->time, health ...
+
+      // 5. Copy the result to a pre-allocated shared buffer
+      uint32_t* dest = reinterpret_cast<uint32_t*>(static_cast<uintptr_t>(get_icon_buffer_ptr(job->icon_id)));
+      std::memcpy(dest, canvas.get_buffer(), 128 * 128 * 4);
+
+      return 0u; // Success
+  }
+
+  // 6. Dispatching from the main thread
+  ag_export(render_all_icons)
+  ag_future* render_all_icons(uint32_t time_ms, uint32_t state_ptr) {
+      std::vector<ag_future*> futures;
+      RenderJob jobs[14]; // 14 icons
+
+      for (int i = 0; i < 14; ++i) {
+          jobs[i].icon_id = i;
+          jobs[i].time = static_cast<float>(time_ms) * 0.001f;
+          jobs[i].state_ptr = state_ptr;
+
+          // Dispatch to worker
+          ag_future* fut = ag_async(render_icon_task, 
+              static_cast<uint32_t>(reinterpret_cast<uintptr_t>(&jobs[i])));
+          futures.push_back(fut);
+      }
+
+      // Wait for ALL workers to finish (fan-in)
+      auto results = ag_await_all(futures);
+      
+      // Check for errors
+      for (int i = 0; i < 14; ++i) {
+          uint32_t status = results.get<uint32_t>(i);
+          if (status != 0u) return status; // Return first error
+      }
+
+      return 123u; // Success code
+  }
+
+================================================================================
+15. API QUICK REFERENCE
+================================================================================
+Category          | Methods / Classes
+------------------|-----------------------------------------------------------
+Canvas            | Canvas2D(w, h), clear(), save(), restore(), get_buffer()
+Transforms        | translate(), scale(), rotate(), skewX(), skewY(), transform(), setTransform()
+Paths             | Shape2D, Path2D, mt, lt, qt, ct, et, close, set_line_width
+Paints            | fill_style(), stroke_style(), LinearGradient, Pattern
+Clipping/Masking  | set_clip(), clear_clip(), set_mask(), clear_mask(), ClipPath
+Compositing       | composite_op(), blend_mode(), global_alpha()
+Markers           | set_markers(), clear_markers(), Marker
+Filters           | set_filter(), clear_filter(), Filter::gaussian_blur
+Images            | draw_image(), draw_pixels(), ImageAlign, ImageFit, ImageSmoothingQuality
+Text              | fill_text(), stroke_text(), text_path(), TextStyle, TextAnchor
+Autogen           | ag_export, ag_async, ag_await, ag_await_all, ag_future
+
+For further implementation details, refer to the inline comments in 
+canvas2d.cpp, canvas2d_raster.cpp, and canvas2d_text.cpp.
