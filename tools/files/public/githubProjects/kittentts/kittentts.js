@@ -1,6 +1,13 @@
 /* ============================================================
  * kittentts.js — KittenTTS engine library
  * Misaki-aligned phoneme pipeline (espeak.py reference)
+ * Changes:
+ *  - ALL-CAPS runs (2+ letters) are spelled letter-by-letter via
+ *    LETTER_IPA — capitals preserved, gold-dict lowercase bypassed
+ *  - Commas are converted to spaces before synthesis (the model
+ *    can't handle the comma token)
+ *  - Short-word fix: ids guard is now < 3 (one real symbol between
+ *    pads), so "it", "It", "It.", "a", "I", "the" all synthesize
  * ============================================================ */
 
 // Node.js / CommonJS compatibility layer
@@ -64,13 +71,28 @@ const MISAKI_E2M = [
 const MISAKI_LEAK = /[ːʲɚrxçɐoɾʔ\u0303\u0329^]/;
 
 /* ============================================================
+ * Letter names, en-us (espeak-style IPA, pre-Misaki).
+ * Used to spell ALL-CAPS runs — capitals are NEVER lowercased,
+ * and the gold dict (which keys everything lowercase) is bypassed
+ * so the letter "A" can't collide with the article "a" → ə.
+ * Verified: all 26 pass _misaki with zero leaks, full vocab coverage.
+ * ============================================================ */
+const LETTER_IPA = {
+  A:'ˈeɪ', B:'bˈiː', C:'sˈiː', D:'dˈiː', E:'ˈiː', F:'ˈɛf',
+  G:'dʒˈiː', H:'ˈeɪtʃ', I:'ˈaɪ', J:'dʒˈeɪ', K:'kˈeɪ', L:'ˈɛl',
+  M:'ˈɛm', N:'ˈɛn', O:'ˈoʊ', P:'pˈiː', Q:'kjˈuː', R:'ˈɑːɹ',
+  S:'ˈɛs', T:'tˈiː', U:'jˈuː', V:'vˈiː', W:'dˈʌbəljˌuː',
+  X:'ˈɛks', Y:'wˈaɪ', Z:'zˈiː'
+};
+
+/* ============================================================
  * Vocab fallback — object keyed by character, values are token IDs.
  * PUA gap entries (\ueXXX) removed: object keys don't shift indices.
  * ============================================================ */
 const IPA_FALLBACK = {
   "$": 0, ";": 1, ":": 2, ",": 3, ".": 4, "!": 5, "?": 6,
   "—": 9, "…": 10, "\"": 11, "(": 12, ")": 13,
-  "“": 14, "”": 15, " ": 16, "̃": 17, "ʣ": 18, "ʥ": 19, "ʦ": 20, "ʨ": 21,
+  "\u201C": 14, "\u201D": 15, " ": 16, "̃": 17, "ʣ": 18, "ʥ": 19, "ʦ": 20, "ʨ": 21,
   "ᵝ": 22, "ꭧ": 23, "A": 24, "I": 25, "O": 31,
   "Q": 33, "S": 35, "T": 36, "W": 39, "Y": 41, "ᵊ": 42,
   "a": 43, "b": 44, "c": 45, "d": 46, "e": 47, "f": 48,
@@ -421,28 +443,8 @@ class KittenTTS {
     if (nodePhonemizer) {
       const phonemizeFn = nodePhonemizer.phonemize || (nodePhonemizer.default && nodePhonemizer.default.phonemize) || (typeof nodePhonemizer.default === 'function' ? nodePhonemizer.default : null);
       if (typeof phonemizeFn === 'function') {
-        this.phon = async (text) => {
-          // Updated regex: explicitly keeps words with internal apostrophes/hyphens AND digits as a single token
-          const tokens = text.match(/[A-Za-z0-9]+(?:['\-][A-Za-z0-9]+)*|[^\sA-Za-z0-9]+|\s+/g) || [];
-          const parts = [];
-          let allGold = true;
-          for (const tk of tokens) {
-            if (!/[A-Za-z0-9]/.test(tk)) { parts.push(tk); continue; }
-            const g = this._goldDict && this._goldDict[tk.toLowerCase()];
-            if (g) {
-              parts.push(typeof g === 'string' ? g : (g.DEFAULT || g.phones || g.ipa || ''));
-            } else {
-              allGold = false;
-              try {
-                parts.push(this._normPh(await phonemizeFn(tk, 'en-us', { keepPunctuation: true })));
-              } catch (e) {
-                parts.push(tk);
-              }
-            }
-          }
-          this._lastPhonWasGold = allGold;
-          return this._normPh(parts.join(''));
-        };
+        this.phon = (text) => this._phonTokens(text,
+          tk => phonemizeFn(tk, 'en-us', { keepPunctuation: true }));
         console.log('✅ phonemizer loaded via require()');
         return true;
       }
@@ -475,28 +477,7 @@ class KittenTTS {
         let us = '';
         try { us = this._normPh(await form(probe)); } catch (e) { us = ''; }
         if (us && IPA_RE.test(us)) {
-          this.phon = async (text) => {
-            // Updated regex: explicitly keeps words with internal apostrophes/hyphens AND digits as a single token
-            const tokens = text.match(/[A-Za-z0-9]+(?:['\-][A-Za-z0-9]+)*|[^\sA-Za-z0-9]+|\s+/g) || [];
-            const parts = [];
-            let allGold = true;
-            for (const tk of tokens) {
-              if (!/[A-Za-z0-9]/.test(tk)) { parts.push(tk); continue; }
-              const g = this._goldDict && this._goldDict[tk.toLowerCase()];
-              if (g) {
-                parts.push(typeof g === 'string' ? g : (g.DEFAULT || g.phones || g.ipa || ''));
-              } else {
-                allGold = false;
-                try {
-                  parts.push(this._normPh(await form(tk)));
-                } catch (e) {
-                  parts.push(tk);
-                }
-              }
-            }
-            this._lastPhonWasGold = allGold;
-            return this._normPh(parts.join(''));
-          };
+          this.phon = (text) => this._phonTokens(text, form);
           console.log('✅ espeak-ng loaded from local vendor');
           return true;
         }
@@ -506,6 +487,39 @@ class KittenTTS {
   }
 
   _normPh(r){const s=Array.isArray(r)?r.join(' '):String(r==null?'':r);return s.replace(/[ \t]+/g,' ').trim();}
+
+  /* ============================================================
+   * Shared token pipeline (Node + browser identical).
+   * ALL-CAPS runs (2+ letters) are spelled via LETTER_IPA —
+   * capitals preserved, gold dict bypassed (its lowercase keys
+   * would turn the letter "A" into the article "a" → ə).
+   * Single capitals ("A car", "I am") still read as words.
+   * ============================================================ */
+  async _phonTokens(text, phFn){
+    const tokens = String(text == null ? '' : text)
+      .match(/[A-Za-z0-9]+(?:['\-][A-Za-z0-9]+)*|[^\sA-Za-z0-9]+|\s+/g) || [];
+    const parts = [];
+    let allGold = true;
+    for (const tk of tokens) {
+      if (!/[A-Za-z0-9]/.test(tk)) { parts.push(tk); continue; }
+      // ALL-CAPS run (2+ letters): spell it. Capitals preserved, gold dict bypassed.
+      if (/^[A-Z]{2,}$/.test(tk)) {
+        allGold = false;
+        parts.push(Array.from(tk).map(c => LETTER_IPA[c]).join(' '));
+        continue;
+      }
+      const g = this._goldDict && this._goldDict[tk.toLowerCase()];
+      if (g) {
+        parts.push(typeof g === 'string' ? g : (g.DEFAULT || g.phones || g.ipa || ''));
+      } else {
+        allGold = false;
+        try { parts.push(this._normPh(await phFn(tk))); }
+        catch (e) { parts.push(tk); }
+      }
+    }
+    this._lastPhonWasGold = allGold;
+    return this._normPh(parts.join(''));
+  }
 
   /* ============================================================
    * Misaki-style normalization — matches espeak.py EspeakFallback
@@ -614,6 +628,9 @@ class KittenTTS {
 
   async synthesize(text,onStatus){
     if(!this.ready)await this.load();
+    // The model can't handle commas — turn every "," into a space.
+    // Done here (before chunking) so phoneme, chars, and text modes all get clean input.
+    text=String(text==null?'':text).replace(/,/g,' ');
     const pieces=(this.textMode||this.effectiveMode()==='chars')?[text]:chunkText(text,200);
     const chunks=[],ipa=[],broken=[];
     for(let i=0;i<pieces.length;i++){
@@ -622,7 +639,9 @@ class KittenTTS {
       const prep=await this.prepareInput(pieces[i]);
       if(this.effectiveMode()==='phonemes')ipa.push(prep.out);
       if(!prep.ok)broken.push({sig:prep.srcSig+'≠'+prep.outSig,text:pieces[i].slice(0,40)});
-      if(!this.textMode&&prep.ids.length<6)throw new Error('no usable ids');
+      // At least ONE real symbol between the pads. Short words are legal:
+      // "it" → ɪ t → [pad,ɪ,t,pad] = 4 ids. Only [pad,pad] (empty) is unusable.
+      if(!this.textMode&&prep.ids.length<3)throw new Error('no usable ids: "'+pieces[i].slice(0,40)+'"');
       await nextFrame();
       const samples=await this.runModel(prep.ids,this._styleFor(prep.ids.length,this.opts.voice),this.opts.speed,pieces[i]);
       chunks.push({text:pieces[i],samples});
