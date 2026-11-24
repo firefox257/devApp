@@ -1,0 +1,1771 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>KittenTTS 2 · Pico — Consonant-True English</title>
+<meta name="description" content="Local KittenTTS 2 Pico English TTS with a consonant-integrity engine: the flap T in water and the R in browser are preserved and proven before a single sample is played.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%231A1220'/%3E%3Cpath d='M7 13 L9 6 L14 10 M25 13 L23 6 L18 10' stroke='%23FF8F3C' stroke-width='2.2' fill='none' stroke-linejoin='round'/%3E%3Ccircle cx='16' cy='18' r='7.5' fill='%23F2761B'/%3E%3Ccircle cx='13' cy='17' r='1.4' fill='%231A1220'/%3E%3Ccircle cx='19' cy='17' r='1.4' fill='%231A1220'/%3E%3C/svg%3E">
+<style>
+:root{
+  --ginger:#FF8F3C;--ginger-deep:#F2761B;--ginger-dark:#8A3D12;--amber:#FFC24B;
+  --magenta:#FF4D8D;--violet:#9B6BFF;--mint:#4FE3B0;--sky:#59C2FF;--lime:#B6E36B;
+  --ok:#4FE3B0;--warn:#FFC24B;--danger:#FF6B6B;--info:#59C2FF;
+  --bg:#171019;--bg2:#1E1526;--surface:#241B30;--surface2:#2C2139;--raise:#372A46;--scrim:rgba(10,6,12,.84);
+  --line:rgba(255,178,120,.16);--line2:rgba(255,178,120,.34);
+  --text:#FCEFE4;--muted:#B7A498;--cool:#9A93B8;
+  --shadow:0 24px 60px -30px rgba(0,0,0,.95);
+}
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);
+  font-family:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+h1,h2,h3{font-family:'Space Grotesk','Inter',sans-serif;letter-spacing:-.02em;margin:0}
+.mono{font-family:'JetBrains Mono',ui-monospace,Menlo,monospace}
+button,input,textarea,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--ginger);outline-offset:3px;border-radius:10px}
+a{color:var(--ginger)}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+*{scrollbar-width:thin;scrollbar-color:var(--ginger-deep) rgba(255,255,255,.05)}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-track{background:rgba(255,255,255,.05);border-radius:99px}
+::-webkit-scrollbar-thumb{background:linear-gradient(180deg,var(--ginger),var(--ginger-dark));border-radius:99px;border:2px solid var(--surface)}
+::-webkit-scrollbar-thumb:hover{background:linear-gradient(180deg,var(--amber),var(--ginger-deep))}
+
+.bg{position:fixed;inset:0;z-index:-2;pointer-events:none;overflow:hidden;
+  background:radial-gradient(900px 620px at 14% -12%,rgba(242,118,27,.24),transparent 62%),
+    radial-gradient(760px 560px at 90% 4%,rgba(155,107,255,.18),transparent 62%),
+    radial-gradient(820px 700px at 55% 114%,rgba(79,227,176,.12),transparent 62%),
+    linear-gradient(180deg,var(--bg),var(--bg2) 65%,var(--bg))}
+.blob{position:absolute;border-radius:50%;filter:blur(92px);opacity:.42;mix-blend-mode:screen}
+.b1{width:46vw;height:46vw;left:-11vw;top:-15vw;background:radial-gradient(circle,var(--ginger-deep),transparent 68%);animation:d1 32s ease-in-out infinite alternate}
+.b2{width:36vw;height:36vw;right:-8vw;top:2vh;background:radial-gradient(circle,var(--violet),transparent 68%);animation:d2 41s ease-in-out infinite alternate}
+.b3{width:34vw;height:34vw;left:44vw;bottom:-16vw;background:radial-gradient(circle,var(--mint),transparent 70%);opacity:.26;animation:d3 47s ease-in-out infinite alternate}
+@keyframes d1{to{transform:translate3d(8vw,7vh,0) scale(1.15)}}
+@keyframes d2{to{transform:translate3d(-7vw,10vh,0) scale(1.12)}}
+@keyframes d3{to{transform:translate3d(-9vw,-7vh,0) scale(1.18)}}
+.grain{position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:.05;mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+.top{position:sticky;top:0;z-index:50;height:64px;display:flex;align-items:center;padding:0 20px;border-bottom:1px solid var(--line);
+  background:linear-gradient(180deg,rgba(23,16,25,.96),rgba(23,16,25,.78));backdrop-filter:blur(14px) saturate(150%);-webkit-backdrop-filter:blur(14px) saturate(150%)}
+.top .inner{max-width:900px;margin:0 auto;width:100%;display:flex;align-items:center;gap:12px}
+.mark{width:38px;height:38px;flex:0 0 auto;filter:drop-shadow(0 4px 10px rgba(242,118,27,.45))}
+.brand b{display:block;font-family:'Space Grotesk',sans-serif;font-size:16.5px;font-weight:700;line-height:1.15}
+.brand span{display:block;font-size:11px;color:var(--muted)}
+.mute{margin-left:auto;display:inline-flex;align-items:center;gap:8px;height:38px;padding:0 15px;border-radius:99px;
+  border:1px solid var(--line);background:rgba(255,255,255,.05);cursor:pointer;font-size:13px;transition:.18s}
+.mute:hover{background:rgba(255,255,255,.1);border-color:var(--line2)}
+.mute svg{width:18px;height:18px;fill:none;stroke:var(--text);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.mute.off{border-color:rgba(255,107,107,.5);background:rgba(255,107,107,.14);color:#FFD3D3}
+.mute.off svg{stroke:var(--danger)}
+
+main{max-width:900px;margin:0 auto;padding:26px 20px 46px}
+.intro{margin:4px 0 20px}
+.intro h1{font-size:clamp(28px,4.8vw,40px);line-height:1.08;font-weight:700}
+.intro h1 em{font-style:normal;background:linear-gradient(100deg,var(--amber),var(--ginger) 42%,var(--magenta) 84%);-webkit-background-clip:text;background-clip:text;color:transparent}
+.intro p{margin:9px 0 0;color:var(--muted);font-size:14.5px;max-width:68ch}
+.intro code{font-family:'JetBrains Mono',monospace;color:var(--amber);background:rgba(0,0,0,.3);padding:1px 6px;border-radius:6px}
+
+.card{background:linear-gradient(168deg,var(--surface),var(--bg2) 135%);border:1px solid var(--line);border-radius:22px;box-shadow:var(--shadow);overflow:hidden;position:relative}
+.card::before{content:"";position:absolute;inset:0 0 auto 0;height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.22),transparent)}
+.pad{padding:18px 20px}
+.pad+.pad{border-top:1px solid var(--line)}
+.lab{display:flex;align-items:center;gap:10px;margin-bottom:11px;flex-wrap:wrap}
+.lab h2{font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--ginger);font-weight:600}
+.lab .hint{margin-left:auto;font-size:12px;color:var(--muted)}
+.tag{font-size:10px;letter-spacing:.1em;text-transform:uppercase;border:1px solid var(--line2);border-radius:99px;padding:3px 9px;color:var(--muted);white-space:nowrap}
+.tag.ok{color:var(--ok);border-color:rgba(79,227,176,.45);background:rgba(79,227,176,.1)}
+.tag.warn{color:var(--warn);border-color:rgba(255,194,75,.5);background:rgba(255,194,75,.12)}
+.tag.bad{color:var(--danger);border-color:rgba(255,107,107,.5);background:rgba(255,107,107,.12)}
+.linkbtn{background:none;border:none;padding:0;color:var(--ginger);font-size:12.5px;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+.linkbtn:hover{color:var(--amber)}
+
+textarea{width:100%;min-height:124px;resize:vertical;padding:15px 16px;border-radius:16px;border:1px solid var(--line);
+  background:linear-gradient(180deg,rgba(0,0,0,.28),rgba(0,0,0,.1));color:var(--text);font-size:16px;line-height:1.7;transition:.18s}
+textarea:focus{outline:none;border-color:var(--line2);box-shadow:0 0 0 3px rgba(242,118,27,.15)}
+.reader{display:none;min-height:124px;max-height:220px;overflow-y:auto;padding:15px 16px;border-radius:16px;border:1px solid var(--line2);
+  background:linear-gradient(180deg,rgba(0,0,0,.32),rgba(0,0,0,.12));font-size:16px;line-height:1.9;box-shadow:0 0 0 3px rgba(242,118,27,.1)}
+body.reading textarea{display:none}
+body.reading .reader{display:block}
+.reader w{display:inline;border-radius:6px;padding:1px 2px;transition:color .18s,background .18s}
+.reader w.past{color:rgba(183,164,152,.6)}
+.reader w.now{background:linear-gradient(120deg,var(--amber),var(--ginger));color:#2A1408;font-weight:600;box-shadow:0 3px 14px -4px var(--ginger-deep)}
+.count{margin-top:9px;font-size:12px;color:var(--muted);display:flex;gap:15px;flex-wrap:wrap;align-items:center}
+.count b{color:var(--text);font-weight:500}
+.count .linkbtn{margin-left:auto}
+
+/* bench */
+.bench{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.bcard{border:1px solid var(--line);border-radius:15px;padding:12px 13px;background:linear-gradient(165deg,rgba(255,255,255,.055),rgba(255,255,255,.015));min-width:0;transition:.3s;position:relative;overflow:hidden}
+.bcard.good{border-color:rgba(79,227,176,.45);background:linear-gradient(165deg,rgba(79,227,176,.12),rgba(255,255,255,.02))}
+.bcard.bad{border-color:rgba(255,107,107,.5);background:linear-gradient(165deg,rgba(255,107,107,.12),rgba(255,255,255,.02))}
+.bcard.flash{box-shadow:0 0 0 1px var(--mint),0 0 28px -10px var(--mint)}
+.bcard .bw{font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:700;display:flex;align-items:center;gap:8px}
+.bcard .bw .vd{margin-left:auto;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.bcard.good .bw .vd{color:var(--ok)}
+.bcard.bad .bw .vd{color:var(--danger)}
+.brow{margin-top:8px}
+.brow .bl{font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:2px}
+.brow .bv{font-family:'JetBrains Mono',monospace;font-size:14px;line-height:1.4;word-break:break-all;color:#EFE2D8}
+.brow.out .bv{color:#FFF3E6}
+.sigs{display:flex;align-items:center;gap:5px;margin-top:9px;flex-wrap:wrap}
+.sg{display:inline-flex;gap:3px}
+.sg i{width:17px;height:17px;border-radius:5px;display:grid;place-items:center;font-family:'JetBrains Mono',monospace;font-size:9.5px;font-weight:700;font-style:normal;color:#1A1220}
+.sigs .eq{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted)}
+.sigs .eq.ok{color:var(--ok)}
+.sigs .eq.no{color:var(--danger)}
+
+/* controls */
+.ctrlgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.ctl .cl{font-size:11.5px;color:var(--muted);margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.ctl .cl b{margin-left:auto;font-family:'Space Grotesk',sans-serif;font-size:11.5px;font-weight:600;background:rgba(255,255,255,.07);border:1px solid var(--line);border-radius:7px;padding:1px 7px}
+select{appearance:none;-webkit-appearance:none;width:100%;padding:9px 30px 9px 12px;border-radius:12px;border:1px solid var(--line);
+  background-color:var(--surface2);color:var(--text);font-size:13px;cursor:pointer;transition:.16s;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23B7A498' stroke-width='1.6' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 11px center;background-size:11px}
+select:hover{border-color:var(--line2)}
+select option{background:#241B30;color:#FCEFE4}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:22px;background:transparent;cursor:pointer;display:block}
+input[type=range]::-webkit-slider-runnable-track{height:6px;border-radius:99px;background:linear-gradient(90deg,var(--ginger),var(--amber)) 0/var(--p,50%) 100% no-repeat,rgba(255,255,255,.1)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;margin-top:-6px;border-radius:50%;background:radial-gradient(circle at 34% 30%,#fff,var(--ginger));border:2px solid var(--bg2);box-shadow:0 0 0 3px rgba(242,118,27,.2),0 2px 7px rgba(0,0,0,.55)}
+input[type=range]::-moz-range-track{height:6px;border-radius:99px;background:rgba(255,255,255,.1)}
+input[type=range]::-moz-range-progress{height:6px;border-radius:99px;background:linear-gradient(90deg,var(--ginger),var(--amber))}
+input[type=range]::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:var(--ginger);border:2px solid var(--bg2)}
+.togs{display:flex;gap:18px;flex-wrap:wrap;margin-top:14px;align-items:center}
+.tg{display:flex;align-items:center;gap:9px;font-size:12.5px;color:var(--muted)}
+.switch{width:44px;height:25px;border-radius:99px;border:1px solid var(--line);background:rgba(255,255,255,.07);position:relative;cursor:pointer;transition:.2s;flex:0 0 auto;padding:0}
+.switch i{position:absolute;top:2.5px;left:3px;width:18px;height:18px;border-radius:50%;background:var(--muted);transition:.2s}
+.switch.on{background:rgba(79,227,176,.22);border-color:rgba(79,227,176,.55)}
+.switch.on i{left:22px;background:var(--mint);box-shadow:0 0 12px var(--mint)}
+.resetbtn{margin-left:auto}
+
+/* audit */
+.auditbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+.sum{display:inline-flex;align-items:center;gap:7px;font-size:11.5px;padding:4px 11px;border-radius:99px;border:1px solid var(--line);background:rgba(255,255,255,.04)}
+.sum i{width:8px;height:8px;border-radius:50%;flex:0 0 auto}
+.sum b{font-family:'JetBrains Mono',monospace;font-weight:500}
+.audit{max-height:206px;overflow-y:auto;border:1px solid var(--line);border-radius:14px;background:rgba(0,0,0,.26)}
+.arow{display:flex;align-items:center;gap:10px;padding:7px 12px;border-bottom:1px solid rgba(255,178,120,.08);min-width:0}
+.arow:last-child{border-bottom:none}
+.arow .aw{font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:600;flex:0 0 92px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.arow .ai{font-family:'JetBrains Mono',monospace;font-size:12.5px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#E9DCD2}
+.arow .ao{font-family:'JetBrains Mono',monospace;font-size:12.5px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#FFF3E6}
+.arow .as{flex:0 0 auto}
+.pill{font-family:'JetBrains Mono',monospace;font-size:9.5px;padding:2px 7px;border-radius:6px;border:1px solid var(--line);color:var(--muted);white-space:nowrap}
+.pill.ok{color:var(--ok);border-color:rgba(79,227,176,.4);background:rgba(79,227,176,.1)}
+.pill.no{color:var(--danger);border-color:rgba(255,107,107,.45);background:rgba(255,107,107,.12)}
+.aempty{padding:16px;text-align:center;color:var(--muted);font-size:12.5px}
+.legend{margin-top:10px;font-size:11.5px;color:var(--muted);display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+.key{display:inline-flex;align-items:center;gap:6px}
+.key i{width:15px;height:15px;border-radius:5px;display:grid;place-items:center;font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;font-style:normal;color:#1A1220}
+.rh{color:var(--mint);font-weight:700}
+.flap{color:var(--sky);font-weight:700}
+.bath{color:var(--amber);font-weight:700}
+.stress{color:var(--magenta)}
+.lostch{color:var(--danger);font-weight:700;text-decoration:line-through}
+
+.accbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+.acc{display:inline-flex;align-items:center;gap:8px;padding:8px 14px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.04);cursor:pointer;transition:.16s;font-size:13px;font-weight:500}
+.acc:hover:not(:disabled){background:rgba(255,255,255,.1);border-color:var(--line2);transform:translateY(-1px)}
+.acc:disabled{opacity:.35;cursor:not-allowed}
+.acc .fl{font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.08em;padding:2px 6px;border-radius:6px;background:rgba(255,255,255,.09);color:var(--muted)}
+.acc.on{border-color:transparent;background:linear-gradient(130deg,var(--mint),#2FC79A);color:#08221B;font-weight:700;box-shadow:0 10px 26px -12px var(--mint)}
+.acc.on .fl{background:rgba(8,34,27,.22);color:#08221B}
+
+.voices{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px}
+.voice{display:flex;flex-direction:column;align-items:flex-start;gap:3px;padding:11px 12px;border-radius:14px;border:1px solid var(--line);
+  background:rgba(255,255,255,.04);cursor:pointer;transition:.16s;text-align:left;position:relative;overflow:hidden;min-width:0}
+.voice:hover:not(:disabled){background:rgba(255,255,255,.09);border-color:var(--line2);transform:translateY(-2px)}
+.voice:disabled{opacity:.42;cursor:not-allowed}
+.voice .nm{font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:14.5px;display:flex;align-items:center;gap:7px;max-width:100%}
+.voice .dot{width:8px;height:8px;border-radius:50%;flex:0 0 auto;box-shadow:0 0 8px currentColor}
+.voice .sub{font-size:9.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;font-family:'JetBrains Mono',monospace}
+.voice.on{border-color:var(--ginger);background:linear-gradient(160deg,rgba(242,118,27,.22),rgba(255,255,255,.03))}
+.voice.on::after{content:"";position:absolute;left:0;right:0;bottom:0;height:3px;background:linear-gradient(90deg,var(--amber),var(--ginger),var(--magenta))}
+.voice.on .sub{color:var(--amber)}
+
+/* ---- talking face ---- */
+.facewrap{display:flex;align-items:stretch;border-top:1px solid var(--line)}
+.facewrap .stage{flex:1;border-top:none;min-width:0;height:auto;min-height:124px}
+.faceBox{flex:0 0 196px;position:relative;display:grid;place-items:center;cursor:pointer;user-select:none;-webkit-user-select:none;
+  border-right:1px solid var(--line);touch-action:manipulation;
+  background:radial-gradient(120px 100px at 50% 42%,rgba(242,118,27,.16),transparent 70%),linear-gradient(180deg,rgba(0,0,0,.32),rgba(0,0,0,.1))}
+.faceSvg{width:168px;height:168px;display:block;overflow:visible;transition:transform .25s}
+.faceBox:hover .faceSvg{transform:scale(1.03)}
+.faceBox:active .faceSvg{transform:scale(.97)}
+.faceCap{position:absolute;left:50%;bottom:7px;transform:translateX(-50%);font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);
+  background:rgba(0,0,0,.42);border:1px solid var(--line);padding:2px 9px;border-radius:99px;pointer-events:none;white-space:nowrap;transition:color .2s,border-color .2s}
+.faceBox.talk .faceCap{color:var(--amber);border-color:rgba(255,194,75,.4)}
+.faceBox.think .faceCap{color:var(--violet);border-color:rgba(155,107,255,.4)}
+.heart{position:absolute;left:50%;top:38%;width:16px;height:16px;pointer-events:none;animation:heartUp .95s ease-out forwards}
+@keyframes heartUp{0%{opacity:0;transform:translate(-50%,0) scale(.4)}18%{opacity:1}
+  100%{opacity:0;transform:translate(calc(-50% + var(--hx,0px)),-64px) scale(1.05) rotate(var(--hr,0deg))}}
+
+.stage{position:relative;height:124px;background:linear-gradient(180deg,rgba(0,0,0,.3),rgba(0,0,0,.08));border-top:1px solid var(--line);cursor:pointer;touch-action:none}
+#wave{display:block;width:100%;height:100%}
+.stageCap{position:absolute;left:12px;top:8px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);pointer-events:none;background:rgba(0,0,0,.4);padding:2px 8px;border-radius:99px}
+.stageHint{position:absolute;inset:0;display:grid;place-content:center;text-align:center;font-size:12.5px;color:var(--muted);pointer-events:none;transition:opacity .3s;padding:0 16px}
+.stageHint.hide{opacity:0}
+.progress{height:4px;background:rgba(255,255,255,.08);position:relative;overflow:hidden}
+.progress i{position:absolute;inset:0 auto 0 0;width:0%;background:linear-gradient(90deg,var(--amber),var(--ginger),var(--magenta));box-shadow:0 0 12px var(--ginger);transition:width .1s linear}
+.spoken{display:flex;align-items:flex-start;gap:9px;padding:10px 20px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:rgba(0,0,0,.24);font-size:12px}
+.spoken .k{font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);flex:0 0 auto;padding-top:2px}
+.spoken .t{font-family:'JetBrains Mono',monospace;color:#E4D6CB;flex:1;min-width:0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.5}
+.spoken .t.none{color:var(--muted);font-style:italic;font-family:'Inter',sans-serif}
+
+.actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.play{display:inline-flex;align-items:center;justify-content:center;gap:10px;height:54px;padding:0 26px;border:none;border-radius:16px;cursor:pointer;
+  font-family:'Space Grotesk',sans-serif;font-size:16.5px;font-weight:700;color:#2A1408;background:linear-gradient(135deg,var(--amber),var(--ginger) 45%,var(--ginger-deep));
+  box-shadow:0 14px 34px -14px var(--ginger-deep);transition:.16s;min-width:186px}
+.play:hover{transform:translateY(-2px);box-shadow:0 20px 44px -14px var(--ginger);filter:brightness(1.05)}
+.play:active{transform:translateY(0) scale(.99)}
+.play svg{width:21px;height:21px;fill:currentColor;flex:0 0 auto}
+.play.stop{background:linear-gradient(135deg,#FF9A9A,var(--danger) 50%,#D93B3B);color:#2A0C0C;box-shadow:0 14px 34px -14px var(--danger)}
+.btn{display:inline-flex;align-items:center;gap:8px;height:46px;padding:0 16px;border-radius:14px;border:1px solid var(--line2);background:rgba(255,255,255,.05);cursor:pointer;font-size:13.5px;font-weight:500;transition:.16s}
+.btn:hover:not(:disabled){background:rgba(255,255,255,.11);transform:translateY(-1px)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.btn.sm{height:36px;padding:0 13px;font-size:12.5px;border-radius:11px}
+.clock{margin-left:auto;font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.clock b{color:var(--text);font-weight:500}
+.spin{width:17px;height:17px;border-radius:50%;border:2px solid rgba(42,20,8,.3);border-top-color:#2A1408;animation:sp .7s linear infinite;flex:0 0 auto}
+@keyframes sp{to{transform:rotate(360deg)}}
+
+.engine{border-top:1px solid var(--line);background:rgba(0,0,0,.26)}
+.engine .head{display:flex;align-items:center;gap:10px;padding:12px 20px;font-size:13px;flex-wrap:wrap}
+.led{width:9px;height:9px;border-radius:50%;background:var(--violet);flex:0 0 auto;animation:pulse 1.25s ease-out infinite}
+.led.ok{background:var(--ok);box-shadow:0 0 11px var(--ok);animation:none}
+.led.err{background:var(--danger);box-shadow:0 0 11px var(--danger);animation:none}
+.led.warn{background:var(--warn);box-shadow:0 0 11px var(--warn);animation:none}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(155,107,255,.55)}100%{box-shadow:0 0 0 10px rgba(155,107,255,0)}}
+.engine .head .grow{flex:1}
+.loadbar{height:3px;background:rgba(255,255,255,.07);overflow:hidden}
+.loadbar i{display:block;height:100%;width:0%;background:linear-gradient(90deg,var(--violet),var(--ginger),var(--magenta));transition:width .25s}
+.alert{display:none;gap:10px;padding:11px 20px;background:rgba(255,194,75,.1);border-top:1px solid rgba(255,194,75,.32);font-size:12.5px;color:#FFE7B8;line-height:1.5}
+.alert.show{display:flex}
+.alert.bad{background:rgba(255,107,107,.1);border-top-color:rgba(255,107,107,.35);color:#FFD9D9}
+.alert svg{width:17px;height:17px;flex:0 0 auto;margin-top:1px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round}
+.alert code{font-family:'JetBrains Mono',monospace;background:rgba(0,0,0,.3);padding:1px 5px;border-radius:5px;color:var(--amber)}
+.rows{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1px;background:var(--line);border-top:1px solid var(--line)}
+.row2{background:var(--surface);padding:9px 20px;display:flex;align-items:center;gap:8px;min-width:0}
+.row2 .k{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);flex:0 0 auto}
+.row2 .v{font-family:'JetBrains Mono',monospace;font-size:11.5px;margin-left:auto;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:64%}
+.row2 .v.good{color:var(--ok)}
+.row2 .v.bad{color:var(--warn)}
+.ipaline{padding:9px 20px;border-top:1px solid var(--line);font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--cool);max-height:76px;overflow:auto;background:rgba(0,0,0,.2);line-height:1.7;word-break:break-word}
+.ipaline b{color:var(--muted);font-weight:400;letter-spacing:.1em;text-transform:uppercase;font-size:9.5px;margin-right:8px;font-family:'Inter',sans-serif}
+
+.foot{margin:16px 2px 0;font-size:12.5px;color:var(--muted);display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.foot .sep{opacity:.4}
+.toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:90;max-width:min(520px,92vw);padding:12px 16px;border-radius:14px;border:1px solid var(--line2);
+  font-size:13.5px;background:linear-gradient(160deg,var(--raise),var(--surface));box-shadow:0 20px 44px -20px #000;opacity:0;pointer-events:none;transition:opacity .3s,transform .3s}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(-4px)}
+.toast.warn{border-color:rgba(255,194,75,.5)}
+.toast.err{border-color:rgba(255,107,107,.55)}
+.toast.ok{border-color:rgba(79,227,176,.5)}
+.enter{opacity:0;transform:translateY(14px);animation:rise .7s cubic-bezier(.2,.8,.2,1) forwards}
+.enter.d1{animation-delay:.08s}.enter.d2{animation-delay:.16s}
+@keyframes rise{to{opacity:1;transform:none}}
+
+@media (max-width:820px){
+  main{padding:20px 14px 40px}
+  .pad{padding:16px 15px}
+  .voices{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .bench{grid-template-columns:1fr}
+  .ctrlgrid{grid-template-columns:1fr;gap:12px}
+  .rows{grid-template-columns:1fr}
+  .play{flex:1 1 100%;min-width:0}
+  .clock{margin-left:0;width:100%;order:9}
+  .brand span{display:none}
+  .facewrap{flex-direction:column}
+  .faceBox{flex:0 0 auto;height:158px;border-right:none;border-bottom:1px solid var(--line)}
+  .faceSvg{width:138px;height:138px}
+  .facewrap .stage{height:106px;min-height:0}
+  .stage{height:106px}
+  .row2 .v{max-width:56%}
+  .spoken{padding:10px 15px}
+  .arow .aw{flex:0 0 70px}
+  .arow .ai{display:none}
+  .resetbtn{margin-left:0}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:.01ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important}
+  .enter{opacity:1;transform:none}
+}
+</style>
+</head>
+<body>
+<div class="bg" aria-hidden="true"><div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div></div>
+<div class="grain" aria-hidden="true"></div>
+
+<header class="top">
+  <div class="inner">
+    <svg class="mark" viewBox="0 0 48 48" aria-hidden="true">
+      <defs><linearGradient id="fur" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFC24B"/><stop offset=".55" stop-color="#F2761B"/><stop offset="1" stop-color="#FF4D8D"/></linearGradient></defs>
+      <g id="ears">
+        <path d="M11 20 L13.5 8 L21 14.5" fill="url(#fur)" stroke="#FF8F3C" stroke-width="1.6" stroke-linejoin="round"/>
+        <path d="M37 20 L34.5 8 L27 14.5" fill="url(#fur)" stroke="#FF8F3C" stroke-width="1.6" stroke-linejoin="round"/>
+      </g>
+      <circle cx="24" cy="27" r="13" fill="url(#fur)"/>
+      <g id="eyes"><ellipse cx="19" cy="25" rx="2.1" ry="2.6" fill="#2A1408"/><ellipse cx="29" cy="25" rx="2.1" ry="2.6" fill="#2A1408"/></g>
+      <path d="M22.4 29.6 h3.2 l-1.6 1.7 z" fill="#2A1408"/>
+      <ellipse id="mouth" cx="24" cy="33.4" rx="3.1" ry="1.5" fill="#2A1408" opacity=".85"/>
+      <path d="M9 27 h6 M9 30.5 h6 M33 27 h6 M33 30.5 h6" stroke="#FFC24B" stroke-width="1.1" opacity=".6" stroke-linecap="round"/>
+    </svg>
+    <div class="brand"><b>KittenTTS 2 · Pico</b><span>consonant-true English</span></div>
+    <button class="mute" id="muteBtn" aria-pressed="false" title="Mute or unmute all sound">
+      <svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path id="w1" d="M16.5 8.5a5 5 0 010 7"/><path id="w2" d="M19 6a8.5 8.5 0 010 12"/></svg>
+      <span id="muteLabel">Sound on</span>
+    </button>
+  </div>
+</header>
+
+<main>
+  <div class="intro enter">
+    <h1>“Water” keeps <em>its T.</em></h1>
+    <p>The flap <code>ɾ</code> was being swapped for an R, which turns <b>water</b> into <b>war</b>. Every substitution is now
+      locked to its consonant class — a stop can only become another stop — and each word’s consonant skeleton is compared
+      before a single sample is played. The bench below proves it live.</p>
+  </div>
+
+  <section class="card enter d1">
+    <div class="pad">
+      <div class="lab"><h2>Your text</h2><span class="tag" id="syncTag">not synthesized</span><button class="linkbtn hint" id="exampleBtn">Try an example</button></div>
+      <label class="sr" for="text">English text to speak</label>
+      <textarea id="text" spellcheck="true" lang="en" placeholder="Type something in English…"></textarea>
+      <div class="reader" id="reader" aria-live="off"></div>
+      <div class="count">
+        <span><b id="chars">0</b> characters</span><span><b id="words">0</b> words</span><span><b id="pieces">0</b> chunks</span>
+        <button class="linkbtn" id="clearBtn">Clear text</button>
+      </div>
+    </div>
+
+    <div class="pad">
+      <div class="lab"><h2>Integrity bench</h2><span class="tag" id="benchTag">checking…</span><span class="hint">espeak → what the model actually receives</span></div>
+      <div class="bench" id="bench"></div>
+      <div class="legend" id="legend"></div>
+    </div>
+
+    <div class="pad">
+      <div class="lab"><h2>Pronunciation &amp; delivery</h2><span class="hint">every change re-checks the bench instantly</span></div>
+      <div class="ctrlgrid">
+        <div class="ctl">
+          <div class="cl">Flap T <span class="mono" style="color:var(--sky)">ɾ</span></div>
+          <select id="flapSel" aria-label="How the American flap T is rendered">
+            <option value="t">crisp t — “watter”</option>
+            <option value="d">soft d — “wadder”</option>
+            <option value="native">native ɾ if the table has it</option>
+          </select>
+        </div>
+        <div class="ctl">
+          <div class="cl">R-coloured vowel <span class="mono rh">ɚ</span></div>
+          <select id="rSel" aria-label="How r-coloured vowels are rendered">
+            <option value="schwa-r">ə + R — “brows-er”</option>
+            <option value="er">ɜ + R — deeper</option>
+            <option value="native">native ɚ if the table has it</option>
+          </select>
+        </div>
+        <div class="ctl">
+          <div class="cl">Accent</div>
+          <select id="accSel" aria-label="espeak-ng English voice"></select>
+        </div>
+      </div>
+      <div class="ctrlgrid" style="margin-top:14px">
+        <div class="ctl"><div class="cl">Speed <b id="speedOut">1.0×</b></div><input type="range" id="speed" min="50" max="180" value="100" aria-label="Speaking speed"></div>
+        <div class="ctl"><div class="cl">Sentence gap <b id="gapOut">120 ms</b></div><input type="range" id="gap" min="0" max="600" step="10" value="120" aria-label="Silence between chunks"></div>
+        <div class="ctl"><div class="cl">Edge fade <b id="fadeOut">12 ms</b></div><input type="range" id="fade" min="0" max="60" value="12" aria-label="Chunk edge fade"></div>
+      </div>
+      <div class="ctrlgrid" style="margin-top:14px">
+        <div class="ctl"><div class="cl">Volume <b id="volOut">85%</b></div><input type="range" id="vol" min="0" max="100" value="85" aria-label="Volume"></div>
+        <div class="ctl"><div class="cl">Input mode</div>
+          <select id="tokenMode" aria-label="Tokenization mode">
+            <option value="auto">auto</option><option value="phonemes">IPA phonemes</option><option value="chars">characters</option>
+          </select>
+        </div>
+        <div class="ctl"><div class="cl">Voice</div><select id="voiceSel" aria-label="KittenTTS voice"></select></div>
+      </div>
+      <div class="togs">
+        <div class="tg"><span>Strict integrity</span><button class="switch on" id="strictBtn" role="switch" aria-checked="true" aria-label="Strict consonant integrity"><i></i></button></div>
+        <div class="tg"><span>Normalize peaks</span><button class="switch on" id="normBtn" role="switch" aria-checked="true" aria-label="Normalize peaks"><i></i></button></div>
+        <button class="btn sm resetbtn" id="resetBtn"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 109-9 9 9 0 00-6.4 2.7L3 8"/><path d="M3 4v4h4"/></svg>Reset pronunciation</button>
+      </div>
+      <div class="accbar" id="accents"></div>
+    </div>
+
+    <div class="pad">
+      <div class="lab"><h2>Word audit</h2><span class="hint">source phonemes → mapped phonemes</span></div>
+      <div class="auditbar">
+        <span class="sum"><i style="background:var(--ok)"></i><b id="nOk">0</b> intact</span>
+        <span class="sum"><i style="background:var(--danger)"></i><b id="nBad">0</b> broken</span>
+        <span class="sum"><i style="background:var(--warn)"></i><b id="nAdapt">0</b> adapted</span>
+      </div>
+      <div class="audit" id="audit"><div class="aempty">Loading the phonemizer…</div></div>
+    </div>
+
+    <div class="pad">
+      <div class="lab"><h2>Voice</h2><span class="tag" id="voiceTag">loading…</span><span class="hint">tap to select</span></div>
+      <div class="voices" id="voices"></div>
+    </div>
+
+    <div class="facewrap">
+      <div class="faceBox" id="faceBox" role="button" tabindex="0" aria-label="Kitten avatar — press to play or stop">
+        <svg class="faceSvg" id="faceSvg" viewBox="0 0 200 200" aria-hidden="true">
+          <defs>
+            <linearGradient id="fFur" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="#FFC24B"/><stop offset=".55" stop-color="#F2761B"/><stop offset="1" stop-color="#E85D9A"/>
+            </linearGradient>
+            <linearGradient id="fEar" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#FF9FB6"/><stop offset="1" stop-color="#FF4D8D"/>
+            </linearGradient>
+            <radialGradient id="fMuzzle" cx=".5" cy=".42" r=".75">
+              <stop offset="0" stop-color="#FFF1DC"/><stop offset="1" stop-color="#FFD9AE"/>
+            </radialGradient>
+          </defs>
+          <circle id="fHalo" cx="100" cy="104" r="86" fill="none" stroke="#FFC24B" stroke-width="2" opacity=".12"/>
+          <g id="fWaves" fill="none" stroke="#FFC24B" stroke-width="2.4" stroke-linecap="round" opacity="0">
+            <path id="fWl1" d="M28 92 q-8 12 0 24"/><path id="fWl2" d="M18 86 q-12 18 0 36"/>
+            <path id="fWr1" d="M172 92 q8 12 0 24"/><path id="fWr2" d="M182 86 q12 18 0 36"/>
+          </g>
+          <g id="fDots" fill="#9B6BFF" opacity="0">
+            <circle id="fD1" cx="152" cy="30" r="3"/><circle id="fD2" cx="166" cy="22" r="3.6"/><circle id="fD3" cx="181" cy="13" r="4.2"/>
+          </g>
+          <g id="fHead">
+            <g id="fEarL"><path d="M52 74 L46 26 L86 50 Z" fill="url(#fFur)" stroke="#FF8F3C" stroke-width="2" stroke-linejoin="round"/><path d="M56 62 L53 38 L74 51 Z" fill="url(#fEar)" opacity=".8"/></g>
+            <g id="fEarR"><path d="M148 74 L154 26 L114 50 Z" fill="url(#fFur)" stroke="#FF8F3C" stroke-width="2" stroke-linejoin="round"/><path d="M144 62 L147 38 L126 51 Z" fill="url(#fEar)" opacity=".8"/></g>
+            <ellipse cx="100" cy="110" rx="62" ry="56" fill="url(#fFur)"/>
+            <path d="M78 60 q4 10 0 16 M100 56 q3 11 0 18 M122 60 q-4 10 0 16" stroke="#C4571B" stroke-width="5" fill="none" stroke-linecap="round" opacity=".55"/>
+            <path d="M38 104 l-9 -3 M39 116 l-9 2 M162 104 l9 -3 M161 116 l9 2" stroke="#F2761B" stroke-width="4" stroke-linecap="round" opacity=".8"/>
+            <ellipse cx="100" cy="130" rx="30" ry="21" fill="url(#fMuzzle)"/>
+            <ellipse id="fBlushL" cx="60" cy="124" rx="8.5" ry="5" fill="#FF4D8D" opacity=".14"/>
+            <ellipse id="fBlushR" cx="140" cy="124" rx="8.5" ry="5" fill="#FF4D8D" opacity=".14"/>
+            <g id="fEyeL">
+              <ellipse cx="74" cy="102" rx="11" ry="13" fill="#2A1408"/>
+              <circle id="fIrisL" cx="74" cy="103" r="7.2" fill="#FFC24B"/>
+              <ellipse id="fPupL" cx="74" cy="103" rx="3.1" ry="6" fill="#1A0D05"/>
+              <circle cx="71.4" cy="99.6" r="2.1" fill="#FFF7EE"/>
+            </g>
+            <g id="fEyeR">
+              <ellipse cx="126" cy="102" rx="11" ry="13" fill="#2A1408"/>
+              <circle id="fIrisR" cx="126" cy="103" r="7.2" fill="#FFC24B"/>
+              <ellipse id="fPupR" cx="126" cy="103" rx="3.1" ry="6" fill="#1A0D05"/>
+              <circle cx="123.4" cy="99.6" r="2.1" fill="#FFF7EE"/>
+            </g>
+            <path d="M94.5 120 h11 l-5.5 6.5 z" fill="#FF4D8D" stroke="#D63A75" stroke-width="1" stroke-linejoin="round"/>
+            <path d="M100 126.5 v5" stroke="#2A1408" stroke-width="1.6" stroke-linecap="round"/>
+            <g id="fWhiskL" stroke="#FFE9CC" stroke-width="1.6" stroke-linecap="round" opacity=".85">
+              <path d="M66 122 L36 116"/><path d="M66 127 L34 127"/><path d="M66 132 L37 138"/>
+            </g>
+            <g id="fWhiskR" stroke="#FFE9CC" stroke-width="1.6" stroke-linecap="round" opacity=".85">
+              <path d="M134 122 L164 116"/><path d="M134 127 L166 127"/><path d="M134 132 L163 138"/>
+            </g>
+            <g id="fJaw">
+              <path id="fMouthIn" d="" fill="#421226" opacity="0"/>
+              <ellipse id="fTongue" cx="100" cy="140" rx="7" ry="4" fill="#FF6B8D" opacity="0"/>
+              <path id="fFangs" d="" fill="#FFF7EE" opacity="0"/>
+              <path id="fSmile" d="M86 132 Q93 139 100 132 Q107 139 114 132" fill="none" stroke="#2A1408" stroke-width="2.4" stroke-linecap="round"/>
+            </g>
+          </g>
+        </svg>
+        <span class="faceCap" id="faceCap">tap to play</span>
+      </div>
+      <div class="stage" id="stage">
+        <canvas id="wave"></canvas>
+        <span class="stageCap" id="stageCap">idle</span>
+        <div class="stageHint" id="stageHint">Fetching the model from this server…</div>
+      </div>
+    </div>
+    <div class="progress"><i id="bar"></i></div>
+    <div class="spoken"><span class="k">Spoken</span><span class="t none" id="spokenText">nothing synthesized yet</span></div>
+
+    <div class="pad">
+      <div class="actions">
+        <button class="play" id="playBtn"><svg id="playIcon" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg><span id="playLabel">Play</span></button>
+        <button class="btn" id="againBtn"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 109-9 9 9 0 00-6.4 2.7L3 8"/><path d="M3 4v4h4"/></svg>From start</button>
+        <button class="btn" id="dlBtn" disabled><svg viewBox="0 0 24 24"><path d="M12 3v12M7 11l5 5 5-5M4 20h16"/></svg>WAV</button>
+        <div class="clock"><b id="cur">0:00</b> / <span id="tot">0:00</span></div>
+      </div>
+    </div>
+
+    <div class="engine">
+      <div class="head"><i class="led" id="led"></i><span id="statusText">Starting up…</span><span class="grow"></span><button class="linkbtn" id="reloadBtn">Reload</button></div>
+      <div class="loadbar"><i id="loadbar"></i></div>
+      <div class="alert" id="alert">
+        <svg viewBox="0 0 24 24"><path d="M12 8v5M12 16.5v.5"/><path d="M10.3 3.9L2.6 17.4A2 2 0 004.3 20.4h15.4a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/></svg>
+        <span id="alertText"></span>
+      </div>
+      <div class="rows">
+        <div class="row2"><span class="k">Graph</span><span class="v" id="rModel">—</span></div>
+        <div class="row2"><span class="k">Voices</span><span class="v" id="rVoices">—</span></div>
+        <div class="row2"><span class="k">espeak voice</span><span class="v" id="rAcc">—</span></div>
+        <div class="row2"><span class="k">Token map</span><span class="v" id="rVocab">—</span></div>
+        <div class="row2"><span class="k">Stops / R</span><span class="v" id="rCons">—</span></div>
+        <div class="row2"><span class="k">Output</span><span class="v" id="rOut">—</span></div>
+      </div>
+      <div class="ipaline"><b>Phonemes fed</b><span id="ipaText">waiting for the first synthesis</span></div>
+    </div>
+  </section>
+
+  <p class="foot enter d2">
+    <span>Model + voices fetched from this host.</span><span class="sep">·</span>
+    <span>Phonemes by espeak-ng in WebAssembly.</span><span class="sep">·</span>
+    <span>Space plays · M mutes · Esc stops</span>
+  </p>
+</main>
+
+<div class="toast" id="toast"></div>
+<noscript><p style="padding:20px;text-align:center">Please enable JavaScript to run the KittenTTS model.</p></noscript>
+
+<script>
+(function(){
+'use strict';
+var $=function(s){return document.querySelector(s);};
+var clamp=function(v,a,b){return Math.min(b,Math.max(a,v));};
+var nf=function(n,d){return Number(n).toFixed(d==null?1:d);};
+var nextFrame=function(){return new Promise(function(r){requestAnimationFrame(function(){r();});});};
+var clock=function(s){s=Math.max(0,s||0);return Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0');};
+
+var MODEL_PATH='kitten_tts_2_pico_en.onnx',VOICES_PATH='voices_en.npz';
+var NAMES=['Ava','Leo','Mia','Max','Zoe','Sam','Ivy','Ben'];
+var HUES=['#FFC24B','#FF8F3C','#FF4D8D','#9B6BFF','#4FE3B0','#59C2FF','#B6E36B','#C9A227'];
+var ACCENTS=[{id:'en-us',label:'American',fl:'US'},{id:'en-us-nyc',label:'New York',fl:'NYC'},{id:'en-gb',label:'British',fl:'GB'},{id:'en-gb-x-rp',label:'British RP',fl:'RP'},{id:'en-au',label:'Australian',fl:'AU'}];
+var BENCH=['water','browser','better'];
+var EXAMPLES=[
+  "I left the browser open while the water cooled, and the teacher said the tea would taste better in a quarter of an hour.",
+  "Hello! I am a small speech model running inside your browser. Type any English sentence and press Play, and I will read it out loud.",
+  "The quick brown fox jumps over the lazy dog while five kittens chase a ball of yarn across the sunny kitchen floor.",
+  "Your appointment is on March third at seven forty five in the morning. Please arrive ten minutes early and bring a photo ID."
+];
+var STORE='kittentts.pico.integrity.v1';
+
+var S={speed:1,volume:.85,muted:false,voice:0,gap:120,fade:12,norm:true,accent:'en-us',flap:'t',rcolor:'schwa-r',strict:true};
+var K={bytes:0,modelId:'',session:null,ort:null,inputs:[],inputTypes:{},textMode:false,outDims:null,
+  styles:{},keys:[],sampleRate:24000,vocab:null,vocabSource:'',vocabVerified:false,vocabType:'phonemes',
+  padId:0,hasUpper:false,phon:null,phonHonors:false,accents:[],tokenMode:'auto',
+  ready:false,blockers:[],loading:false};
+var P={chunks:[],inferSig:'',spokenText:'',master:null,peaks:null,buffer:null,speaking:false,busy:false,
+  pos:0,startedAt:0,startedPos:0,words:[],activeWord:-1,total:0,example:0,lastMs:0};
+var AUD={rows:[],ok:0,bad:0,adapt:0,more:0,running:false};
+
+try{
+  var sv=JSON.parse(localStorage.getItem(STORE)||'null');
+  if(sv){S.speed=clamp(sv.speed||1,.5,1.8);S.volume=sv.volume==null?.85:clamp(sv.volume,0,1);S.voice=clamp(sv.voice||0,0,7);
+    S.gap=sv.gap==null?120:clamp(sv.gap,0,600);S.fade=sv.fade==null?12:clamp(sv.fade,0,60);S.norm=sv.norm!==false;
+    if(sv.accent)S.accent=sv.accent;if(sv.flap)S.flap=sv.flap;if(sv.rcolor)S.rcolor=sv.rcolor;S.strict=sv.strict!==false;}
+}catch(e){}
+function persist(){try{localStorage.setItem(STORE,JSON.stringify({speed:S.speed,volume:S.volume,voice:S.voice,gap:S.gap,fade:S.fade,norm:S.norm,accent:S.accent,flap:S.flap,rcolor:S.rcolor,strict:S.strict,text:$('#text').value}));}catch(e){}}
+var toastT=null;
+function toast(msg,kind,ms){var el=$('#toast');el.textContent=msg;el.className='toast show '+(kind||'');clearTimeout(toastT);toastT=setTimeout(function(){el.className='toast '+(kind||'');},ms||4200);}
+
+/* ============ consonant classes — the invariant ============ */
+var STOPS='p b t d k g ɡ ʔ ɾ ʈ ɖ c ɟ q ʡ';
+var FRICS='f v θ ð s z ʃ ʒ ʂ ʐ ɕ ʑ ç x ɣ χ h ɦ ɸ β ʁ ħ ʕ ʝ ɧ ʢ';
+var NASALS='m n ŋ ɳ ɲ ɴ ɱ';
+var LATS='l ɫ ɬ ɮ ʎ ʟ ɺ';
+var RHOT='ɹ r ɻ ɽ';
+var GLIDES='j w ɥ ɰ ʍ';
+var AFFR={'ʧ':1,'ʤ':1,'ʦ':1,'ʣ':1,'ʨ':1,'ʥ':1,'ʈʂ':1};
+var RHV={'ɚ':1,'ɝ':1,'ɜ˞':1,'ɐ˞':1};
+var CLS={T:{c:'#FFC24B',n:'stop'},F:{c:'#FF4D8D',n:'fricative'},N:{c:'#9B6BFF',n:'nasal'},L:{c:'#59C2FF',n:'lateral'},R:{c:'#4FE3B0',n:'rhotic'},G:{c:'#B6E36B',n:'glide'}};
+function classOf(ch){
+  if(AFFR[ch])return 'TF';
+  if(RHV[ch])return 'R';
+  if(STOPS.indexOf(ch)>=0&&ch!==' ')return 'T';
+  if(FRICS.indexOf(ch)>=0&&ch!==' ')return 'F';
+  if(NASALS.indexOf(ch)>=0&&ch!==' ')return 'N';
+  if(LATS.indexOf(ch)>=0&&ch!==' ')return 'L';
+  if(RHOT.indexOf(ch)>=0&&ch!==' ')return 'R';
+  if(GLIDES.indexOf(ch)>=0&&ch!==' ')return 'G';
+  return '';
+}
+function signature(str){
+  var out='';
+  Array.from(String(str||'')).forEach(function(c){out+=classOf(c);});
+  return out;
+}
+function sigChips(sig){
+  var h='<span class="sg">';
+  Array.from(sig||'').forEach(function(c){
+    var m=CLS[c];
+    h+='<i style="background:'+(m?m.c:'#666')+'" title="'+(m?m.n:c)+'">'+c+'</i>';
+  });
+  return h+'</span>';
+}
+
+/* ============ audio binding ============ */
+function inferSignature(){return [K.modelId,$('#text').value,S.voice,nf(S.speed,3),effectiveMode(),S.accent,S.flap,S.rcolor,'i3'].join('\u241F');}
+function hasCurrentAudio(){return P.chunks.length>0&&P.inferSig===inferSignature()&&!!P.master;}
+var AC=null,GAIN=null,ANA=null,SRC=null,TD=null;
+function actx(){
+  if(!AC){var C=window.AudioContext||window.webkitAudioContext;if(!C)return null;
+    AC=new C();GAIN=AC.createGain();ANA=AC.createAnalyser();ANA.fftSize=1024;TD=new Uint8Array(ANA.fftSize);
+    ANA.connect(GAIN);GAIN.connect(AC.destination);applyVol();}
+  if(AC.state==='suspended')AC.resume().catch(function(){});
+  return AC;
+}
+function applyVol(){if(GAIN)GAIN.gain.value=S.muted?0:S.volume;}
+function duration(){return P.master?P.master.length/K.sampleRate:0;}
+function position(){if(!P.speaking||!AC)return P.pos;return clamp(P.startedPos+(AC.currentTime-P.startedAt),0,duration());}
+function killNode(){if(SRC){try{SRC.onended=null;SRC.stop();}catch(e){}try{SRC.disconnect();}catch(e){}SRC=null;}}
+function playBuffer(from){
+  if(!hasCurrentAudio())return false;
+  var c=actx();if(!c)return false;
+  if(!P.buffer||P.buffer.length!==P.master.length){P.buffer=c.createBuffer(1,P.master.length,K.sampleRate);P.buffer.copyToChannel(P.master,0);}
+  killNode();
+  var p=clamp(from==null?P.pos:from,0,Math.max(0,duration()-.02));
+  SRC=c.createBufferSource();SRC.buffer=P.buffer;SRC.connect(ANA);
+  SRC.onended=function(){if(!P.speaking)return;P.speaking=false;P.pos=0;killNode();document.body.classList.remove('reading');$('#bar').style.width='100%';sync();setStatus('ok',readyMsg());Face.poke('happy',2.4);};
+  SRC.start(0,p);
+  P.speaking=true;P.startedAt=c.currentTime;P.startedPos=p;P.pos=p;
+  $('#stageCap').textContent='KittenTTS · '+NAMES[S.voice%NAMES.length]+' · '+accentLabel(S.accent);
+  sync();return true;
+}
+function stopPlayback(keep){
+  killNode();P.speaking=false;P.pos=0;P.activeWord=-1;
+  document.body.classList.remove('reading');$('#bar').style.width='0%';$('#cur').textContent='0:00';sync();
+  if(!keep)setStatus(K.ready?'ok':'err',K.ready?readyMsg():blockMsg());
+}
+function dropAudio(){
+  P.chunks=[];P.inferSig='';P.spokenText='';P.master=null;P.peaks=null;P.buffer=null;P.pos=0;wavePath=null;
+  $('#spokenText').textContent='nothing synthesized yet';$('#spokenText').className='t none';
+}
+
+/* ============ fetch / npz ============ */
+async function fetchLocal(path,onProgress){
+  var res=await fetch(path,{cache:'no-cache'});
+  if(!res.ok)throw new Error(path+' → HTTP '+res.status);
+  var total=Number(res.headers.get('content-length'))||0;
+  if(res.body&&res.body.getReader){
+    var rd=res.body.getReader(),parts=[],got=0;
+    for(;;){var r=await rd.read();if(r.done)break;parts.push(r.value);got+=r.value.length;if(onProgress)onProgress(total?got/total:0);}
+    var bytes=new Uint8Array(got),o=0;parts.forEach(function(p){bytes.set(p,o);o+=p.length;});
+    if(onProgress)onProgress(1);return bytes;
+  }
+  var buf=new Uint8Array(await res.arrayBuffer());if(onProgress)onProgress(1);return buf;
+}
+function readNpy(u8){
+  if(u8[0]!==0x93||String.fromCharCode.apply(null,u8.subarray(1,6))!=='NUMPY')throw new Error('not a .npy array');
+  var major=u8[6],hlen,off;
+  if(major===1){hlen=u8[8]|(u8[9]<<8);off=10;}else{hlen=(u8[8]|(u8[9]<<8)|(u8[10]<<16)|(u8[11]<<24))>>>0;off=12;}
+  var head=new TextDecoder().decode(u8.subarray(off,off+hlen));
+  var dm=/['"]descr['"]\s*:\s*['"]([^'"]+)['"]/.exec(head),sm=/['"]shape['"]\s*:\s*\(([^)]*)\)/.exec(head);
+  var descr=dm?dm[1]:'<f4',shape=sm?sm[1].split(',').map(function(s){return s.trim();}).filter(Boolean).map(Number):[];
+  var body=u8.slice(off+hlen),data;
+  if(/f4/.test(descr))data=new Float32Array(body.buffer,body.byteOffset,Math.floor(body.length/4));
+  else if(/f8/.test(descr)){var d8=new Float64Array(body.buffer,body.byteOffset,Math.floor(body.length/8));data=Float32Array.from(d8);}
+  else if(/i4/.test(descr)){var d4=new Int32Array(body.buffer,body.byteOffset,Math.floor(body.length/4));data=Float32Array.from(d4);}
+  else throw new Error('unsupported array type '+descr);
+  return {data:data,shape:shape.length?shape:[data.length]};
+}
+async function unzip(u8){
+  var dv=new DataView(u8.buffer,u8.byteOffset,u8.byteLength),eocd=-1;
+  for(var i=u8.length-22;i>=Math.max(0,u8.length-66000);i--){if(dv.getUint32(i,true)===0x06054b50){eocd=i;break;}}
+  if(eocd<0)throw new Error(VOICES_PATH+' is not a readable npz archive');
+  var count=dv.getUint16(eocd+10,true),p=dv.getUint32(eocd+16,true),out={};
+  for(var n=0;n<count;n++){
+    if(dv.getUint32(p,true)!==0x02014b50)break;
+    var method=dv.getUint16(p+10,true),csize=dv.getUint32(p+20,true);
+    var nlen=dv.getUint16(p+28,true),elen=dv.getUint16(p+30,true),clen=dv.getUint16(p+32,true),lho=dv.getUint32(p+42,true);
+    var name=new TextDecoder().decode(u8.subarray(p+46,p+46+nlen));
+    var start=lho+30+dv.getUint16(lho+26,true)+dv.getUint16(lho+28,true);
+    var raw=u8.subarray(start,start+csize);
+    if(method===0)out[name]=raw.slice();
+    else if(method===8){
+      if(typeof DecompressionStream==='undefined')throw new Error('this browser cannot unpack a compressed npz');
+      var st=new Blob([raw.slice()]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+      out[name]=new Uint8Array(await new Response(st).arrayBuffer());
+    }
+    p+=46+nlen+elen+clen;
+  }
+  return out;
+}
+function ingestStyles(entries){
+  var styles={},keys=[];
+  Object.keys(entries).forEach(function(full){
+    var nm=String(full).split('/').pop().replace(/\.npy$/i,'');if(!nm)return;
+    try{var arr=readNpy(entries[full]);if(arr.data.length){styles[nm]=arr;keys.push(nm);}}catch(e){}
+  });
+  if(!keys.length)throw new Error('no style arrays inside '+VOICES_PATH);
+  if(keys.length===1){
+    var only=styles[keys[0]],sh=only.shape;
+    if(sh.length>=2&&sh[0]>=2&&sh[0]<=32){
+      var rows=sh[0],dim=Math.floor(only.data.length/rows),flat={};
+      for(var r=0;r<rows;r++)flat['voice-'+(r+1)]={data:only.data.slice(r*dim,(r+1)*dim),shape:[dim]};
+      styles=flat;keys=Object.keys(flat);
+    }
+  }
+  keys.sort(function(a,b){
+    var na=/(\d+)/.exec(a),nb=/(\d+)/.exec(b);
+    if(na&&nb&&+na[1]!==+nb[1])return +na[1]-+nb[1];
+    var fa=/[-_]f$/.test(a)?0:1,fb=/[-_]f$/.test(b)?0:1;
+    if(fa!==fb)return fa-fb;return a.localeCompare(b);
+  });
+  K.keys=keys.slice(0,8);K.styles={};K.keys.forEach(function(k){K.styles[k]=styles[k];});
+  if(S.voice>=K.keys.length)S.voice=0;
+}
+
+/* ============ onnx inspect ============ */
+function pbWalk(u8,cb){
+  var p=0;
+  function vi(){var r=0,s=0;for(;;){if(p>=u8.length)throw new Error('eof');var b=u8[p++];r+=(b&0x7f)*Math.pow(2,s);if(!(b&0x80))break;s+=7;if(s>42)throw new Error('varint');}return r;}
+  while(p<u8.length){
+    var key=vi(),f=Math.floor(key/8),w=key%8;
+    if(w===0){var v=vi();cb(f,0,null,0,v);}
+    else if(w===2){var l=vi();if(p+l>u8.length)break;cb(f,2,u8.subarray(p,p+l),l,0);p+=l;}
+    else if(w===5){cb(f,5,u8.subarray(p,p+4),4,0);p+=4;}
+    else if(w===1){cb(f,1,u8.subarray(p,p+8),8,0);p+=8;}
+    else break;
+  }
+}
+function inspectOnnx(buf){
+  var u8=new Uint8Array(buf),dec=new TextDecoder(),meta={},inits=[],inputs=[];
+  try{
+    pbWalk(u8,function(f,w,pay){
+      if(w!==2)return;
+      if(f===14){var k='',v='';try{pbWalk(pay,function(a,b,c){if(b===2){if(a===1)k=dec.decode(c);else if(a===2)v=dec.decode(c);}});}catch(e){}if(k)meta[k]=v;}
+      else if(f===7){
+        try{pbWalk(pay,function(gf,gw,gp){
+          if(gw!==2)return;
+          if(gf===5){var nm='',strs=[];try{pbWalk(gp,function(a,b,c){if(b===2){if(a===8)nm=dec.decode(c);else if(a===6)strs.push(dec.decode(c));}});}catch(e){}if(strs.length>=4)inits.push({name:nm,symbols:strs});}
+          else if(gf===11){var nm2='',elem=0;
+            try{pbWalk(gp,function(a,b,c){if(a===1&&b===2)nm2=dec.decode(c);else if(a===2&&b===2){pbWalk(c,function(x,y,z){if(x===1&&y===2){try{pbWalk(z,function(m,n,o,p2,q){if(m===1&&n===0)elem=q;});}catch(e){}}});}});}catch(e){}
+            inputs.push({name:nm2,elem:elem});}
+        });}catch(e){}
+      }
+    });
+  }catch(e){}
+  return {meta:meta,inits:inits,inputs:inputs};
+}
+
+/* ============ vocab ============ */
+function decodeKey(k){
+  return k.replace(/\\u([0-9a-fA-F]{4})/g,function(_,h){return String.fromCharCode(parseInt(h,16));})
+    .replace(/\\x([0-9a-fA-F]{2})/g,function(_,h){return String.fromCharCode(parseInt(h,16));})
+    .replace(/\\n/g,'\n').replace(/\\t/g,'\t').replace(/\\"/g,'"').replace(/\\'/g,"'").replace(/\\\\/g,'\\');
+}
+function normalizeVocab(raw){
+  if(raw==null)return null;
+  if(Array.isArray(raw)){var out={},n=0;raw.forEach(function(s,i){if(typeof s==='string'){out[s]=i;n++;}else if(s&&typeof s==='object'&&typeof s.token==='string'){out[s.token]=i;n++;}});return n>=4?out:null;}
+  if(typeof raw==='object'){
+    var a=normalizeVocab(raw.vocab);if(a)return a;
+    if(raw.model&&raw.model.vocab){var b=normalizeVocab(raw.model.vocab);if(b)return b;}
+    var s1={},n1=0,s2={},n2=0;
+    Object.keys(raw).forEach(function(k){var v=raw[k];
+      if(typeof v==='number'&&isFinite(v)){s1[k]=v;n1++;}else if(/^\d+$/.test(k)&&typeof v==='string'){s2[v]=+k;n2++;}});
+    if(n1>=4&&n1>=n2)return s1;if(n2>=4)return s2;
+  }
+  return null;
+}
+function vocabFromDictText(text){
+  var blocks=String(text).match(/\{[\s\S]*?\}/g);if(!blocks)return null;
+  var best=null,bestN=0;
+  for(var b=0;b<blocks.length;b++){
+    var m,re=/["']((?:\\.|[^"'\\])+)["']\s*:\s*(\d+)/g,o={},n=0;
+    while((m=re.exec(blocks[b]))){o[decodeKey(m[1])]=+m[2];n++;}
+    if(n>bestN&&n>=4){best=o;bestN=n;}
+    var re2=/(\d+)\s*:\s*["']((?:\\.|[^"'\\])+)["']/g,o2={},n2=0;
+    while((m=re2.exec(blocks[b]))){o2[decodeKey(m[2])]=+m[1];n2++;}
+    if(n2>bestN&&n2>=4){best=o2;bestN=n2;}
+  }
+  return best;
+}
+function tryParseVocab(val){
+  if(val==null)return null;
+  if(typeof val==='object')return normalizeVocab(val);
+  if(typeof val!=='string')return null;
+  var s=val.trim();
+  if(s.charAt(0)==='{'||s.charAt(0)==='['){try{var r=normalizeVocab(JSON.parse(s));if(r)return r;}catch(e){}}
+  var d=vocabFromDictText(s);if(d)return d;
+  if(s.length>=4&&s.length<=512&&/^[\x20-\x7e]+$/.test(s)&&new Set(s).size===s.length){var o={};Array.from(s).forEach(function(c,i){o[c]=i;});return o;}
+  return null;
+}
+var IPA_RE=/[əɪʊæɹˈˌɛɑɔɜŋθðʃʒɡɾʔːɐɒβɕçɖɟɥɨʝɯɰɳɲɴøɸœɻʁɽʂʈʋʌɣɤχʎʤʧʣʥʦʨɚɝ]/;
+function detectVocabType(v){
+  var keys=Object.keys(v).filter(function(k){return !/^<.*>$/.test(k);}),ipa=0,ascii=0;
+  keys.forEach(function(k){if(IPA_RE.test(k))ipa++;if(/^[\x20-\x7e]$/.test(k))ascii++;});
+  if(ipa>=3)return 'phonemes';
+  if(keys.length&&ascii>=keys.length*0.7)return 'chars';
+  return 'phonemes';
+}
+function findPadId(v){var c=['<pad>','<PAD>','pad','<blank>','<BLANK>','_','<eps>'];for(var i=0;i<c.length;i++)if(v[c[i]]!=null)return v[c[i]];return 0;}
+var IPA_FALLBACK={"$":0,";":1,":":2,",":3,".":4,"!":5,"?":6,"—":9,"…":10,"\"":11,"(":12,")":13,"“":14,"”":15," ":16,"\u0303":17,"ʣ":18,"ʥ":19,"ʦ":20,"ʨ":21,"ᵝ":22,"\uAB67":23,"A":24,"I":25,"O":26,"Q":27,"S":28,"T":29,"W":30,"Y":31,"ᵊ":32,"a":33,"b":34,"c":35,"d":36,"e":37,"f":38,"h":39,"i":40,"j":41,"k":42,"l":43,"m":44,"n":45,"o":46,"p":47,"q":48,"r":49,"s":50,"t":51,"u":52,"v":53,"w":54,"x":55,"y":56,"z":57,"ɑ":58,"ɐ":59,"ɒ":60,"æ":61,"β":62,"ɔ":63,"ɕ":64,"ç":65,"ɖ":66,"ð":67,"ʤ":68,"ə":69,"ɚ":70,"ɛ":71,"ɜ":72,"ɟ":73,"ɡ":74,"ɥ":75,"ɨ":76,"ɪ":77,"ʝ":78,"ɯ":79,"ɰ":80,"ŋ":81,"ɳ":82,"ɲ":83,"ɴ":84,"ø":85,"ɸ":86,"θ":87,"œ":88,"ɹ":89,"ɾ":90,"ɻ":91,"ʁ":92,"ɽ":93,"ʂ":94,"ʃ":95,"ʈ":96,"ʧ":97,"ʊ":98,"ʋ":99,"ʌ":100,"ɣ":101,"ɤ":102,"χ":103,"ʎ":104,"ʒ":105,"ʔ":106,"ˈ":107,"ˌ":108,"ː":109,"ʰ":110,"ʲ":111,"↓":112,"→":113,"↗":114,"↘":115,"ᵻ":117};
+async function resolveVocab(info){
+  var best=null,score=-1,key='';
+  Object.keys(info.meta).forEach(function(k){
+    var v=tryParseVocab(info.meta[k]);
+    if(v){var sc=Object.keys(v).length;if(/vocab|symbol|token|phoneme|char|letter|g2p|dict/i.test(k))sc+=10000;if(sc>score){best=v;score=sc;key=k;}}
+  });
+  if(best)return {v:best,src:'metadata:'+key,verified:true};
+  for(var i=0;i<info.inits.length;i++){
+    var it=info.inits[i],o={};it.symbols.forEach(function(s,idx){o[s]=idx;});
+    if(it.symbols.length>=4)return {v:o,src:'tensor:'+it.name,verified:true};
+  }
+  var side=['vocab.json','tokenizer.json','config.json','symbols.json','phonemes.json','vocab.txt','tokens.txt','kitten_tts_2_pico_en.json','metadata.json'];
+  for(var s=0;s<side.length;s++){
+    try{var r=await fetch(side[s],{cache:'no-cache'});if(!r.ok)continue;var vv=tryParseVocab(await r.text());if(vv)return {v:vv,src:side[s],verified:true};}catch(e){}
+  }
+  return {v:IPA_FALLBACK,src:'built-in guess',verified:false};
+}
+
+/* ============ class-locked mapping ============ */
+var LIG={'tʃ':'ʧ','dʒ':'ʤ','ts':'ʦ','dz':'ʣ','tɕ':'ʨ','dʑ':'ʥ'};
+var BASE={
+ 'ɡ':[{to:['g'],q:'exact'}],'g':[{to:['ɡ'],q:'exact'}],
+ 'ʧ':[{to:['t','ʃ'],q:'exact'}],'ʤ':[{to:['d','ʒ'],q:'exact'}],
+ 'ʦ':[{to:['t','s'],q:'exact'}],'ʣ':[{to:['d','z'],q:'exact'}],
+ 'ʨ':[{to:['t','ɕ'],q:'exact'},{to:['t','ʃ'],q:'near'}],'ʥ':[{to:['d','ʑ'],q:'exact'},{to:['d','ʒ'],q:'near'}],
+ 'ɹ':[{to:['r'],q:'exact'},{to:['ɻ'],q:'exact'}],'ɻ':[{to:['ɹ'],q:'exact'},{to:['r'],q:'exact'}],
+ 'ɽ':[{to:['ɹ'],q:'near'},{to:['r'],q:'near'}],
+ 'ʔ':[{to:['t'],q:'near'},{to:['k'],q:'near'}],'ʡ':[{to:['t'],q:'near'}],
+ 'ɫ':[{to:['l'],q:'exact'}],'ɬ':[{to:['l'],q:'near'}],'ʎ':[{to:['l'],q:'near'}],'ɺ':[{to:['l'],q:'near'}],'ɮ':[{to:['l'],q:'near'}],'ʟ':[{to:['l'],q:'near'}],
+ 'ŋ':[{to:['n'],q:'near'}],'ɲ':[{to:['n'],q:'near'}],'ɳ':[{to:['n'],q:'near'}],'ɴ':[{to:['n'],q:'near'}],'ɱ':[{to:['m'],q:'near'}],
+ 'θ':[{to:['s'],q:'near'},{to:['f'],q:'near'}],'ð':[{to:['z'],q:'near'},{to:['v'],q:'near'}],
+ 'ʃ':[{to:['s'],q:'near'}],'ʒ':[{to:['z'],q:'near'}],
+ 'ʂ':[{to:['ʃ'],q:'near'},{to:['s'],q:'near'}],'ʐ':[{to:['ʒ'],q:'near'},{to:['z'],q:'near'}],
+ 'ɕ':[{to:['ʃ'],q:'near'},{to:['s'],q:'near'}],'ʑ':[{to:['ʒ'],q:'near'},{to:['z'],q:'near'}],
+ 'ç':[{to:['h'],q:'near'}],'x':[{to:['h'],q:'near'}],'χ':[{to:['h'],q:'near'}],
+ 'ɣ':[{to:['h'],q:'near'}],'ʁ':[{to:['h'],q:'near'}],'ħ':[{to:['h'],q:'near'}],'ʕ':[{to:['h'],q:'near'}],
+ 'ɸ':[{to:['f'],q:'near'}],'β':[{to:['v'],q:'near'}],'ʝ':[{to:['ʒ'],q:'near'},{to:['h'],q:'near'}],
+ 'ɧ':[{to:['ʃ'],q:'near'}],'ʢ':[{to:['h'],q:'near'}],'ɦ':[{to:['h'],q:'near'}],
+ 'ɥ':[{to:['w'],q:'near'}],'ɰ':[{to:['w'],q:'near'}],'ʍ':[{to:['w'],q:'near'}],
+ 'ʈ':[{to:['t'],q:'near'}],'ɖ':[{to:['d'],q:'near'}],'ɟ':[{to:['d'],q:'near'}],'c':[{to:['k'],q:'near'}],'q':[{to:['k'],q:'near'}],
+ 'ɐ':[{to:['ə'],q:'near'}],'ɒ':[{to:['ɑ'],q:'near'},{to:['ɔ'],q:'near'}],
+ 'ɜ':[{to:['ɛ'],q:'near'},{to:['ə'],q:'near'}],'ə':[{to:['ʌ'],q:'near'},{to:['ɛ'],q:'near'}],
+ 'ɪ':[{to:['i'],q:'near'}],'ʊ':[{to:['u'],q:'near'}],'ᵻ':[{to:['ɪ'],q:'exact'}],'ᵊ':[{to:['ə'],q:'near'}],
+ 'ɨ':[{to:['ɪ'],q:'near'}],'ɯ':[{to:['u'],q:'near'}],'ɤ':[{to:['o'],q:'near'}],
+ 'œ':[{to:['ɛ'],q:'near'}],'ø':[{to:['o'],q:'near'}],
+ 'ɔ':[{to:['o'],q:'near'},{to:['ɑ'],q:'near'}],'ɑ':[{to:['a'],q:'near'}],'æ':[{to:['a'],q:'near'}],
+ 'ɛ':[{to:['e'],q:'near'}],'ʌ':[{to:['ə'],q:'near'}],
+ 'ː':[{to:[':'],q:'exact'},{to:[''],q:'near'}],
+ 'ˈ':[{to:["'"],q:'exact'},{to:[''],q:'near'}],'ˌ':[{to:[','],q:'exact'},{to:[''],q:'near'}],
+ 'ʰ':[{to:[''],q:'near'}],'ʲ':[{to:[''],q:'near'}],
+ '̃':[{to:[''],q:'near'}],'̩':[{to:[''],q:'near'}],'̯':[{to:[''],q:'near'}],'‿':[{to:[' '],q:'exact'}]
+};
+function bestR(){
+  var V=K.vocab||{};
+  var order=['ɹ','r','ɻ','ɽ'];
+  for(var i=0;i<order.length;i++)if(V[order[i]]!=null)return order[i];
+  return null;
+}
+function rChain(base){
+  var V=K.vocab||{},out=[];
+  ['ɹ','r','ɻ','ɽ'].forEach(function(R){if(V[R]!=null&&V[base]!=null)out.push({to:[base,R],q:'exact'});});
+  if(base!=='ə'&&V['ə']!=null)['ɹ','r'].forEach(function(R){if(V[R]!=null)out.push({to:['ə',R],q:'near'});});
+  if(V['ɚ']!=null)out.push({to:['ɚ'],q:'exact'});
+  return out;
+}
+function buildSubs(){
+  var V=K.vocab||{},s={};
+  Object.keys(BASE).forEach(function(k){s[k]=BASE[k];});
+  s['ɚ']=rChain('ə');s['ɝ']=rChain('ɜ');
+  var flap=[];
+  if(S.flap==='native'){if(V['ɾ']!=null)flap.push({to:['ɾ'],q:'exact'});}
+  if(V['t']!=null)flap.push({to:['t'],q:'near'});
+  if(V['d']!=null)flap.push({to:['d'],q:'near'});
+  if(S.flap==='native'&&V['ɾ']!=null)flap.unshift({to:['ɾ'],q:'exact'});
+  s['ɾ']=flap;
+  return s;
+}
+function forced(c){
+  var V=K.vocab||{};
+  if(c==='ɾ'){
+    if(S.flap==='t'&&V['t']!=null)return {to:['t'],q:'near'};
+    if(S.flap==='d'&&V['d']!=null)return {to:['d'],q:'near'};
+    return null;
+  }
+  if(c==='ɚ'||c==='ɝ'){
+    if(S.rcolor==='native')return null;
+    var R=bestR();if(!R)return null;
+    var base=S.rcolor==='er'?'ɜ':'ə';
+    if(V[base]==null)base=(base==='ə'?'ɜ':'ə');
+    if(V[base]==null)return null;
+    return {to:[base,R],q:'exact'};
+  }
+  return null;
+}
+function mapPhonemes(str){
+  var V=K.vocab||{},pad=K.padId||0,subs=buildSubs();
+  var ids=[],out=[],issues=[],ch=Array.from(String(str||''));
+  for(var i=0;i<ch.length;i++){
+    var c=ch[i],nx=ch[i+1]||'',lig=LIG[c+nx];
+    var f=forced(c);
+    if(f){f.to.forEach(function(s){ids.push(V[s]);out.push(s);});if(f.to.join('')!==c)issues.push({from:c,to:f.to.join(''),q:f.q});continue;}
+    if(lig&&V[lig]!=null&&(V[c]==null||V[nx]==null)){ids.push(V[lig]);out.push(lig);i++;continue;}
+    if(V[c]!=null){ids.push(V[c]);out.push(c);continue;}
+    if(lig&&V[lig]!=null){ids.push(V[lig]);out.push(lig);issues.push({from:c+nx,to:lig,q:'exact'});i++;continue;}
+    var chain=subs[c],done=false;
+    if(chain){
+      for(var s2=0;s2<chain.length;s2++){
+        var alt=chain[s2],ok=true;
+        for(var t=0;t<alt.to.length;t++){var u=alt.to[t];if(u!==''&&V[u]==null){ok=false;break;}}
+        if(!ok)continue;
+        if(signature(alt.to.join(''))!==signature(c))continue;
+        alt.to.forEach(function(u){if(u!==''){ids.push(V[u]);out.push(u);}});
+        if(alt.to.join('')!==c)issues.push({from:c,to:alt.to.join('')||'∅',q:alt.q});
+        done=true;break;
+      }
+    }
+    if(done)continue;
+    if(/\s/.test(c)){if(V[' ']!=null){ids.push(V[' ']);out.push(' ');}continue;}
+    issues.push({from:c,to:null,q:'lost'});out.push('∅');
+  }
+  var srcSig=signature(str),outSig=signature(out.join(''));
+  return {ids:[pad].concat(ids,[pad]),out:out.join(''),issues:issues,srcSig:srcSig,outSig:outSig,ok:srcSig===outSig};
+}
+
+/* ============ espeak ============ */
+function normPh(r){var s=Array.isArray(r)?r.join(' '):String(r==null?'':r);return s.replace(/[ \t]+/g,' ').trim();}
+function looksIPA(s){return !!s&&IPA_RE.test(s);}
+function accentLabel(id){for(var i=0;i<ACCENTS.length;i++)if(ACCENTS[i].id===id)return ACCENTS[i].label;return id;}
+async function initPhonemizer(){
+  var urls=['https://cdn.jsdelivr.net/npm/phonemizer/+esm','https://esm.sh/phonemizer','https://cdn.jsdelivr.net/npm/phonemizer@0.2.1/+esm','https://esm.sh/phonemizer@0.2.1'];
+  var probe='water car dance better browser';
+  for(var u=0;u<urls.length;u++){
+    var mod;
+    try{mod=await Promise.race([import(urls[u]),new Promise(function(_,rej){setTimeout(function(){rej(new Error('timeout'));},18000);})]);}catch(e){continue;}
+    var fn=mod.phonemize||(mod.default&&mod.default.phonemize)||(typeof mod.default==='function'?mod.default:null);
+    if(typeof fn!=='function')continue;
+    var forms=[
+      function(t,l){return fn(t,l,{keepPunctuation:true});},
+      function(t,l){return fn(t,l);},
+      function(t,l){return fn(t,{language:l,keepPunctuation:true});},
+      function(t,l){return fn(t,{language:l});},
+      function(t,l){return fn(t,{voice:l,keepPunctuation:true});},
+      function(t,l){return fn(t,{lang:l,keepPunctuation:true});}
+    ];
+    var fb=null;
+    for(var f=0;f<forms.length;f++){
+      var form=forms[f],us='',gb='';
+      try{us=normPh(await form(probe,'en-us'));}catch(e){us='';}
+      if(!looksIPA(us))continue;
+      try{gb=normPh(await form(probe,'en-gb'));}catch(e){gb='';}
+      if(looksIPA(gb)&&gb!==us){K.phon=function(t,l){return form(t,l).then(normPh);};K.phonHonors=true;await probeAccents();return true;}
+      if(!fb)fb={form:form};
+    }
+    if(fb){K.phon=function(t,l){return fb.form(t,l).then(normPh);};K.phonHonors=false;await probeAccents();return true;}
+  }
+  return false;
+}
+async function probeAccents(){
+  K.accents=[];
+  var words=BENCH.concat(['car','teacher']);
+  for(var i=0;i<ACCENTS.length;i++){
+    var a=ACCENTS[i],map={},ok=false;
+    for(var w=0;w<words.length;w++){
+      var ip='';try{ip=await K.phon(words[w],a.id);}catch(e){ip='';}
+      if(looksIPA(ip)){ok=true;map[words[w]]=ip;}else map[words[w]]='';
+    }
+    if(ok)K.accents.push({id:a.id,label:a.label,fl:a.fl,words:map});
+  }
+  if(!K.accents.length)return;
+  if(!K.accents.some(function(x){return x.id===S.accent;}))S.accent=(K.accents.filter(function(x){return x.id==='en-us';})[0]||K.accents[0]).id;
+}
+function activeAccent(){for(var i=0;i<K.accents.length;i++)if(K.accents[i].id===S.accent)return K.accents[i];return K.accents[0]||null;}
+var phCache={};
+async function phonemize(text){
+  var key=S.accent+'\u241F'+text;
+  if(phCache[key]!=null)return phCache[key];
+  var out=await K.phon(text,S.accent);phCache[key]=out;return out;
+}
+function paintIPA(s,issues){
+  var lost={};(issues||[]).forEach(function(i){if(i.q==='lost')lost[i.from]=1;});
+  var out='';
+  Array.from(String(s||'')).forEach(function(c){
+    var e=c.replace(/&/g,'&amp;').replace(/</g,'&lt;');
+    if(lost[c])out+='<span class="lostch">'+e+'</span>';
+    else if(/[ɹɚɝɻr]/.test(c))out+='<span class="rh">'+e+'</span>';
+    else if(c==='ɾ')out+='<span class="flap">'+e+'</span>';
+    else if(c==='ɑ'||c==='ɒ')out+='<span class="bath">'+e+'</span>';
+    else if(c==='ˈ'||c==='ˌ')out+='<span class="stress">'+e+'</span>';
+    else out+=e;
+  });
+  return out;
+}
+
+/* ============ runtime ============ */
+async function loadOrt(){
+  if(K.ort)return K.ort;
+  var vers=['1.22.0','1.20.1','1.19.2'];
+  for(var i=0;i<vers.length;i++){
+    try{
+      await new Promise(function(res,rej){
+        var s=document.createElement('script');
+        s.src='https://cdn.jsdelivr.net/npm/onnxruntime-web@'+vers[i]+'/dist/ort.min.js';
+        s.onload=res;s.onerror=function(){rej(new Error('404'));};document.head.appendChild(s);
+        setTimeout(function(){rej(new Error('timeout'));},22000);
+      });
+      if(window.ort){var o=window.ort;
+        o.env.wasm.wasmPaths='https://cdn.jsdelivr.net/npm/onnxruntime-web@'+vers[i]+'/dist/';
+        o.env.wasm.numThreads=1;o.env.wasm.proxy=false;try{o.env.logLevel='error';}catch(e){}
+        K.ort=o;return o;}
+    }catch(e){}
+  }
+  throw new Error('the ONNX runtime could not be loaded');
+}
+
+/* ============ status ============ */
+function effectiveMode(){if(K.textMode)return 'text';if(K.tokenMode!=='auto')return K.tokenMode;return K.vocabType||'phonemes';}
+function setLoad(f){$('#loadbar').style.width=(clamp(f,0,1)*100)+'%';}
+function readyMsg(){return 'Ready — '+K.keys.length+' voices · '+accentLabel(S.accent)+' · '+AUD.ok+'/'+(AUD.ok+AUD.bad)+' words intact.';}
+function blockMsg(){return K.blockers.length?('Still needed: '+K.blockers.join(', ')+'.'):'Ready.';}
+function setStatus(kind,msg){$('#led').className='led'+(kind==='ok'?' ok':kind==='err'?' err':kind==='warn'?' warn':'');$('#statusText').textContent=msg;paintRows();}
+function showAlert(msg,bad){var el=$('#alert');if(msg){$('#alertText').innerHTML=msg;el.classList.add('show');el.classList.toggle('bad',!!bad);}else el.classList.remove('show');}
+function paintRows(){
+  var V=K.vocab||{};
+  var stops=['t','d','p','b','k','ɡ','g','ɾ'].filter(function(s){return V[s]!=null;});
+  var rs=['ɹ','r','ɚ','ɝ','ɻ'].filter(function(s){return V[s]!=null;});
+  $('#rModel').textContent=K.session?(nf(K.bytes/1048576,1)+' MB · '+MODEL_PATH):'not loaded';
+  $('#rModel').className='v '+(K.session?'good':'bad');
+  $('#rVoices').textContent=K.keys.length?(K.keys.length+' from '+VOICES_PATH):'not loaded';
+  $('#rVoices').className='v '+(K.keys.length?'good':'bad');
+  $('#rAcc').textContent=K.accents.length?S.accent:'—';
+  $('#rAcc').className='v '+(K.accents.length?'good':'bad');
+  $('#rVocab').textContent=K.textMode?'not needed':(K.vocab?(K.vocabSource+' · '+Object.keys(K.vocab).length):'unresolved');
+  $('#rVocab').className='v '+((K.textMode||(K.vocab&&K.vocabVerified))?'good':'bad');
+  $('#rCons').textContent=K.vocab?('T: '+(stops.join('')||'∅')+'  R: '+(rs.join('')||'∅')):'—';
+  $('#rCons').className='v '+((stops.length&&rs.length)?'good':'bad');
+  $('#rOut').textContent=K.outDims?(K.outDims.join('×')+' @ '+(K.sampleRate/1000)+' kHz'):(K.session?'awaiting first run':'—');
+  $('#rOut').className='v '+(K.session?'good':'bad');
+}
+function refreshReady(){
+  var b=[];
+  if(!K.session)b.push(MODEL_PATH);
+  if(!K.keys.length)b.push(VOICES_PATH);
+  if(!K.textMode&&!K.vocab)b.push('token map');
+  if(effectiveMode()==='phonemes'&&!K.phon)b.push('espeak-ng phonemizer');
+  K.blockers=b;K.ready=b.length===0;
+  $('#voiceTag').textContent=K.keys.length?(K.keys.length+' KittenTTS voices'):'no voices';
+  $('#voiceTag').className='tag '+(K.keys.length?'ok':'warn');
+  var V=K.vocab||{};
+  if(!K.ready)showAlert(blockMsg(),true);
+  else if(effectiveMode()==='phonemes'&&!bestR())showAlert('This token map has <b>no R symbol</b> (ɹ r ɻ ɽ). R-coloured endings cannot be built — add the model’s own <code>vocab.json</code> beside <code>'+MODEL_PATH+'</code>.',true);
+  else if(effectiveMode()==='phonemes'&&V['t']==null&&V['d']==null)showAlert('This token map has <b>no t or d</b>, so the flap in “water” cannot be preserved. Add the model’s own <code>vocab.json</code>.',true);
+  else if(AUD.bad>0&&S.strict)showAlert('<b>'+AUD.bad+' word(s)</b> lose a consonant with this token map. Strict integrity is blocking playback — the audit shows exactly which.',true);
+  else if(!K.textMode&&!K.vocabVerified)showAlert('The model does not expose its symbol table, so a built-in guess is in use. Add its <code>vocab.json</code> next to <code>'+MODEL_PATH+'</code> for exact pronunciation.');
+  else showAlert('');
+  $('#stageHint').textContent=K.ready?'Press Play to synthesize your text':blockMsg();
+  paintRows();renderVoices();renderAccentChips();sync();
+}
+
+/* ============ bench + audit ============ */
+function renderBench(flash){
+  var box=$('#bench');box.innerHTML='';
+  var a=activeAccent(),allOk=true,any=false;
+  BENCH.forEach(function(w){
+    var ip=a&&a.words[w]?a.words[w]:'';
+    var m=(ip&&K.vocab&&effectiveMode()==='phonemes')?mapPhonemes(ip):null;
+    var ok=m?m.ok:false;
+    if(m){any=true;if(!ok)allOk=false;}
+    var c=document.createElement('div');
+    c.className='bcard '+(m?(ok?'good':'bad'):'')+(flash?' flash':'');
+    var head=document.createElement('div');head.className='bw';
+    head.innerHTML='<span></span><span class="vd">'+(m?(ok?'intact':'broken'):'pending')+'</span>';
+    head.firstChild.textContent=w;
+    var r1=document.createElement('div');r1.className='brow';
+    r1.innerHTML='<div class="bl">espeak says</div><div class="bv">'+(ip?paintIPA(ip,m?m.issues:[]):'—')+'</div>';
+    var r2=document.createElement('div');r2.className='brow out';
+    r2.innerHTML='<div class="bl">model receives</div><div class="bv">'+(m?paintIPA(m.out,m.issues):'—')+'</div>';
+    var sg=document.createElement('div');sg.className='sigs';
+    if(m){
+      sg.innerHTML=sigChips(m.srcSig)+'<span class="eq '+(ok?'ok':'no')+'">'+(ok?'=':'≠')+'</span>'+sigChips(m.outSig);
+    } else sg.innerHTML='<span class="eq">consonant skeleton appears here</span>';
+    c.appendChild(head);c.appendChild(r1);c.appendChild(r2);c.appendChild(sg);
+    box.appendChild(c);
+  });
+  var t=$('#benchTag');
+  if(!any){t.textContent='waiting for the model';t.className='tag';}
+  else{t.textContent=allOk?'all consonants preserved':'a consonant is being lost';t.className='tag '+(allOk?'ok':'bad');}
+  if(flash)setTimeout(function(){Array.prototype.forEach.call(box.children,function(el){el.classList.remove('flash');});},700);
+  var lg=$('#legend');lg.innerHTML='';
+  Object.keys(CLS).forEach(function(k){
+    var s=document.createElement('span');s.className='key';
+    s.innerHTML='<i style="background:'+CLS[k].c+'">'+k+'</i>'+CLS[k].n;
+    lg.appendChild(s);
+  });
+}
+var auditT=null;
+function scheduleAudit(){clearTimeout(auditT);auditT=setTimeout(runAudit,300);}
+async function runAudit(){
+  if(AUD.running)return;
+  if(!K.phon||!K.vocab||effectiveMode()!=='phonemes'){
+    AUD.rows=[];AUD.ok=AUD.bad=AUD.adapt=0;renderAudit();renderBench(false);return;
+  }
+  AUD.running=true;
+  try{
+    var text=$('#text').value,seen={},list=[];
+    (text.match(/[A-Za-z][A-Za-z'-]*/g)||[]).forEach(function(w){var k=w.toLowerCase();if(!seen[k]){seen[k]=1;list.push(w);}});
+    var cap=list.slice(0,44),rows=[],ok=0,bad=0,ad=0;
+    for(var i=0;i<cap.length;i++){
+      var w=cap[i],ip='';
+      try{ip=await phonemize(w);}catch(e){ip='';}
+      var m=ip?mapPhonemes(ip):{out:'',issues:[{from:w,to:null,q:'lost'}],srcSig:'',outSig:'',ok:false};
+      if(m.ok)ok++;else bad++;
+      if(m.issues.some(function(x){return x.q==='near';}))ad++;
+      rows.push({word:w,ipa:ip,m:m});
+    }
+    AUD.rows=rows;AUD.ok=ok;AUD.bad=bad;AUD.adapt=ad;AUD.more=Math.max(0,list.length-cap.length);
+  }finally{AUD.running=false;}
+  renderAudit();renderBench(false);refreshReady();
+}
+function renderAudit(){
+  var box=$('#audit');box.innerHTML='';
+  $('#nOk').textContent=AUD.ok;$('#nBad').textContent=AUD.bad;$('#nAdapt').textContent=AUD.adapt;
+  if(K.textMode){box.innerHTML='<div class="aempty">This graph accepts raw text — phoneme mapping is bypassed.</div>';return;}
+  if(effectiveMode()==='chars'){box.innerHTML='<div class="aempty">Character input mode — letters go straight to the model.</div>';return;}
+  if(!K.phon){box.innerHTML='<div class="aempty">Loading the espeak-ng phonemizer…</div>';return;}
+  if(!AUD.rows.length){box.innerHTML='<div class="aempty">Type some English text and every word is checked here.</div>';return;}
+  AUD.rows.forEach(function(r){
+    var row=document.createElement('div');row.className='arow';
+    var w=document.createElement('div');w.className='aw';w.textContent=r.word;w.title=r.word;
+    var a=document.createElement('div');a.className='ai';a.innerHTML=paintIPA(r.ipa,r.m.issues);a.title='espeak: '+r.ipa;
+    var b=document.createElement('div');b.className='ao';b.innerHTML=paintIPA(r.m.out,r.m.issues);b.title='model receives: '+r.m.out;
+    var s=document.createElement('div');s.className='as';
+    var p=document.createElement('span');p.className='pill '+(r.m.ok?'ok':'no');
+    p.textContent=r.m.ok?(r.m.srcSig||'—'):(r.m.srcSig+'≠'+r.m.outSig);
+    p.title=r.m.ok?'consonant skeleton preserved':'consonant skeleton changed';
+    s.appendChild(p);
+    row.appendChild(w);row.appendChild(a);row.appendChild(b);row.appendChild(s);
+    box.appendChild(row);
+  });
+  if(AUD.more){var m=document.createElement('div');m.className='aempty';m.textContent='+'+AUD.more+' more words checked during synthesis';box.appendChild(m);}
+}
+
+/* ============ load ============ */
+async function loadAll(){
+  if(K.loading)return;
+  K.loading=true;K.ready=false;K.session=null;K.keys=[];K.styles={};K.inputs=[];K.outDims=null;K.vocab=null;K.vocabVerified=false;
+  stopPlayback(true);dropAudio();refreshReady();
+  setStatus('','Fetching '+MODEL_PATH+' and '+VOICES_PATH+'…');setLoad(.02);
+  var prog={m:0,v:0},push=function(){setLoad(.02+.72*(prog.m*.88+prog.v*.12));};
+  try{
+    var res=await Promise.all([
+      fetchLocal(MODEL_PATH,function(f){prog.m=f;push();}),
+      fetchLocal(VOICES_PATH,function(f){prog.v=f;push();})
+    ]);
+    var modelBytes=res[0],voiceBytes=res[1];
+    K.bytes=modelBytes.length;K.modelId=MODEL_PATH+':'+modelBytes.length;
+    ingestStyles(await unzip(voiceBytes));setLoad(.76);
+    var info=inspectOnnx(modelBytes.buffer);
+    Object.keys(info.meta).forEach(function(k){if(/sample_?rate/i.test(k)){var n=parseInt(info.meta[k],10);if(n>=8000&&n<=96000)K.sampleRate=n;}});
+    setStatus('','Starting the WebAssembly runtime…');setLoad(.8);
+    var ort=await loadOrt();
+    K.session=await ort.InferenceSession.create(modelBytes,{executionProviders:['wasm'],graphOptimizationLevel:'all',logSeverityLevel:3});
+    K.inputs=Array.from(K.session.inputNames||[]);K.inputTypes={};
+    try{
+      var md=K.session.inputMetadata;
+      if(md){if(Array.isArray(md))md.forEach(function(x){if(x&&x.name)K.inputTypes[x.name]=String(x.type||'');});
+        else Object.keys(md).forEach(function(k){K.inputTypes[k]=String((md[k]&&md[k].type)||md[k]||'');});}
+    }catch(e){}
+    info.inputs.forEach(function(x){if(x.name&&x.elem===8&&!K.inputTypes[x.name])K.inputTypes[x.name]='string';});
+    K.textMode=K.inputs.some(function(n){return /string/i.test(K.inputTypes[n]||'')||/^(text|raw_text|input_text|sentence|strings)$/i.test(n);});
+    if(!K.textMode){
+      setStatus('','Resolving the symbol table…');
+      var vr=await resolveVocab(info);
+      K.vocab=vr.v;K.vocabSource=vr.src;K.vocabVerified=vr.verified;
+      K.vocabType=detectVocabType(K.vocab);K.padId=findPadId(K.vocab);
+      K.hasUpper=Object.keys(K.vocab).some(function(k){return /[A-Z]/.test(k);});
+    }
+    setLoad(.88);
+    if(!K.phon){setStatus('','Loading espeak-ng and probing English voices…');await initPhonemizer();}
+    setLoad(1);setTimeout(function(){setLoad(0);},800);
+    K.loading=false;
+    buildVoiceSelect();renderAccentChips();refreshReady();
+    await runAudit();
+    setStatus(K.ready?'ok':'err',K.ready?readyMsg():blockMsg());
+    if(K.ready){toast('Loaded · flap → '+S.flap+', R → '+S.rcolor+'.','ok',2800);await warmup();}
+  }catch(err){
+    K.loading=false;setLoad(0);refreshReady();
+    setStatus('err',(err.message||'Load failed')+' — check both files sit next to this page.');
+    toast((err.message||'Load failed'),'err',6500);
+    Face.poke('sad',2.6);
+  }
+}
+async function warmup(){
+  if(P.busy||!K.ready)return;
+  if(S.strict&&AUD.bad>0)return;
+  var sig=inferSignature(),text=$('#text').value;
+  if(!text.trim())return;
+  P.busy=true;sync();
+  try{
+    var r=await runSynthesis(text,S.voice,true);
+    if(inferSignature()!==sig)return;
+    P.chunks=r.chunks;P.inferSig=sig;P.spokenText=text;P.total=text.length;assemble();
+    setStatus('ok','Ready — '+nf(duration(),1)+' s buffered, consonants intact. Press Play.');
+    $('#stageCap').textContent='KittenTTS · buffered';
+  }catch(e){
+    if(inferSignature()===sig)setStatus('warn',(e.message||e));
+  }finally{P.busy=false;sync();counters();}
+}
+
+/* ============ synthesis ============ */
+async function prepareInput(text){
+  var pad=K.padId||0;
+  if(K.textMode)return {ids:[pad,pad],out:text,issues:[],ok:true,srcSig:'',outSig:''};
+  if(effectiveMode()==='chars'){
+    var t=K.hasUpper?text:text.toLowerCase(),V=K.vocab,ids=[],out=[];
+    Array.from(t).forEach(function(c){if(V[c]!=null){ids.push(V[c]);out.push(c);}});
+    return {ids:[pad].concat(ids,[pad]),out:out.join(''),issues:[],ok:true,srcSig:'',outSig:''};
+  }
+  if(!K.phon)throw new Error('the espeak-ng phonemizer is required but did not load');
+  var ph=await phonemize(text);
+  return mapPhonemes(ph);
+}
+function styleFor(len,i){
+  var key=K.keys[i],v=key?K.styles[key]:null;
+  if(!v)throw new Error('no style vector for this voice');
+  var d=v.data,sh=v.shape||[];
+  if(sh.length<=1)return Float32Array.from(d);
+  var rows=sh[0],dim=Math.floor(d.length/rows);
+  if(!dim)return Float32Array.from(d);
+  var idx=rows<=4?0:clamp(len,0,rows-1);
+  return Float32Array.from(d.subarray(idx*dim,(idx+1)*dim));
+}
+async function runModel(ids,style,speed,raw){
+  var ort=K.ort,sess=K.session,feeds={};
+  sess.inputNames.forEach(function(name){
+    var n=name.toLowerCase(),typ=K.inputTypes[name]||'';
+    if(/speed|length_scale|duration/.test(n)){
+      var val=/length_scale|duration/.test(n)?1/speed:speed;
+      feeds[name]=new ort.Tensor('float32',new Float32Array([val]),[1]);
+    }else if(/style|speaker|embed|voice|ref/.test(n)){
+      feeds[name]=new ort.Tensor('float32',style,[1,style.length]);
+    }else if(/mask/.test(n)){
+      feeds[name]=new ort.Tensor('int64',BigInt64Array.from({length:ids.length},function(){return 1n;}),[1,ids.length]);
+    }else if(/lang|accent/.test(n)&&/string/i.test(typ)){
+      feeds[name]=new ort.Tensor('string',[S.accent],[1]);
+    }else if(/lang/.test(n)){
+      feeds[name]=new ort.Tensor('int64',BigInt64Array.from([0n]),[1]);
+    }else if(/string/i.test(typ)||(/text|sentence|raw/.test(n)&&!/id|token/.test(n))){
+      feeds[name]=new ort.Tensor('string',[raw],[1]);
+    }else{
+      feeds[name]=new ort.Tensor('int64',BigInt64Array.from(ids.map(function(x){return BigInt(x);})),[1,ids.length]);
+    }
+  });
+  var out=await sess.run(feeds),best=null;
+  Object.keys(out).forEach(function(k){var t=out[k];if(t&&t.data&&t.data.length&&(!best||t.data.length>best.data.length))best=t;});
+  if(!best)throw new Error('the graph returned no tensor');
+  var dims=Array.from(best.dims||[]);
+  K.outDims=dims.length?dims:[best.data.length];
+  if(dims.length===3&&dims[1]>1&&dims[1]<=256&&dims[2]>dims[1]*4)throw new Error('graph output looks like a spectrogram, not a waveform');
+  paintRows();
+  var d=best.data;
+  if(d instanceof Float32Array)return d;
+  if(d instanceof Int16Array)return Float32Array.from(d,function(x){return x/32768;});
+  return Float32Array.from(d,function(x){return Number(x);});
+}
+function verifySpeech(x,sr){
+  var n=x.length;if(n<sr*0.1)return {ok:false,why:'output too short'};
+  var peak=0;for(var i=0;i<n;i++){var v=x[i];if(!isFinite(v))return{ok:false,why:'invalid samples'};var a=v<0?-v:v;if(a>peak)peak=a;}
+  if(peak<1e-4)return {ok:false,why:'silent output'};
+  var zc=0;for(var j=1;j<n;j++){if((x[j-1]<0)!==(x[j]<0))zc++;}
+  var zcr=zc/n,hop=Math.max(1,Math.round(sr*0.02)),frames=Math.floor(n/hop);
+  if(frames<8)return {ok:false,why:'output too short'};
+  var en=new Float32Array(frames),mean=0;
+  for(var f=0;f<frames;f++){var s=0;for(var k=f*hop;k<(f+1)*hop;k++)s+=x[k]*x[k];en[f]=Math.sqrt(s/hop);mean+=en[f];}
+  mean/=frames;var vr=0;for(var f2=0;f2<frames;f2++){var d=en[f2]-mean;vr+=d*d;}
+  var cv=Math.sqrt(vr/frames)/(mean||1e-9);
+  var alpha=Math.exp(-2*Math.PI*3500/sr),y=0,lp=0,tot=0;
+  for(var m=0;m<n;m++){y=(1-alpha)*x[m]+alpha*y;lp+=y*y;tot+=x[m]*x[m];}
+  var low=lp/(tot||1e-9),ok=(zcr<0.36)&&(cv>0.3)&&(low>0.4);
+  return {ok:ok,why:ok?'':(zcr>=0.36?'noise-like output':(cv<=0.3?'flat output':'no speech spectrum'))};
+}
+function chunkText(text,max){
+  var out=[],curStart=0,len=0;
+  var flush=function(end){var p=text.slice(curStart,end);if(p.trim())out.push(p);curStart=end;len=0;};
+  for(var i=0;i<text.length;i++){
+    len++;
+    var brk=/[.!?…\n]/.test(text[i])&&(/\s/.test(text[i+1]||' ')||i===text.length-1);
+    if(brk&&text.slice(curStart,i+1).trim().length>10){flush(i+1);continue;}
+    if(len>=max){
+      var win=text.slice(curStart,i+1),m,re=/[,;:]\s|\s/g,last=-1;
+      while((m=re.exec(win)))last=m.index;
+      var cut=last>max*.4?curStart+last+1:i+1;flush(cut);i=cut-1;
+    }
+  }
+  if(curStart<text.length)flush(text.length);
+  if(!out.length&&text.trim())out.push(text);
+  return out;
+}
+function assemble(){
+  if(!P.chunks.length){P.master=null;P.peaks=null;P.buffer=null;wavePath=null;sync();return;}
+  var sr=K.sampleRate,gap=Math.round(S.gap/1000*sr),fade=Math.round(S.fade/1000*sr),total=0;
+  P.chunks.forEach(function(c,i){total+=c.samples.length+(i<P.chunks.length-1?gap:0);});
+  var out=new Float32Array(total),o=0;
+  P.chunks.forEach(function(c,i){
+    var s=c.samples,n=s.length,f=Math.min(fade,n>>1);
+    for(var j=0;j<n;j++){var v=s[j];
+      if(f>0){if(j<f)v*=.5-.5*Math.cos(Math.PI*j/f);else if(j>n-f)v*=.5-.5*Math.cos(Math.PI*(n-j)/f);}
+      out[o+j]=v;}
+    o+=n+(i<P.chunks.length-1?gap:0);
+  });
+  if(S.norm){var peak=0;for(var i=0;i<out.length;i++){var a=Math.abs(out[i]);if(a>peak)peak=a;}
+    if(peak>1e-5){var g=.97/peak;for(var k=0;k<out.length;k++)out[k]*=g;}}
+  else{for(var k2=0;k2<out.length;k2++)out[k2]=clamp(out[k2],-1,1);}
+  P.master=out;P.buffer=null;P.peaks=makePeaks(out,900);wavePath=null;P.pos=clamp(P.pos,0,duration());
+  $('#spokenText').textContent=P.spokenText;$('#spokenText').className='t';$('#spokenText').title=P.spokenText;
+  counters();sync();
+}
+function makePeaks(s,n){
+  var out=new Float32Array(n*2),step=s.length/n;
+  for(var i=0;i<n;i++){var a=Math.floor(i*step),b=Math.min(s.length,Math.floor((i+1)*step)),mn=0,mx=0;
+    for(var j=a;j<b;j++){var v=s[j];if(v<mn)mn=v;if(v>mx)mx=v;}out[i*2]=mn;out[i*2+1]=mx;}
+  return out;
+}
+async function runSynthesis(text,voiceIndex,quiet){
+  var pieces=(K.textMode||effectiveMode()==='chars')?[text]:chunkText(text,200),chunks=[],ipa=[],broken=[],t0=performance.now();
+  for(var i=0;i<pieces.length;i++){
+    if(!quiet)setStatus('','Synthesizing… part '+(i+1)+' of '+pieces.length+' · '+accentLabel(S.accent));
+    setLoad((i+.4)/pieces.length);
+    var prep=await prepareInput(pieces[i]);
+    if(effectiveMode()==='phonemes')ipa.push(prep.out);
+    if(!prep.ok)broken.push({sig:prep.srcSig+'≠'+prep.outSig,text:pieces[i].slice(0,40)});
+    if(!K.textMode&&prep.ids.length<6)throw new Error('the symbol table produced no usable ids for chunk '+(i+1));
+    await nextFrame();
+    var samples=await runModel(prep.ids,styleFor(prep.ids.length,voiceIndex),S.speed,pieces[i]);
+    chunks.push({text:pieces[i],samples:samples});
+  }
+  setLoad(0);P.lastMs=performance.now()-t0;
+  if(S.strict&&broken.length){
+    var e=new Error('Strict integrity blocked playback — a consonant would change in: “'+broken[0].text+'…” ('+broken[0].sig+').');
+    e.strict=true;throw e;
+  }
+  var total=0;chunks.forEach(function(c){total+=c.samples.length;});
+  var probe=new Float32Array(total),o=0;chunks.forEach(function(c){probe.set(c.samples,o);o+=c.samples.length;});
+  var check=verifySpeech(probe,K.sampleRate);
+  if(!check.ok){var er=new Error(check.why);er.gate=check;throw er;}
+  $('#ipaText').innerHTML=K.textMode?'raw text → '+JSON.stringify(text.slice(0,160)):(ipa.length?paintIPA(ipa.join('  ')):paintIPA(text.slice(0,200)));
+  return {chunks:chunks};
+}
+
+/* ============ reader ============ */
+function buildReader(text){
+  var r=$('#reader');r.innerHTML='';P.words=[];
+  var re=/\S+/g,m,last=0;
+  while((m=re.exec(text))){
+    if(m.index>last)r.appendChild(document.createTextNode(text.slice(last,m.index)));
+    var w=document.createElement('w');w.textContent=m[0];r.appendChild(w);
+    P.words.push({el:w,start:m.index,end:m.index+m[0].length});last=m.index+m[0].length;
+  }
+  if(last<text.length)r.appendChild(document.createTextNode(text.slice(last)));
+}
+function highlight(pos){
+  if(!P.words.length)return;
+  var idx=-1;
+  for(var i=0;i<P.words.length;i++){
+    if(pos>=P.words[i].start&&pos<P.words[i].end){idx=i;break;}
+    if(P.words[i].start>pos){idx=i-1;break;}
+  }
+  if(idx<0&&pos>=P.words[P.words.length-1].end)idx=P.words.length-1;
+  if(idx===P.activeWord)return;
+  P.activeWord=idx;
+  for(var j=0;j<P.words.length;j++){var cl=j<idx?'past':j===idx?'now':'';if(P.words[j].el.className!==cl)P.words[j].el.className=cl;}
+  if(idx>=0){var r=$('#reader'),el=P.words[idx].el,top=el.offsetTop-r.offsetTop;
+    if(top<r.scrollTop+8||top>r.scrollTop+r.clientHeight-40)r.scrollTop=Math.max(0,top-r.clientHeight/2);}
+}
+
+/* ============ actions ============ */
+async function pressPlay(){
+  if(P.busy)return;
+  if(P.speaking){P.pos=position();stopPlayback();return;}
+  if(!K.ready){toast(blockMsg(),'err',5000);setStatus('err',blockMsg());return;}
+  var text=$('#text').value;
+  if(!text.trim()){toast('Type some English text first.','warn');$('#text').focus();return;}
+  if(text.length>4000){text=text.slice(0,4000);$('#text').value=text;toast('Trimmed to the first 4000 characters.','warn');}
+  if(hasCurrentAudio()){playBuffer();return;}
+  var sig=inferSignature();
+  stopPlayback(true);P.busy=true;sync();P.total=text.length;
+  buildReader(text);document.body.classList.add('reading');P.activeWord=-1;highlight(0);
+  try{
+    var r=await runSynthesis(text,S.voice,false);
+    if(inferSignature()!==sig){toast('Settings changed while synthesizing — press Play again.','warn',4200);document.body.classList.remove('reading');P.busy=false;sync();return;}
+    P.chunks=r.chunks;P.inferSig=sig;P.spokenText=text;P.pos=0;assemble();P.busy=false;
+    if(!playBuffer(0))toast('Tap Play once more to allow audio.','warn');
+    else setStatus('ok','Speaking · '+accentLabel(S.accent)+' · '+NAMES[S.voice%NAMES.length]+' · '+Math.round(P.lastMs)+' ms.');
+  }catch(e){
+    P.busy=false;document.body.classList.remove('reading');
+    var msg=e.gate?('Output failed the speech check ('+e.gate.why+') — nothing was played.'):(e.message||String(e));
+    setStatus(e.strict?'warn':'err',msg);toast(msg,e.strict?'warn':'err',7000);refreshReady();
+    Face.poke('sad',2.6);
+  }
+  sync();
+}
+function selectVoice(i){
+  S.voice=i;persist();renderVoices();buildVoiceSelect();sync();Face.poke('happy',1.2);
+  if(K.ready&&!hasCurrentAudio())setStatus('warn',NAMES[i%NAMES.length]+' selected — press Play to hear your text.');
+}
+async function refreshPronunciation(flash){
+  phCache={};stopPlayback(true);dropAudio();
+  renderBench(flash);paintRows();sync();
+  await runAudit();
+  if(K.ready)await warmup();
+}
+function renderAccentChips(){
+  var bar=$('#accents');bar.innerHTML='';
+  if(!K.accents.length){var s=document.createElement('span');s.className='tag warn';s.textContent='espeak-ng unavailable';bar.appendChild(s);return;}
+  K.accents.forEach(function(a){
+    var b=document.createElement('button');b.type='button';b.className='acc'+(a.id===S.accent?' on':'');
+    b.setAttribute('aria-pressed',String(a.id===S.accent));b.title='espeak-ng '+a.id;
+    b.innerHTML='<span></span><span class="fl"></span>';
+    b.firstChild.textContent=a.label;b.lastChild.textContent=a.fl;
+    b.addEventListener('click',async function(){
+      if(S.accent===a.id)return;
+      S.accent=a.id;persist();buildAccentSelect();
+      await refreshPronunciation(true);
+      toast(a.label+' phonemes loaded.','ok',2200);
+    });
+    bar.appendChild(b);
+  });
+}
+function buildAccentSelect(){
+  var sel=$('#accSel');sel.innerHTML='';
+  if(!K.accents.length){var o=document.createElement('option');o.textContent='loading…';sel.appendChild(o);sel.disabled=true;return;}
+  sel.disabled=false;
+  K.accents.forEach(function(a){var o=document.createElement('option');o.value=a.id;o.textContent=a.label+' ('+a.id+')';sel.appendChild(o);});
+  sel.value=S.accent;
+}
+function buildVoiceSelect(){
+  var sel=$('#voiceSel');sel.innerHTML='';
+  var n=K.keys.length||8;
+  for(var i=0;i<n;i++){
+    var o=document.createElement('option');o.value=String(i);
+    o.textContent=NAMES[i%NAMES.length]+(K.keys[i]?' · '+K.keys[i]:'');
+    sel.appendChild(o);
+  }
+  sel.value=String(S.voice);
+}
+
+/* ============ canvas ============ */
+var cv=$('#wave'),cx=cv.getContext('2d'),W=0,H=0,DPR=1,wavePath=null;
+function sizeCanvas(){
+  var r=$('#stage').getBoundingClientRect();
+  DPR=Math.min(2,window.devicePixelRatio||1);
+  W=Math.max(10,r.width);H=Math.max(10,r.height);
+  cv.width=Math.round(W*DPR);cv.height=Math.round(H*DPR);
+  cx.setTransform(DPR,0,0,DPR,0,0);wavePath=null;
+}
+function idleAmp(i,n,t){
+  var x=i/n;
+  return (Math.sin(x*10+t*.9)*.5+.5)*.24*(.45+.55*Math.sin(t*.5+x*2))+(Math.sin(x*26-t*1.6)*.5+.5)*.08+Math.exp(-Math.pow((x-.5)*3.2,2))*.16*(.6+.4*Math.sin(t*1.2));
+}
+function buildPath(t){
+  var p=new Path2D(),mid=H/2,amp=H/2-16,n=Math.max(40,Math.floor(W/3));
+  for(var i=0;i<n;i++){
+    var x=i*(W/n),mn,mx;
+    if(P.peaks){var k=Math.min(899,Math.floor(i/n*900));mn=P.peaks[k*2];mx=P.peaks[k*2+1];}
+    else{var v=idleAmp(i,n,t);mn=-v;mx=v;}
+    p.rect(x,mid-mx*amp,Math.max(1,W/n-1.2),Math.max(1.4,(mx-mn)*amp));
+  }
+  return p;
+}
+
+/* ============ talking face ============ */
+var Face=(function(){
+  var box=$('#faceBox'),cap=$('#faceCap');
+  var ids=['fHalo','fWaves','fWl1','fWl2','fWr1','fWr2','fDots','fD1','fD2','fD3','fHead','fEarL','fEarR','fEyeL','fEyeR','fIrisL','fIrisR','fPupL','fPupR','fBlushL','fBlushR','fWhiskL','fWhiskR','fJaw','fMouthIn','fTongue','fFangs','fSmile'];
+  var el={};ids.forEach(function(id){el[id]=document.getElementById(id);});
+  var hm={mouth:$('#mouth'),ears:$('#ears'),eyes:$('#eyes')};
+  var F=function(n){return (+n).toFixed(2);};
+  var RM=false;try{RM=matchMedia('(prefers-reduced-motion: reduce)').matches;}catch(e){}
+  var st={open:0,wide:0,round:0,blink:0,nextBlink:2.5,twNext:4,twStart:-9,twSide:1,lx:0,ly:0,mood:'',moodUntil:0,voice:-1,cap:'',smile:''};
+  function poke(m,secs){st.mood=m;st.moodUntil=performance.now()/1000+(secs||2.2);}
+  function heart(){
+    if(RM)return;
+    var s=document.createElementNS('http://www.w3.org/2000/svg','svg');
+    s.setAttribute('viewBox','0 0 24 24');s.setAttribute('class','heart');
+    s.style.setProperty('--hx',Math.round(Math.random()*56-28)+'px');
+    s.style.setProperty('--hr',Math.round(Math.random()*44-22)+'deg');
+    s.innerHTML='<path d="M12 21S2.6 15.2 1.4 10.6C.5 7.2 2.6 4 6.1 4c2.4 0 4.1 1.4 5.9 3.5C13.8 5.4 15.5 4 17.9 4c3.5 0 5.6 3.2 4.7 6.6C21.4 15.2 12 21 12 21z" fill="#FF4D8D"/>';
+    box.appendChild(s);setTimeout(function(){s.remove();},1000);
+  }
+  box.addEventListener('click',function(){heart();pressPlay();});
+  box.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();heart();pressPlay();}});
+  var SMILE={idle:'M86 132 Q93 139 100 132 Q107 139 114 132',happy:'M84 131 Q92 142 100 131 Q108 142 116 131',sad:'M88 137 Q100 129 112 137'};
+  function tick(t,energy,zcr){
+    var talking=P.speaking,busy=P.busy&&!talking;
+    if(st.mood&&t>=st.moodUntil)st.mood='';
+    var mood=st.mood,happy=mood==='happy',sad=mood==='sad';
+    /* voice-tinted iris + halo */
+    if(S.voice!==st.voice){st.voice=S.voice;var hue=HUES[S.voice%HUES.length];
+      el.fIrisL.setAttribute('fill',hue);el.fIrisR.setAttribute('fill',hue);
+      el.fHalo.setAttribute('stroke',hue);el.fWaves.setAttribute('stroke',hue);}
+    /* viseme targets: loudness → jaw, brightness → shape */
+    var openT=talking?clamp(Math.pow(energy,.85)*1.15,0,1):0;
+    var wideT=talking?clamp((zcr-.12)*4,0,1):0;
+    var roundT=talking?clamp((.10-zcr)*9,0,1)*clamp(energy*2,0,1):0;
+    if(happy&&!talking)openT=Math.max(openT,.22);
+    st.open+=(openT-st.open)*(openT>st.open?.55:.16);
+    st.wide+=(wideT-st.wide)*.25;st.round+=(roundT-st.round)*.2;
+    var open=clamp(st.open+(RM?0:Math.sin(t*13.7)*.03*energy),0,1);
+    /* blink */
+    if(t>=st.nextBlink){st.blink=1;st.nextBlink=t+2.2+Math.random()*3.8;if(Math.random()<.16)st.nextBlink=t+.3;}
+    st.blink=Math.max(0,st.blink-.09);
+    var bv=Math.sin(clamp(st.blink,0,1)*Math.PI);
+    var lid=(happy&&!talking?.34:sad?.6:1)*(1-bv*.94);
+    /* gaze */
+    var tx,ty2;
+    if(busy){tx=3.4;ty2=-3.2;}else if(talking){tx=2.1;ty2=.4;}
+    else if(sad){tx=0;ty2=3;}else if(RM){tx=0;ty2=0;}
+    else{tx=Math.sin(t*.31)*2.4;ty2=Math.cos(t*.21)*1.5;}
+    st.lx+=(tx-st.lx)*.08;st.ly+=(ty2-st.ly)*.08;
+    el.fEyeL.setAttribute('transform','translate(0 '+F(102*(1-lid))+') scale(1 '+F(lid)+')');
+    el.fEyeR.setAttribute('transform','translate(0 '+F(102*(1-lid))+') scale(1 '+F(lid)+')');
+    var look='translate('+F(st.lx)+' '+F(st.ly)+')';
+    el.fIrisL.setAttribute('transform',look);el.fPupL.setAttribute('transform',look);
+    el.fIrisR.setAttribute('transform',look);el.fPupR.setAttribute('transform',look);
+    /* mouth blob + tongue + fangs */
+    var w=(9+open*13)*(1-st.round*.42)*(1+st.wide*.34);
+    var h=(1.5+open*17)*(1+st.round*.22)*(1-st.wide*.3);
+    var ty=133,bx=100;
+    el.fMouthIn.setAttribute('d','M'+F(bx-w)+' '+ty+' Q'+bx+' '+(ty+2.5)+' '+F(bx+w)+' '+ty+' Q'+F(bx+w*.92)+' '+F(ty+h)+' '+bx+' '+F(ty+h)+' Q'+F(bx-w*.92)+' '+F(ty+h)+' '+F(bx-w)+' '+ty+' Z');
+    el.fMouthIn.setAttribute('opacity',F(clamp(open*7,0,1)));
+    var tOn=h>7?clamp((h-7)/6,0,.95):0;
+    el.fTongue.setAttribute('opacity',F(tOn));
+    if(tOn>0){el.fTongue.setAttribute('cy',F(ty+h-Math.min(h*.28,4.5)));el.fTongue.setAttribute('rx',F(w*.55));el.fTongue.setAttribute('ry',F(Math.min(h*.3,5)));}
+    var fo=clamp((open-.5)*3.4,0,.95);
+    el.fFangs.setAttribute('opacity',F(fo));
+    if(fo>0){var fx=w*.52;el.fFangs.setAttribute('d','M'+F(bx-fx-2.4)+' '+(ty+1.2)+' h4.8 l-2.4 4.6 z M'+F(bx+fx-2.4)+' '+(ty+1.2)+' h4.8 l-2.4 4.6 z');}
+    el.fJaw.setAttribute('transform','translate(0 '+F(open*1.6)+')');
+    var sd=SMILE[sad?'sad':happy?'happy':'idle'];
+    if(sd!==st.smile){st.smile=sd;el.fSmile.setAttribute('d',sd);}
+    /* whiskers + blush */
+    var sway=RM?0:Math.sin(t*.8)*.6;
+    el.fWhiskL.setAttribute('transform','rotate('+F(-2-open*5+sway)+' 66 127)');
+    el.fWhiskR.setAttribute('transform','rotate('+F(2+open*5-sway)+' 134 127)');
+    var bl=F(.12+open*.3+(happy?.18:0));
+    el.fBlushL.setAttribute('opacity',bl);el.fBlushR.setAttribute('opacity',bl);
+    /* ears: perk while talking, random twitch, droop when sad */
+    if(!RM&&t>=st.twNext){st.twStart=t;st.twSide=Math.random()<.5?-1:1;st.twNext=t+3+Math.random()*6;}
+    var twE=RM?0:Math.max(0,1-(t-st.twStart)/.32);
+    var tw=Math.sin((t-st.twStart)*34)*9*twE;
+    var perk=talking?energy*4:happy?5:0,droop=sad?15:0;
+    el.fEarL.setAttribute('transform','rotate('+F(perk-droop+(st.twSide<0?tw:0))+' 68 62)');
+    el.fEarR.setAttribute('transform','rotate('+F(-perk+droop+(st.twSide>0?tw:0))+' 132 62)');
+    /* head bob */
+    var hy=RM?0:Math.sin(t*1.8)*1.1-open*1.8+(busy?Math.sin(t*2.6)*.8:0);
+    var hr=RM?0:Math.sin(t*.9)*1.1+(talking?Math.sin(t*6.3)*.7*energy:0);
+    el.fHead.setAttribute('transform','translate(0 '+F(hy)+') rotate('+F(hr)+' 100 110)');
+    /* halo + sound arcs */
+    el.fHalo.setAttribute('opacity',F(.10+energy*.45+(happy?.22:0)));
+    el.fHalo.setAttribute('r',F(86+energy*3));
+    el.fWaves.setAttribute('opacity',F(talking?clamp(energy*1.7,0,.9):0));
+    if(talking){
+      el.fWl1.setAttribute('opacity',F(.55+.45*Math.sin(t*7)));el.fWl2.setAttribute('opacity',F(.55+.45*Math.sin(t*7-1.1)));
+      el.fWr1.setAttribute('opacity',F(.55+.45*Math.sin(t*7-.5)));el.fWr2.setAttribute('opacity',F(.55+.45*Math.sin(t*7-1.6)));
+      el.fWl1.setAttribute('transform','translate('+F(-energy*3)+' 0)');el.fWl2.setAttribute('transform','translate('+F(-energy*5)+' 0)');
+      el.fWr1.setAttribute('transform','translate('+F(energy*3)+' 0)');el.fWr2.setAttribute('transform','translate('+F(energy*5)+' 0)');
+    }
+    /* thinking dots */
+    el.fDots.setAttribute('opacity',busy?'1':'0');
+    if(busy){el.fD1.setAttribute('opacity',F(.3+.7*Math.max(0,Math.sin(t*3.2))));
+      el.fD2.setAttribute('opacity',F(.3+.7*Math.max(0,Math.sin(t*3.2-.85))));
+      el.fD3.setAttribute('opacity',F(.3+.7*Math.max(0,Math.sin(t*3.2-1.7))));}
+    /* caption */
+    var txt,cls='';
+    if(sad){txt='oh no…';}
+    else if(busy){txt='thinking…';cls='think';}
+    else if(talking){txt=S.muted?'muted · still talking':'speaking';cls='talk';}
+    else if(!K.ready){txt='warming up';}
+    else if(hasCurrentAudio()){txt='tap to replay';}
+    else txt='tap to play';
+    if(txt!==st.cap){st.cap=txt;cap.textContent=txt;box.className='faceBox'+(cls?' '+cls:'');
+      box.setAttribute('aria-label','Kitten avatar — '+txt+'. Press to play or stop.');}
+    /* header mark mirrors the same life */
+    hm.mouth.setAttribute('ry',F(1.2+open*3.6));
+    hm.ears.setAttribute('transform','rotate('+F((RM?0:Math.sin(t*1.5)*1.2)+open*2.6)+' 24 20)');
+    var hs=1-bv*.8;
+    hm.eyes.setAttribute('transform','translate(0 '+F(25*(1-hs))+') scale(1 '+F(hs)+')');
+  }
+  return {tick:tick,poke:poke};
+})();
+
+var lastT=0;
+function loop(ts){
+  requestAnimationFrame(loop);
+  if(document.hidden||ts-lastT<25)return;lastT=ts;
+  var t=ts/1000;
+  cx.clearRect(0,0,W,H);
+  cx.strokeStyle='rgba(183,164,152,.15)';cx.lineWidth=1;
+  cx.beginPath();cx.moveTo(0,H/2+.5);cx.lineTo(W,H/2+.5);cx.stroke();
+  if(!P.peaks||!wavePath)wavePath=buildPath(t);
+  var d=Math.max(.001,duration()),prog=P.master?clamp(position()/d,0,1):0,stale=P.master&&!hasCurrentAudio();
+  cx.save();cx.shadowBlur=12;cx.shadowColor='rgba(255,143,60,.45)';
+  var cool=cx.createLinearGradient(0,0,W,0);
+  if(stale){cool.addColorStop(0,'rgba(154,147,184,.3)');cool.addColorStop(1,'rgba(183,164,152,.26)');}
+  else{cool.addColorStop(0,'rgba(155,107,255,.4)');cool.addColorStop(.5,'rgba(255,77,141,.34)');cool.addColorStop(1,'rgba(255,143,60,.4)');}
+  cx.fillStyle=cool;cx.fill(wavePath);
+  if(prog>0&&!stale){
+    cx.save();cx.beginPath();cx.rect(0,0,prog*W,H);cx.clip();
+    var hot=cx.createLinearGradient(0,0,W,0);hot.addColorStop(0,'#FFC24B');hot.addColorStop(.45,'#FF8F3C');hot.addColorStop(1,'#FF4D8D');
+    cx.shadowBlur=16;cx.shadowColor='rgba(255,143,60,.8)';cx.fillStyle=hot;cx.fill(wavePath);cx.restore();
+  }
+  cx.restore();
+  if(P.master&&!stale){var x=prog*W;cx.save();cx.strokeStyle='rgba(252,239,228,.9)';cx.lineWidth=1.6;cx.shadowBlur=10;cx.shadowColor='#FF8F3C';cx.beginPath();cx.moveTo(x,5);cx.lineTo(x,H-5);cx.stroke();cx.restore();}
+  var energy=0,zcr=0;
+  if(P.speaking&&ANA&&SRC){
+    ANA.getByteTimeDomainData(TD);var s=0,zc=0,n=0;
+    for(var i=0;i<TD.length;i+=4){var v=(TD[i]-128)/128;s+=v*v;if(n&&(TD[i-4]<128)!==(TD[i]<128))zc++;n++;}
+    energy=clamp(Math.sqrt(s/n)*3.2,0,1);zcr=zc/n;
+  }
+  Face.tick(t,energy,zcr);
+  if(P.speaking&&P.master){
+    var frac=clamp(position()/Math.max(.001,duration()),0,1);
+    $('#bar').style.width=(frac*100).toFixed(1)+'%';highlight(frac*P.total);
+    $('#cur').textContent=clock(position());$('#tot').textContent=clock(duration());
+  }
+}
+
+/* ============ UI ============ */
+function renderVoices(){
+  var box=$('#voices');box.innerHTML='';
+  var count=K.keys.length||8;
+  for(var i=0;i<count;i++){
+    (function(i){
+      var b=document.createElement('button');b.type='button';b.className='voice'+(i===S.voice?' on':'');
+      b.setAttribute('aria-pressed',String(i===S.voice));b.disabled=!K.ready;
+      var key=K.keys[i];b.title=key?('KittenTTS '+key):'Loading voices_en.npz';
+      var nm=document.createElement('span');nm.className='nm';
+      var dot=document.createElement('i');dot.className='dot';dot.style.background=HUES[i%HUES.length];dot.style.color=HUES[i%HUES.length];
+      nm.appendChild(dot);nm.appendChild(document.createTextNode(NAMES[i%NAMES.length]));
+      var sb=document.createElement('span');sb.className='sub';sb.textContent=key||'—';
+      b.appendChild(nm);b.appendChild(sb);
+      b.addEventListener('click',function(){selectVoice(i);});
+      box.appendChild(b);
+    })(i);
+  }
+}
+function counters(){
+  var t=$('#text').value,w=t.trim()?t.trim().split(/\s+/).length:0;
+  $('#chars').textContent=t.length;$('#words').textContent=w;
+  $('#pieces').textContent=t.trim()?((K.textMode||effectiveMode()==='chars')?1:chunkText(t,200).length):0;
+  if(!P.speaking)$('#tot').textContent=clock(duration());
+}
+function sync(){
+  var busy=P.busy,sp=P.speaking,current=hasCurrentAudio();
+  $('#playLabel').textContent=busy?'Working…':sp?'Stop':current?'Play':'Play my text';
+  $('#playIcon').innerHTML=sp?'<rect x="6" y="6" width="12" height="12" rx="2"/>':'<path d="M8 5v14l11-7z"/>';
+  $('#playBtn').classList.toggle('stop',sp&&!busy);
+  var old=$('#playBtn').querySelector('.spin');
+  if(busy&&!old){var s=document.createElement('span');s.className='spin';$('#playBtn').prepend(s);$('#playIcon').style.display='none';}
+  if(!busy&&old){old.remove();$('#playIcon').style.display='';}
+  $('#dlBtn').disabled=!current;$('#againBtn').disabled=!K.ready;
+  var st=$('#syncTag');
+  if(busy){st.textContent='synthesizing…';st.className='tag';}
+  else if(!P.master){st.textContent='not synthesized';st.className='tag warn';}
+  else if(current){st.textContent='matches your text';st.className='tag ok';}
+  else{st.textContent='changed — will re-synthesize';st.className='tag warn';}
+  $('#muteBtn').classList.toggle('off',S.muted);$('#muteBtn').setAttribute('aria-pressed',String(S.muted));
+  $('#muteLabel').textContent=S.muted?'Sound off':'Sound on';
+  $('#w1').style.opacity=S.muted?0:1;$('#w2').style.opacity=S.muted?0:1;
+  $('#normBtn').classList.toggle('on',S.norm);$('#normBtn').setAttribute('aria-checked',String(S.norm));
+  $('#strictBtn').classList.toggle('on',S.strict);$('#strictBtn').setAttribute('aria-checked',String(S.strict));
+  $('#stageHint').classList.toggle('hide',!!P.master||P.busy||K.ready);
+  if(!P.speaking)$('#stageCap').textContent=P.master?(current?'KittenTTS · buffered':'KittenTTS · outdated'):'idle';
+}
+function paintRange(el){var mn=+el.min,mx=+el.max;el.style.setProperty('--p',((el.value-mn)/(mx-mn)*100)+'%');}
+function reassembleLive(){
+  if(!P.chunks.length)return;
+  var wasPlaying=P.speaking,ratio=duration()?position()/duration():0;
+  assemble();if(wasPlaying)playBuffer(ratio*duration());
+}
+function exportWav(){
+  if(!hasCurrentAudio()){toast('Press Play so the audio matches your text first.','warn');return;}
+  var f=P.master,sr=K.sampleRate,n=f.length,buf=new ArrayBuffer(44+n*2),dv=new DataView(buf);
+  var str=function(o,s){for(var i=0;i<s.length;i++)dv.setUint8(o+i,s.charCodeAt(i));};
+  str(0,'RIFF');dv.setUint32(4,36+n*2,true);str(8,'WAVE');str(12,'fmt ');
+  dv.setUint32(16,16,true);dv.setUint16(20,1,true);dv.setUint16(22,1,true);
+  dv.setUint32(24,sr,true);dv.setUint32(28,sr*2,true);dv.setUint16(32,2,true);dv.setUint16(34,16,true);
+  str(36,'data');dv.setUint32(40,n*2,true);
+  var o=44;for(var i=0;i<n;i++){var v=clamp(f[i],-1,1);dv.setInt16(o,v<0?v*0x8000:v*0x7fff,true);o+=2;}
+  var url=URL.createObjectURL(new Blob([buf],{type:'audio/wav'})),a=document.createElement('a');
+  a.href=url;a.download='kittentts-'+S.accent+'-'+NAMES[S.voice%NAMES.length].toLowerCase()+'.wav';
+  document.body.appendChild(a);a.click();a.remove();
+  setTimeout(function(){URL.revokeObjectURL(url);},4000);
+  toast('Saved the WAV of exactly what was spoken.','ok');
+}
+function wire(){
+  var ta=$('#text');
+  ta.addEventListener('input',function(){if(P.speaking)stopPlayback(true);counters();persist();sync();scheduleAudit();});
+  $('#exampleBtn').addEventListener('click',function(){
+    P.example=(P.example+1)%EXAMPLES.length;stopPlayback(true);ta.value=EXAMPLES[P.example];
+    counters();persist();sync();scheduleAudit();
+    setStatus(K.ready?'warn':'err',K.ready?'Example loaded — press Play to hear it.':blockMsg());
+  });
+  $('#clearBtn').addEventListener('click',function(){
+    stopPlayback(true);dropAudio();ta.value='';counters();persist();sync();scheduleAudit();ta.focus();
+    setStatus(K.ready?'ok':'err',K.ready?readyMsg():blockMsg());
+  });
+  $('#playBtn').addEventListener('click',pressPlay);
+  $('#againBtn').addEventListener('click',function(){if(P.busy)return;stopPlayback(true);P.pos=0;if(hasCurrentAudio())playBuffer(0);else pressPlay();});
+  $('#dlBtn').addEventListener('click',exportWav);
+  $('#reloadBtn').addEventListener('click',async function(){K.phon=null;K.accents=[];phCache={};await loadAll();});
+  $('#flapSel').addEventListener('change',async function(e){S.flap=e.target.value;persist();await refreshPronunciation(true);toast('Flap T → '+(S.flap==='native'?'native ɾ':S.flap)+'.','ok',2200);});
+  $('#rSel').addEventListener('change',async function(e){S.rcolor=e.target.value;persist();await refreshPronunciation(true);toast('R-colour → '+(S.rcolor==='native'?'native ɚ':S.rcolor==='er'?'ɜ + R':'ə + R')+'.','ok',2200);});
+  $('#accSel').addEventListener('change',async function(e){S.accent=e.target.value;persist();renderAccentChips();await refreshPronunciation(true);});
+  $('#tokenMode').addEventListener('change',async function(e){K.tokenMode=e.target.value;stopPlayback(true);dropAudio();refreshReady();await runAudit();if(K.ready)await warmup();});
+  $('#voiceSel').addEventListener('change',function(e){selectVoice(+e.target.value);});
+  $('#muteBtn').addEventListener('click',function(){S.muted=!S.muted;applyVol();sync();persist();toast(S.muted?'All audio muted.':'Sound on.','',1600);});
+  $('#normBtn').addEventListener('click',function(){S.norm=!S.norm;persist();reassembleLive();sync();});
+  $('#strictBtn').addEventListener('click',function(){
+    S.strict=!S.strict;persist();sync();refreshReady();
+    toast(S.strict?'Strict: playback blocks if any consonant would change.':'Integrity check relaxed — approximations will play.','warn',3200);
+    if(!S.strict&&K.ready&&!hasCurrentAudio())warmup();
+  });
+  $('#resetBtn').addEventListener('click',async function(){
+    S.flap='t';S.rcolor='schwa-r';S.strict=true;S.accent=(K.accents.filter(function(a){return a.id==='en-us';})[0]||K.accents[0]||{id:'en-us'}).id;
+    $('#flapSel').value=S.flap;$('#rSel').value=S.rcolor;buildAccentSelect();persist();
+    await refreshPronunciation(true);toast('Pronunciation reset to consonant-true American.','ok',2600);
+  });
+  var sp=$('#speed'),gp=$('#gap'),fd=$('#fade'),vo=$('#vol');
+  sp.value=Math.round(S.speed*100);gp.value=S.gap;fd.value=S.fade;vo.value=Math.round(S.volume*100);
+  [sp,gp,fd,vo].forEach(paintRange);
+  $('#speedOut').textContent=S.speed.toFixed(1)+'×';$('#gapOut').textContent=S.gap+' ms';
+  $('#fadeOut').textContent=S.fade+' ms';$('#volOut').textContent=Math.round(S.volume*100)+'%';
+  sp.addEventListener('input',function(){paintRange(sp);S.speed=+sp.value/100;$('#speedOut').textContent=S.speed.toFixed(1)+'×';if(P.speaking)stopPlayback(true);counters();persist();sync();});
+  gp.addEventListener('input',function(){paintRange(gp);S.gap=+gp.value;$('#gapOut').textContent=S.gap+' ms';persist();reassembleLive();});
+  fd.addEventListener('input',function(){paintRange(fd);S.fade=+fd.value;$('#fadeOut').textContent=S.fade+' ms';persist();reassembleLive();});
+  vo.addEventListener('input',function(){paintRange(vo);S.volume=+vo.value/100;$('#volOut').textContent=vo.value+'%';if(S.volume>0&&S.muted)S.muted=false;applyVol();sync();persist();});
+  var stage=$('#stage'),drag=false;
+  var seek=function(e){
+    if(!hasCurrentAudio())return;
+    var r=stage.getBoundingClientRect(),p=clamp((e.clientX-r.left)/r.width,0,1)*duration();
+    if(P.speaking)playBuffer(p);else{P.pos=p;$('#cur').textContent=clock(p);$('#bar').style.width=(p/duration()*100)+'%';}
+  };
+  stage.addEventListener('pointerdown',function(e){if(!hasCurrentAudio())return;drag=true;try{stage.setPointerCapture(e.pointerId);}catch(x){}seek(e);});
+  stage.addEventListener('pointermove',function(e){if(drag)seek(e);});
+  stage.addEventListener('pointerup',function(e){drag=false;try{stage.releasePointerCapture(e.pointerId);}catch(x){}});
+  stage.addEventListener('pointercancel',function(){drag=false;});
+  document.addEventListener('keydown',function(e){
+    var typing=/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName);
+    if((e.metaKey||e.ctrlKey)&&e.key==='Enter'){e.preventDefault();pressPlay();return;}
+    if(typing)return;
+    if(e.code==='Space'){e.preventDefault();pressPlay();}
+    else if(e.key==='Escape'&&P.speaking)stopPlayback();
+    else if(e.key==='m'||e.key==='M'){S.muted=!S.muted;applyVol();sync();persist();}
+  });
+  new ResizeObserver(sizeCanvas).observe(stage);
+  window.addEventListener('resize',sizeCanvas);
+  window.addEventListener('beforeunload',function(){stopPlayback(true);});
+}
+
+/* ============ start ============ */
+(async function init(){
+  var saved=null;try{saved=JSON.parse(localStorage.getItem(STORE)||'null');}catch(e){}
+  $('#text').value=(saved&&typeof saved.text==='string'&&saved.text.length)?saved.text:EXAMPLES[0];
+  $('#flapSel').value=S.flap;$('#rSel').value=S.rcolor;
+  wire();renderVoices();buildVoiceSelect();buildAccentSelect();renderAccentChips();renderBench(false);renderAudit();
+  counters();sizeCanvas();sync();paintRows();
+  requestAnimationFrame(loop);
+  setStatus('','Loading espeak-ng and probing English voices…');
+  await initPhonemizer();
+  buildAccentSelect();renderAccentChips();renderBench(false);
+  await loadAll();
+  counters();sync();
+})();
+})();
+</script>
+</body>
+</html>

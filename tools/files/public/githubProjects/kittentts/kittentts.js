@@ -422,12 +422,12 @@ class KittenTTS {
       const phonemizeFn = nodePhonemizer.phonemize || (nodePhonemizer.default && nodePhonemizer.default.phonemize) || (typeof nodePhonemizer.default === 'function' ? nodePhonemizer.default : null);
       if (typeof phonemizeFn === 'function') {
         this.phon = async (text) => {
-          // Updated regex: explicitly keeps words with internal apostrophes/hyphens as a single token
-          const tokens = text.match(/[A-Za-z]+(?:['\-][A-Za-z]+)*|[^\sA-Za-z]+|\s+/g) || [];
+          // Updated regex: explicitly keeps words with internal apostrophes/hyphens AND digits as a single token
+          const tokens = text.match(/[A-Za-z0-9]+(?:['\-][A-Za-z0-9]+)*|[^\sA-Za-z0-9]+|\s+/g) || [];
           const parts = [];
           let allGold = true;
           for (const tk of tokens) {
-            if (!/[A-Za-z]/.test(tk)) { parts.push(tk); continue; }
+            if (!/[A-Za-z0-9]/.test(tk)) { parts.push(tk); continue; }
             const g = this._goldDict && this._goldDict[tk.toLowerCase()];
             if (g) {
               parts.push(typeof g === 'string' ? g : (g.DEFAULT || g.phones || g.ipa || ''));
@@ -476,12 +476,12 @@ class KittenTTS {
         try { us = this._normPh(await form(probe)); } catch (e) { us = ''; }
         if (us && IPA_RE.test(us)) {
           this.phon = async (text) => {
-            // Updated regex: explicitly keeps words with internal apostrophes/hyphens as a single token
-            const tokens = text.match(/[A-Za-z]+(?:['\-][A-Za-z]+)*|[^\sA-Za-z]+|\s+/g) || [];
+            // Updated regex: explicitly keeps words with internal apostrophes/hyphens AND digits as a single token
+            const tokens = text.match(/[A-Za-z0-9]+(?:['\-][A-Za-z0-9]+)*|[^\sA-Za-z0-9]+|\s+/g) || [];
             const parts = [];
             let allGold = true;
             for (const tk of tokens) {
-              if (!/[A-Za-z]/.test(tk)) { parts.push(tk); continue; }
+              if (!/[A-Za-z0-9]/.test(tk)) { parts.push(tk); continue; }
               const g = this._goldDict && this._goldDict[tk.toLowerCase()];
               if (g) {
                 parts.push(typeof g === 'string' ? g : (g.DEFAULT || g.phones || g.ipa || ''));
